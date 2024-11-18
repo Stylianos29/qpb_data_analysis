@@ -40,6 +40,7 @@ import logging
 
 sys.path.append('../')
 from library import filesystem_utilities
+from library import constants
 
 
 @click.command()
@@ -49,26 +50,30 @@ from library import filesystem_utilities
 @click.option("--output_files_directory", "output_files_directory", "-out_dir",
               default=None,
         help="Directory where all the generated output files will be stored.")
+# TODO: Add additional options for source script's log file directory and name
 
 def main(qpb_log_files_directory, output_files_directory):
     
-    # PERFORM VALIDITY CHECKS ON THE INPUT ARGUMENTS
+    # PERFORM VALIDITY CHECKS ON INPUT ARGUMENTS
 
     if not filesystem_utilities.is_valid_directory(qpb_log_files_directory):
         error_message = "Passed log files directory path is invalid or not "\
                                                                   "a directory."
-        logging.error(error_message)
         print("ERROR:", error_message)
         sys.exit(1)
 
     if not filesystem_utilities.is_valid_directory(output_files_directory):
         error_message = "Passed output files directory path is invalid or "\
                                                               "not a directory."
-        logging.error(error_message)
         print("ERROR:", error_message)
         sys.exit(1)
+
+    # SET CURRENT SCRIPT'S LOG FILE DIRECTORY AND NAME
+
+    log_file_directory = output_files_directory
+    log_filename = os.path.basename(output_files_directory)+".log"
+    filesystem_utilities.setup_logging(log_file_directory, log_filename)
 
 
 if __name__ == "__main__":
     main()
-
