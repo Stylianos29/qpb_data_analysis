@@ -68,12 +68,40 @@ def main(qpb_log_files_directory, output_files_directory):
         print("ERROR:", error_message)
         sys.exit(1)
 
+    script_name = os.path.basename(__file__)  # Get the script's filename
+    output_files_name = os.path.basename(output_files_directory)
+
     # SET CURRENT SCRIPT'S LOG FILE DIRECTORY AND NAME
 
     log_file_directory = output_files_directory
-    log_filename = os.path.basename(output_files_directory)+".log"
+    log_filename = output_files_name+".log"
     filesystem_utilities.setup_logging(log_file_directory, log_filename)
 
+    logging.info(f"Script '{script_name}' execution initiated.")
+
+    # FILENAME ANALYSIS
+    
+    # List to pass values to dataframe
+    parameters_values_list = list()
+
+    # Loop over all .txt files in qpb log files directory
+    for log_file_full_path in glob.glob(os.path.join(qpb_log_files_directory, \
+                                                                      "*.txt")):
+        log_file = os.path.basename(log_file_full_path)
+
+        parameters_values_list.append({"Filename": log_file})
+
+    parameter_values_dataframe = pd.DataFrame(parameters_values_list)
+
+    csv_file_full_path = os.path.join(output_files_directory, 
+                                      output_files_name+".csv")
+
+    # Export dataframe to .cvs file
+    parameter_values_dataframe.to_csv(csv_file_full_path, index=False)
+    logging.info(
+        f"Extracted parameter values passed to {output_files_name}.csv file.")
+
+    logging.info(f"Script '{script_name}' execution terminated successfully.")
 
 if __name__ == "__main__":
     main()
