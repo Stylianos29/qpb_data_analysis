@@ -4,8 +4,8 @@
 FILENAME_REGEX_PATTERNS_DICTIONARY = {
     # General parameters
     # TODO: What about about "Bare"?
-    "Operator_method": r"(?P<Operator_method>Chebyshev|KL|Bare)",
-    "Operator_type": r"(?P<Operator_type>Standard|Brillouin)",
+    "Overlap_operator_method": r"(?P<Operator_method>Chebyshev|KL|Bare)",
+    "Kernel_operator_type": r"(?P<Operator_type>Standard|Brillouin)",
     "QCD_beta_value": r"beta(?P<QCD_beta_value>\d+p?\d*)",
     "Configuration_label": r"config(?P<Configuration_label>\d+)",
     "APE_iterations": r"APEiters(?P<APE_iterations>\d+)",
@@ -31,7 +31,7 @@ FILENAME_REGEX_PATTERNS_DICTIONARY = {
 # value type
 PARAMETER_ATTRIBUTES_DICTIONARY = {
     # General parameters
-    "Operator_type": {
+    "Kernel_operator_type": {
         "line_identifier": "Dslash operator is",
         "regex_pattern": r"Dslash operator is (.+)",
         "type": "str",
