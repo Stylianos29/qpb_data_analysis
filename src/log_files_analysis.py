@@ -39,7 +39,7 @@ import logging
 
 
 sys.path.append('../')
-from library import filesystem_utilities
+from library import constants, filesystem_utilities
 from library import extraction
 
 
@@ -78,6 +78,7 @@ def main(qpb_log_files_directory, output_files_directory):
     filesystem_utilities.setup_logging(log_file_directory, log_filename)
 
     logging.info(f"Script '{script_name}' execution initiated.")
+    logger = logging.getLogger(__name__)
 
     # FILENAME ANALYSIS
     
@@ -89,13 +90,47 @@ def main(qpb_log_files_directory, output_files_directory):
                             os.path.join(qpb_log_files_directory, "*.txt")):
         qpb_log_filename = os.path.basename(qpb_log_file_full_path)
 
-        # parameters_values_list.append({"Filename": qpb_log_filename})
+        extracted_values_dictionary = dict()
 
-        extracted_values_from_filename_dictionary = extraction.filename_extraction(qpb_log_filename)
+        extracted_values_dictionary["Filename"] = qpb_log_filename
 
-        extracted_values_from_filename_dictionary["Filename"] = qpb_log_filename
+        extracted_values_from_filename_dictionary = \
+            extraction.extract_parameters_values_from_filename(qpb_log_filename,
+                                                                        logger)
 
-        parameters_values_list.append(extracted_values_from_filename_dictionary)
+        # Read log file
+        with open(qpb_log_file_full_path, "r") as file:
+            qpb_log_file_contents_list = file.readlines()
+        
+        extracted_values_from_file_contents_dictionary = \
+            extraction.extract_parameters_values_from_file_contents(
+                                            qpb_log_file_contents_list, logger)
+
+        # Compare and merge the dictionaries
+        for key in extracted_values_from_file_contents_dictionary.keys() | extracted_values_from_filename_dictionary.keys():
+            if key in extracted_values_from_filename_dictionary and key in extracted_values_from_file_contents_dictionary:
+                # If the key exists in both dictionaries, compare their values
+                if extracted_values_from_filename_dictionary[key] == extracted_values_from_file_contents_dictionary[key]:
+                    # Values match; add the key-value pair to the final dictionary
+                    extracted_values_dictionary[key] = extracted_values_from_file_contents_dictionary[key]
+                else:
+                    # Values differ; use the file contents value and log a warning
+                    extracted_values_dictionary[key] = extracted_values_from_file_contents_dictionary[key]
+                    if logger:
+                        logger.warning(
+                            f"Discrepancy for key '{key}': "
+                            f"filename value='{extracted_values_from_filename_dictionary[key]}' "
+                            f"vs file contents value='{extracted_values_from_file_contents_dictionary[key]}'. "
+                            "Using the value from file contents."
+                        )
+            elif key in extracted_values_from_file_contents_dictionary:
+                # Key exists only in file contents; add it to the final dictionary
+                extracted_values_dictionary[key] = extracted_values_from_file_contents_dictionary[key]
+            elif key in extracted_values_from_filename_dictionary:
+                # Key exists only in filename; add it to the final dictionary
+                extracted_values_dictionary[key] = extracted_values_from_filename_dictionary[key]
+
+            parameters_values_list.append(extracted_values_dictionary)
 
     parameter_values_dataframe = pd.DataFrame(parameters_values_list)
 
