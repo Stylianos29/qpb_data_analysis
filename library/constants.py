@@ -1,7 +1,7 @@
 # Log files filenames might contain specific labels corresponding to
 # parameters next to their values. Listed below are the parameters and their
 # identifying labels
-FILENAME_REGEX_PATTERNS_DICTIONARY = {
+FILENAME_SINGLE_VALUE_PATTERNS_DICTIONARY = {
     # General parameters
     "Overlap_operator_method": {
         "pattern": r"(?P<Overlap_operator_method>Chebyshev|KL|Bare)",
@@ -15,6 +15,7 @@ FILENAME_REGEX_PATTERNS_DICTIONARY = {
         "pattern": r"beta(?P<QCD_beta_value>\d+p?\d*)",
         "type": float
     },
+    # TODO: Add a Lattice_geometry pattern
     "Configuration_label": {
         "pattern": r"config(?P<Configuration_label>\d+)",
         "type": str
@@ -172,11 +173,6 @@ FILE_CONTENTS_SINGLE_VALUE_PATTERNS_DICTIONARY = {
         "regex_pattern": r"(\d+(\.\d+)?)",
         "type": float,
     },
-    "Number_of_CG_iterations": {
-        "line_identifier": "After",
-        "regex_pattern": r"After (\d+)",
-        "type": int,
-    },
     # This one can attributed to both Chebyshev and KL cases with different
     # meaning though
     # TODO: I need to find a way to anticipate all the invert cases
@@ -194,18 +190,23 @@ FILE_CONTENTS_SINGLE_VALUE_PATTERNS_DICTIONARY = {
 }
 
 
-FILE_CONTENTS_MULTI_VALUE_PATTERNS_DICTIONARY = {
+FILE_CONTENTS_MULTIVALUED_PATTERNS_DICTIONARY = {
+    "MSCG_Elapsed_time": {
+        # "line_identifier": "sec",
+        "line_identifier": "msCG converged, t = ",
+        "regex_pattern": r"(\d+\.\d+)",
+        "type": float,
+    },
+    "Number_of_MSCG_iterations": {
+        "line_identifier": "msCG converged, t = ",
+        "regex_pattern": r"After (\d+) iterations msCG converged,",
+        "type": int,
+    },
+}
     # TODO: I need to decide what to do with this option
     # Results
     # "Calculation_result": {
     #     "line_identifier": "Done vector =",
     #     "regex_pattern": r"(\d+\.\d+e[+-]\d+)",
     #     "type": float,
-    # },
-    "Elapsed_time": {
-        # "line_identifier": "sec",
-        "line_identifier": "converged, t = ",
-        "regex_pattern": r"(\d+\.\d+)",
-        "type": float,
-    },
-}
+    # }, 
