@@ -38,8 +38,7 @@ import logging
 import h5py
 
 sys.path.append('../')
-from library import constants, filesystem_utilities
-from library import extraction
+from library import extraction, filesystem_utilities
 
 
 @click.command()
@@ -168,7 +167,8 @@ def main(qpb_log_files_directory, output_files_directory):
                                             qpb_log_file_contents_list, logger)
             
             # Loop through each multivalued parameter and store it as a dataset
-            for parameter, values in extracted_multivalued_parameters_from_file_contents_dictionary.items():
+            for parameter, values in \
+        extracted_multivalued_parameters_from_file_contents_dictionary.items():
                 # Create a dataset for each parameter in the file
                 file_group.create_dataset(parameter, data=values)
 
