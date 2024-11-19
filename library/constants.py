@@ -31,6 +31,10 @@ FILENAME_REGEX_PATTERNS_DICTIONARY = {
         "pattern": r"m(?P<Bare_mass>\d+p?\d*)",
         "type": float
     },
+    "Kappa_value": {
+        "pattern": r"kappa(?P<Kappa_value>\d+p?\d*)",
+        "type": float
+    },
     "Clover_coefficient": {
         "pattern": r"cSW(?P<Clover_coefficient>\d+p?\d*)",
         "type": float
@@ -71,125 +75,137 @@ FILENAME_REGEX_PATTERNS_DICTIONARY = {
     },
 }
 
+
 # Most of the information will be extracted from the contents of the
 # log files. Listed below are the line identifiers for locating the
 # line containing the parameter value, along with the regex type and the
 # value type
-PARAMETER_ATTRIBUTES_DICTIONARY = {
+FILE_CONTENTS_SINGLE_VALUE_PATTERNS_DICTIONARY = {
     # General parameters
     "Kernel_operator_type": {
         "line_identifier": "Dslash operator is",
         "regex_pattern": r"Dslash operator is (.+)",
-        "type": "str",
+        "type": str,
     },
     "Lattice_geometry": {
         "line_identifier": "(Lt, Lz, Ly, Lx)",
         "regex_pattern": r"\(Lt, Lz, Ly, Lx\) =\s*(.*)",
-        "type": "str",
+        "type": str,
     },
     "Configuration_label": {
         "line_identifier": "Gauge field (raw_32) = ",
         "regex_pattern": r"\.(\d+)$",
-        "type": "str",
+        "type": str,
     },
     "QCD_beta_value": {
         "line_identifier": "Gauge field (raw_32) = ",
         "regex_pattern": r"Nf0_b(.*?)_L",
-        "type": "str",
+        "type": float,
     },
     "Initial_APE_iterations": {
         "line_identifier": "Gauge field (raw_32) = ",
-        "regex_pattern": r"T\d+(_[^.]*)?\.",
-        "type": "str",
+        "regex_pattern": r"_apeN(\d+)a",
+        "type": int,
     },
     "APE_alpha": {
         "line_identifier": "APE alpha =",
         "regex_pattern": r"(\d+(\.\d+)?)",
-        "type": "float",
+        "type": float,
     },
     "APE_iterations": {
         "line_identifier": "APE iterations =",
         "regex_pattern": r"(\d+)",
-        "type": "int",
+        "type": int,
     },
     "Rho_value": {
         "line_identifier": "rho =",
         "regex_pattern": r"(\d+(\.\d+)?)",
-        "type": "float",
+        "type": float,
     },
+    # TODO: Investigate whether identifier: "Mass = " needs to be added as well
     "Bare_mass": {
         "line_identifier": "mass = ",
         "regex_pattern": r"(\d+(\.\d+)?)",
-        "type": "float",
+        "type": float,
+    },
+    "Kappa_value": {
+        "line_identifier": "kappa = ",
+        "regex_pattern": r"(\d+(\.\d+)?)",
+        "type": float,
     },
     # NOTE: The Clover coefficient is an integer number, 0 or 1.  But it is
     # given a float type for flexibility
     "Clover_coefficient": {
         "line_identifier": "Clover param = ",
         "regex_pattern": r"(\d+(\.\d+)?)",
-        "type": "float",
-    },
-    "Maximum_solver_iterations": {
-        "line_identifier": "Max solver iters = ",
-        "regex_pattern": r"(\d+)",
-        "type": "int",
+        "type": float,
     },
     "Plaquette": {
         "line_identifier": "Plaquette =",
         "regex_pattern": r"(\d+(\.\d+)?)",
-        "type": "float",
-    },
-    # TODO: I need to decide what to do with this option
-    # Results
-    # "Calculation_result": {
-    #     "line_identifier": "Done vector =",
-    #     "regex_pattern": r"(\d+\.\d+e[+-]\d+)",
-    #     "type": "float",
-    # },
-    "Elapsed_time": {
-        # "line_identifier": "sec",
-        "line_identifier": "converged, t = ",
-        "regex_pattern": r"(\d+\.\d+)",
-        "type": "float",
+        "type": float,
     },
     # Chebyshev-specific parameters
     "Number_of_Chebyshev_terms": {
         "line_identifier": "Number of Chebyshev polynomial terms = ",
         "regex_pattern": r"(\d+)",
-        "type": "int",
+        "type": int,
     },
     "Minimum_eigenvalue": {
         "line_identifier": ", beta =",
         "regex_pattern": r"alpha = (\d+(\.\d+)?)",
-        "type": "float",
+        "type": float,
     },
     "Maximum_eigenvalue": {
         "line_identifier": ", beta =",
         "regex_pattern": r", beta = (\d+(\.\d+)?)",
-        "type": "float",
+        "type": float,
     },
     # KL-specific parameters
     "KL_diagonal_order": {
         "line_identifier": "KL iters = ",
         "regex_pattern": r"(\d+)",
-        "type": "int",
+        "type": int,
     },
     "KL_scaling_factor": {
         "line_identifier": "Mu =",
         "regex_pattern": r"(\d+(\.\d+)?)",
-        "type": "float",
+        "type": float,
     },
     "Number_of_CG_iterations": {
         "line_identifier": "After",
         "regex_pattern": r"After (\d+)",
-        "type": "int",
+        "type": int,
     },
     # This one can attributed to both Chebyshev and KL cases with different
     # meaning though
+    # TODO: I need to find a way to anticipate all the invert cases
     "Solver_epsilon": {
         # "line_identifier": "Solver epsilon =",
         "line_identifier": "Outer solver epsilon =",
         "regex_pattern": r"(\d+\.\d+e-\d+)",
-        "type": "float",
+        "type": float,
+    },
+    "Maximum_solver_iterations": {
+        "line_identifier": "Max solver iters = ",
+        "regex_pattern": r"(\d+)",
+        "type": int,
+    },
+}
+
+
+FILE_CONTENTS_MULTI_VALUE_PATTERNS_DICTIONARY = {
+    # TODO: I need to decide what to do with this option
+    # Results
+    # "Calculation_result": {
+    #     "line_identifier": "Done vector =",
+    #     "regex_pattern": r"(\d+\.\d+e[+-]\d+)",
+    #     "type": float,
+    # },
+    "Elapsed_time": {
+        # "line_identifier": "sec",
+        "line_identifier": "converged, t = ",
+        "regex_pattern": r"(\d+\.\d+)",
+        "type": float,
     },
 }
