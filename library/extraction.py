@@ -1,6 +1,7 @@
-from inspect import Parameter
 import os
 import re
+
+import numpy as np
 
 
 import library.constants as constants
@@ -44,7 +45,7 @@ def extract_parameters_values_from_filename(filename, logger=None):
 
     # Apply each regex pattern to the filename
     for (parameter_name, parameter_info) in \
-                            constants.FILENAME_REGEX_PATTERNS_DICTIONARY.items():
+                    constants.FILENAME_SINGLE_VALUE_PATTERNS_DICTIONARY.items():
         regex_pattern = parameter_info["pattern"]
         expected_type = parameter_info["type"]
 
@@ -84,10 +85,9 @@ def extract_parameters_values_from_filename(filename, logger=None):
 
     return extracted_values_dictionary
 
-import re
 
-
-def extract_parameters_values_from_file_contents(file_contents_list, logger=None):
+def extract_parameters_values_from_file_contents(file_contents_list, 
+                                                                logger=None):
     """
     Extract parameter values from file contents based on patterns defined in
     FILE_CONTENTS_SINGLE_VALUE_PATTERNS_DICTIONARY.
@@ -117,7 +117,8 @@ def extract_parameters_values_from_file_contents(file_contents_list, logger=None
             # Apply regex to extract the value
             match = re.search(regex_pattern, relevant_line)
             if match:
-                raw_value = match.group(1)  # Assume the first capture group contains the value
+                # Assume the first capture group contains the value
+                raw_value = match.group(1)
 
                 # Preprocess the value if it contains 'p' instead of '.'
                 if "p" in raw_value and expected_type in {float, int}:
@@ -128,12 +129,48 @@ def extract_parameters_values_from_file_contents(file_contents_list, logger=None
                     extracted_values[parameter_name] = expected_type(raw_value)
                 except ValueError:
                     if logger:
-                        logger.warning(f"Failed to convert '{raw_value}' to {expected_type} for {parameter_name}.")
+                        logger.warning(f"Failed to convert '{raw_value}' "\
+                                    f"to {expected_type} for {parameter_name}.")
             else:
                 if logger:
-                    logger.warning(f"Regex pattern '{regex_pattern}' did not match for {parameter_name}.")
+                    logger.warning(f"Regex pattern '{regex_pattern}' did not "\
+                                                f"match for {parameter_name}.")
         else:
             if logger:
-                logger.warning(f"Line identifier '{line_identifier}' not found for {parameter_name}.")
+                logger.warning(f"Line identifier '{line_identifier}' not "\
+                                                f"found for {parameter_name}.")
 
     return extracted_values
+
+
+def extract_multivalued_parameters_from_file_contents(file_contents_list, 
+                                                                logger=None):
+    
+    # Initialize a dictionary to store multivalued parameters
+    multivalued_parameters = {}
+
+    # Loop through each line in the file contents
+    for line in file_contents_list:
+        # Check for each multivalued parameter in the dictionary
+        for parameter, pattern_details in \
+                constants.FILE_CONTENTS_MULTIVALUED_PATTERNS_DICTIONARY.items():
+            # If the line contains the line identifier for the current parameter
+            if pattern_details["line_identifier"] in line:
+                # Find all matches using the regex pattern
+                matches = re.findall(pattern_details["regex_pattern"], line)
+                if matches:
+                    # Initialize a non-existing key with an empty list
+                    if parameter not in multivalued_parameters:
+                        multivalued_parameters[parameter] = []
+
+                    # Convert extracted values to correct type and add to list
+                    for match in matches:
+                        multivalued_parameters[parameter].append(
+                                                pattern_details["type"](match))
+
+    # Convert lists to numpy arrays
+    for key, value in multivalued_parameters.items():
+        multivalued_parameters[key] = np.array(value)
+
+    # Return the dictionary with Numpy arrays
+    return multivalued_parameters
