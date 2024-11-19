@@ -37,7 +37,6 @@ import pandas as pd
 import logging
 import h5py
 
-
 sys.path.append('../')
 from library import constants, filesystem_utilities
 from library import extraction
@@ -80,7 +79,7 @@ def main(qpb_log_files_directory, output_files_directory):
     logging.info(f"Script '{script_name}' execution initiated.")
     logger = logging.getLogger(__name__)
 
-    # EXTRACT PARAMETER VALUES
+    # EXTRACT SINGLE-VALUED PARAMETERS
     
     # List to pass values to dataframe
     parameters_values_list = list()
@@ -106,14 +105,14 @@ def main(qpb_log_files_directory, output_files_directory):
             qpb_log_file_contents_list = file.readlines()
         
         # Extract parameter values from the contents of the file
-        extracted_values_from_file_contents_dictionary = \
+        extracted_single_valued_parameters_from_file_contents_dictionary = \
             extraction.extract_parameters_values_from_file_contents(
                                             qpb_log_file_contents_list, logger)
 
         # Merge extracted values from file contents into the main dictionary
         # File contents are considered the primary source of truth
         extracted_values_dictionary.update(
-                                extracted_values_from_file_contents_dictionary)
+            extracted_single_valued_parameters_from_file_contents_dictionary)
 
         # Compare and update the dictionary with values from the filename
         for key, value in extracted_values_from_filename_dictionary.items():
@@ -131,6 +130,7 @@ def main(qpb_log_files_directory, output_files_directory):
                         )
             else:
                 # Add parameters that exist only in filename to the dictionary
+                # TODO: This must be accompanied by appropriate checks
                 extracted_values_dictionary[key] = value
 
         # Append the fully constructed dictionary to the list of parameters
@@ -145,9 +145,37 @@ def main(qpb_log_files_directory, output_files_directory):
 
     # Export dataframe to .cvs file
     parameter_values_dataframe.to_csv(csv_file_full_path, index=False)
-    logging.info(
-        f"Extracted parameter values passed to {output_files_name}.csv file.")
+    logging.info(f"Extracted single-valued parameters passed to "\
+                                        f"{output_files_name}.csv file.")
 
+    # EXTRACT MULTIVALUED PARAMETERS
+
+    hdf5_file_full_path = os.path.join(output_files_directory, 
+                                      output_files_name + ".h5")
+    with h5py.File(hdf5_file_full_path, 'w') as hdf5_file:
+
+        for qpb_log_file_full_path in glob.glob(
+                                os.path.join(qpb_log_files_directory, "*.txt")):
+            # Extract the filename from the full path
+            qpb_log_filename = os.path.basename(qpb_log_file_full_path)
+
+            # Create a group for the current file (based on the filename)
+            file_group = hdf5_file.create_group(qpb_log_filename)
+
+            # Extract multivalued parameters from the contents of the file
+            extracted_multivalued_parameters_from_file_contents_dictionary = \
+                extraction.extract_multivalued_parameters_from_file_contents(
+                                            qpb_log_file_contents_list, logger)
+            
+            # Loop through each multivalued parameter and store it as a dataset
+            for parameter, values in extracted_multivalued_parameters_from_file_contents_dictionary.items():
+                # Create a dataset for each parameter in the file
+                file_group.create_dataset(parameter, data=values)
+
+    logging.info(f"Extracted multivalued parameters passed to "\
+                                        f"{output_files_name}.h5 file.")
+
+    # Log termination of the script
     logging.info(f"Script '{script_name}' execution terminated successfully.")
 
 
