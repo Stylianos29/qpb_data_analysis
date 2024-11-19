@@ -40,7 +40,7 @@ import logging
 
 sys.path.append('../')
 from library import filesystem_utilities
-from library import constants
+from library import extraction
 
 
 @click.command()
@@ -85,16 +85,22 @@ def main(qpb_log_files_directory, output_files_directory):
     parameters_values_list = list()
 
     # Loop over all .txt files in qpb log files directory
-    for log_file_full_path in glob.glob(os.path.join(qpb_log_files_directory, \
-                                                                      "*.txt")):
-        log_file = os.path.basename(log_file_full_path)
+    for qpb_log_file_full_path in glob.glob(
+                            os.path.join(qpb_log_files_directory, "*.txt")):
+        qpb_log_filename = os.path.basename(qpb_log_file_full_path)
 
-        parameters_values_list.append({"Filename": log_file})
+        # parameters_values_list.append({"Filename": qpb_log_filename})
+
+        extracted_values_from_filename_dictionary = extraction.filename_extraction(qpb_log_filename)
+
+        extracted_values_from_filename_dictionary["Filename"] = qpb_log_filename
+
+        parameters_values_list.append(extracted_values_from_filename_dictionary)
 
     parameter_values_dataframe = pd.DataFrame(parameters_values_list)
 
     csv_file_full_path = os.path.join(output_files_directory, 
-                                      output_files_name+".csv")
+                                                    output_files_name+".csv")
 
     # Export dataframe to .cvs file
     parameter_values_dataframe.to_csv(csv_file_full_path, index=False)
@@ -102,6 +108,7 @@ def main(qpb_log_files_directory, output_files_directory):
         f"Extracted parameter values passed to {output_files_name}.csv file.")
 
     logging.info(f"Script '{script_name}' execution terminated successfully.")
+
 
 if __name__ == "__main__":
     main()
