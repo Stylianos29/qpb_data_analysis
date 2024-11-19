@@ -61,8 +61,8 @@ FILENAME_REGEX_PATTERNS_DICTIONARY = {
         "pattern": r"_EpsMSCG(?P<MSCG_epsilon>\d*[\.p]?\d+e[+-]\d+|\d+e[+-]\d+)",
         "type": float
     },
-    "KL_iterations": {
-        "pattern": r"_n(?P<KL_iterations>\d+)",
+    "KL_diagonal_order": {
+        "pattern": r"_n(?P<KL_diagonal_order>\d+)",
         "type": int
     },
     "KL_scaling_factor": {
@@ -169,7 +169,7 @@ PARAMETER_ATTRIBUTES_DICTIONARY = {
         "type": "float",
     },
     # KL-specific parameters
-    "KL_iterations": {
+    "KL_diagonal_order": {
         "line_identifier": "KL iters = ",
         "regex_pattern": r"(\d+)",
         "type": "int",
