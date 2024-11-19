@@ -62,8 +62,13 @@ Notes:
   is consistent across main groups.
 """
 
-import click # type: ignore
+import sys
+
+import click  # type: ignore
 import h5py
+
+sys.path.append('../../')
+from library import filesystem_utilities
 
 
 @click.command()
@@ -84,7 +89,13 @@ import h5py
 
 def main(hdf5_file_path, list_groups, list_subgroups, list_attributes, \
                                                     dataset_name, show_sample):
-    
+
+    # Check provided path to HDF5 file
+    if not filesystem_utilities.is_valid_file(hdf5_file_path):
+        print("ERROR: Provided path to .csv file is invalid.")
+        print("Exiting...")
+        sys.exit(1)
+
     with h5py.File(hdf5_file_path, 'r') as hdf5_file:
         if list_groups:
             # List all top-level groups
@@ -104,6 +115,8 @@ def main(hdf5_file_path, list_groups, list_subgroups, list_attributes, \
             for subgroup in sorted(subgroups):
                 print(f"- {subgroup}")
 
+
+        # TODO: Check validity of the provided "dataset_name"
         if list_attributes:
             # List attributes of the whole file (or specific group/dataset)
             if dataset_name:
