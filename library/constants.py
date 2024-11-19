@@ -3,26 +3,72 @@
 # identifying labels
 FILENAME_REGEX_PATTERNS_DICTIONARY = {
     # General parameters
-    # TODO: What about about "Bare"?
-    "Overlap_operator_method": r"(?P<Operator_method>Chebyshev|KL|Bare)",
-    "Kernel_operator_type": r"(?P<Operator_type>Standard|Brillouin)",
-    "QCD_beta_value": r"beta(?P<QCD_beta_value>\d+p?\d*)",
-    "Configuration_label": r"config(?P<Configuration_label>\d+)",
-    "APE_iterations": r"APEiters(?P<APE_iterations>\d+)",
-    "Rho_value": r"rho(?P<Rho_value>\d+p?\d*)",
-    "Bare_mass": r"m(?P<Bare_mass>\d+p?\d*)",
-    "Clover_coefficient": r"cSW(?P<Clover_coefficient>\d+p?\d*)",
+    "Overlap_operator_method": {
+        "pattern": r"(?P<Overlap_operator_method>Chebyshev|KL|Bare)",
+        "type": str
+    },
+    "Kernel_operator_type": {
+        "pattern": r"(?P<Kernel_operator_type>Standard|Brillouin)",
+        "type": str
+    },
+    "QCD_beta_value": {
+        "pattern": r"beta(?P<QCD_beta_value>\d+p?\d*)",
+        "type": float
+    },
+    "Configuration_label": {
+        "pattern": r"config(?P<Configuration_label>\d+)",
+        "type": str
+    },
+    "APE_iterations": {
+        "pattern": r"APEiters(?P<APE_iterations>\d+)",
+        "type": int
+    },
+    "Rho_value": {
+        "pattern": r"rho(?P<Rho_value>\d+p?\d*)",
+        "type": float
+    },
+    "Bare_mass": {
+        "pattern": r"m(?P<Bare_mass>\d+p?\d*)",
+        "type": float
+    },
+    "Clover_coefficient": {
+        "pattern": r"cSW(?P<Clover_coefficient>\d+p?\d*)",
+        "type": float
+    },
     # Chebyshev-specific parameters
-    "Delta_Min": r"dMin(?P<Delta_Min>\d+p?\d*)",
-    "Delta_Max": r"dMax(?P<Delta_Max>\d+p?\d*)",
-    "Number_of_Chebyshev_terms": r"N(?P<Number_of_Chebyshev_terms>\d+)",
-    "Lanczos_Epsilon":\
-            r"EpsLanczos(?P<Lanczos_Epsilon>\d+\.\d+e[+-]\d+|\d+e[+-]\d+)",
+    "Delta_Min": {
+        "pattern": r"dMin(?P<Delta_Min>\d+p?\d*)",
+        "type": float
+    },
+    "Delta_Max": {
+        "pattern": r"dMax(?P<Delta_Max>\d+p?\d*)",
+        "type": float
+    },
+    "Number_of_Chebyshev_terms": {
+        "pattern": r"N(?P<Number_of_Chebyshev_terms>\d+)",
+        "type": int
+    },
+    "Lanczos_Epsilon": {
+        "pattern": r"EpsLanczos(?P<Lanczos_Epsilon>\d+\.\d+e[+-]\d+|\d+e[+-]\d+)",
+        "type": float
+    },
     # KL-specific parameters
-    "CG_epsilon": r"_EpsCG(?P<CG_epsilon>\d*[\.p]?\d+e[+-]\d+|\d+e[+-]\d+)",
-    "MSCG_epsilon": r"_EpsMSCG(?P<MSCG_epsilon>\d*[\.p]?\d+e[+-]\d+|\d+e[+-]\d+)",
-    "KL_iterations": r"_n(?P<KL_iterations>\d+)",
-    "KL_scaling_factor": r"mu(?P<KL_scaling_factor>\d+p?\d*)",
+    "CG_epsilon": {
+        "pattern": r"_EpsCG(?P<CG_epsilon>\d*[\.p]?\d+e[+-]\d+|\d+e[+-]\d+)",
+        "type": float
+    },
+    "MSCG_epsilon": {
+        "pattern": r"_EpsMSCG(?P<MSCG_epsilon>\d*[\.p]?\d+e[+-]\d+|\d+e[+-]\d+)",
+        "type": float
+    },
+    "KL_iterations": {
+        "pattern": r"_n(?P<KL_iterations>\d+)",
+        "type": int
+    },
+    "KL_scaling_factor": {
+        "pattern": r"mu(?P<KL_scaling_factor>\d+p?\d*)",
+        "type": float
+    },
 }
 
 # Most of the information will be extracted from the contents of the
