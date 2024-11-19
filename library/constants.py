@@ -15,7 +15,10 @@ FILENAME_SINGLE_VALUE_PATTERNS_DICTIONARY = {
         "pattern": r"beta(?P<QCD_beta_value>\d+p?\d*)",
         "type": float
     },
-    # TODO: Add a Lattice_geometry pattern
+    "Lattice_geometry": {
+        "pattern": r"_T(?P<TemporalDimension>\d+)L(?P<SpatialDimension>\d+)_",
+        "type": int
+    },
     "Configuration_label": {
         "pattern": r"config(?P<Configuration_label>\d+)",
         "type": str
@@ -54,7 +57,7 @@ FILENAME_SINGLE_VALUE_PATTERNS_DICTIONARY = {
         "type": int
     },
     "Lanczos_Epsilon": {
-        "pattern": r"EpsLanczos(?P<Lanczos_Epsilon>\d+\.\d+e[+-]\d+|\d+e[+-]\d+)",
+    "pattern": r"EpsLanczos(?P<Lanczos_Epsilon>\d+\.\d+e[+-]\d+|\d+e[+-]\d+)",
         "type": float
     },
     # KL-specific parameters
@@ -202,11 +205,34 @@ FILE_CONTENTS_MULTIVALUED_PATTERNS_DICTIONARY = {
         "regex_pattern": r"After (\d+) iterations msCG converged,",
         "type": int,
     },
+    "Calculation_result": {
+        "line_identifier": "Done vector =",
+        "regex_pattern": r"(\d+\.\d+e[+-]\d+)",
+        "type": float,
+    },
+    "Iterations_printed_count": {
+        "line_identifier": " iters =",
+        "regex_pattern": r"(\d+),",
+        "type": int,
+    },
+    "Printed_squared_relative_residual": {
+        "line_identifier": " iters =",
+        "regex_pattern": r", res = (\d+\.\d+e[+-]\d+)",
+        "type": float,
+    },
+    "MS_shifts": {
+        "line_identifier": "Shift = ",
+        "regex_pattern": r"(\d+\.\d+),",
+        "type": float,
+    },
+    "Final_squared_residual": {
+        "line_identifier": "Shift = ",
+        "regex_pattern": r", residual = (\d+\.\d+e[+-]\d+)",
+        "type": float,
+    },
+    "Final_squared_relative_residual": {
+        "line_identifier": "Shift = ",
+        "regex_pattern": r", relative = (\d+\.\d+e[+-]\d+)",
+        "type": float,
+    },
 }
-    # TODO: I need to decide what to do with this option
-    # Results
-    # "Calculation_result": {
-    #     "line_identifier": "Done vector =",
-    #     "regex_pattern": r"(\d+\.\d+e[+-]\d+)",
-    #     "type": float,
-    # }, 
