@@ -211,3 +211,5 @@ def main(qpb_log_files_directory, output_files_directory, log_file_directory,
 
 if __name__ == "__main__":
     main()
+
+# TODO: Included a terminating message

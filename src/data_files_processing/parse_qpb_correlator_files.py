@@ -142,3 +142,5 @@ def main(data_files_directory, hdf5_files_directory, output_hdf5_file_name):
 
 if __name__ == "__main__":
     main()
+
+# TODO: Include logging properly
