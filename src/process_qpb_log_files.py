@@ -49,39 +49,70 @@ from library import extraction, filesystem_utilities
 @click.option("--output_files_directory", "output_files_directory", "-out_dir",
               default=None,
         help="Directory where all the generated output files will be stored.")
-# TODO: Add additional options for source script's log file directory and name
+@click.option("--log_file_directory", "log_file_directory",
+              "-log_file_dir", default=None,
+                help="Directory where the script's log file will be stored.")
+@click.option("--log_filename", "log_filename", "-log",
+                default="process_qpb_log_files_script.log",
+                help="Specific name for the script's log file.")
+@click.option("--csv_filename", "csv_filename", "-csv",
+                default="qpb_log_files_single_valued_parameters.csv",
+                help="Specific name for the qpb log files .csv output file.")
+@click.option("--hdf5_filename", "hdf5_filename", "-hdf5",
+                default="qpb_log_files_multivalued_parameters.h5",
+                help="Specific name for the qpb log files HDF5 output file.")
 
-def main(qpb_log_files_directory, output_files_directory):
-    
+def main(qpb_log_files_directory, output_files_directory, log_file_directory, 
+            log_filename, csv_filename, hdf5_filename):
+
     # PERFORM VALIDITY CHECKS ON INPUT ARGUMENTS
 
     if not filesystem_utilities.is_valid_directory(qpb_log_files_directory):
         error_message = "Passed log files directory path is invalid or not "\
                                                                   "a directory."
         print("ERROR:", error_message)
+        print("Exiting...")
         sys.exit(1)
 
     if not filesystem_utilities.is_valid_directory(output_files_directory):
         error_message = "Passed output files directory path is invalid or "\
                                                               "not a directory."
         print("ERROR:", error_message)
+        print("Exiting...")
         sys.exit(1)
 
-    script_name = os.path.basename(__file__)  # Get the script's filename
-    output_files_name = os.path.basename(output_files_directory)
+    # Specify current script's log file directory
+    if log_file_directory is None:
+        log_file_directory = output_files_directory
+    elif not filesystem_utilities.is_valid_directory(log_file_directory):
+        error_message = "Passed directory path to store script's log file is "\
+                                                "invalid or not a directory."
+        print("ERROR:", error_message)
+        print("Exiting...")
+        sys.exit(1)
 
-    # SET CURRENT SCRIPT'S LOG FILE DIRECTORY AND NAME
+    # Check for proper extensions in provided filenames
+    if not csv_filename.endswith('.csv'):
+        csv_filename=csv_filename+'.csv'
+    if not hdf5_filename.endswith('.h5'):
+        hdf5_filename=hdf5_filename+'.h5'
 
-    log_file_directory = output_files_directory
-    log_filename = output_files_name+".log"
+    # INITIATE LOGGING
+
     filesystem_utilities.setup_logging(log_file_directory, log_filename)
 
-    logging.info(f"Script '{script_name}' execution initiated.")
+    # Create a logger instance for the current script using the script's name.
     logger = logging.getLogger(__name__)
+
+    # Get the script's filename
+    script_name = os.path.basename(__file__)
+
+    # Initiate logging
+    logging.info(f"Script '{script_name}' execution initiated.")
 
     # EXTRACT SINGLE-VALUED PARAMETERS
     
-    # List to pass values to dataframe
+    # Create list to pass values to dataframe
     parameters_values_list = list()
     # Loop over all .txt files in the QPB log files directory
     for qpb_log_file_full_path in glob.glob(
@@ -140,18 +171,16 @@ def main(qpb_log_files_directory, output_files_directory):
     parameter_values_dataframe = pd.DataFrame(parameters_values_list)
 
     # Save the DataFrame to a CSV file in the output directory
-    csv_file_full_path = os.path.join(output_files_directory, 
-                                      output_files_name + ".csv")
+    csv_file_full_path = os.path.join(output_files_directory, csv_filename)
 
     # Export dataframe to .cvs file
     parameter_values_dataframe.to_csv(csv_file_full_path, index=False)
-    logging.info(f"Extracted single-valued parameters passed to "\
-                                        f"{output_files_name}.csv file.")
+    logging.info(f"Extracted multivalued parameters are stored in the "\
+                                                    f"'{csv_filename}' file.")
 
     # EXTRACT MULTIVALUED PARAMETERS
 
-    hdf5_file_full_path = os.path.join(output_files_directory, 
-                                      output_files_name + ".h5")
+    hdf5_file_full_path = os.path.join(output_files_directory, hdf5_filename)
     with h5py.File(hdf5_file_full_path, 'w') as hdf5_file:
 
         for qpb_log_file_full_path in glob.glob(
@@ -173,10 +202,10 @@ def main(qpb_log_files_directory, output_files_directory):
                 # Create a dataset for each parameter in the file
                 file_group.create_dataset(parameter, data=values)
 
-    logging.info(f"Extracted multivalued parameters passed to "\
-                                        f"{output_files_name}.h5 file.")
+    logging.info(f"Extracted multivalued parameters are stored in the "\
+                                                    f"'{hdf5_filename}' file.")
 
-    # Log termination of the script
+    # Terminate logging
     logging.info(f"Script '{script_name}' execution terminated successfully.")
 
 
