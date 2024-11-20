@@ -1,21 +1,25 @@
 # Processed Data Files Directory
 
-This directory is intended to store processed data files generated after running
-the `qpb_data_analysis` scripts. Follow these guidelines to keep your files
-organized:
+This directory is intended to store processed data files generated after
+analyzing the raw data files stored in `data_files/raw` directory. Follow these
+guidelines to keep your files organized:
 
 ## Organization
 
 - Place files under directories structured as:
-<qpb_main_program>/<project_name>/ For example: qpb_project_1/simulation_123/
-qpb_project_2/simulation_456/
+  <qpb_main_program>/<experiment_name>/
+
+  For example:
+  - invert/Chebyshev_several_N_and_m_varying_EpsCG/
+  - sign_squared_violation/KL_several_vectors_varying_configs_and_n/
 
 ## File Types
 
 - The processed data files typically include:
 - `.csv` files
 - `.h5` files (HDF5 format)
-- `.jpg` or `.png` plot images
+- `.log` files (text files)
+- `.md` files (markdown format)
 
 ## Additional Notes
 
