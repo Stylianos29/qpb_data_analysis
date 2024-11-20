@@ -5,4 +5,6 @@ output/plots/*
 unit_tests/__pycache__/*
 
 data_files/raw/*
+!data_files/raw/README.md
 data_files/processed/*
+!data_files/processed/README.md
