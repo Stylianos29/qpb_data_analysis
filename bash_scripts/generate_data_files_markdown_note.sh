@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# TODO: This script needs a total reconstruction. There should be a template
+# from which it copies to create the markdown metadata files.
 
 ################################################################################
 # generate_data_files_markdown_note.sh - Script for automating the generation of
@@ -24,7 +26,6 @@
 #   with details about the data file sets, both automatically generated and
 #   user-added notes.
 ################################################################################
-
 
 
 RAW_DATA_FILES_DIRECTORY="../data_files/raw"
@@ -57,17 +58,20 @@ for data_files_main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
         data_files_experiment_directory_name=$(basename "$data_files_experiment_directory")
 
         # Construct markdown file name and its full path
-markdown_file_full_path="${data_files_experiment_directory/$RAW_DATA_FILES_DIRECTORY\
-/$PROCESSED_DATA_FILES_DIRECTORY}"
+# markdown_file_full_path="${data_files_experiment_directory/$RAW_DATA_FILES_DIRECTORY\
+# /$PROCESSED_DATA_FILES_DIRECTORY}"
         
-        # Verify if a directory with the same name exists in the processed files directory
-        if [ ! -d "$markdown_file_full_path" ]; then
-            echo "There is no '${markdown_file_full_path}' directory."
-            mkdir -p "$markdown_file_full_path"
-            echo "The directory has been created."
-        fi
+        markdown_file_full_path="${data_files_main_program_directory}"
+        markdown_file_full_path+="/${data_files_experiment_directory_name}_metadata.md"
 
-        markdown_file_full_path+="/${data_files_experiment_directory_name}.md"
+        # # Verify if a directory with the same name exists in the processed files directory
+        # if [ ! -d "$markdown_file_full_path" ]; then
+        #     echo "There is no '${markdown_file_full_path}' directory."
+        #     mkdir -p "$markdown_file_full_path"
+        #     echo "The directory has been created."
+        # fi
+
+        # markdown_file_full_path+="/${data_files_experiment_directory_name}.md"
 
         note_section_title="### Notes"
 
