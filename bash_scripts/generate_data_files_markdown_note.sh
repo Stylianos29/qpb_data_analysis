@@ -30,7 +30,8 @@ for data_files_main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
         # Verify if a directory with the same name exists in the processed files directory
         if [ ! -d "$markdown_file_full_path" ]; then
             echo "There is no '${markdown_file_full_path}' directory."
-            echo "Moving to the next data files directory..."
+            mkdir "$markdown_file_full_path"
+            echo "The directory has been created."
             continue
         fi
 
