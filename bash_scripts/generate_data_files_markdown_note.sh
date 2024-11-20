@@ -1,5 +1,32 @@
 #!/bin/bash
 
+
+################################################################################
+# generate_data_files_markdown_note.sh - Script for automating the generation of
+# markdown files containing information about the raw data file sets as stored
+# in specific directories, allowing for the addition of further notes.
+#
+# Functionalities:
+# - Takes a directory path as input.
+# - Loops through all directories within the specified raw data directory.
+# - For each subdirectory, it generates a markdown file with details about the
+#   data files and their naming conventions.
+# - If the markdown file already exists, it preserves any existing notes under
+#   the "### Notes" section.
+# - If the corresponding directory does not exist in the processed data
+#   directory, it creates it.
+#
+# Input:
+# - A raw data directory path defined in the script (e.g., ../data_files/raw).
+#
+# Output:
+# - Markdown files generated in the corresponding processed data subdirectories
+#   with details about the data file sets, both automatically generated and
+#   user-added notes.
+################################################################################
+
+
+
 RAW_DATA_FILES_DIRECTORY="../data_files/raw"
 PROCESSED_DATA_FILES_DIRECTORY="../data_files/processed"
 

@@ -1,5 +1,26 @@
 #!/bin/bash
 
+
+################################################################################
+# find_empty_files.sh -Script for finding and listing all empty files within a
+# given directory and its subdirectories.
+#
+# Functionalities:
+# - Takes a directory path as input.
+# - Uses the `find` command to locate all files in the specified directory and
+#   its subdirectories.
+# - Checks if each file is empty (i.e., file size is 0 bytes).
+# - Prints the paths of all empty files.
+#
+# Input:
+# - A directory path as the first argument (e.g., ./find_empty_files.sh
+#   /path/to/directory).
+#
+# Output:
+# - The script outputs the list of empty files within the provided directory.
+################################################################################
+
+
 # Function to check if a file is empty
 is_empty_file() {
     local file="$1"
