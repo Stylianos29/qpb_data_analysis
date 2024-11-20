@@ -1,3 +1,4 @@
+# TODO: Revisit this detailed commentary
 """
 Log Files Analysis Script
 
