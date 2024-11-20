@@ -30,29 +30,35 @@
 RAW_DATA_FILES_DIRECTORY="../data_files/raw"
 PROCESSED_DATA_FILES_DIRECTORY="../data_files/processed"
 
-# Loop over all directories of depth 1, excluding 'pion_correlator_data_files'
+# Loop over all subdirectories of the raw data files directory. These
+# subdirectories are expected to refer to the name of the qpb main program that
+# generated the data files
 for data_files_main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
 
     # Check if "data_files_main_program_directory" is a directory
     if [ ! -d "$data_files_main_program_directory" ]; then
+        # Ignore if it is not a directory
         continue
     fi
 
-    # Loop over all directories of depth 2
-    for data_files_project_directory in "$data_files_main_program_directory"/*; do
+    # Loop over all subdirectories of depth 2. These subdirectories are expected
+    # to refer to the specific experiment or analysis done
+    for data_files_experiment_directory in "$data_files_main_program_directory"/*; do
 
-        # Check if "data_files_project_directory" is a directory
-        if [ ! -d "$data_files_project_directory" ]; then
+        # Check if "data_files_experiment_directory" is a directory
+        if [ ! -d "$data_files_experiment_directory" ]; then
+            # Ignore if it is not a directory
             continue
         fi
 
         # CREATE THE MARKDOWN FILE
 
         # Get the name of the directory of depth 2
-        data_files_project_directory_name=$(basename "$data_files_project_directory")
+        data_files_experiment_directory_name=$(basename "$data_files_experiment_directory")
 
         # Construct markdown file name and its full path
-        markdown_file_full_path="${data_files_project_directory/$RAW_DATA_FILES_DIRECTORY/$PROCESSED_DATA_FILES_DIRECTORY}"
+markdown_file_full_path="${data_files_experiment_directory/$RAW_DATA_FILES_DIRECTORY\
+/$PROCESSED_DATA_FILES_DIRECTORY}"
         
         # Verify if a directory with the same name exists in the processed files directory
         if [ ! -d "$markdown_file_full_path" ]; then
@@ -61,7 +67,7 @@ for data_files_main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
             echo "The directory has been created."
         fi
 
-        markdown_file_full_path+="/${data_files_project_directory_name}.md"
+        markdown_file_full_path+="/${data_files_experiment_directory_name}.md"
 
         note_section_title="### Notes"
 
@@ -74,7 +80,7 @@ for data_files_main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
 
         # EXTRACT USEFUL INFORMATION
 
-        operator_method="${data_files_project_directory_name%%_*}"
+        operator_method="${data_files_experiment_directory_name%%_*}"
         data_files_main_program=$(basename "$data_files_main_program_directory")
 
         # FILL IN THE MARKDOWN FILE
@@ -82,7 +88,7 @@ for data_files_main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
         # TODO: Fold the message written to file in maximum 80 characters
         {
             # First line: Directory name as header
-            echo "# $data_files_project_directory_name"
+            echo "# $data_files_experiment_directory_name"
             echo
             # Second line: "## Overview"
             echo "## Overview"
@@ -104,3 +110,5 @@ for data_files_main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
 
     done
 done
+
+# TODO: Create a terminating message for success or failure
