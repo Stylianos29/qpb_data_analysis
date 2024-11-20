@@ -236,3 +236,15 @@ FILE_CONTENTS_MULTIVALUED_PATTERNS_DICTIONARY = {
         "type": float,
     },
 }
+
+
+CORRELATOR_IDENTIFIERS_LIST = [
+    "1-1",
+    "g5-g5",
+    "g5-g4g5",
+    "g4g5-g5",
+    "g4g5-g4g5",
+    "g1-g1",
+    "g2-g2",
+    "g3-g3"
+]
