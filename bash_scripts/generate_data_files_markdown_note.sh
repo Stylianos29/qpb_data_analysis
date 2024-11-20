@@ -57,16 +57,18 @@ for data_files_main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
         # Verify if a directory with the same name exists in the processed files directory
         if [ ! -d "$markdown_file_full_path" ]; then
             echo "There is no '${markdown_file_full_path}' directory."
-            mkdir "$markdown_file_full_path"
+            mkdir -p "$markdown_file_full_path"
             echo "The directory has been created."
-            continue
         fi
 
         markdown_file_full_path+="/${data_files_project_directory_name}.md"
 
+        note_section_title="### Notes"
+
         # Preserve existing notes if the markdown file already exists
         existing_notes=""
         if [ -f "$markdown_file_full_path" ]; then
+            # TODO: Pass "note_section_title" as variable inside the following message
             existing_notes=$(awk '/^### Notes/ {found=1; next} found' "$markdown_file_full_path")
         fi
 
@@ -77,8 +79,7 @@ for data_files_main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
 
         # FILL IN THE MARKDOWN FILE
 
-        note_section_title="### Notes"
-
+        # TODO: Fold the message written to file in maximum 80 characters
         {
             # First line: Directory name as header
             echo "# $data_files_project_directory_name"
