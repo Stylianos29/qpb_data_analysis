@@ -1,10 +1,12 @@
-library/__pycache__/*
-
-output/plots/*
-
-unit_tests/__pycache__/*
+bash_scripts/utils/*
 
 data_files/raw/*
 !data_files/raw/README.md
 data_files/processed/*
 !data_files/processed/README.md
+
+library/__pycache__/*
+
+output/plots/*
+
+unit_tests/__pycache__/*
