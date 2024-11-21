@@ -1,17 +1,16 @@
 import os
 import sys
 
-import click
+import click # type: ignore
 import numpy as np
-import gvar as gv
+import gvar as gv # type: ignore
 import pandas as pd
 import ast
 import logging
 import h5py
 
-sys.path.append('/nvme/h/cy22sg1/Data_analysis/python_scripts/critical_mass_analysis/')
-import custom_library.momentum_correlator as momentum_correlator
-import custom_library.jackknife_analysis as jackknife_analysis
+sys.path.append('../')
+from library import momentum_correlator, jackknife_analysis, filesystem_utilities
 
 
 def is_valid_directory(directory_path):
@@ -34,18 +33,19 @@ def is_valid_directory(directory_path):
 def main(log_files_data_csv_file_path, pion_correlator_values_hdf5_file_path,
                         jackknife_analysis_for_PCAC_mass_values_hdf5_file_path):
 
-    # Check validity of passed file paths
-    if not os.path.isfile(log_files_data_csv_file_path):
-        logging.error("The log files data csv file path is invalid!")
+    # PERFORM VALIDITY CHECKS ON INPUT ARGUMENTS
+
+    if not filesystem_utilities.is_valid_file(log_files_data_csv_file_path):
+        # logging.error("The log files data csv file path is invalid!")
         sys.exit(1)
 
-    if not os.path.isfile(pion_correlator_values_hdf5_file_path):
-        logging.error("The pion correlator values HDF5 file path is invalid!")
+    if not filesystem_utilities.is_valid_file(pion_correlator_values_hdf5_file_path):
+        # logging.error("The pion correlator values HDF5 file path is invalid!")
         sys.exit(1)
 
     if not is_valid_directory(os.path.dirname(
                     jackknife_analysis_for_PCAC_mass_values_hdf5_file_path)):
-        logging.error("The HDF5 files directory path is invalid!")
+        # logging.error("The HDF5 files directory path is invalid!")
         sys.exit(1)
 
     # EXTRACT USEFUL ATTRIBUTES OF THE WORKING DATASET OF PION CORRELATOR
