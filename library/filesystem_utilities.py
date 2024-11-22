@@ -49,3 +49,19 @@ def setup_logging(log_directory, log_filename):
 
     # Set the custom WrappedFormatter
     file_handler.setFormatter(WrappedFormatter("%(asctime)s - %(levelname)s - %(message)s"))
+
+
+def extract_directory_names(directory_path):
+    """
+    Extracts the parent directory name and the last directory name from a given path.
+    
+    Parameters:
+        directory_path (str): The full path to the directory.
+        
+    Returns:
+        tuple: A tuple containing the parent directory name and the last directory name.
+    """
+    parent_directory_name = os.path.basename(os.path.dirname(directory_path))
+    last_directory_name = os.path.basename(os.path.normpath(directory_path))
+    
+    return parent_directory_name, last_directory_name
