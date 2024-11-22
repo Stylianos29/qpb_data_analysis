@@ -59,7 +59,7 @@
 
 
 # Define paths for the source scripts, raw data files, and processed data files.
-SOURCE_SCRIPTS_DIRECTORY="../src/data_files_processing"
+SOURCE_SCRIPTS_DIRECTORY="../core/src/data_files_processing"
 RAW_DATA_FILES_DIRECTORY="../data_files/raw"
 PROCESSED_DATA_FILES_DIRECTORY="../data_files/processed"
 
