@@ -89,8 +89,8 @@ def main(input_qpb_log_files_csv_file_path,
 
     filesystem_utilities.setup_logging(log_file_directory, log_filename)
 
-    # Create a logger instance for the current script using the script's name.
-    logger = logging.getLogger(__name__)
+    # # Create a logger instance for the current script using the script's name.
+    # logger = logging.getLogger(__name__)
 
     # Get the script's filename
     script_name = os.path.basename(__file__)
