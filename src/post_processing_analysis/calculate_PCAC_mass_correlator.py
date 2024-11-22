@@ -1,204 +1,410 @@
 import os
 import sys
+import itertools
 
-import click # type: ignore
+import click  # type: ignore
 import numpy as np
-import gvar as gv # type: ignore
+import gvar as gv  # type: ignore
 import pandas as pd
 import ast
 import logging
 import h5py
 
-sys.path.append('../')
-from library import momentum_correlator, jackknife_analysis, filesystem_utilities
-
-
-def is_valid_directory(directory_path):
-    # Check if passed directory path exists and it is indeed a directory
-    return os.path.exists(directory_path) and os.path.isdir(directory_path)
+sys.path.append("../")
+from library import momentum_correlator
+from library import jackknife_analysis
+from library import filesystem_utilities
+from library import data_processing
 
 
 @click.command()
-@click.option("--log_files_data_csv_file_path", "log_files_data_csv_file_path",
-              "-log_csv", default="../csv_files/log_files_data.csv",
-            help="Path to the .csv file containing the extracted info from log files.")
-@click.option("--pion_correlator_values_hdf5_file_path",
-              "pion_correlator_values_hdf5_file_path",
-              "-pion_hdf5", default="../hdf5_files/pion_correlator_values.h5",
-            help="Path to the HDF5 file containing the extracted pion correlator values.")
-@click.option("--jackknife_analysis_for_PCAC_mass_values_hdf5_file_path",
-              "jackknife_analysis_for_PCAC_mass_values_hdf5_file_path",
-              "-PCAC_hdf5", default="../hdf5_files/jackknife_PCAC_mass_values.h5",
-            help="Path to the output HDF5 file with the jackknife PCAC mass values.")
-def main(log_files_data_csv_file_path, pion_correlator_values_hdf5_file_path,
-                        jackknife_analysis_for_PCAC_mass_values_hdf5_file_path):
+@click.option("--input_qpb_log_files_csv_file_path",
+              "input_qpb_log_files_csv_file_path", "-log_csv", default=None,
+              help="Path to input .csv file containing extracted info from "\
+                                                        "qpb log files sets.")
+@click.option("--input_correlator_values_hdf5_file_path",
+              "input_correlator_values_hdf5_file_path", "-cor_hdf5",
+              default=None,
+        help="Path to input HDF5 file containing extracted correlators values.")
+@click.option("--output_files_directory", "output_files_directory", "-out_dir",
+              default=None,
+              help="Path to directory where all output files will be stored.")
+@click.option("--output_hdf5_filename", "output_hdf5_filename",
+              "-hdf5", default="PCAC_mass_correlator_values.h5",
+              help="Specific name for the output HDF5 file.")
+@click.option("--log_file_directory", "log_file_directory", "-log_file_dir", 
+              default=None, 
+              help="Directory where the script's log file will be stored.")
+@click.option("--log_filename", "log_filename", "-log", 
+              default="calculate_PCAC_mass_correlator_script.log", 
+              help="Specific name for the script's log file.")
+
+def main(input_qpb_log_files_csv_file_path, 
+        input_correlator_values_hdf5_file_path, output_files_directory,
+                    output_hdf5_filename, log_file_directory, log_filename):
 
     # PERFORM VALIDITY CHECKS ON INPUT ARGUMENTS
 
-    if not filesystem_utilities.is_valid_file(log_files_data_csv_file_path):
-        # logging.error("The log files data csv file path is invalid!")
+    if not filesystem_utilities.is_valid_file(input_qpb_log_files_csv_file_path):
+        error_message = "Passed qpb log files .csv file path is invalid!."
+        print("ERROR:", error_message)
         sys.exit(1)
 
-    if not filesystem_utilities.is_valid_file(pion_correlator_values_hdf5_file_path):
-        # logging.error("The pion correlator values HDF5 file path is invalid!")
+    if not filesystem_utilities.is_valid_file(input_correlator_values_hdf5_file_path):
+        error_message = "Passed correlator values HDF5 file path is invalid!."
+        print("ERROR:", error_message)
         sys.exit(1)
 
-    if not is_valid_directory(os.path.dirname(
-                    jackknife_analysis_for_PCAC_mass_values_hdf5_file_path)):
-        # logging.error("The HDF5 files directory path is invalid!")
+    # If no output directory is provided, use the directory of the input file
+    if output_files_directory is None:
+        output_files_directory = os.path.dirname(input_correlator_values_hdf5_file_path)
+    # Check validity if the provided
+    elif not filesystem_utilities.is_valid_file(output_files_directory):
+        error_message = (
+            "Passed output files directory path is invalid " "or not a directory."
+        )
+        print("ERROR:", error_message)
+        print("Exiting...")
         sys.exit(1)
 
-    # EXTRACT USEFUL ATTRIBUTES OF THE WORKING DATASET OF PION CORRELATOR
+    # Specify current script's log file directory
+    if log_file_directory is None:
+        log_file_directory = output_files_directory
+    elif not filesystem_utilities.is_valid_directory(log_file_directory):
+        error_message = (
+            "Passed directory path to store script's log file is "
+            "invalid or not a directory."
+        )
+        print("ERROR:", error_message)
+        print("Exiting...")
+        sys.exit(1)
 
-    # Load the CSV file into a DataFrame
-    log_files_dataframe = pd.read_csv(log_files_data_csv_file_path)
+    # Check for proper extensions in provided output filenames
+    if not output_hdf5_filename.endswith(".h5"):
+        output_hdf5_filename = output_hdf5_filename + ".h5"
+    if not log_filename.endswith(".log"):
+        log_filename = log_filename + ".log"
 
-    # Extract unique values
-    # TODO: Check uniqueness of the operator method
-    unique_operator_method = log_files_dataframe['Operator_method'].unique()[0]
-    # unique_operator_type = log_files_dataframe['Operator_type'].unique()[0]
-    unique_lattice_geometry = log_files_dataframe['Lattice_geometry'].unique()[0]
-    unique_QCD_beta_value = log_files_dataframe['QCD_beta_value'].unique()[0]
-    unique_APE_alpha = log_files_dataframe['APE_alpha'].unique()[0]
-    unique_APE_iterations = log_files_dataframe['APE_iterations'].unique()[0]
-    unique_rho_value = log_files_dataframe['Rho_value'].unique()[0]
-    unique_clover_coefficient = log_files_dataframe['Clover_coefficient'].unique()[0]
-    unique_KL_iterations = log_files_dataframe['KL_iterations'].unique()[0]
-    # unique_KL_scaling_factor = log_files_dataframe['KL_scaling_factor'].unique()[0]
-    # unique_CG_epsilon = log_files_dataframe['CG_epsilon'].unique()[0]
-    # unique_MSCG_epsilon = log_files_dataframe['MSCG_epsilon'].unique()[0]
-    # unique_bare_mass = log_files_dataframe['Bare_mass'].unique()[0]
+    # INITIATE LOGGING
 
-    # Calculate further useful information
-    number_of_gauge_configurations = log_files_dataframe['Configuration_label'].nunique()
-    temporal_direction_lattice_size = int(ast.literal_eval(unique_lattice_geometry)[0])
+    filesystem_utilities.setup_logging(log_file_directory, log_filename)
 
-    # TODO: Write comments
-    with h5py.File(jackknife_analysis_for_PCAC_mass_values_hdf5_file_path, 'w') as hdf5_file_write, \
-        h5py.File(pion_correlator_values_hdf5_file_path, 'r') as hdf5_file_read:
+    # Create a logger instance for the current script using the script's name.
+    logger = logging.getLogger(__name__)
 
-        # Add a global attributes to the file
-        hdf5_file_write.attrs['Operator_method'] = unique_operator_method
-        hdf5_file_write.attrs['QCD_beta_value'] = unique_QCD_beta_value
-        hdf5_file_write.attrs['APE_alpha'] = unique_APE_alpha
-        hdf5_file_write.attrs['APE_iterations'] = unique_APE_iterations
-        hdf5_file_write.attrs['Rho_value'] = unique_rho_value
-        hdf5_file_write.attrs['Clover_coefficient'] = unique_clover_coefficient
-        hdf5_file_write.attrs['KL_iterations'] = unique_KL_iterations
-        # hdf5_file_write.attrs['KL_scaling_factor'] = unique_KL_scaling_factor
-        # hdf5_file_write.attrs['Bare_mass'] = unique_bare_mass
+    # Get the script's filename
+    script_name = os.path.basename(__file__)
 
-        hdf5_file_write.attrs['number_of_gauge_configurations'] = number_of_gauge_configurations
-        hdf5_file_write.attrs['temporal_direction_lattice_size'] = temporal_direction_lattice_size
+    # Initiate logging
+    logging.info(f"Script '{script_name}' execution initiated.")
 
-        PCAC_mass_correlator_values_hdf5_group = hdf5_file_write.create_group('PCAC_mass_correlator_values')
+    # PCAC MASS CORRELATOR VALUES CALCULATION
 
-        # EXTRACT THE g5-g5 AND THE g4g5-g5 PION CORRELATORS FROM HDF5 FILE
+    # Construct output HDF5 file path
+    output_PCAC_mass_correlator_hdf5_file_path = os.path.join(
+                                output_files_directory, output_hdf5_filename)
 
-        # TODO: Write comments
-        for operator_type, operator_type_group in log_files_dataframe.groupby('Operator_type'):
+    # Open the input HDF5 file for reading and the output HDF5 file for writing
+    with h5py.File(input_correlator_values_hdf5_file_path, "r") \
+        as hdf5_file_read, h5py.File(
+            output_PCAC_mass_correlator_hdf5_file_path, "w") as hdf5_file_write:
 
-            operator_type_hdf5_group = PCAC_mass_correlator_values_hdf5_group.create_group(operator_type)
+        # Initialize group structure of the output HDF5 file
+        # NOTE: The assumption here is that the name of the raw data files
+        # directory represents the data files set (or experiment) and its parent
+        # directory the qpb main program that generated the data files
+        parent_directory_name, last_directory_name = (
+                                filesystem_utilities.extract_directory_names(
+                                    output_files_directory)
+                                    )
+        qpb_main_program_group = hdf5_file_write.create_group(
+                                                        parent_directory_name)
+        data_files_set_group = qpb_main_program_group.create_group(
+                                                        last_directory_name)
 
-            for KL_scaling_factor, KL_scaling_factor_group in operator_type_group.groupby('KL_scaling_factor'):
+        # Select input HDF5 file's group to read
+        input_qpb_main_program_group = hdf5_file_read[parent_directory_name]
+        input_data_files_set_group = input_qpb_main_program_group[
+                                                        last_directory_name]
+        
+        # ANALYZE .CSV FILE
 
-                KL_scaling_factor_hdf5_group = operator_type_hdf5_group.create_group(str(KL_scaling_factor))
+        # Load the CSV file into a DataFrame
+        qpb_log_files_dataframe = pd.read_csv(input_qpb_log_files_csv_file_path)
 
-                for bare_mass, bare_mass_group in KL_scaling_factor_group.groupby('Bare_mass'):
+        # Extract fields with a single unique value
+        fields_with_unique_values_dictionary = (
+            data_processing.get_fields_with_unique_values(
+                qpb_log_files_dataframe)
+            )
 
-                    bare_mass_hdf5_group = KL_scaling_factor_hdf5_group.create_group(str(bare_mass))
+        # Extract a list of fields with a multiple unique values
+        excluded_fields = {"Filename", "Plaquette", "Configuration_label"}
+        list_of_fields_with_multiple_values = (
+            data_processing.get_fields_with_multiple_values(
+                qpb_log_files_dataframe, excluded_fields)
+            )
 
-                    for CG_epsilon, CG_epsilon_group in bare_mass_group.groupby('CG_epsilon'):
+        # Get a list of all unique field values
+        unique_combinations = [ qpb_log_files_dataframe[field].unique()
+                            for field in list_of_fields_with_multiple_values ]
 
-                        CG_epsilon_hdf5_group = bare_mass_hdf5_group.create_group(str(CG_epsilon))
+        # Use itertools.product to create all combinations of these unique
+        # values
+        for analysis_index, combination in enumerate(
+                                    itertools.product(*unique_combinations)):
+            # Create a filter for the current combination
+            filters = {field: value for field, value in zip(
+                            list_of_fields_with_multiple_values, combination)}
 
-                        # for MSCG_epsilon, MSCG_epsilon_group in CG_epsilon_group.groupby('MSCG_epsilon'):
+            # Get the subset of the dataframe based on the current combination
+            dataframe_group = qpb_log_files_dataframe
+            for field, value in filters.items():
+                dataframe_group = dataframe_group[
+                                            dataframe_group[field] == value]
 
-                        #     MSCG_epsilon_hdf5_group = CG_epsilon_hdf5_group.create_group(str(MSCG_epsilon))
+            # Skip empty dataframe_groups (no data for this combination)
+            if dataframe_group.empty:
+                continue
 
-                        g5_g5_correlator_values_per_configuration_list = []
-                        g4g5_g5_correlator_values_per_configuration_list = []
+            # Now 'group' contains the subset for this combination of values
+            list_of_qpb_log_filenames = dataframe_group["Filename"].tolist()
 
-                        # Iterate over all top-level groups (filenames)
-                        # for filename in hdf5_file_read.keys():
-                        for filename in CG_epsilon_group['Filename'].tolist():
+            number_of_gauge_configurations = len(list_of_qpb_log_filenames)
 
-                            # TODO: Write comment
-                            filename = filename.replace(".txt", ".dat")
-                            filename_group = hdf5_file_read[filename]
+            # Define a unique name for each top-level HDF5 group
+            PCAC_mass_correlator_analysis_group_name = (
+                        f"PCAC_mass_correlator_analysis_{analysis_index+1}")
+            PCAC_mass_correlator_hdf5_group = data_files_set_group.create_group(
+                                    PCAC_mass_correlator_analysis_group_name)
 
-                            if 'g5-g5' in filename_group.keys():
-                                g5_g5_data = filename_group['g5-g5'][:]
-                                g5_g5_correlator_values_per_configuration_list.append(g5_g5_data)
+            # Add attributes to top-level HDF5 groups
+            for key, value in fields_with_unique_values_dictionary.items():
+                PCAC_mass_correlator_hdf5_group.attrs[key] = value
+            for key, value in filters.items():
+                PCAC_mass_correlator_hdf5_group.attrs[key] = value
 
-                            if 'g4g5-g5' in filename_group.keys():
-                                g4g5_g5_data = filename_group['g4g5-g5'][:]
-                                g4g5_g5_correlator_values_per_configuration_list.append(g4g5_g5_data)
+            # Pass "g5-g5" and "g4g5-g5" datasets, corresponding to different
+            # gauge links configuration files, to respective lists common for
+            # the current grouping of parameters
+            g5_g5_correlator_values_per_configuration_list = []
+            g4g5_g5_correlator_values_per_configuration_list = []
 
-                        # Convert the list of 1D arrays into a 2D NumPy array
-                        g5_g5_correlator_values_per_configuration_2D_array = np.vstack(g5_g5_correlator_values_per_configuration_list)
-                        g4g5_g5_correlator_values_per_configuration_2D_array = np.vstack(g4g5_g5_correlator_values_per_configuration_list)
+            for qpb_log_filename in list_of_qpb_log_filenames:
 
-                        # JACKKNIFE ANALYSIS OF THE g5-g5 and g4g5-g5 PION CORRELATORS
+                correlators_file_name = qpb_log_filename.replace(".txt", ".dat")
 
-                        # Jackknife analysis of the g5-g5 correlator values
-                        jackknife_analyzed_g5_g5_correlator_values_per_configuration_object = jackknife_analysis.JackknifeAnalysis(g5_g5_correlator_values_per_configuration_2D_array)
+                filename_group = input_data_files_set_group[
+                                                        correlators_file_name]
 
-                        # Jackknife samples of the g5-g5 correlators
-                        jackknife_samples_of_g5_g5_correlator_2D_array = jackknife_analyzed_g5_g5_correlator_values_per_configuration_object.jackknife_replicas_of_original_2D_array
+                if "g5-g5" in filename_group.keys():
+                    g5_g5_dataset = filename_group["g5-g5"][:]
+                    g5_g5_correlator_values_per_configuration_list.append(
+                                                                g5_g5_dataset)
 
-                        # Jackknife average of the g5-g5 correlators
-                        jackknife_average_of_g5_g5_correlator = jackknife_analyzed_g5_g5_correlator_values_per_configuration_object.jackknife_average
+                if "g4g5-g5" in filename_group.keys():
+                    g4g5_g5_dataset = filename_group["g4g5-g5"][:]
+                    g4g5_g5_correlator_values_per_configuration_list.append(
+                                                                g4g5_g5_dataset)
 
-                        # Jackknife analysis of the g4g5-g5 correlator values 
-                        jackknife_analyzed_g4g5_g5_correlator_values_per_configuration_object = jackknife_analysis.JackknifeAnalysis(g4g5_g5_correlator_values_per_configuration_2D_array)
+            # Convert the list of 1D arrays into a 2D NumPy array
+            g5_g5_correlator_values_per_configuration_2D_array = np.vstack(
+                g5_g5_correlator_values_per_configuration_list)
+            g4g5_g5_correlator_values_per_configuration_2D_array = np.vstack(
+                g4g5_g5_correlator_values_per_configuration_list)
 
-                        # Jackknife samples of the g4g5-g5 correlators
-                        jackknife_samples_of_g4g5_g5_correlator_2D_array = jackknife_analyzed_g4g5_g5_correlator_values_per_configuration_object.jackknife_replicas_of_original_2D_array
+            # JACKKNIFE ANALYSIS OF THE g5-g5
 
-                        # Jackknife average of the g4g5-g5 correlators
-                        jackknife_average_of_g4g5_g5_correlator = jackknife_analyzed_g4g5_g5_correlator_values_per_configuration_object.jackknife_average
+            # Jackknife analysis of the g5-g5 correlator values
+            jackknife_analyzed_g5_g5_correlator_values_per_configuration_object = (
+                jackknife_analysis.JackknifeAnalysis(
+                    g5_g5_correlator_values_per_configuration_2D_array
+                )
+            )
 
-                        # PCAC MASS CALCULATION
+            # Jackknife samples of the g5-g5 correlators
+            jackknife_samples_of_g5_g5_correlator_2D_array = (
+                jackknife_analyzed_g5_g5_correlator_values_per_configuration_object.jackknife_replicas_of_original_2D_array
+            )
+            # Store dataset and attach brief description
+            PCAC_mass_correlator_hdf5_group.create_dataset(
+                "jackknife_samples_of_g5_g5_correlator_2D_array",
+                    data=jackknife_samples_of_g5_g5_correlator_2D_array).attrs[
+                        'Description'] = (
+                            "Jackknife samples.")
 
-                        """ The PCAC mass is defined as the ratio of the g4g5-g5 derivative correlator values over the g5-g5 correlator values """
+            # Jackknife average of the g5-g5 correlators
+            jackknife_average_of_g5_g5_correlator = (
+                jackknife_analyzed_g5_g5_correlator_values_per_configuration_object.jackknife_average
+            )
+            # Store dataset and attach brief description
+            PCAC_mass_correlator_hdf5_group.create_dataset(
+                "jackknife_average_of_g5_g5_correlator_mean_values",
+                        data=gv.mean(jackknife_average_of_g5_g5_correlator)).attrs[
+                        'Description'] = (
+                "Average from Jackknife samples. Mean values.")
+            PCAC_mass_correlator_hdf5_group.create_dataset(
+                "jackknife_average_of_g5_g5_correlator_error_values",
+                        data=gv.sdev(jackknife_average_of_g5_g5_correlator)).attrs[
+                        'Description'] = (
+                "Average from Jackknife samples. Error values.")
 
-                        # Jackknife samples of the g4g5-g5 derivate correlators
-                        jackknife_samples_of_g4g5_g5_derivative_correlator_2D_list = list()
-                        for index in range(len(jackknife_samples_of_g4g5_g5_correlator_2D_array)):
-                            jackknife_samples_of_g4g5_g5_derivative_correlator_2D_list.append(momentum_correlator.centered_difference_correlator_derivative(jackknife_samples_of_g4g5_g5_correlator_2D_array[index]))
-                        jackknife_samples_of_g4g5_g5_derivative_correlator_2D_array = np.array(jackknife_samples_of_g4g5_g5_derivative_correlator_2D_list)
+            # JACKKNIFE ANALYSIS OF THE g4g5-g5 PION CORRELATORS
 
-                        # g4g5-g5 derivative correlator from the jackknife average of g4g5-g5 correlator
-                        g4g5_g5_derivative_correlator_from_jackknife_average_of_g4g5_g5_correlator = momentum_correlator.centered_difference_correlator_derivative(jackknife_average_of_g4g5_g5_correlator)
+            # Jackknife analysis of the g4g5-g5 correlator values
+            jackknife_analyzed_g4g5_g5_correlator_values_per_configuration_object = (
+                jackknife_analysis.JackknifeAnalysis(
+                    g4g5_g5_correlator_values_per_configuration_2D_array
+                )
+            )
 
-                        # Jackknife samples of the time-dependent PCAC mass values
-                        jackknife_samples_of_time_dependent_PCAC_mass_values_list = list()
-                        for index in range(len(jackknife_samples_of_g5_g5_correlator_2D_array)):
+            # Jackknife samples of the g4g5-g5 correlators
+            jackknife_samples_of_g4g5_g5_correlator_2D_array = (
+                jackknife_analyzed_g4g5_g5_correlator_values_per_configuration_object.jackknife_replicas_of_original_2D_array
+            )
+            # Store dataset and attach brief description
+            PCAC_mass_correlator_hdf5_group.create_dataset(
+                "jackknife_samples_of_g4g5_g5_correlator_2D_array",
+                        data=jackknife_samples_of_g4g5_g5_correlator_2D_array).attrs[
+                        'Description'] = (
+                "Jackknife samples.")
 
-                            jackknife_sample_of_time_dependent_PCAC_mass_values = 0.5*jackknife_samples_of_g4g5_g5_derivative_correlator_2D_array[index]/jackknife_samples_of_g5_g5_correlator_2D_array[index]
+            # Jackknife average of the g4g5-g5 correlators
+            jackknife_average_of_g4g5_g5_correlator = (
+                jackknife_analyzed_g4g5_g5_correlator_values_per_configuration_object.jackknife_average
+            )
+            # Store dataset and attach brief description
+            PCAC_mass_correlator_hdf5_group.create_dataset(
+                "jackknife_average_of_g4g5_g5_correlator_mean_values",
+                        data=gv.mean(jackknife_average_of_g4g5_g5_correlator)).attrs[
+                        'Description'] = (
+                "Average from Jackknife samples. Mean values.")
+            PCAC_mass_correlator_hdf5_group.create_dataset(
+                "jackknife_average_of_g4g5_g5_correlator_error_values",
+                        data=gv.sdev(jackknife_average_of_g4g5_g5_correlator)).attrs[
+                        'Description'] = (
+                "Average from Jackknife samples. Error values.")
 
-                            jackknife_sample_of_time_dependent_PCAC_mass_values = momentum_correlator.symmetrization(jackknife_sample_of_time_dependent_PCAC_mass_values)
-                            
-                            jackknife_samples_of_time_dependent_PCAC_mass_values_list.append(jackknife_sample_of_time_dependent_PCAC_mass_values)
-                        jackknife_samples_of_time_dependent_PCAC_mass_values_2D_array = np.array(jackknife_samples_of_time_dependent_PCAC_mass_values_list)
+            # PCAC MASS CORRELATOR CALCULATION
 
-                        # Jackknife average of the time-dependent PCAC mass values
-                        jackknife_average_of_time_dependent_PCAC_mass_values_array = gv.gvar(
-                            np.average(jackknife_samples_of_time_dependent_PCAC_mass_values_2D_array, axis=0),
-                            np.sqrt(number_of_gauge_configurations-1)*np.std(jackknife_samples_of_time_dependent_PCAC_mass_values_2D_array, axis=0, ddof=0)
-                            )
+            """ 
+            NOTE: The PCAC mass is defined as the ratio of the g4g5-g5
+            derivative correlator values over the g5-g5 correlator values
+            """
 
-                        # Time-dependent PCAC mass values from the jackknife averages of the correlators
-                        time_dependent_PCAC_mass_values_from_jackknife_averages_of_correlators_array = 0.5*g4g5_g5_derivative_correlator_from_jackknife_average_of_g4g5_g5_correlator/jackknife_average_of_g5_g5_correlator
+            # Jackknife samples of the g4g5-g5 derivate correlators
+            jackknife_samples_of_g4g5_g5_derivative_correlator_2D_list = list()
+            for index in range(len(jackknife_samples_of_g4g5_g5_correlator_2D_array)):
+                jackknife_samples_of_g4g5_g5_derivative_correlator_2D_list.append(
+                    momentum_correlator.centered_difference_correlator_derivative(
+                        jackknife_samples_of_g4g5_g5_correlator_2D_array[index]
+                    )
+                )
+            jackknife_samples_of_g4g5_g5_derivative_correlator_2D_array = np.array(
+                jackknife_samples_of_g4g5_g5_derivative_correlator_2D_list
+            )
+            # Store dataset and attach brief description
+            PCAC_mass_correlator_hdf5_group.create_dataset(
+                "jackknife_samples_of_g4g5_g5_derivative_correlator_2D_array",
+            data=jackknife_samples_of_g4g5_g5_derivative_correlator_2D_array).attrs[
+                        'Description'] = (
+                "Centered difference derivative.")
 
-                        time_dependent_PCAC_mass_values_from_jackknife_averages_of_correlators_array = momentum_correlator.symmetrization(time_dependent_PCAC_mass_values_from_jackknife_averages_of_correlators_array)
+            # g4g5-g5 derivative correlator from the jackknife average of g4g5-g5 correlator
+            g4g5_g5_derivative_correlator_from_jackknife_average_of_g4g5_g5_correlator = momentum_correlator.centered_difference_correlator_derivative(
+                jackknife_average_of_g4g5_g5_correlator
+            )
+            # Store dataset and attach brief description
+            PCAC_mass_correlator_hdf5_group.create_dataset(
+                "g4g5_g5_derivative_correlator_from_jackknife_average_of_g4g5_g5_correlator_mean_values",
+            data=gv.mean(g4g5_g5_derivative_correlator_from_jackknife_average_of_g4g5_g5_correlator)).attrs[
+                        'Description'] = (
+                "Centered difference derivative from average of g4g5-g5 correlator. Mean values.")
+            PCAC_mass_correlator_hdf5_group.create_dataset(
+                "g4g5_g5_derivative_correlator_from_jackknife_average_of_g4g5_g5_correlator_error_values",
+            data=gv.sdev(g4g5_g5_derivative_correlator_from_jackknife_average_of_g4g5_g5_correlator)).attrs[
+                        'Description'] = (
+                "Centered difference derivative from average of g4g5-g5 correlator. Error values.")
 
-                        CG_epsilon_hdf5_group.create_dataset('jackknife_samples_of_PCAC_mass_correlator_values', data=jackknife_samples_of_time_dependent_PCAC_mass_values_2D_array)
-                        CG_epsilon_hdf5_group.create_dataset('jackknife_average_of_PCAC_mass_correlator_values_means', data=gv.mean(jackknife_average_of_time_dependent_PCAC_mass_values_array))
-                        CG_epsilon_hdf5_group.create_dataset('jackknife_average_of_PCAC_mass_correlator_values_error', data=gv.sdev(jackknife_average_of_time_dependent_PCAC_mass_values_array))
+            # Jackknife samples of the time-dependent PCAC mass values
+            jackknife_samples_of_time_dependent_PCAC_mass_values_list = list()
+            for index in range(len(jackknife_samples_of_g5_g5_correlator_2D_array)):
 
-    print("* PCAC mass correlator values jackknife analysis completed.")
+                jackknife_sample_of_time_dependent_PCAC_mass_values = (
+                    0.5
+                    * jackknife_samples_of_g4g5_g5_derivative_correlator_2D_array[index]
+                    / jackknife_samples_of_g5_g5_correlator_2D_array[index]
+                )
+
+                jackknife_sample_of_time_dependent_PCAC_mass_values = (
+                    momentum_correlator.symmetrization(
+                        jackknife_sample_of_time_dependent_PCAC_mass_values
+                    )
+                )
+
+                jackknife_samples_of_time_dependent_PCAC_mass_values_list.append(
+                    jackknife_sample_of_time_dependent_PCAC_mass_values
+                )
+            jackknife_samples_of_time_dependent_PCAC_mass_values_2D_array = np.array(
+                jackknife_samples_of_time_dependent_PCAC_mass_values_list
+            )
+            # Store dataset and attach brief description
+            PCAC_mass_correlator_hdf5_group.create_dataset(
+                "jackknife_samples_of_time_dependent_PCAC_mass_values_2D_array",
+            data=jackknife_samples_of_time_dependent_PCAC_mass_values_2D_array).attrs[
+                        'Description'] = (
+                "Jackknife samples.")
+
+            # Jackknife average of the time-dependent PCAC mass values
+            jackknife_average_of_time_dependent_PCAC_mass_values_array = gv.gvar(
+                np.average(
+                    jackknife_samples_of_time_dependent_PCAC_mass_values_2D_array,
+                    axis=0,
+                ),
+                np.sqrt(number_of_gauge_configurations - 1)
+                * np.std(
+                    jackknife_samples_of_time_dependent_PCAC_mass_values_2D_array,
+                    axis=0,
+                    ddof=0,
+                ),
+            )
+            # Store dataset and attach brief description
+            PCAC_mass_correlator_hdf5_group.create_dataset(
+                "jackknife_average_of_time_dependent_PCAC_mass_values_array_mean_values",
+            data=gv.mean(jackknife_average_of_time_dependent_PCAC_mass_values_array)).attrs[
+                        'Description'] = (
+                "Average from Jackknife samples. Mean values.")
+            PCAC_mass_correlator_hdf5_group.create_dataset(
+                "jackknife_average_of_time_dependent_PCAC_mass_values_array_error_values",
+            data=gv.sdev(jackknife_average_of_time_dependent_PCAC_mass_values_array)).attrs[
+                        'Description'] = (
+                "Average from Jackknife samples. Error values.")
+            
+            # Time-dependent PCAC mass values from the jackknife averages of the correlators
+            time_dependent_PCAC_mass_values_from_jackknife_averages_of_correlators_array = (
+                0.5
+                * g4g5_g5_derivative_correlator_from_jackknife_average_of_g4g5_g5_correlator
+                / jackknife_average_of_g5_g5_correlator
+            )
+            time_dependent_PCAC_mass_values_from_jackknife_averages_of_correlators_array = momentum_correlator.symmetrization(
+                time_dependent_PCAC_mass_values_from_jackknife_averages_of_correlators_array
+            )
+            # Store dataset and attach brief description
+            PCAC_mass_correlator_hdf5_group.create_dataset(
+                "time_dependent_PCAC_mass_values_from_jackknife_averages_of_correlators_array_mean_values",
+            data=gv.mean(time_dependent_PCAC_mass_values_from_jackknife_averages_of_correlators_array)).attrs[
+                        'Description'] = (
+                "Average from average correlators. Mean values.")
+            PCAC_mass_correlator_hdf5_group.create_dataset(
+                "time_dependent_PCAC_mass_values_from_jackknife_averages_of_correlators_array_error_values",
+            data=gv.sdev(time_dependent_PCAC_mass_values_from_jackknife_averages_of_correlators_array)).attrs[
+                        'Description'] = (
+                "Average from average correlators. Error values.")
+
+    print("   >> PCAC mass correlator values jackknife analysis completed.")
+
+    # Terminate logging
+    logging.info(f"Script '{script_name}' execution terminated successfully.")
 
 
 if __name__ == "__main__":

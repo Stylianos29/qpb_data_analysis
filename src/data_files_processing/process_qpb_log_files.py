@@ -49,18 +49,18 @@ from library import extraction, filesystem_utilities
 @click.option("--output_files_directory", "output_files_directory", "-out_dir",
               default=None,
         help="Directory where all the generated output files will be stored.")
-@click.option("--log_file_directory", "log_file_directory",
-              "-log_file_dir", default=None,
-                help="Directory where the script's log file will be stored.")
-@click.option("--log_filename", "log_filename", "-log",
-                default="process_qpb_log_files_script.log",
-                help="Specific name for the script's log file.")
 @click.option("--csv_filename", "csv_filename", "-csv",
                 default="qpb_log_files_single_valued_parameters.csv",
                 help="Specific name for the qpb log files .csv output file.")
 @click.option("--hdf5_filename", "hdf5_filename", "-hdf5",
                 default="qpb_log_files_multivalued_parameters.h5",
                 help="Specific name for the qpb log files HDF5 output file.")
+@click.option("--log_file_directory", "log_file_directory",
+              "-log_file_dir", default=None,
+                help="Directory where the script's log file will be stored.")
+@click.option("--log_filename", "log_filename", "-log",
+                default="process_qpb_log_files_script.log",
+                help="Specific name for the script's log file.")
 
 def main(qpb_log_files_directory, output_files_directory, log_file_directory, 
             log_filename, csv_filename, hdf5_filename):
@@ -96,7 +96,9 @@ def main(qpb_log_files_directory, output_files_directory, log_file_directory,
         csv_filename=csv_filename+'.csv'
     if not hdf5_filename.endswith('.h5'):
         hdf5_filename=hdf5_filename+'.h5'
-
+    if not log_filename.endswith('.log'):
+        log_filename=log_filename+'.log'
+        
     # INITIATE LOGGING
 
     filesystem_utilities.setup_logging(log_file_directory, log_filename)
@@ -183,13 +185,27 @@ def main(qpb_log_files_directory, output_files_directory, log_file_directory,
     hdf5_file_full_path = os.path.join(output_files_directory, hdf5_filename)
     with h5py.File(hdf5_file_full_path, 'w') as hdf5_file:
 
+        # Initialize group structure of the HDF5 file
+        # NOTE: The assumption here is that the name of the raw data files
+        # directory represents the data files set (or experiment) and its parent
+        # directory the qpb main program that generated the data files
+        parent_directory_name, last_directory_name = (
+                                filesystem_utilities.extract_directory_names(
+                                    qpb_log_files_directory)
+                                    )
+        qpb_main_program_group = hdf5_file.create_group(parent_directory_name)
+        data_files_set_group = qpb_main_program_group.create_group(
+                                                        last_directory_name)
+
+
         for qpb_log_file_full_path in glob.glob(
                                 os.path.join(qpb_log_files_directory, "*.txt")):
             # Extract the filename from the full path
             qpb_log_filename = os.path.basename(qpb_log_file_full_path)
 
             # Create a group for the current file (based on the filename)
-            file_group = hdf5_file.create_group(qpb_log_filename)
+            qpb_log_file_group = data_files_set_group.create_group(
+                                                            qpb_log_filename)
 
             # Extract multivalued parameters from the contents of the file
             extracted_multivalued_parameters_from_file_contents_dictionary = \
@@ -200,7 +216,9 @@ def main(qpb_log_files_directory, output_files_directory, log_file_directory,
             for parameter, values in \
         extracted_multivalued_parameters_from_file_contents_dictionary.items():
                 # Create a dataset for each parameter in the file
-                file_group.create_dataset(parameter, data=values)
+                qpb_log_file_group.create_dataset(parameter, data=values)
+
+    print("     >> Processing raw qpb log files completed.")
 
     logging.info(f"Extracted multivalued parameters are stored in the "\
                                                     f"'{hdf5_filename}' file.")
