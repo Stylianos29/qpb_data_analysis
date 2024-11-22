@@ -49,7 +49,6 @@ import h5py
 import numpy as np
 import logging
 
-sys.path.append('../')
 from library import constants, filesystem_utilities
 
 
@@ -189,7 +188,7 @@ def main(raw_data_files_directory, output_files_directory,
                 data_files_group.create_dataset(correlator_identifier,
                     data=correlator_values_dictionary[correlator_identifier])
 
-    print("     >> Parsing raw correlator files completed.")
+    print("   -- Parsing raw correlator files completed.")
 
     # Terminate logging
     logging.info(f"Script '{script_name}' execution terminated successfully.")

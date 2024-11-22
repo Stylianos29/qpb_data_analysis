@@ -10,7 +10,6 @@ import ast
 import logging
 import h5py
 
-sys.path.append("../")
 from library import momentum_correlator
 from library import jackknife_analysis
 from library import filesystem_utilities
@@ -401,7 +400,7 @@ def main(input_qpb_log_files_csv_file_path,
                         'Description'] = (
                 "Average from average correlators. Error values.")
 
-    print("   >> PCAC mass correlator values jackknife analysis completed.")
+    print("   -- PCAC mass correlator values jackknife analysis completed.")
 
     # Terminate logging
     logging.info(f"Script '{script_name}' execution terminated successfully.")

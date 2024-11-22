@@ -10,7 +10,6 @@ import ast
 import logging
 import h5py
 
-sys.path.append("../")
 from library import filesystem_utilities
 import library as effective_mass
 
@@ -98,7 +97,7 @@ def main(input_qpb_log_files_csv_file_path,
 
     # PCAC MASS CORRELATOR VALUES CALCULATION
 
-    print("   >> PCAC mass estimates calculation completed.")
+    print("   -- PCAC mass estimates calculation completed.")
 
     # Terminate logging
     logging.info(f"Script '{script_name}' execution terminated successfully.")

@@ -38,7 +38,6 @@ import pandas as pd
 import logging
 import h5py
 
-sys.path.append('../')
 from library import extraction, filesystem_utilities
 
 
@@ -218,7 +217,7 @@ def main(qpb_log_files_directory, output_files_directory, log_file_directory,
                 # Create a dataset for each parameter in the file
                 qpb_log_file_group.create_dataset(parameter, data=values)
 
-    print("     >> Processing raw qpb log files completed.")
+    print("   -- Processing raw qpb log files completed.")
 
     logging.info(f"Extracted multivalued parameters are stored in the "\
                                                     f"'{hdf5_filename}' file.")
