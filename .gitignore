@@ -1,12 +1,12 @@
 bash_scripts/utils/*
 
+core/library/__pycache__/*
+core/qpb_data_analysis.egg-info/*
+core/unit_tests/__pycache__/*
+
 data_files/raw/*
 !data_files/raw/README.md
 data_files/processed/*
 !data_files/processed/README.md
 
-library/__pycache__/*
-
 output/plots/*
-
-unit_tests/__pycache__/*
