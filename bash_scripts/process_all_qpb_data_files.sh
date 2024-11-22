@@ -77,7 +77,7 @@ for data_files_main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
     fi
 
     echo
-    echo "Working with '${data_files_main_program_directory}' qpb main program:"
+    echo "Working within '${data_files_main_program_directory}':"
 
     # Loop over all subdirectories of the current main program directory.
     # These are expected to represent specific experiments or analyses.
@@ -92,7 +92,7 @@ for data_files_main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
         # Extract name of data files set directory
         data_files_set_directory=$(basename $data_files_experiment_directory)
 
-        echo "- '${data_files_set_directory}' dataset directory:"
+        echo "- '${data_files_set_directory}' data files set:"
 
         # Construct path to corresponding processed data files subdirectory
         output_directory_path=$PROCESSED_DATA_FILES_DIRECTORY
@@ -102,8 +102,8 @@ for data_files_main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
         # Create the processed data files subdirectory if it does not exit
         if [ ! -d "$output_directory_path" ]; then
             mkdir -p "$output_directory_path"
-            echo "WARNING: Subdirectory '${output_directory_path}' does not "
-            echo "exit, so it was created."
+            echo "   ++ WARNING: Subdirectory '${output_directory_path}' does "
+            echo "not exist, so it was created."
         fi
 
         # Initialize a boolean variable for warning purposes
@@ -115,7 +115,7 @@ for data_files_main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
         if find "$data_files_experiment_directory" \
                             -maxdepth 1 -type f -name "*.txt" | grep -q .; then
             
-            echo "  ++ It contains qpb log files."
+            echo "   ++ It contains qpb log files."
             NO_DATA_FILES="False"
 
             # Call the Python script to process qpb log files in the current
@@ -133,7 +133,7 @@ for data_files_main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
         if find "$data_files_experiment_directory" \
                             -maxdepth 1 -type f -name "*.dat" | grep -q .; then
 
-            echo "  ++ It contains qpb correlator files."
+            echo "   ++ It contains qpb correlator files."
             NO_DATA_FILES="False"
 
             # Call the Python script to process correlator data file in the
@@ -142,14 +142,14 @@ for data_files_main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
             #   automatically.
             # - Generates output files with appropriate names.
             python "${SOURCE_SCRIPTS_DIRECTORY}/parse_qpb_correlator_files.py" \
-                -data_dir "$data_files_experiment_directory" \
-                -hdf5_dir "$output_directory_path" \
+                -raw_dir "$data_files_experiment_directory" \
+                -out_dir "$output_directory_path" \
                 -out_hdf5_file "$OUTPUT_HDF5_FILE_NAME"
         fi
 
         # If no data files were found print a warning
         if [ NO_DATA_FILES == "True" ]; then
-            echo "  ++ WARNING: No data files were found in this directory!"
+            echo "   ++ WARNING: No data files were found in this directory!"
         fi
 
     done
