@@ -1,8 +1,9 @@
 #!/bin/bash
 
 # Define paths for the source scripts, raw data files, and processed data files.
-SOURCE_SCRIPTS_DIRECTORY="../src/post_processing_analysis"
+SOURCE_SCRIPTS_DIRECTORY="../core/src/post_processing_analysis"
 PROCESSED_DATA_FILES_DIRECTORY="../data_files/processed"
+PLOTS_DIRECTORY="../output/plots"
 
 # Set a common output HDF5 filename for all qpb main programs and datasets
 INPUT_LOG_FILES_CSV_FILE_NAME="qpb_log_files_single_valued_parameters.csv"
@@ -39,6 +40,8 @@ for data_files_main_program_directory in "$PROCESSED_DATA_FILES_DIRECTORY"/*; do
         input_hdf5_file_path="${data_files_sets_directory}"
         input_hdf5_file_path+="/${INPUT_HDF5_FILE_NAME}"
 
+        h5glance "$input_hdf5_file_path" >> "${input_hdf5_file_path%.h5}_tree.txt"
+
         # Check if both the correlator values HDF5 file and qpb log files .csv
         # file exist; skip otherwise.
         if [ ! -f "${input_hdf5_file_path}" ] \
@@ -47,13 +50,39 @@ for data_files_main_program_directory in "$PROCESSED_DATA_FILES_DIRECTORY"/*; do
             continue
         fi
 
-        # 
+        # PCAC mass correlator analysis
         python "${SOURCE_SCRIPTS_DIRECTORY}/calculate_PCAC_mass_correlator.py" \
             -log_csv "$input_log_files_csv_file_path" \
             -cor_hdf5 "$input_hdf5_file_path"
 
+        input_hdf5_file_path="${data_files_sets_directory}"
+        input_hdf5_file_path+="/PCAC_mass_correlator_values.h5"
+
+        # Accompany the HDF5 file with a detailed tree graph of its structure
+        h5glance "$input_hdf5_file_path" >> "${input_hdf5_file_path%.h5}_tree.txt"
+
+        # Construct path to corresponding plots subdirectory
+        plots_subdirectory_path=$PLOTS_DIRECTORY
+        plots_subdirectory_path+="/$(basename $data_files_main_program_directory)"
+        plots_subdirectory_path+="/$(basename $data_files_sets_directory)"
+
+        # Create the plots subdirectory if it does not exit
+        if [ ! -d "$plots_subdirectory_path" ]; then
+            mkdir -p "$plots_subdirectory_path"
+            warning_message="   ++ WARNING: Subdirectory "
+            warning_message+="'${plots_subdirectory_path}' does not exist, so "
+            warning_message+="it was created."
+            echo "${warning_message}"
+        fi
+
+        # PCAC mass estimates analysis
+        python "${SOURCE_SCRIPTS_DIRECTORY}/calculate_PCAC_mass_estimates.py" \
+            -PCAC_hdf5 "$input_hdf5_file_path" \
+            -plots_dir "$plots_subdirectory_path"
     done
 done
 
 echo
 echo "Script termination."
+
+# TODO: Provide better names for inputs and outputs
