@@ -102,8 +102,10 @@ for data_files_main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
         # Create the processed data files subdirectory if it does not exit
         if [ ! -d "$output_directory_path" ]; then
             mkdir -p "$output_directory_path"
-            echo "   ++ WARNING: Subdirectory '${output_directory_path}' does "
-            echo "not exist, so it was created."
+            warning_message="   ++ WARNING: Subdirectory "
+            warning_message+="'${plots_subdirectory_path}' does not exist, so "
+            warning_message+="it was created."
+            echo "${warning_message}"
         fi
 
         # Initialize a boolean variable for warning purposes
@@ -125,6 +127,10 @@ for data_files_main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
             python "${SOURCE_SCRIPTS_DIRECTORY}/process_qpb_log_files.py" \
                 -qpb_log_dir "$data_files_experiment_directory" \
                 -out_dir "$output_directory_path"
+
+            # TODO: Include a tree graph in the output files
+            # # Accompany the HDF5 file with a detailed tree graph of its structure
+            # h5glance "$output_hdf5_file_path" >> "${output_hdf5_file_path%.h5}_tree.txt"
         fi
 
         # QPB CORRELATOR FILES PARSING
@@ -145,6 +151,10 @@ for data_files_main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
                 -raw_dir "$data_files_experiment_directory" \
                 -out_dir "$output_directory_path" \
                 -out_hdf5_file "$OUTPUT_HDF5_FILE_NAME"
+                
+            # TODO: Include a tree graph in the output files
+            # # Accompany the HDF5 file with a detailed tree graph of its structure
+            # h5glance "$output_hdf5_file_path" >> "${output_hdf5_file_path%.h5}_tree.txt"
         fi
 
         # If no data files were found print a warning
