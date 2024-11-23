@@ -15,5 +15,6 @@ setup(
         "gvar",
         "lsqfit",
         "h5py",
+        "h5glance"
     ]
 )
