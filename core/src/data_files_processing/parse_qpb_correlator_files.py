@@ -32,7 +32,7 @@ Usage:
     Run the script from the command line as follows:
         python parse_pion_correlator_files_to_HDF5.py --raw_data_files_directory
         <path_to_data> --output_files_directory <path_to_hdf5>
-        --output_hdf5_filename <output_file_name.h5>
+        --output_hdf5_filename <output_filename.h5>
 
 Example:
     Given .dat files in the specified data directory, the script will generate
