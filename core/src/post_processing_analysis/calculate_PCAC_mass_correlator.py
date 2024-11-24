@@ -141,7 +141,7 @@ def main(input_qpb_log_files_csv_file_path,
         for key, value in fields_with_unique_values_dictionary.items():
             data_files_set_group.attrs[key] = value
 
-        # Extract a list of fields with a multiple unique values
+        # Extract list of fields with multiple unique values excluding specified
         excluded_fields = {"Filename", "Plaquette", "Configuration_label"}
         list_of_fields_with_multiple_values = (
             data_processing.get_fields_with_multiple_values(
@@ -195,10 +195,10 @@ def main(input_qpb_log_files_csv_file_path,
 
             for qpb_log_filename in list_of_qpb_log_filenames:
 
-                correlators_file_name = qpb_log_filename.replace(".txt", ".dat")
+                correlators_filename = qpb_log_filename.replace(".txt", ".dat")
 
                 filename_group = input_data_files_set_group[
-                                                        correlators_file_name]
+                                                        correlators_filename]
 
                 if "g5-g5" in filename_group.keys():
                     g5_g5_dataset = filename_group["g5-g5"][:]
