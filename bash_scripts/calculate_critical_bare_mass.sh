@@ -79,6 +79,14 @@ for data_files_main_program_directory in "$PROCESSED_DATA_FILES_DIRECTORY"/*; do
         python "${SOURCE_SCRIPTS_DIRECTORY}/calculate_PCAC_mass_estimates.py" \
             -PCAC_hdf5 "$input_hdf5_file_path" \
             -plots_dir "$plots_subdirectory_path"
+
+        input_csv_file_path="${data_files_sets_directory}"
+        input_csv_file_path+="/PCAC_mass_estimates.csv"
+
+        # Critical bare mass from PCAC mass estimates analysis
+        python "${SOURCE_SCRIPTS_DIRECTORY}/calculate_critical_bare_mass_from_PCAC_mass.py" \
+            -PCAC_csv "$input_csv_file_path" \
+            -plots_dir "$plots_subdirectory_path"
     done
 done
 
@@ -86,3 +94,4 @@ echo
 echo "Script termination."
 
 # TODO: Provide better names for inputs and outputs
+# TODO: Generate a summary files for each .csv file
