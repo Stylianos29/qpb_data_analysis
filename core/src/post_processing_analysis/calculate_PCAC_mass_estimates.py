@@ -26,7 +26,7 @@ from library import filesystem_utilities, effective_mass
 @click.option("--plots_directory", "plots_directory", "-plots_dir",
               default="../../output/plots",
               help="Path to the output directory for storing plots.")
-@click.option("--output_PCAC_mass_csv_file_name", "output_PCAC_mass_csv_file_name",
+@click.option("--output_PCAC_mass_csv_filename", "output_PCAC_mass_csv_filename",
               "-hdf5", default="PCAC_mass_estimates.csv",
               help="Specific name for the output HDF5 file.")
 @click.option("--log_file_directory", "log_file_directory", "-log_file_dir", 
@@ -38,7 +38,7 @@ from library import filesystem_utilities, effective_mass
 
 def main(input_PCAC_mass_correlator_values_hdf5_file_path,
          output_files_directory, plots_directory,
-         output_PCAC_mass_csv_file_name, log_file_directory, log_filename):
+         output_PCAC_mass_csv_filename, log_file_directory, log_filename):
 
     # PERFORM VALIDITY CHECKS ON INPUT ARGUMENTS
 
@@ -62,7 +62,7 @@ def main(input_PCAC_mass_correlator_values_hdf5_file_path,
         sys.exit(1)
 
     if not filesystem_utilities.is_valid_directory(plots_directory):
-        error_message = "The specified plotting directory path is invalid."
+        error_message = "The specified plots directory path is invalid."
         print("ERROR:", error_message)
         sys.exit(1)
 
@@ -79,8 +79,8 @@ def main(input_PCAC_mass_correlator_values_hdf5_file_path,
         sys.exit(1)
 
     # Check for proper extensions in provided output filenames
-    if not output_PCAC_mass_csv_file_name.endswith(".csv"):
-        output_PCAC_mass_csv_file_name = output_PCAC_mass_csv_file_name + ".csv"
+    if not output_PCAC_mass_csv_filename.endswith(".csv"):
+        output_PCAC_mass_csv_filename = output_PCAC_mass_csv_filename + ".csv"
     if not log_filename.endswith(".log"):
         log_filename = log_filename + ".log"
 
@@ -171,13 +171,15 @@ def main(input_PCAC_mass_correlator_values_hdf5_file_path,
 
             # Ignore the second half of the PCAC mass correlator values array since its
             # been by construction symmetrized
-            y = jackknife_average_of_time_dependent_PCAC_mass_values_array[LOWEST_INDEX_CUT:temporal_direction_lattice_size//2]
+            y = jackknife_average_of_time_dependent_PCAC_mass_values_array[
+                            LOWEST_INDEX_CUT:temporal_direction_lattice_size//2]
 
             # The corresponding time values must be shifted by the lowest index cut
             x = range(LOWEST_INDEX_CUT, len(y)+LOWEST_INDEX_CUT)
 
             # Usually at t=T/4 the time-dependent PCAC mass starts to plateau
-            PCAC_mass_plateau_fit_guess = [gv.mean(y[temporal_direction_lattice_size//4])]
+            PCAC_mass_plateau_fit_guess = [
+                gv.mean(y[temporal_direction_lattice_size//4])]
 
             # NOTE: 
             PCAC_mass_plateau_fit_minimum_chi2 = 1000 # Set to an arbitrary large number
@@ -195,9 +197,10 @@ def main(input_PCAC_mass_correlator_values_hdf5_file_path,
 
             # PLOT TIME DEPENDENCE OF PCAC MASS VALUES
 
-            plots_nested_subdirectory = os.path.join(plots_directory, "PCAC_mass_estimates_calculation")
-            # Create "plots_nested_subdirectory" if it does not exist
-            os.makedirs(plots_nested_subdirectory, exist_ok=True)
+            plots_subdirectory = os.path.join(plots_directory,
+                                              "PCAC_mass_estimates_calculation")
+            # Create "plots_subdirectory" if it does not exist
+            os.makedirs(plots_subdirectory, exist_ok=True)
 
             fig, ax = plt.subplots()
             ax.grid()
@@ -229,7 +232,7 @@ def main(input_PCAC_mass_correlator_values_hdf5_file_path,
             # plot_filename = f'Jackknife_average_PCAC_mass_correlator_values_{Operator_method}_{operator_type}_m{bare_mass}_EpsCG{CG_epsilon}_EpsMSCG{MSCG_epsilon}.png'
             plot_filename = PCAC_mass_correlator_analysis_group_name
             # f'Jackknife_average_PCAC_mass_correlator_values_{Operator_method}_{operator_type}_m{bare_mass}_EpsCG{CG_epsilon}.png'
-            plot_path = os.path.join(plots_nested_subdirectory, plot_filename)
+            plot_path = os.path.join(plots_subdirectory, plot_filename)
 
             fig.savefig(plot_path)
             plt.close()
@@ -245,7 +248,7 @@ def main(input_PCAC_mass_correlator_values_hdf5_file_path,
 
     # Construct output .csv file path
     csv_file_full_path = os.path.join(output_files_directory,
-                                                output_PCAC_mass_csv_file_name)
+                                                output_PCAC_mass_csv_filename)
     # Export the DataFrame to a CSV file
     PCAC_mass_estimates_dataframe.to_csv(csv_file_full_path, index=False)
 
