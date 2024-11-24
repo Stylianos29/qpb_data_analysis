@@ -135,10 +135,6 @@ def extract_parameters_values_from_file_contents(file_contents_list,
                 if logger:
                     logger.warning(f"Regex pattern '{regex_pattern}' did not "\
                                                 f"match for {parameter_name}.")
-        else:
-            if logger:
-                logger.warning(f"Line identifier '{line_identifier}' not "\
-                                                f"found for {parameter_name}.")
 
     return extracted_values
 
