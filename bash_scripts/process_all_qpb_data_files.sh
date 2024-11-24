@@ -103,7 +103,7 @@ for data_files_main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
         if [ ! -d "$output_directory_path" ]; then
             mkdir -p "$output_directory_path"
             warning_message="   ++ WARNING: Subdirectory "
-            warning_message+="'${plots_subdirectory_path}' does not exist, so "
+            warning_message+="'${output_directory_path}' does not exist, so "
             warning_message+="it was created."
             echo "${warning_message}"
         fi
@@ -167,3 +167,5 @@ done
 
 echo
 echo "Processing all qpb data_files completed!"
+
+# TODO: Generate a summary files for each .csv file
