@@ -248,3 +248,14 @@ CORRELATOR_IDENTIFIERS_LIST = [
     "g2-g2",
     "g3-g3"
 ]
+
+# Define a fixed, constant dtype dictionary
+dtype_mapping = {
+    'Clover_coefficient': int,
+    'Configuration_label': str,
+}
+
+# Define a fixed, constant converters dictionary
+converters_mapping = {
+    'QCD_beta_value': lambda x: f"{float(x):.2f}",  # Format floats to 2 decimal places
+}
