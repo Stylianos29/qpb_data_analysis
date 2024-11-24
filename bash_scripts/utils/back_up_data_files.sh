@@ -6,15 +6,15 @@ SOURCE_DIR="/nvme/h/cy22sg1/Data_analysis/data_files"
 DEST_DIR="/onyx/qdata/cy22sg1/data_files"
 LOG_FILE="/nvme/h/cy22sg1/Data_analysis/rsync.log"
 
-# Step 1: Compress subsubdirectories (depth-2) into .tar.gz files inside their
+# Step 1: Compress subdirectories (depth-2) into .tar.gz files inside their
 # respective depth-1 subdirectory
-find "$SOURCE_DIR" -mindepth 2 -maxdepth 2 -type d | while read subsubdir; do
+find "$SOURCE_DIR" -mindepth 2 -maxdepth 2 -type d | while read subdirDepth2; do
     # Get the parent directory (depth-1 subdirectory)
-    parent_dir=$(dirname "$subsubdir")
+    parent_dir=$(dirname "$subdirDepth2")
     
-    # Ensure the subsubdirectory is correctly compressed into a tar.gz file
+    # Ensure the subdirectory is correctly compressed into a tar.gz file
     # inside the parent directory
-    tar -czf "$parent_dir/$(basename "$subsubdir").tar.gz" -C "$parent_dir" "$(basename "$subsubdir")"
+    tar -czf "$parent_dir/$(basename "$subdirDepth2").tar.gz" -C "$parent_dir" "$(basename "$subdirDepth2")"
 done
 
 # Step 2: Rsync to backup files (only .tar.gz and markdown files, maintaining
