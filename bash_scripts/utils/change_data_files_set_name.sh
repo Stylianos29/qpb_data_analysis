@@ -58,12 +58,12 @@ done
 
 # Validate the directory path argument if provided
 if [ -z "$directory_path" ]; then
-    echo "Error: Directory path not provided."
+    echo "ERROR: Directory path not provided."
     usage
 fi
 
 if [ ! -d "$directory_path" ]; then
-    echo "Error: Directory path '$directory_path' does not exist or is not a directory."
+    echo "ERROR: Directory path '$directory_path' does not exist or is not a directory."
     exit 1
 fi
 
