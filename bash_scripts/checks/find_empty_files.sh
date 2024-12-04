@@ -1,21 +1,22 @@
 #!/bin/bash
 
 ################################################################################
-# find_empty_files.sh - Script for finding and optionally deleting all empty 
+# find_empty_files.sh - Script for finding and optionally deleting all empty
 # files within a given directory and its subdirectories.
 #
 # Functionalities:
 # - Takes a directory path as input using the `-d` or `--directory` flag.
 # - Optionally removes empty files when the `-r` or `--remove` flag is provided.
-# - Optionally prints usage information when the `-u` or `--usage` flag is provided.
+# - Optionally prints usage information when the `-u` or `--usage` flag is
+#   provided.
 # - Uses the `find` command to locate all files in the specified directory and
 #   its subdirectories.
 # - Checks if each file is empty (i.e., file size is 0 bytes).
 # - Prints the paths of all empty files.
 #
 # Input:
-# - A directory path as the first argument, or via the `-d` or `--directory` flag 
-#   (e.g., ./find_empty_files.sh -d /path/to/directory).
+# - A directory path as the first argument, or via the `-d` or `--directory`
+#   flag (e.g., ./find_empty_files.sh -d /path/to/directory).
 # - Optional flag `-r` or `--remove` to delete empty files.
 # - Optional flag `-u` or `--usage` to print the usage instructions.
 #
@@ -80,12 +81,12 @@ fi
 
 # Validate directory path if provided
 if [ -z "$directory_path" ]; then
-    echo "Error: Directory path is required. Use -d or --directory to specify it."
+    echo "ERROR: Directory path is required. Use -d or --directory to specify it."
     usage
 fi
 
 if [ ! -d "$directory_path" ]; then
-    echo "Error: '$directory_path' is not a valid directory."
+    echo "ERROR: '$directory_path' is not a valid directory."
     exit 1
 fi
 
