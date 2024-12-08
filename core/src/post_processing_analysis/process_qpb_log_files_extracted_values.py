@@ -14,10 +14,16 @@ from library import filesystem_utilities
 @click.option(
     "--input_qpb_log_files_csv_file_path",
     "input_qpb_log_files_csv_file_path",
-    "-log_csv",
-    default="/nvme/h/cy22sg1/qpb_data_analysis/data_files/processed/invert/Chebyshev_several_m_varying_EpsLanczos/qpb_log_files_single_valued_parameters.csv",
-    help="Path to input .csv file containing extracted info from "
-    "qpb log files sets.",
+    "-in_csv_path",
+    default=None,
+    help="Path to .csv file containing extracted info from qpb log files sets.",
+)
+@click.option(
+    "--output_qpb_log_files_csv_filename",
+    "output_qpb_log_files_csv_filename",
+    "-out_csv",
+    default=None,
+    help="Specific name for the output .csv file.",
 )
 @click.option(
     "--log_file_directory",
@@ -33,7 +39,12 @@ from library import filesystem_utilities
     default="TEST.log",
     help="Specific name for the script's log file.",
 )
-def main(input_qpb_log_files_csv_file_path, log_file_directory, log_filename):
+def main(
+    input_qpb_log_files_csv_file_path,
+    output_qpb_log_files_csv_filename,
+    log_file_directory,
+    log_filename,
+):
 
     # PERFORM VALIDITY CHECKS ON INPUT ARGUMENTS
 
@@ -41,6 +52,11 @@ def main(input_qpb_log_files_csv_file_path, log_file_directory, log_filename):
         error_message = "Passed qpb log files .csv file path is invalid!."
         print("ERROR:", error_message)
         sys.exit(1)
+
+    if output_qpb_log_files_csv_filename is None:
+        output_qpb_log_files_csv_filename = os.path.basename(
+            input_qpb_log_files_csv_file_path
+        )
 
     # Specify current script's log file directory
     if log_file_directory is None:
@@ -82,12 +98,18 @@ def main(input_qpb_log_files_csv_file_path, log_file_directory, log_filename):
             "Kernel_operator_type"
         ].replace("Standard", "Wilson")
 
-    # Extract 'Temporal_dimension_size' and 'Spatial_dimension_size'
+    # Ensure the "Configuration_label" field has 7-digit strings
+    if "Configuration_label" in qpb_log_files_dataframe.columns:
+        qpb_log_files_dataframe["Configuration_label"] = (
+            qpb_log_files_dataframe["Configuration_label"].astype(str).str.zfill(7)
+        )
+
+    # Extract 'Temporal_lattice_size' and 'Spatial_lattice_size'
     if "Lattice_geometry" in qpb_log_files_dataframe.columns:
-        qpb_log_files_dataframe["Temporal_dimension_size"] = qpb_log_files_dataframe[
+        qpb_log_files_dataframe["Temporal_lattice_size"] = qpb_log_files_dataframe[
             "Lattice_geometry"
         ].apply(lambda x: int(ast.literal_eval(x)[0]))
-        qpb_log_files_dataframe["Spatial_dimension_size"] = qpb_log_files_dataframe[
+        qpb_log_files_dataframe["Spatial_lattice_size"] = qpb_log_files_dataframe[
             "Lattice_geometry"
         ].apply(lambda x: int(ast.literal_eval(x)[1]))
 
@@ -95,7 +117,7 @@ def main(input_qpb_log_files_csv_file_path, log_file_directory, log_filename):
         qpb_log_files_dataframe.drop(columns=["Lattice_geometry"], inplace=True)
 
     # Modify the "MPI_geometry" field
-    if "Lattice_geometry" in qpb_log_files_dataframe.columns:
+    if "MPI_geometry" in qpb_log_files_dataframe.columns:
         qpb_log_files_dataframe["MPI_geometry"] = qpb_log_files_dataframe[
             "MPI_geometry"
         ].apply(
@@ -121,46 +143,54 @@ def main(input_qpb_log_files_csv_file_path, log_file_directory, log_filename):
                 columns={"Initial_APE_iterations": "APE_iterations"}, inplace=True
             )
 
-    # Take the square root of the Solver_epsilon value
+    # Take the square root of the "Solver_epsilon" value
     if "Solver_epsilon" in qpb_log_files_dataframe.columns:
         qpb_log_files_dataframe["Solver_epsilon"] = np.sqrt(
-            qpb_log_files_dataframe["Solver_epsilon"].apply(ast.literal_eval)
+            qpb_log_files_dataframe["Solver_epsilon"].apply(float)
         )
 
-    # TODO: MSCG_epsilon, take the square root
+    # Take the square root of the "CG_epsilon" value
+    if "CG_epsilon" in qpb_log_files_dataframe.columns:
+        qpb_log_files_dataframe["CG_epsilon"] = np.sqrt(
+            qpb_log_files_dataframe["CG_epsilon"].apply(float)
+        )
 
-    # TODO: CG_epsilon, take the square root
+    # Take the square root of the "MSCG_epsilon" value
+    if "MSCG_epsilon" in qpb_log_files_dataframe.columns:
+        qpb_log_files_dataframe["MSCG_epsilon"] = np.sqrt(
+            qpb_log_files_dataframe["MSCG_epsilon"].apply(float)
+        )
 
     # Take the square root of the "Minimum_eigenvalue_squared" value
     if "Minimum_eigenvalue_squared" in qpb_log_files_dataframe.columns:
         qpb_log_files_dataframe["Minimum_eigenvalue"] = np.sqrt(
-            qpb_log_files_dataframe["Minimum_eigenvalue_squared"].apply(
-                ast.literal_eval
-            )
+            qpb_log_files_dataframe["Minimum_eigenvalue_squared"].apply(float)
         )
-        # Remove "Minimum_eigenvalue_squared"
-        qpb_log_files_dataframe.drop(
-            columns=["Minimum_eigenvalue_squared"], inplace=True
-        )
+        # # Remove "Minimum_eigenvalue_squared"
+        # qpb_log_files_dataframe.drop(
+        #     columns=["Minimum_eigenvalue_squared"], inplace=True
+        # )
 
     # Take the square root of the "Maximum_eigenvalue_squared" value
     if "Maximum_eigenvalue_squared" in qpb_log_files_dataframe.columns:
         qpb_log_files_dataframe["Maximum_eigenvalue"] = np.sqrt(
-            qpb_log_files_dataframe["Maximum_eigenvalue_squared"].apply(
-                ast.literal_eval
-            )
+            qpb_log_files_dataframe["Maximum_eigenvalue_squared"].apply(float)
         )
-        # Remove "Maximum_eigenvalue_squared"
-        qpb_log_files_dataframe.drop(
-            columns=["Maximum_eigenvalue_squared"], inplace=True
-        )
+        # # Remove "Maximum_eigenvalue_squared"
+        # qpb_log_files_dataframe.drop(
+        #     columns=["Maximum_eigenvalue_squared"], inplace=True
+        # )
 
-    # Export modified DataFrame back to the same .csv file
-    qpb_log_files_dataframe.to_csv(
-        input_qpb_log_files_csv_file_path.replace(".csv", "TEST.csv"), index=False
+    # Construct the output .csv file path
+    output_qpb_log_files_csv_file_path = os.path.join(
+        os.path.dirname(input_qpb_log_files_csv_file_path),
+        output_qpb_log_files_csv_filename,
     )
 
-    print("   -- Processing extracted QPB parameters and output values completed.")
+    # Export modified DataFrame back to the same .csv file
+    qpb_log_files_dataframe.to_csv(output_qpb_log_files_csv_file_path, index=False)
+
+    print("   -- Processing QPB log files extracted information completed.")
 
     # Terminate logging
     logging.info(f"Script '{script_name}' execution terminated successfully.")
