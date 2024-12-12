@@ -1,6 +1,3 @@
-bash_scripts/utils/lowercase_mass.sh
-bash_scripts/utils/remove_kappa_lines.sh
-
 core/library/__pycache__/*
 core/qpb_data_analysis.egg-info/*
 core/unit_tests/__pycache__/*
