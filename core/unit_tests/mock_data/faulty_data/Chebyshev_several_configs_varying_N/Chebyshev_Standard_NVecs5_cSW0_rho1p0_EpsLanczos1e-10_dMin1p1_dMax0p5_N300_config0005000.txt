@@ -1,0 +1,42 @@
+ (Lt, Lz, Ly, Lx) = (48,24,24,24)
+ Processes = (1, 4, 2, 2)
+ Threads per process =  2
+ Gauge field (raw_32) = /nvme/h/cy22sg1/scratch/Nf0/Nf0_b6p20_L24T48-APE/conf_Nf0_b6p20_L24T48_apeN1a0p72.0005000
+ APE alpha = 0.72
+ APE iterations = 0
+ Conf shifts = 14 7 6 2
+ rho = 1
+ mass = 0
+ Clover param = 0
+ Number of Chebyshev terms = 300
+ BC in time = 1
+ Lanczos epsilon = 1.000000e-10
+ Max Lanczos iters = 10000
+ Dslash operator is Standard
+ Plaquette =   0.90600913
+ Min eigenvalue squared modification = 1.100000
+ Max eigenvalue squared modification = 0.500000
+	iter =  101, CN = 4.681527e+01/4.897842e-02 = 9.558347e+02 (change = 8.868449e-04, target = 1.000000e-10)
+	iter =  201, CN = 4.681707e+01/4.708573e-02 = 9.942942e+02 (change = 5.460395e-05, target = 1.000000e-10)
+	iter =  301, CN = 4.681721e+01/4.694754e-02 = 9.972239e+02 (change = 2.272758e-05, target = 1.000000e-10)
+	iter =  401, CN = 4.681723e+01/4.691585e-02 = 9.978978e+02 (change = 1.013987e-09, target = 1.000000e-10)
+	iter =  501, CN = 4.681723e+01/4.691585e-02 = 9.978979e+02 (change = 1.083644e-10, target = 1.000000e-10)
+ Min eigenvalue squared = 0.0516074363322074
+ Max eigenvalue squared = 23.4081756317774392
+
+ Done vector = 1 / 5, || Sign^2(X) - 1 ||^2 = nan
+
+ Done vector = 2 / 5, || Sign^2(X) - 1 ||^2 = nan
+
+ Done vector = 3 / 5, || Sign^2(X) - 1 ||^2 = nan
+
+ Done vector = 4 / 5, || Sign^2(X) - 1 ||^2 = nan
+
+ Done vector = 5 / 5, || Sign^2(X) - 1 ||^2 = nan
+ Done, 5 vectors in t = 638.534292 sec
+ || Sign^2(X) - 1 ||^2 (normalized, per stochastic source):
+    0 nan
+    1 nan
+    2 nan
+    3 nan
+    4 nan
