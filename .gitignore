@@ -12,3 +12,6 @@ data_files/processed/*
 
 output/plots/*
 !output/plots/README.md
+
+examples/*/*
+core/unit_tests/mock_data/faulty_data/*

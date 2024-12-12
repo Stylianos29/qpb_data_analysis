@@ -64,7 +64,7 @@ Notes:
 
 import sys
 
-import click  # type: ignore
+import click
 import h5py
 
 sys.path.append('../../')

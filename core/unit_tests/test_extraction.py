@@ -1,9 +1,8 @@
 import unittest
 import sys
 
-import pytest # type: ignore
+import pytest
 
-sys.path.append('../')
 from library import extraction
 
 

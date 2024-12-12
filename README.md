@@ -9,11 +9,12 @@ libraries, usage examples, and unit tests to ensure reliability and ease of use.
 
 1. Clone the repository:  
 ```
-git clone https://github.com/Stylianos29/qpb_data_analysis.git
-cd qpb_data_analysis
+git clone https://github.com/Stylianos29/qpb_data_analysis.git cd
+qpb_data_analysis
 ```
 
-2. Standard Python packaging script. Use `setup.py` to install the project as a Python package and install Python dependencies:  
+2. Standard Python packaging script. Use `setup.py` to install the project as a
+ Python package and install Python dependencies:  
 ```
 pip install -e .
 ```

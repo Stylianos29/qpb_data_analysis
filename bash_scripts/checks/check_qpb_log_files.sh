@@ -62,3 +62,5 @@ if [[ "$found_flag" = false ]]; then
 else
     [[ "$REMOVE" = false ]] && echo -e "\nUse -r or --remove to delete these files."
 fi
+
+# TODO: Analyze .err files for error or suspicious behavior.

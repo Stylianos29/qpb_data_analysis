@@ -3,16 +3,17 @@ import sys
 import itertools
 import ast
 
-import click # type: ignore
+import click
 import numpy as np
-import matplotlib.pyplot as plt # type: ignore
-from matplotlib.ticker import MaxNLocator # type: ignore
-import gvar as gv # type: ignore
-import lsqfit # type: ignore
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
+import gvar as gv
+import lsqfit
 import logging
 import pandas as pd
 import h5py
 import copy
+import textwrap
 
 from library import filesystem_utilities, data_processing, plotting
 
@@ -36,7 +37,7 @@ from library import filesystem_utilities, data_processing, plotting
               default=None, 
               help="Directory where the script's log file will be stored.")
 @click.option("--log_filename", "log_filename", "-log", 
-              default="calculate_PCAC_mass_correlator_script.log", 
+              default=None, 
               help="Specific name for the script's log file.")
 
 def main(input_PCAC_mass_estimates_csv_file_path,
@@ -80,6 +81,12 @@ def main(input_PCAC_mass_estimates_csv_file_path,
         print("ERROR:", error_message)
         print("Exiting...")
         sys.exit(1)
+
+    # Get the script's filename
+    script_name = os.path.basename(__file__)
+
+    if log_filename is None:
+        log_filename = script_name.replace(".py", ".log")
 
     # Check for proper extensions in provided output filenames
     if not output_critical_bare_mass_csv_filename.endswith(".csv"):
@@ -177,6 +184,17 @@ def main(input_PCAC_mass_estimates_csv_file_path,
         #                                            )
         # ax.set_title()
         # ax.set_title(f'Jackknife-averaged PCAC mass against bare mass values \n({modified_operator_category_plus_enumeration_label}, # of configs={sample_size}, $\\beta=${BETA_VALUE}, $\\rho$={RHO}, $c_{{SW}}=${C_SW})') # T={TEMPORAL_DIRECTION_LATTICE_SIZE}
+
+        # plot_title = ""
+        # # # "Sign squared violation against scaling factor"
+        # parameter_values_subtitle=plotting.construct_plot_subtitle(
+        #                                         parameters_value_dictionary)
+        # # # f"[KL {operator_type} $n$={KL_iterations}, $\\beta$={unique_QCD_beta_value}, $c_{{SW}}$={unique_clover_coefficient}, $\\rho$={unique_rho_value}, APE iters={unique_APE_iterations}, $\\epsilon_{{MSCG}}$={unique_MSCG_epsilon}, config: {configuration_label}, $\\kappa$={condition_number:.2f}]"
+        # wrapper = textwrap.TextWrapper(width=100, initial_indent="   ")
+        # wrapped_parameter_values_subtitle = wrapper.fill(parameter_values_subtitle)
+
+        # ax.set_title(f'{plot_title}\n{wrapped_parameter_values_subtitle}', pad=7)
+        
         ax.set(xlabel='a$m_{{bare}}$', ylabel='a$m_{PCAC}$')
         plt.subplots_adjust(left=0.14) # Adjust left margin
 

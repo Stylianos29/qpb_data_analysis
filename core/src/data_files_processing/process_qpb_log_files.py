@@ -32,8 +32,7 @@ import glob
 import os
 import sys
 
-import click # type: ignore
-import numpy as np
+import click
 import pandas as pd
 import logging
 import h5py
@@ -48,17 +47,20 @@ from library import extraction, filesystem_utilities
 @click.option("--output_files_directory", "output_files_directory", "-out_dir",
               default=None,
         help="Directory where all the generated output files will be stored.")
-@click.option("--csv_filename", "csv_filename", "-csv",
+@click.option("--csv_filename", "csv_filename", "-csv_name",
                 default="qpb_log_files_single_valued_parameters.csv",
                 help="Specific name for the qpb log files .csv output file.")
-@click.option("--hdf5_filename", "hdf5_filename", "-hdf5",
+@click.option("--hdf5_filename", "hdf5_filename", "-hdf5_name",
                 default="qpb_log_files_multivalued_parameters.h5",
                 help="Specific name for the qpb log files HDF5 output file.")
+# TODO: Make use of this flag for enabling logging
+# @click.option("--generate_log", "generate_log", "-gen_log", is_flag=True,
+            #   default=False,
+            #   help="Flag to determine whether to generate a log file or not.")
 @click.option("--log_file_directory", "log_file_directory",
               "-log_file_dir", default=None,
                 help="Directory where the script's log file will be stored.")
-@click.option("--log_filename", "log_filename", "-log",
-                default="process_qpb_log_files_script.log",
+@click.option("--log_filename", "log_filename", "-log", default=None,
                 help="Specific name for the script's log file.")
 
 def main(qpb_log_files_directory, output_files_directory, log_file_directory, 
@@ -67,8 +69,8 @@ def main(qpb_log_files_directory, output_files_directory, log_file_directory,
     # PERFORM VALIDITY CHECKS ON INPUT ARGUMENTS
 
     if not filesystem_utilities.is_valid_directory(qpb_log_files_directory):
-        error_message = "Passed log files directory path is invalid or not "\
-                                                                  "a directory."
+        error_message = ("Passed log files directory path is invalid or not "
+                                                                  "a directory.")
         print("ERROR:", error_message)
         print("Exiting...")
         sys.exit(1)
@@ -90,6 +92,12 @@ def main(qpb_log_files_directory, output_files_directory, log_file_directory,
         print("Exiting...")
         sys.exit(1)
 
+    # Get the script's filename
+    script_name = os.path.basename(__file__)
+
+    if log_filename is None:
+        log_filename = script_name.replace(".py", ".log")
+
     # Check for proper extensions in provided filenames
     if not csv_filename.endswith('.csv'):
         csv_filename=csv_filename+'.csv'
@@ -104,9 +112,6 @@ def main(qpb_log_files_directory, output_files_directory, log_file_directory,
 
     # Create a logger instance for the current script using the script's name.
     logger = logging.getLogger(__name__)
-
-    # Get the script's filename
-    script_name = os.path.basename(__file__)
 
     # Initiate logging
     logging.info(f"Script '{script_name}' execution initiated.")
@@ -199,6 +204,11 @@ def main(qpb_log_files_directory, output_files_directory, log_file_directory,
 
         for qpb_log_file_full_path in glob.glob(
                                 os.path.join(qpb_log_files_directory, "*.txt")):
+            
+            # Read the contents of the log file into a list of lines
+            with open(qpb_log_file_full_path, "r") as file:
+                qpb_log_file_contents_list = file.readlines()
+
             # Extract the filename from the full path
             qpb_log_filename = os.path.basename(qpb_log_file_full_path)
 

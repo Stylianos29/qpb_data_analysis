@@ -3,7 +3,7 @@ import sys
 import itertools
 import ast
 
-import click
+import click 
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
@@ -29,21 +29,20 @@ def KL_number_of_MV_multiplications(KL_iterations_array):
     return 2*KL_iterations_array + 1
 
 
-
 @click.command()
 @click.option("--input_csv_file_path",
               "input_csv_file_path", "-csv",
-              default="/nvme/h/cy22sg1/qpb_data_analysis/data_files/processed/sign_squared_violation/KL_several_rho_varying_n_and_config/qpb_log_files_single_valued_parameters.csv",
+              default="/nvme/h/cy22sg1/qpb_data_analysis/data_files/processed/sign_squared_values/Chebyshev_several_configs_varying_EpsLanczos/qpb_log_files_single_valued_parameters.csv",
         help="Path to input .csv file containing extracted single-valued parameters.")
 @click.option("--input_HDF5_file_path",
               "input_HDF5_file_path", "-h5",
-              default="/nvme/h/cy22sg1/qpb_data_analysis/data_files/processed/sign_squared_violation/KL_several_rho_varying_n_and_config/qpb_log_files_multivalued_parameters.h5",
+              default="/nvme/h/cy22sg1/qpb_data_analysis/data_files/processed/sign_squared_values/Chebyshev_several_configs_varying_EpsLanczos/qpb_log_files_multivalued_parameters.h5",
         help="Path to input HDF5 file containing extracted multivalued parameters.")
 @click.option("--output_files_directory", "output_files_directory", "-out_dir",
               default=None,
               help="Path to directory where all output files will be stored.")
 @click.option("--plots_directory", "plots_directory", "-plots_dir",
-              default="/nvme/h/cy22sg1/qpb_data_analysis/output/plots/sign_squared_violation/KL_several_rho_varying_n_and_config",
+              default="/nvme/h/cy22sg1/qpb_data_analysis/output/plots/sign_squared_values/Chebyshev_several_configs_varying_EpsLanczos",
               help="Path to the output directory for storing plots.")
 @click.option("--log_file_directory", "log_file_directory", "-log_file_dir", 
               default=None, 
@@ -116,7 +115,7 @@ def main(input_csv_file_path, input_HDF5_file_path, output_files_directory, plot
     # Initiate logging
     logging.info(f"Script '{script_name}' execution initiated.")
 
-    # CRITICAL BARE MASS CALCULATION
+    # ? CALCULATION
     
     # ANALYZE .CSV FILE
 
@@ -144,112 +143,88 @@ def main(input_csv_file_path, input_HDF5_file_path, output_files_directory, plot
             qpb_data_files_set_dataframe)
         )
 
+    output_values_list=['Plaquette', 'Minimum_eigenvalue_squared', 'Maximum_eigenvalue_squared', 'Total_overhead_time', 'Total_number_of_Lanczos_iterations']
+
     # Extract list of fields with multiple unique values excluding specified
-    selected_field_name = 'KL_diagonal_order'
-    excluded_fields = {"Filename", "Plaquette", selected_field_name}
+    selected_field_name = ['Lanczos_epsilon']
+    excluded_fields = {"Filename", 'Lanczos_epsilon', *output_values_list, *selected_field_name}
+
     list_of_fields_with_multiple_values = (
         data_processing.get_fields_with_multiple_values(
             qpb_data_files_set_dataframe, excluded_fields)
         )
-
+    
+    list_of_fields_with_multiple_values.pop(2)
+    
     # Get a list of all unique field values
     unique_combinations = [ qpb_data_files_set_dataframe[field].unique()
                         for field in list_of_fields_with_multiple_values ]
+    
+    plots_subdirectory = os.path.join(plots_directory, 'TEST')
+    # Create "plots_subdirectory" if it does not exist
+    os.makedirs(plots_subdirectory, exist_ok=True)
+    
+    # Use itertools.product to create all combinations of the unique values
+    analysis_index = 0 # Initialize counter
+    for combination in itertools.product(*unique_combinations):
 
-    with h5py.File(input_HDF5_file_path, "r") as hdf5_file_read:
-        
-        # Initialize group structure of the output HDF5 file
-        # NOTE: The assumption here is that the name of the raw data files
-        # directory represents the data files set (or experiment) and its parent
-        # directory the qpb main program that generated the data files
-        parent_directory_name, last_directory_name = (
-                                filesystem_utilities.extract_directory_names(
-                                    output_files_directory)
-                                    )
-        # Select input HDF5 file's group to read
-        input_qpb_main_program_group = hdf5_file_read[parent_directory_name]
-        input_data_files_set_group = input_qpb_main_program_group[
-                                                        last_directory_name]
-        
-        plots_subdirectory = os.path.join(plots_directory, 'TEST')
-        # Create "plots_subdirectory" if it does not exist
-        os.makedirs(plots_subdirectory, exist_ok=True)
-        
-        # Use itertools.product to create all combinations of the unique values
-        analysis_index = 0 # Initialize counter
-        for combination in itertools.product(*unique_combinations):
+        # Create a filter for the current combination
+        filters = {field: value for field, value in zip(
+                        list_of_fields_with_multiple_values, combination)}
 
-            # Create a filter for the current combination
-            filters = {field: value for field, value in zip(
-                            list_of_fields_with_multiple_values, combination)}
+        # Get the subset of the dataframe based on the current combination
+        current_combination_group = qpb_data_files_set_dataframe
+        for field, value in filters.items():
+            current_combination_group = current_combination_group[
+                                        current_combination_group[field] == value]
 
-            # Get the subset of the dataframe based on the current combination
-            current_combination_group = qpb_data_files_set_dataframe
-            for field, value in filters.items():
-                current_combination_group = current_combination_group[
-                                            current_combination_group[field] == value]
+        # Skip empty current_combination_groups (no data for this combination)
+        if current_combination_group.empty:
+            continue
 
-            # Skip empty current_combination_groups (no data for this combination)
-            if current_combination_group.empty:
-                continue
+        analysis_index += 1
 
-            analysis_index += 1
+        # Now 'group' contains the subset for this combination of values
+        Lanczos_epsilon_values_array = current_combination_group['Lanczos_epsilon'].to_numpy()
+        maximum_eigenvalue_squared_values_array = current_combination_group['Maximum_eigenvalue_squared'].to_numpy()
 
-            # Now 'group' contains the subset for this combination of values
-            list_of_qpb_log_filenames = current_combination_group[
-                                                        "Filename"].tolist()
+        # Plot against n for each configuration
+        fig, ax = plt.subplots()
+        ax.grid()
 
-            number_of_gauge_configurations = len(list_of_qpb_log_filenames)
+        # ax.set_title(f'Sign squared violation against KL iterations ({operator_type}, $\\beta$={unique_QCD_beta_value},\n$c_{{SW}}$={unique_clover_coefficient}, $\\rho$={rho_value}, APE iters={unique_APE_iterations}, $\\mu$={unique_mu_value}, $\\epsilon_{{CG}}$={CG_epsilon}, # of configs: {number_of_configurations})', pad=7)
+        # ax.set(xlabel='n', ylabel='|| Sign$^2$(X) - 1 ||$^2$')
+        plt.subplots_adjust(left=0.13) # Adjust left margin
+        ax.set_xscale('log')
+        # ax.set_yscale('log')
 
-            calculation_results_array = np.array([
-                input_data_files_set_group[qpb_log_filename]['Calculation_result'][:][0]
-                for qpb_log_filename in list_of_qpb_log_filenames
-            ])
+        ax.scatter(Lanczos_epsilon_values_array, maximum_eigenvalue_squared_values_array)
 
-            print(calculation_results_array)
+        plot_path = os.path.join(plots_subdirectory, f'maximum_{analysis_index}'+'.png')
+        fig.savefig(plot_path)
+        plt.close()
 
-            selected_field_values_array = current_combination_group[selected_field_name].to_numpy()
 
-            # Plot against n for each configuration
-            fig, ax = plt.subplots()
-            ax.grid()
+        # Now 'group' contains the subset for this combination of values
+        Lanczos_epsilon_values_array = current_combination_group['Lanczos_epsilon'].to_numpy()
+        minimum_eigenvalue_squared_values_array = current_combination_group['Minimum_eigenvalue_squared'].to_numpy()
 
-            # ax.set_title(f'Sign squared violation against KL iterations ({operator_type}, $\\beta$={unique_QCD_beta_value},\n$c_{{SW}}$={unique_clover_coefficient}, $\\rho$={rho_value}, APE iters={unique_APE_iterations}, $\\mu$={unique_mu_value}, $\\epsilon_{{CG}}$={CG_epsilon}, # of configs: {number_of_configurations})', pad=7)
-            ax.set(xlabel='n', ylabel='|| Sign$^2$(X) - 1 ||$^2$')
-            plt.subplots_adjust(left=0.13) # Adjust left margin
-            ax.set_yscale('log')
+        # Plot against n for each configuration
+        fig, ax = plt.subplots()
+        ax.grid()
 
-            # plt.axhline(y=1e-5, color='green', linestyle='--')
-            # plt.axhline(y=1e-10, color='black', linestyle='--')
+        # ax.set_title(f'Sign squared violation against KL iterations ({operator_type}, $\\beta$={unique_QCD_beta_value},\n$c_{{SW}}$={unique_clover_coefficient}, $\\rho$={rho_value}, APE iters={unique_APE_iterations}, $\\mu$={unique_mu_value}, $\\epsilon_{{CG}}$={CG_epsilon}, # of configs: {number_of_configurations})', pad=7)
+        # ax.set(xlabel='n', ylabel='|| Sign$^2$(X) - 1 ||$^2$')
+        plt.subplots_adjust(left=0.13) # Adjust left margin
+        ax.set_xscale('log')
+        # ax.set_yscale('log')
 
-            # Set x-axis ticks to integer values only
-            ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        ax.scatter(Lanczos_epsilon_values_array, minimum_eigenvalue_squared_values_array)
 
-            ax.scatter(selected_field_values_array, calculation_results_array)
+        plot_path = os.path.join(plots_subdirectory, f'minimum_{analysis_index}'+'.png')
+        fig.savefig(plot_path)
+        plt.close()
 
-#             # sorted_rho_value_group = rho_value_group.sort_values(by='Condition_number', ascending=False)
-#             for configuration_label, configuration_label_group in sorted_rho_value_group.groupby('Configuration_label', sort=False):
-
-#                 KL_iterations_array = np.array(configuration_label_group['KL_iterations'])
-#                 sign_squared_violation_array = np.array(configuration_label_group['Sign_squared_violation'])
-
-#                 condition_number = configuration_label_group['Condition_number'].unique()[0]
-
-#                 ax.scatter(KL_iterations_array, sign_squared_violation_array
-# #                         #    , label=f'$\\alpha^2$={minimum_eigenvalue**2:.5f}, $\\beta^2$={maximum_eigenvalue**2:.4f}, $\\kappa$={kappa:.2f}, config: {Configuration_label}')
-#                             # , label=f'config: {Configuration_label}')
-#                         , label=f'config: {configuration_label}, $\\kappa$={condition_number:.2f}')
-#                         # , label=f'$\\kappa$={condition_number:.2f}')
-
-#             # Extend the axes range
-#             # ax.set_ylim([1e-15, 1e1])  # Adjust the range as needed
-            # ax.set_xlim([0, 30])  # Adjust the range as needed
-
-            # ax.legend(loc="upper right", title="Condition number:")
-
-            plot_path = os.path.join(plots_subdirectory, f'test_{analysis_index}'+'.png')
-            fig.savefig(plot_path)
-            plt.close()
 
     print("   -- analysis completed.")
 

@@ -44,7 +44,7 @@ import glob
 import os
 import sys
 
-import click # type: ignore
+import click
 import h5py
 import numpy as np
 import logging
@@ -66,8 +66,7 @@ from library import constants, filesystem_utilities
 @click.option("--log_file_directory", "log_file_directory", "-log_file_dir", 
               default=None, 
               help="Directory where the script's log file will be stored.")
-@click.option("--log_filename", "log_filename", "-log", 
-              default="parse_qpb_correlator_files_script.log", 
+@click.option("--log_filename", "log_filename", "-log", default=None,
               help="Specific name for the script's log file.")
 
 def main(raw_data_files_directory, output_files_directory, 
@@ -110,6 +109,12 @@ def main(raw_data_files_directory, output_files_directory,
         print("ERROR:", error_message)
         print("Exiting...")
         sys.exit(1)
+
+    # Get the script's filename
+    script_name = os.path.basename(__file__)
+
+    if log_filename is None:
+        log_filename = script_name.replace(".py", ".log")
 
     # Check for proper extensions in provided output filenames
     if not output_hdf5_filename.endswith(".h5"):

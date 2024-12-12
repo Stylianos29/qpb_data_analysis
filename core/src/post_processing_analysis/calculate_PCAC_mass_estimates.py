@@ -1,18 +1,19 @@
 import os
 import sys
 
-import click # type: ignore
+import click
 import numpy as np
-import matplotlib.pyplot as plt # type: ignore
-from matplotlib.ticker import MaxNLocator # type: ignore
-import gvar as gv # type: ignore
-import lsqfit # type: ignore
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
+import gvar as gv
+import lsqfit
 import logging
 import pandas as pd
 import h5py
 import copy
+import textwrap
 
-from library import filesystem_utilities, effective_mass
+from library import filesystem_utilities, effective_mass, plotting, constants
 
 
 @click.command()
@@ -32,8 +33,7 @@ from library import filesystem_utilities, effective_mass
 @click.option("--log_file_directory", "log_file_directory", "-log_file_dir", 
               default=None, 
               help="Directory where the script's log file will be stored.")
-@click.option("--log_filename", "log_filename", "-log", 
-              default="calculate_PCAC_mass_correlator_script.log", 
+@click.option("--log_filename", "log_filename", "-log", default=None, 
               help="Specific name for the script's log file.")
 
 def main(input_PCAC_mass_correlator_values_hdf5_file_path,
@@ -78,6 +78,12 @@ def main(input_PCAC_mass_correlator_values_hdf5_file_path,
         print("Exiting...")
         sys.exit(1)
 
+    # Get the script's filename
+    script_name = os.path.basename(__file__)
+
+    if log_filename is None:
+        log_filename = script_name.replace(".py", ".log")
+
     # Check for proper extensions in provided output filenames
     if not output_PCAC_mass_csv_filename.endswith(".csv"):
         output_PCAC_mass_csv_filename = output_PCAC_mass_csv_filename + ".csv"
@@ -98,6 +104,31 @@ def main(input_PCAC_mass_correlator_values_hdf5_file_path,
     logging.info(f"Script '{script_name}' execution initiated.")
 
     # PCAC MASS ESTIMATES CALCULATION
+
+    # Create plots main subdirectory
+    plots_main_subdirectory = os.path.join(plots_directory, "PCAC_mass_estimates_calculation")
+    # Create "plots_main_subdirectory" if it does not exist
+    os.makedirs(plots_main_subdirectory, exist_ok=True)
+
+    PCAC_mass_plots_base_name = "PCAC_mass_correlator_values"
+    PCAC_mass_plots_subdirectory = os.path.join(plots_main_subdirectory, PCAC_mass_plots_base_name)
+    # Create "PCAC_mass_plots_subdirectory" if it does not exist
+    os.makedirs(PCAC_mass_plots_subdirectory, exist_ok=True)
+
+    g5_g5_plots_base_name = "g5g5_correlator_values"
+    g5_g5_plots_subdirectory = os.path.join(plots_main_subdirectory, g5_g5_plots_base_name)
+    # Create "g5_g5_plots_subdirectory" if it does not exist
+    os.makedirs(g5_g5_plots_subdirectory, exist_ok=True)
+
+    g4g5_g5_plots_base_name = "g4g5g5_correlator_values"
+    g4g5_g5_plots_subdirectory = os.path.join(plots_main_subdirectory, g4g5_g5_plots_base_name)
+    # Create "g5_g5_plots_subdirectory" if it does not exist
+    os.makedirs(g4g5_g5_plots_subdirectory, exist_ok=True)
+
+    g4g5_g5_derivative_plots_base_name = "g4g5g5_derivative_correlator_values"
+    g4g5_g5_derivative_plots_subdirectory = os.path.join(plots_main_subdirectory, g4g5_g5_derivative_plots_base_name)
+    # Create "g5_g5_plots_subdirectory" if it does not exist
+    os.makedirs(g4g5_g5_derivative_plots_subdirectory, exist_ok=True)
 
     # Open the input HDF5 file for reading and the output HDF5 file for writing
     with h5py.File(input_PCAC_mass_correlator_values_hdf5_file_path, "r") \
@@ -127,20 +158,13 @@ def main(input_PCAC_mass_correlator_values_hdf5_file_path,
 
         # Loop over all PCAC mass correlator Jackknife analysis groups
         for PCAC_mass_correlator_analysis_group_name, \
-                    PCAC_mass_correlator_analysis_group \
-                            in input_data_files_set_group.items():
+                            PCAC_mass_correlator_analysis_group \
+                                        in input_data_files_set_group.items():
             
             # Cautionary check if the item is a PCAC_mass_correlator_analysis_group
             if not isinstance(PCAC_mass_correlator_analysis_group, h5py.Group):
                 # TODO: Log warning
                 continue
-
-            # # Loop through datasets within the group
-            # for dataset_name, dataset in group.items():
-            #     # Check if the item is a dataset
-            # TODO: Perform test before reading dataset
-            # if isinstance(dataset, h5py.Dataset):
-            # print(f"  Dataset: {dataset_name}, Data: {dataset[:]}")
 
             # Initialize the parameters values dictionary
             parameters_value_dictionary = copy.deepcopy(
@@ -150,8 +174,10 @@ def main(input_PCAC_mass_correlator_values_hdf5_file_path,
             for parameter, attribute \
                         in PCAC_mass_correlator_analysis_group.attrs.items():
                 parameters_value_dictionary[parameter] = attribute
+            #     print(attribute)
+            # print()
 
-            jackknife_average_of_time_dependent_PCAC_mass_values_array = (
+            jackknife_average_PCAC_mass_correlator_array = (
                 gv.gvar(PCAC_mass_correlator_analysis_group[
     'jackknife_average_of_PCAC_mass_correlator_values_array_mean_values'][:],
                         PCAC_mass_correlator_analysis_group[
@@ -160,7 +186,7 @@ def main(input_PCAC_mass_correlator_values_hdf5_file_path,
                 )
             
             temporal_direction_lattice_size = len(
-                jackknife_average_of_time_dependent_PCAC_mass_values_array
+                jackknife_average_PCAC_mass_correlator_array
             )
 
             # OPTIMUM FIT RANGE INVESTIGATION
@@ -171,7 +197,7 @@ def main(input_PCAC_mass_correlator_values_hdf5_file_path,
 
             # Ignore the second half of the PCAC mass correlator values array since its
             # been by construction symmetrized
-            y = jackknife_average_of_time_dependent_PCAC_mass_values_array[
+            y = jackknife_average_PCAC_mass_correlator_array[
                             LOWEST_INDEX_CUT:temporal_direction_lattice_size//2]
 
             # The corresponding time values must be shifted by the lowest index cut
@@ -197,15 +223,34 @@ def main(input_PCAC_mass_correlator_values_hdf5_file_path,
 
             # PLOT TIME DEPENDENCE OF PCAC MASS VALUES
 
-            plots_subdirectory = os.path.join(plots_directory,
-                                              "PCAC_mass_estimates_calculation")
-            # Create "plots_subdirectory" if it does not exist
-            os.makedirs(plots_subdirectory, exist_ok=True)
-
             fig, ax = plt.subplots()
-            ax.grid()
+            # ax.grid()
+            plt.grid(color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
+
+            # plot_title = ""
+            # # # "Sign squared violation against scaling factor"
+            # parameter_values_subtitle=plotting.construct_plot_subtitle(
+            #                                     parameters_value_dictionary)
+            # # # f"[KL {operator_type} $n$={KL_iterations}, $\\beta$={unique_QCD_beta_value}, $c_{{SW}}$={unique_clover_coefficient}, $\\rho$={unique_rho_value}, APE iters={unique_APE_iterations}, $\\epsilon_{{MSCG}}$={unique_MSCG_epsilon}, config: {configuration_label}, $\\kappa$={condition_number:.2f}]"
+            # wrapper = textwrap.TextWrapper(width=100, initial_indent="   ")
+            # wrapped_parameter_values_subtitle = wrapper.fill(parameter_values_subtitle)
+
+            # ax.set_title(f'{plot_title}\n{wrapped_parameter_values_subtitle}', pad=7)
+
             # ax.set_title(f'Jackknife average of $m_{{PCAC}}(t)$ values ({Operator_method} {operator_type}, $\\beta$={QCD_beta_value:.2f}, $c_{{SW}}$={int(Clover_coefficient)},\n$\\rho$={Rho_value}, APE iters={APE_iterations}, $\\mu$={KL_scaling_factor}, $\\epsilon_{{CG}}$={CG_epsilon}, $\\epsilon_{{MSCG}}$={MSCG_epsilon}, $n$={KL_iterations}, $m_b=${bare_mass})', pad=7)
             # ax.set_title(f'Jackknife average of $m_{{PCAC}}(t)$ values ({Operator_method} {operator_type}, $\\beta$={QCD_beta_value:.2f}, $c_{{SW}}$={int(Clover_coefficient)},\n$\\rho$={Rho_value}, APE iters={APE_iterations}, $\\mu$={KL_scaling_factor}, $\\epsilon_{{CG}}$={CG_epsilon}, $n$={KL_iterations}, $m_b=${bare_mass})', pad=7)
+
+
+            plot_title = ""
+
+            parameter_values_subtitle = plotting.construct_plot_subtitle(
+                parameters_value_dictionary
+            )
+            wrapper = textwrap.TextWrapper(width=100, initial_indent="   ")
+            wrapped_parameter_values_subtitle = wrapper.fill(parameter_values_subtitle)
+
+            ax.set_title(f"{plot_title}\n{wrapped_parameter_values_subtitle}", pad=6)
+
             ax.set(xlabel='$t/a$', ylabel='a$m_{PCAC}(t)$')
             
             # Set x-axis ticks to integer values only
@@ -230,9 +275,40 @@ def main(input_PCAC_mass_correlator_values_hdf5_file_path,
                 ax.legend(loc="lower center")
             
             # plot_filename = f'Jackknife_average_PCAC_mass_correlator_values_{Operator_method}_{operator_type}_m{bare_mass}_EpsCG{CG_epsilon}_EpsMSCG{MSCG_epsilon}.png'
-            plot_filename = PCAC_mass_correlator_analysis_group_name
+            # plot_filename = plots_base_name + input_data_files_set_group.attrs[]
+            # PCAC_mass_correlator_analysis_group_name
             # f'Jackknife_average_PCAC_mass_correlator_values_{Operator_method}_{operator_type}_m{bare_mass}_EpsCG{CG_epsilon}.png'
-            plot_path = os.path.join(plots_subdirectory, plot_filename)
+            # plot_path = os.path.join(plots_subdirectory, plot_filename)
+
+            # Initialize characteristic substring
+            if "Kernel_operator_type" in fields_with_unique_values_dictionary:
+                plots_characteristic_fields_values_string = (
+                    fields_with_unique_values_dictionary["Kernel_operator_type"]
+                )
+            elif "Kernel_operator_type" in input_data_files_set_group.attrs:
+                plots_characteristic_fields_values_string = (
+                    input_data_files_set_group.attrs["Kernel_operator_type"]
+                )
+            elif "Kernel_operator_type" in PCAC_mass_correlator_analysis_group.attrs:
+                plots_characteristic_fields_values_string = (
+                    PCAC_mass_correlator_analysis_group.attrs["Kernel_operator_type"]
+                )
+            else:
+                plots_characteristic_fields_values_string = ""
+
+            for key, value in PCAC_mass_correlator_analysis_group.attrs.items():
+                if key in constants.PARAMETERS_PRINTED_LABELS_DICTIONARY:
+                    plots_characteristic_fields_values_string += (
+                        "_" + constants.PARAMETERS_PRINTED_LABELS_DICTIONARY[key]
+                    )
+                    plots_characteristic_fields_values_string += str(value)
+
+            plots_characteristic_fields_values_string = plots_characteristic_fields_values_string.replace(".", "p")
+
+            plot_path = os.path.join(
+                PCAC_mass_plots_subdirectory,
+                f"{PCAC_mass_plots_base_name}_{plots_characteristic_fields_values_string}" + ".png",
+            )
 
             fig.savefig(plot_path)
             plt.close()
@@ -242,6 +318,134 @@ def main(input_PCAC_mass_correlator_values_hdf5_file_path,
                 )
 
             PCAC_mass_estimates_list.append(parameters_value_dictionary)
+
+
+            # PLOT G5-G5 CORRELATOR VALUES
+
+            jackknife_average_of_g5_g5_correlator_values_array = (
+            gv.gvar(PCAC_mass_correlator_analysis_group[
+            'jackknife_average_of_g5_g5_correlator_mean_values'][:],
+                    PCAC_mass_correlator_analysis_group[
+            'jackknife_average_of_g5_g5_correlator_error_values'][:]
+                )
+            )
+
+            fig, ax = plt.subplots()
+            # ax.grid()
+            plt.grid(color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
+
+            plot_title = ""
+            ax.set_title(f"{plot_title}\n{wrapped_parameter_values_subtitle}", pad=6)
+
+            ax.set(xlabel='$t/a$', ylabel='g5g5(t)')
+
+            ax.set_yscale("log")
+
+            # Set x-axis ticks to integer values only
+            ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+
+            # Ignore the second half of the PCAC mass correlator values array since its
+            # been by construction symmetrized
+            y = jackknife_average_of_g5_g5_correlator_values_array[
+                            LOWEST_INDEX_CUT:temporal_direction_lattice_size-LOWEST_INDEX_CUT+1]
+
+            # The corresponding time values must be shifted by the lowest index cut
+            x = range(LOWEST_INDEX_CUT, len(y)+LOWEST_INDEX_CUT)
+
+            ax.errorbar(x, gv.mean(y), yerr=gv.sdev(y), fmt='.', markersize=8, capsize=10)
+
+            plot_path = os.path.join(
+            g5_g5_plots_subdirectory,
+            f"{g5_g5_plots_base_name}_{plots_characteristic_fields_values_string}" + ".png",
+            )
+
+            fig.savefig(plot_path)
+            plt.close()
+
+
+            # PLOT G4G5-G5 CORRELATOR VALUES
+
+            jackknife_average_of_g4g5_g5_correlator_values_array = (
+            gv.gvar(PCAC_mass_correlator_analysis_group[
+            'jackknife_average_of_g4g5_g5_correlator_mean_values'][:],
+                    PCAC_mass_correlator_analysis_group[
+            'jackknife_average_of_g4g5_g5_correlator_error_values'][:]
+                )
+            )
+
+            fig, ax = plt.subplots()
+            # ax.grid()
+            plt.grid(color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
+
+            plot_title = ""
+            ax.set_title(f"{plot_title}\n{wrapped_parameter_values_subtitle}", pad=6)
+
+            ax.set(xlabel='$t/a$', ylabel='g4g5g5(t)')
+
+            # ax.set_yscale("log")
+
+            # Set x-axis ticks to integer values only
+            ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+
+            # Ignore the second half of the PCAC mass correlator values array since its
+            # been by construction symmetrized
+            y = jackknife_average_of_g4g5_g5_correlator_values_array[
+                            LOWEST_INDEX_CUT:temporal_direction_lattice_size-LOWEST_INDEX_CUT+1]
+
+            # The corresponding time values must be shifted by the lowest index cut
+            x = range(LOWEST_INDEX_CUT, len(y)+LOWEST_INDEX_CUT)
+
+            ax.errorbar(x, gv.mean(y), yerr=gv.sdev(y), fmt='.', markersize=8, capsize=10)
+
+            plot_path = os.path.join(
+            g4g5_g5_plots_subdirectory,
+            f"{g4g5_g5_plots_base_name}_{plots_characteristic_fields_values_string}" + ".png",
+            )
+
+            fig.savefig(plot_path)
+            plt.close()
+
+            # PLOT G4G5-G5 DERIVATIVE CORRELATOR VALUES
+
+            jackknife_average_of_g4g5_g5_derivative_correlator_values_array = (
+            gv.gvar(PCAC_mass_correlator_analysis_group[
+            'g4g5_g5_derivative_correlator_from_jackknife_average_of_g4g5_g5_correlator_mean_values'][:],
+                    PCAC_mass_correlator_analysis_group[
+            'g4g5_g5_derivative_correlator_from_jackknife_average_of_g4g5_g5_correlator_error_values'][:]
+                )
+            )
+
+            fig, ax = plt.subplots()
+            # ax.grid()
+            plt.grid(color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
+
+            plot_title = ""
+            ax.set_title(f"{plot_title}\n{wrapped_parameter_values_subtitle}", pad=6)
+
+            ax.set(xlabel='$t/a$', ylabel='$\\partial$g4g5g5(t)')
+
+            ax.set_yscale("log")
+
+            # Set x-axis ticks to integer values only
+            ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+
+            # Ignore the second half of the PCAC mass correlator values array since its
+            # been by construction symmetrized
+            y = jackknife_average_of_g4g5_g5_derivative_correlator_values_array[
+                            LOWEST_INDEX_CUT:temporal_direction_lattice_size-LOWEST_INDEX_CUT+1]
+
+            # The corresponding time values must be shifted by the lowest index cut
+            x = range(LOWEST_INDEX_CUT, len(y)+LOWEST_INDEX_CUT)
+
+            ax.errorbar(x, gv.mean(y), yerr=gv.sdev(y), fmt='.', markersize=8, capsize=10)
+
+            plot_path = os.path.join(
+            g4g5_g5_derivative_plots_subdirectory,
+            f"{g4g5_g5_derivative_plots_base_name}_{plots_characteristic_fields_values_string}" + ".png",
+            )
+
+            fig.savefig(plot_path)
+            plt.close()
 
     # Create a DataFrame from the extracted data
     PCAC_mass_estimates_dataframe = pd.DataFrame(PCAC_mass_estimates_list)
