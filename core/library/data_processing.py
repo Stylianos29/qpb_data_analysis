@@ -97,9 +97,9 @@ def get_fields_with_multiple_values(df, excluded_fields=None) -> list:
 
 def get_fields_with_unique_values(df: pd.DataFrame) -> dict:
     """
-    This function returns a dictionary where the keys are the column names
-    from the DataFrame, and the values are the single unique value in the column
-    for those columns that contain only a single unique value.
+    This function returns a dictionary where the keys are the column names from
+    the DataFrame, and the values are the single unique value in the column for
+    those columns that contain only a single unique value.
 
     Parameters:
     -----------
@@ -109,19 +109,15 @@ def get_fields_with_unique_values(df: pd.DataFrame) -> dict:
     Returns:
     --------
     dict
-        A dictionary with column names as keys and the single unique value
-        as values for those columns that have only one unique value.
+        A dictionary with column names as keys and the single unique value as
+        values for those columns that have only one unique value.
 
     Example:
     --------
     df = pd.DataFrame({
-        'col1': [1, 1, 1, 1],
-        'col2': [1, 1, 1, 1],
-        'col3': [5, 6, 7, 8]
-    })
-    result = get_fields_with_unique_values(df)
-    print(result)
-    # Output: {'col1': 1, 'col2': 1}
+        'col1': [1, 1, 1, 1], 'col2': [1, 1, 1, 1], 'col3': [5, 6, 7, 8]
+    }) result = get_fields_with_unique_values(df) print(result) # Output:
+    {'col1': 1, 'col2': 1}
     """
     single_unique_value_columns = {}
 
@@ -156,16 +152,19 @@ class DataFrameAnalyzer:
         # Extract fields with multiple values (to be dynamically adjusted later)
         self.fields_with_multiple_values = []
 
-        # Get combinations of unique field values for analysis (to be updated later)
+        # Get combinations of unique field values for analysis (to be updated
+        # later)
         self.unique_combinations = []
 
     def set_excluded_fields(self, excluded_fields: Set[str]):
         """
-        Set the excluded fields and update the combinations and fields with multiple values.
+        Set the excluded fields and update the combinations and fields with
+        multiple values.
 
         Parameters:
         -----------
-        excluded_fields (set): A set of column names to exclude from the analysis.
+        excluded_fields (set): A set of column names to exclude from the
+        analysis.
         """
         # Update the excluded fields
         self.excluded_fields = excluded_fields
@@ -182,12 +181,13 @@ class DataFrameAnalyzer:
 
     def generate_combinations(self) -> List[Dict[str, any]]:
         """
-        Generate all possible combinations of unique values across multiple fields.
+        Generate all possible combinations of unique values across multiple
+        fields.
 
         Returns:
         --------
-        List of dictionaries, where each dictionary represents a combination
-        of values for different fields.
+        List of dictionaries, where each dictionary represents a combination of
+        values for different fields.
         """
         return [
             dict(zip(self.fields_with_multiple_values, combination))
@@ -196,11 +196,13 @@ class DataFrameAnalyzer:
 
     def get_dataframe_group(self, filters: Dict[str, any]) -> pd.DataFrame:
         """
-        Filters the dataframe based on the provided filters (a combination of field values).
+        Filters the dataframe based on the provided filters (a combination of
+        field values).
 
         Parameters:
         -----------
-        filters (dict): A dictionary with field names as keys and the corresponding values to filter on.
+        filters (dict): A dictionary with field names as keys and the
+        corresponding values to filter on.
 
         Returns:
         --------
@@ -214,9 +216,9 @@ class DataFrameAnalyzer:
 
     def get_valid_dataframe_groups_with_metadata(self) -> List[Dict[str, any]]:
         """
-        Returns a list of dictionaries, where each dictionary contains:
-        - The valid (non-empty) dataframe group.
-        - The combined metadata for that group.
+        Returns a list of dictionaries, where each dictionary contains: - The
+        valid (non-empty) dataframe group. - The combined metadata for that
+        group.
 
         Returns:
         --------
@@ -240,18 +242,18 @@ class DataFrameAnalyzer:
 
 def extract_datasets_to_dict(hdf5_file_path, dataset_name, group_level=3):
     """
-    Extracts datasets from a specified group level in an HDF5 file and stores them in a dictionary.
+    Extracts datasets from a specified group level in an HDF5 file and stores
+    them in a dictionary.
 
-    Parameters:
-    - hdf5_file_path (str): Path to the HDF5 file.
-    - dataset_name (str): Name of the dataset to extract within each group.
-    - group_level (int, optional): The level of groups containing the datasets (default: 3).
+    Parameters: - hdf5_file_path (str): Path to the HDF5 file. - dataset_name
+    (str): Name of the dataset to extract within each group. - group_level (int,
+    optional): The level of groups containing the datasets (default: 3).
 
-    Returns:
-    - dict: A dictionary where keys are group names at the specified level, and values are the extracted datasets.
+    Returns: - dict: A dictionary where keys are group names at the specified
+    level, and values are the extracted datasets.
 
-    Raises:
-    - ValueError: If the group level is invalid or the dataset is not found at the specified level.
+    Raises: - ValueError: If the group level is invalid or the dataset is not
+    found at the specified level.
     """
     data_dict = {}
 
@@ -296,10 +298,10 @@ class DataHandler:
         """
         Initialize the DataHandler.
 
-        Parameters:
-        - ?
-        - hdf5_path (str): Path to the HDF5 file containing datasets.
-        - base_hdf5_path (str): Base path in the HDF5 file where level-3 groups are located. Default is "sign_squared_values/Chebyshev_several_configs_varying_Ν".
+        Parameters: - ? - hdf5_path (str): Path to the HDF5 file containing
+        datasets. - base_hdf5_path (str): Base path in the HDF5 file where
+        level-3 groups are located. Default is
+        "sign_squared_values/Chebyshev_several_configs_varying_Ν".
         """
         # Load the DataFrame
         self.df = dataframe
@@ -314,12 +316,11 @@ class DataHandler:
         """
         Retrieve a value associated with a specific filename.
 
-        Parameters:
-        - filename (str): The linking value (Filename field in the DataFrame).
-        - field_or_dataset (str): The name of the DataFrame field or HDF5 dataset.
+        Parameters: - filename (str): The linking value (Filename field in the
+        DataFrame). - field_or_dataset (str): The name of the DataFrame field or
+        HDF5 dataset.
 
-        Returns:
-        - Value from the DataFrame or HDF5 file.
+        Returns: - Value from the DataFrame or HDF5 file.
         """
         # Check if the field_or_dataset exists in the DataFrame
         if field_or_dataset in self.df.columns:
@@ -348,13 +349,16 @@ class DataHandler:
 
 def extract_HDF5_datasets_to_dictionary(file_path, dataset_name):
     """
-    Open an HDF5 file and extract datasets named 'Calculation_result_per_vector' stored in level-3 groups.
+    Open an HDF5 file and extract datasets named 'Calculation_result_per_vector'
+    stored in level-3 groups.
 
     Parameters:
-        file_path (str): The physical path of the HDF5 file provided by the user.
+        file_path (str): The physical path of the HDF5 file provided by the
+        user.
 
     Returns:
-        dict: A dictionary with group basenames as keys and the corresponding datasets (NumPy arrays) as values.
+        dict: A dictionary with group basenames as keys and the corresponding
+        datasets (NumPy arrays) as values.
     """
     datasets_dictionary = {}
 
@@ -364,7 +368,8 @@ def extract_HDF5_datasets_to_dictionary(file_path, dataset_name):
         def traverse_groups(name, obj):
             # Only process if the object is a dataset with the target name
             if isinstance(obj, h5py.Dataset) and name.endswith(dataset_name):
-                # Get the group name (parent group name) and extract its basename
+                # Get the group name (parent group name) and extract its
+                # basename
                 group_name = name.rsplit("/", maxsplit=1)[0]
                 basename = os.path.basename(group_name)
                 # Store the dataset as a NumPy array
@@ -374,3 +379,47 @@ def extract_HDF5_datasets_to_dictionary(file_path, dataset_name):
         hdf_file.visititems(traverse_groups)
 
     return datasets_dictionary
+
+
+def find_single_value_columns(df):
+    """
+    Finds columns in the DataFrame with a single unique value and returns a dictionary
+    with column names as keys and their unique values as dictionary values.
+
+    Parameters:
+    df (pd.DataFrame): The input Pandas DataFrame.
+
+    Returns:
+    dict: A dictionary with column names as keys and their unique values as dictionary values.
+    """
+    single_value_columns = {}
+    
+    for col in df.columns:
+        unique_values = df[col].nunique()  # Get the number of unique values in the column
+        if unique_values == 1:
+            # If there's only one unique value, add it to the dictionary
+            single_value_columns[col] = df[col].iloc[0]
+    
+    return single_value_columns
+
+
+def find_multiple_value_columns(df):
+    """
+    Finds columns in the DataFrame with multiple unique values and returns a dictionary
+    with column names as keys and the count of unique values as dictionary values.
+
+    Parameters:
+    df (pd.DataFrame): The input Pandas DataFrame.
+
+    Returns:
+    dict: A dictionary with column names as keys and the count of unique values as dictionary values.
+    """
+    multiple_value_columns = {}
+    
+    for col in df.columns:
+        unique_values_count = df[col].nunique()  # Get the number of unique values in the column
+        if unique_values_count > 1:
+            # If there's more than one unique value, add it to the dictionary
+            multiple_value_columns[col] = unique_values_count
+    
+    return multiple_value_columns
