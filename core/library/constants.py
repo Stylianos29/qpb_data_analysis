@@ -1,5 +1,10 @@
+import os
+
 import ast
 
+
+# Define the root directory of the project
+ROOT = os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))  # The directory of this file (constants.py)
 
 # Log files filenames might contain specific labels corresponding to
 # parameters next to their values. Listed below are the parameters and their
@@ -313,7 +318,12 @@ CONVERTERS_MAPPING = {
     # Format floats to 2 decimal places
     "QCD_beta_value": lambda x: f"{float(x):.2f}",
     # Format floats to 2 decimal places
+    "Delta_Min": lambda x: f"{float(x):.2f}",
+    # Format floats to 2 decimal places
+    "Delta_Max": lambda x: f"{float(x):.2f}",
+    # Format floats to 2 decimal places
     "PCAC_mass_estimate": lambda x: ast.literal_eval(x),
+    "Average_calculation_result": lambda x: ast.literal_eval(x),
     # Format floats in exponential notation
     "Solver_epsilon": lambda x: f"{float(x):.0e}",
 }
@@ -337,6 +347,11 @@ AXES_LABELS_DICTIONARY = {
     "KL_diagonal_order": "n",
     "KL_scaling_factor": "$\\mu$",
 }
+
+# TODO: Maybe I need separate lists for qpb input parameters and qpb output
+# values
+
+# TODO: I need a list for output values labels for plot axes
 
 
 PARAMETERS_PRINTED_LABELS_DICTIONARY = {
@@ -362,6 +377,8 @@ OUTPUT_VALUES_LIST = [
     "Plaquette",
     "Minimum_eigenvalue_squared",
     "Maximum_eigenvalue_squared",
+    "Condition_number",
+    "Total_overhead_time",
     "Total_overhead_time",
     "Total_number_of_Lanczos_iterations",
     "PCAC_mass_estimate",
@@ -378,7 +395,9 @@ OUTPUT_VALUES_LIST = [
     "Total_calculation_time",
     "Average_number_of_MSCG_iterations",
     "Average_CG_calculation_time_per_spinor",
-    "Average_number_of_CG_iterations_per_spinor"
+    "Average_number_of_CG_iterations_per_spinor",
+    "Average_calculation_result",
+    "Threads_per_process",
 ]
 
 PARAMETERS_WITH_EXPONENTIAL_FORMAT = [
