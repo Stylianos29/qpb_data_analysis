@@ -1,3 +1,5 @@
+archive/*
+
 core/library/__pycache__/*
 core/qpb_data_analysis.egg-info/*
 core/unit_tests/__pycache__/*
@@ -9,3 +11,6 @@ data_files/processed/*
 
 output/plots/*
 !output/plots/README.md
+
+examples/*
+!examples/README.md
