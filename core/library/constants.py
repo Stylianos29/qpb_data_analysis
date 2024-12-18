@@ -1,10 +1,9 @@
-import os
-
+from pathlib import Path
 import ast
 
 
 # Define the root directory of the project
-ROOT = os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))  # The directory of this file (constants.py)
+ROOT = Path(__file__).resolve().parents[2]
 
 # Log files filenames might contain specific labels corresponding to
 # parameters next to their values. Listed below are the parameters and their
@@ -373,31 +372,59 @@ PARAMETERS_PRINTED_LABELS_DICTIONARY = {
 }
 
 
-OUTPUT_VALUES_LIST = [
-    "Plaquette",
-    "Minimum_eigenvalue_squared",
-    "Maximum_eigenvalue_squared",
-    "Condition_number",
-    "Total_overhead_time",
-    "Total_overhead_time",
-    "Total_number_of_Lanczos_iterations",
-    "PCAC_mass_estimate",
-    "MSCG_Elapsed_time",
-    "Number_of_MSCG_iterations",
-    "Calculation_result_per_vector",
-    "Solver_iterations_running_count",
-    "Running_squared_relative_residual",
-    "MS_expansion_shifts",
-    "Final_squared_residual",
-    "Final_squared_relative_residual",
-    "Minimum_eigenvalue",
-    "Maximum_eigenvalue",
-    "Total_calculation_time",
-    "Average_number_of_MSCG_iterations",
+TUNABLE_PARAMETER_NAMES_LIST = [
+    "APE_alpha",
+    "APE_iterations",
+    "Bare_mass",
+    "CG_epsilon",
+    "Clover_coefficient",
+    "Configuration_label",
+    "Delta_Max",
+    "Delta_Min",
+    "Kappa_value",
+    "Kernel_operator_type",
+    "KL_diagonal_order",
+    "KL_scaling_factor",
+    "Lanczos_epsilon",
+    "Maximum_Lanczos_iterations",
+    "Maximum_solver_iterations",
+    "MPI_geometry",
+    "MSCG_epsilon",
+    "Number_of_Chebyshev_terms",
+    "Number_of_vectors",
+    "Overlap_operator_method",
+    "QCD_beta_value",
+    "Rho_value",
+    "Solver_epsilon",
+]
+
+
+OUTPUT_QUANTITY_NAMES_LIST = [
+    "Average_calculation_result",
     "Average_CG_calculation_time_per_spinor",
     "Average_number_of_CG_iterations_per_spinor",
-    "Average_calculation_result",
+    "Average_number_of_MSCG_iterations",
+    "Calculation_result_per_vector",
+    "Condition_number",
+    "Final_squared_relative_residual",
+    "Final_squared_residual",
+    "Maximum_eigenvalue",
+    "Maximum_eigenvalue_squared",
+    "Minimum_eigenvalue",
+    "Minimum_eigenvalue_squared",
+    "MS_expansion_shifts",
+    "MSCG_Elapsed_time",
+    "Number_of_MSCG_iterations",
+    "PCAC_mass_estimate",
+    "Plaquette",
+    "Running_squared_relative_residual",
+    "Solver_iterations_running_count",
+    "Spatial_lattice_size",
+    "Temporal_lattice_size",
     "Threads_per_process",
+    "Total_calculation_time",
+    "Total_number_of_Lanczos_iterations",
+    "Total_overhead_time",
 ]
 
 PARAMETERS_WITH_EXPONENTIAL_FORMAT = [
