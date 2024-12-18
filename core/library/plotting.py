@@ -6,64 +6,74 @@ from matplotlib.ticker import MaxNLocator
 import textwrap
 import gvar as gv
 
-from library import constants, data_processing
+from library import constants, filesystem_utilities, data_processing
 
 
 class DataPlotter:
-    def __init__(self, dataframe, base_plot_directory):
-        """
-        Initialize the DataPlotter with a pandas DataFrame.
+    def __init__(
+        self,
+        analyzer: data_processing.DataFrameAnalyzer,
+        base_plots_directory: str,
+    ):
 
-        Parameters: dataframe (pd.DataFrame): The data to be visualized.
-        """
-        self.dataframe = dataframe
-        self.base_plot_directory = base_plot_directory
-        self.current_plots_subdirectory = base_plot_directory
+        if not filesystem_utilities.is_valid_directory(base_plots_directory):
+            raise ValueError(f"Invalid base plots directory: '{base_plots_directory}'.")
+        self.base_plots_directory = base_plots_directory
 
-        # Create an instance of DataFrameAnalyzer
-        self.analyzer = data_processing.DataFrameAnalyzer(self.dataframe)
+        # Initialize plots subdirectories
+        self.individual_plots_subdirectory = base_plots_directory
+        self.combined_plots_subdirectory = base_plots_directory
 
-        self.fields_with_single_unique_values_dictionary = (
-            data_processing.get_fields_with_unique_values(self.dataframe)
+        # Initialize pair of variable for plotting
+        self.independent_variable_name = None
+        self.dependent_variable_name = None
+
+        # Use provided DataFrameAnalyzer object to extract constant attributes
+        self.analyzer = analyzer
+
+        self.single_valued_fields_dictionary = (
+            self.analyzer.single_valued_fields_dictionary
         )
 
-    def set_pair_of_variables_for_plotting(self, independent_var, dependent_var):
+        self.list_of_dataframe_fields = self.analyzer.list_of_dataframe_fields
 
-        # TODO: Check input
-        self.independent_variable_name = independent_var
-        self.dependent_variable_name = dependent_var
+    def set_pair_of_variables(
+        self,
+        independent_variable: str,
+        dependent_variable: str,
+    ):
+        # Validate input
+        if independent_variable not in self.list_of_dataframe_fields:
+            raise ValueError(f"Invalid x-axis variable name {independent_variable}.")
+        self.independent_variable_name = independent_variable
+
+        if dependent_variable not in self.list_of_dataframe_fields:
+            raise ValueError(f"Invalid y-axis variable name {independent_variable}.")
+        self.dependent_variable_name = dependent_variable
 
         self.plots_base_name = (
             self.dependent_variable_name + "_Vs_" + self.independent_variable_name
         )
 
-    def prepare_plots_directory(
-        self, base_directory=None, plots_base_name=None, clear_existing=False
+    def prepare_plots_subdirectory(
+        self, plots_base_subdirectory=None, plots_base_name=None, clear_existing=False
     ):
-        """
-        Prepare the directory for saving plots.
 
-        Parameters:
-            clear_existing (bool): Whether to delete existing files and
-            subdirectories.
-                - If True, clears all contents of the directory.
-                - If False, leaves existing files intact.
-
-        Returns:
-            str: The full path to the prepared directory.
-        """
-
-        if base_directory is None:
-            base_directory = self.base_plot_directory
+        if plots_base_subdirectory is None:
+            plots_base_subdirectory = self.base_plots_directory
+        elif not filesystem_utilities.is_valid_directory(plots_base_subdirectory):
+            raise ValueError(
+                f"Invalid plots base subdirectory: '{plots_base_subdirectory}'."
+            )
 
         if plots_base_name is None:
             plots_base_name = self.plots_base_name
 
-        plots_subdirectory = os.path.join(base_directory, plots_base_name)
-
-        # Ensure the directory exists before clearing or using it.
+        # Create plots subdirectory if it does not exist
+        plots_subdirectory = os.path.join(plots_base_subdirectory, plots_base_name)
         os.makedirs(plots_subdirectory, exist_ok=True)
 
+        # Ensure the directory exists before clearing or using it.
         if clear_existing:
             for item in os.listdir(plots_subdirectory):
                 item_path = os.path.join(plots_subdirectory, item)
@@ -72,10 +82,10 @@ class DataPlotter:
                 elif os.path.isdir(item_path):
                     shutil.rmtree(item_path)
 
-        self.current_plots_subdirectory = plots_subdirectory
+        return plots_subdirectory
 
     def construct_plot_title(
-        self, leading_substring, metadata_dictionary, title_width=100
+        self, leading_substring, metadata_dictionary, title_width=105
     ):
         """
         Constructs a subtitle string for plots based on unique field values.
@@ -103,7 +113,7 @@ class DataPlotter:
         }
 
         fields_unique_value_dictionary = (
-            self.fields_with_single_unique_values_dictionary | metadata_dictionary
+            self.single_valued_fields_dictionary | metadata_dictionary
         )
 
         # Start building the subtitle with the prioritized fields
@@ -178,7 +188,7 @@ class DataPlotter:
         """
 
         fields_unique_value_dictionary = (
-            self.fields_with_single_unique_values_dictionary | metadata_dictionary
+            self.single_valued_fields_dictionary | metadata_dictionary
         )
 
         # Initialize characteristic substring
@@ -205,179 +215,143 @@ class DataPlotter:
 
         return plot_path
 
-    def plot_individuals(self, TEST_list=list()):
+    def _plot_group(self, ax, dataframe_group):
+        """
+        Helper method to plot a single group on the given Axes object.
 
-        excluded_fields = {
-            "Filename",
-            *constants.OUTPUT_VALUES_LIST,
-            self.independent_variable_name,
-            self.dependent_variable_name,
-            *TEST_list,
-        }
-        self.analyzer.set_excluded_fields(excluded_fields)
-
-        self.valid_groups_with_metadata = (
-            self.analyzer.get_valid_dataframe_groups_with_metadata()
+        Parameters:
+            ax (matplotlib.axes.Axes): The Axes object to plot on.
+            dataframe_group (pd.DataFrame): The DataFrame group to plot.
+        """
+        independent_data = dataframe_group[self.independent_variable_name].to_numpy()
+        dependent_data = gv.gvar(
+            dataframe_group[self.dependent_variable_name].to_numpy()
         )
 
-        for group_data in self.valid_groups_with_metadata:
-            dataframe_group = group_data["dataframe_group"]
-            metadata_dictionary = group_data["metadata"]
+        ax.errorbar(
+            independent_data,
+            gv.mean(dependent_data),
+            yerr=gv.sdev(dependent_data),
+            fmt=".",
+            markersize=8,
+            capsize=10,
+        )
 
-            independent_variable_dataset = dataframe_group[
-                self.independent_variable_name
-            ].to_numpy()
-            dependent_variable_dataset = gv.gvar(
-                dataframe_group[self.dependent_variable_name].to_numpy()
+    def plot_data(
+        self,
+        grouping_field: str = None,
+        excluded_fields: list = None,
+        dedicated_subdirectory: bool = True,
+        clear_existing_plots: bool = False,
+    ):
+        # Check first if pair of variables has been set
+        if (
+            self.independent_variable_name is None
+            or self.dependent_variable_name is None
+        ):
+            raise ValueError("Pair of plotting variables not set yet.")
+        # Initialize the grouping fields list
+        grouping_fields_list = [
+            self.independent_variable_name,
+            self.dependent_variable_name,
+        ]
+
+        if excluded_fields is not None:
+            # Check if input is list
+            if type(excluded_fields) is not list:
+                raise TypeError("Expected a list for 'excluded_fields' argument.")
+            # Check if provided list elements are valid
+            invalid_input = list(
+                set(excluded_fields) - set(self.list_of_dataframe_fields)
             )
+            if invalid_input:
+                raise ValueError(
+                    f"Invalid element(s) {invalid_input} passed to 'excluded_fields'"
+                )
+            # If validated then append to grouping field list
+            grouping_fields_list += excluded_fields
+
+        if grouping_field is not None:
+            # TODO: Revisit the list that is checked against for validity
+            if grouping_field not in self.list_of_dataframe_fields:
+                raise ValueError(f"Invalid grouping variable {grouping_field}.")
+            # If validated then append to grouping field list
+            grouping_fields_list.append(grouping_field)
+
+        # Initialize current plots directory
+        current_plots_subdirectory = self.base_plots_directory
+        current_plots_base_name = self.plots_base_name
+        # Create a dedicated subdirectory for individual plots if no grouping
+        # field has been provided
+        if dedicated_subdirectory:
+            if grouping_field is None:
+                self.individual_plots_subdirectory = self.prepare_plots_subdirectory(
+                    clear_existing=clear_existing_plots
+                )
+                current_plots_subdirectory = self.individual_plots_subdirectory
+            else:
+                current_plots_base_name = (
+                    "Combined_" + self.plots_base_name + "_grouped_by_" + constants.PARAMETERS_PRINTED_LABELS_DICTIONARY[grouping_field]
+                )
+                self.combined_plots_subdirectory = self.prepare_plots_subdirectory(
+                    plots_base_subdirectory=self.individual_plots_subdirectory,
+                    plots_base_name=current_plots_base_name,
+                    clear_existing=clear_existing_plots,
+                )
+                current_plots_subdirectory = self.combined_plots_subdirectory
+
+        dataframe_group = self.analyzer.group_by_reduced_tunable_parameters_list(
+            grouping_fields_list
+        )
+
+        reduced_tunable_parameters_list = self.analyzer.reduced_tunable_parameters_list
+
+        #  Initialize metadata dictionary
+        metadata_dictionary = {}
+        for values_combination, group in dataframe_group:
+
+            if (
+                type(values_combination) is not tuple
+                and len(reduced_tunable_parameters_list) == 1
+            ):
+                metadata_dictionary[reduced_tunable_parameters_list[0]] = (
+                    values_combination
+                )
+            else:
+                metadata_dictionary = dict(
+                    zip(reduced_tunable_parameters_list, list(values_combination))
+                )
 
             fig, ax = plt.subplots()
             ax.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
 
             plot_title_leading_substring = ""
+            if grouping_field:
+                plot_title_leading_substring = "Combined "
             plot_title = self.construct_plot_title(
                 plot_title_leading_substring,
                 metadata_dictionary,
             )
-            ax.set_title(f"{plot_title}", pad=6)
+            ax.set_title(f"{plot_title}", pad=8)
 
             ax.set_yscale("log")
 
             ax.set(xlabel="N", ylabel="||sgn$^2$(X) - I||$^2$")
-            fig.subplots_adjust(left=0.14)  # Adjust left margin
+            fig.subplots_adjust(left=0.13)  # Adjust left margin
 
             # Set x-axis ticks to integer values only
             ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
-            ax.errorbar(
-                independent_variable_dataset,
-                gv.mean(dependent_variable_dataset),
-                yerr=gv.sdev(dependent_variable_dataset),
-                fmt=".",
-                markersize=8,
-                capsize=10,
-            )
+            if grouping_field:
+                for _, sub_group in group.groupby(grouping_field):
+                    self._plot_group(ax, sub_group)
+            else:
+                self._plot_group(ax, group)
 
             plot_path = self.generate_plot_path(
-                self.current_plots_subdirectory,
-                self.plots_base_name,
+                current_plots_subdirectory,
+                current_plots_base_name,
                 metadata_dictionary,
             )
             fig.savefig(plot_path)
             plt.close()
-
-    def plot_grouped(self, group_var, TEST_list=list(), plots_directory=None):
-
-        self.group_variable_name = group_var
-
-        if plots_directory is None:
-            plots_directory = self.current_plots_subdirectory
-
-        plots_base_name = "Combined_" + self.plots_base_name
-
-        self.prepare_plots_directory(plots_directory, plots_base_name)
-        plots_subdirectory = self.current_plots_subdirectory
-
-        excluded_fields = {
-            "Filename",
-            *constants.OUTPUT_VALUES_LIST,
-            self.independent_variable_name,
-            self.dependent_variable_name,
-            self.group_variable_name,
-            *TEST_list,
-        }
-        self.analyzer.set_excluded_fields(excluded_fields)
-
-        self.valid_groups_with_metadata = (
-            self.analyzer.get_valid_dataframe_groups_with_metadata()
-        )
-
-        for group_data in self.valid_groups_with_metadata:
-            dataframe_group = group_data["dataframe_group"]
-            metadata_dictionary = group_data["metadata"]
-
-            fig, ax = plt.subplots()
-            ax.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
-
-            plot_title_leading_substring = ""
-            plot_title = self.construct_plot_title(
-                plot_title_leading_substring, metadata_dictionary
-            )
-            ax.set_title(f"{plot_title}", pad=6)
-
-            ax.set_yscale("log")
-
-            ax.set(xlabel="N", ylabel="||sgn$^2$(X) - I||$^2$")
-            fig.subplots_adjust(left=0.14)  # Adjust left margin
-
-            # Set x-axis ticks to integer values only
-            ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-
-            for (
-                group_variable,
-                group_variable_group,
-            ) in dataframe_group.groupby(self.group_variable_name):
-
-                independent_variable_dataset = group_variable_group[
-                    self.independent_variable_name
-                ].to_numpy()
-                dependent_variable_dataset = gv.gvar(
-                    group_variable_group[self.dependent_variable_name].to_numpy()
-                )
-
-                ax.errorbar(
-                    independent_variable_dataset,
-                    gv.mean(dependent_variable_dataset),
-                    yerr=gv.sdev(dependent_variable_dataset),
-                    fmt=".",
-                    markersize=8,
-                    capsize=10,
-                )
-
-            plot_path = self.generate_plot_path(
-                plots_subdirectory,
-                self.plots_base_name,
-                metadata_dictionary,
-            )
-            fig.savefig(plot_path)
-            plt.close()
-
-
-def print_dictionaries_side_by_side(left_dictionary, right_dictionary, line_width=80, left_column_title=None, right_column_title=None):
-    """
-    Print two dictionaries side by side, with the second dictionary
-    starting at the middle of the line width.
-
-    Parameters:
-    - left_dictionary (dict): The first dictionary to print.
-    - right_dictionary (dict): The second dictionary to print.
-    - line_width (int, optional): The total width of the line. Default is 80.
-    """
-    # Calculate the middle position of the line
-    middle_position = line_width // 2
-
-    # Prepare keys and values as formatted strings
-    left_dictionary_items = [f"{k}: {v}" for k, v in left_dictionary.items()]
-    right_dictionary_items = [f"{k}: {v}" for k, v in right_dictionary.items()]
-
-    # Determine the maximum number of lines to print
-    max_lines = max(len(left_dictionary_items), len(right_dictionary_items))
-
-    # Print titles if provided, aligned with the key-value pairs
-    if left_column_title and right_column_title:
-        # Format and align the two column titles
-        # Format the first title and add the separator
-        title_output = f"{left_column_title:<{middle_position-3}} | {right_column_title}"
-        print(title_output)
-        # print(f"{left_column_title:<{middle_position}}{right_column_title}")
-        print("-" * (line_width))
-
-    # Print dictionaries side by side
-    for i in range(max_lines):
-        # Get the current item from each dictionary, if it exists
-        left = left_dictionary_items[i] if i < len(left_dictionary_items) else ""
-        right = right_dictionary_items[i] if i < len(right_dictionary_items) else ""
-        
-        # Format and align the two outputs
-        output = f"{left:<{middle_position}}{right}"
-        print(output)
