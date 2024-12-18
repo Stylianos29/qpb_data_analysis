@@ -164,8 +164,8 @@ def main(input_qpb_log_files_csv_file_path,
         #     (qpb_log_files_dataframe["KL_diagonal_order"] == 2)
         # ]
 
-        # Create an instance of DataFrameAnalyzer
-        analyzer = data_processing.DataFrameAnalyzer(qpb_log_files_dataframe)
+        # Create an instance of DataAnalyzer
+        analyzer = data_processing.DataAnalyzer(qpb_log_files_dataframe)
 
         # Store unique values as attributes to top-level output HDF5 groups
         for key, value in analyzer.fields_with_unique_values_dictionary.items():
@@ -174,7 +174,7 @@ def main(input_qpb_log_files_csv_file_path,
         # Set excluded fields
         excluded_fields = {
             "Filename",
-            *constants.OUTPUT_VALUES_LIST,
+            *constants.OUTPUT_QUANTITY_NAMES_LIST,
             "Configuration_label",
         }
         analyzer.set_excluded_fields(excluded_fields)

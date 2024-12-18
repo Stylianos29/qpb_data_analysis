@@ -60,13 +60,13 @@ if __name__ == "__main__":
     # Assuming your CSV data is loaded here
     qpb_log_files_dataframe = pd.read_csv(input_qpb_log_files_csv_file_path)
 
-    # Create an instance of DataFrameAnalyzer
-    analyzer = data_processing.DataFrameAnalyzer(qpb_log_files_dataframe)
+    # Create an instance of DataAnalyzer
+    analyzer = data_processing.DataAnalyzer(qpb_log_files_dataframe)
 
     # Set excluded fields
     excluded_fields = {
         "Filename",
-        *constants.OUTPUT_VALUES_LIST,
+        *constants.OUTPUT_QUANTITY_NAMES_LIST,
         "Lanczos_epsilon",
         # "Configuration_label",
     }
