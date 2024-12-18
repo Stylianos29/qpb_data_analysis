@@ -9,6 +9,53 @@ from typing import List, Set, Dict
 from library import constants
 
 
+def print_dictionaries_side_by_side(
+    left_dictionary,
+    right_dictionary,
+    line_width=80,
+    left_column_title=None,
+    right_column_title=None,
+):
+    """
+    Print two dictionaries side by side, with the second dictionary starting at
+    the middle of the line width.
+
+    Parameters: - left_dictionary (dict): The first dictionary to print. -
+    right_dictionary (dict): The second dictionary to print. - line_width (int,
+    optional): The total width of the line. Default is 80.
+    """
+    # Calculate the middle position of the line
+    middle_position = line_width // 2
+
+    # Prepare keys and values as formatted strings
+    left_dictionary_items = [f"{k}: {v}" for k, v in left_dictionary.items()]
+    right_dictionary_items = [f"{k}: {v}" for k, v in right_dictionary.items()]
+
+    # Determine the maximum number of lines to print
+    max_lines = max(len(left_dictionary_items), len(right_dictionary_items))
+
+    # Print titles if provided, aligned with the key-value pairs
+    if left_column_title and right_column_title:
+        # Format and align the two column titles Format the first title and add
+        # the separator
+        title_output = (
+            f"{left_column_title:<{middle_position-3}} | {right_column_title}"
+        )
+        print(title_output)
+        # print(f"{left_column_title:<{middle_position}}{right_column_title}")
+        print("-" * (line_width))
+
+    # Print dictionaries side by side
+    for i in range(max_lines):
+        # Get the current item from each dictionary, if it exists
+        left = left_dictionary_items[i] if i < len(left_dictionary_items) else ""
+        right = right_dictionary_items[i] if i < len(right_dictionary_items) else ""
+
+        # Format and align the two outputs
+        output = f"{left:<{middle_position}}{right}"
+        print(output)
+
+
 def load_csv(input_csv_file_path, dtype_mapping=None, converters_mapping=None):
     """
     Loads a CSV file into a Pandas DataFrame with optional filtering of dtypes
@@ -95,48 +142,10 @@ def get_fields_with_multiple_values(df, excluded_fields=None) -> list:
     return varying_fields
 
 
-def get_fields_with_unique_values(df: pd.DataFrame) -> dict:
-    """
-    This function returns a dictionary where the keys are the column names from
-    the DataFrame, and the values are the single unique value in the column for
-    those columns that contain only a single unique value.
-
-    Parameters:
-    -----------
-    df : pandas.DataFrame
-        The dataframe whose columns are to be analyzed.
-
-    Returns:
-    --------
-    dict
-        A dictionary with column names as keys and the single unique value as
-        values for those columns that have only one unique value.
-
-    Example:
-    --------
-    df = pd.DataFrame({
-        'col1': [1, 1, 1, 1], 'col2': [1, 1, 1, 1], 'col3': [5, 6, 7, 8]
-    }) result = get_fields_with_unique_values(df) print(result) # Output:
-    {'col1': 1, 'col2': 1}
-    """
-    single_unique_value_columns = {}
-
-    # Iterate through each column
-    for column in df.columns:
-        unique_values = df[column].unique()
-
-        # Only add columns where there is a single unique value
-        if len(unique_values) == 1:
-            # Store the unique value directly, not as a list
-            single_unique_value_columns[column] = unique_values[0]
-
-    return single_unique_value_columns
-
-
-class DataFrameAnalyzer:
+class DataAnalyzer:
     def __init__(self, df: pd.DataFrame):
         """
-        Initializes the DataFrameAnalyzer instance.
+        Initializes the DataAnalyzer instance.
 
         Parameters:
         -----------
@@ -145,9 +154,7 @@ class DataFrameAnalyzer:
         self.df = df
 
         # Extract fields with unique values (constant for this DataFrame)
-        self.fields_with_unique_values_dictionary = get_fields_with_unique_values(
-            self.df
-        )
+        self.fields_with_unique_values_dictionary = self.get_fields_with_unique_values()
 
         # Extract fields with multiple values (to be dynamically adjusted later)
         self.fields_with_multiple_values = []
@@ -155,6 +162,60 @@ class DataFrameAnalyzer:
         # Get combinations of unique field values for analysis (to be updated
         # later)
         self.unique_combinations = []
+
+    def get_column_titles(self):
+        """
+        Retrieve a list of all column titles from a Pandas DataFrame.
+
+        Parameters:
+            dataframe (pd.DataFrame): The input DataFrame.
+
+        Returns:
+            list: A list of column titles as strings.
+
+        Usage:
+            >>> df = pd.DataFrame({'A': [1, 2], 'B': [3, 4]})
+            >>> get_column_titles(df)
+            ['A', 'B']
+        """
+        return self.df.columns.tolist()
+
+    def get_fields_with_unique_values(self) -> dict:
+        """
+        This function returns a dictionary where the keys are the column names
+        from the DataFrame, and the values are the single unique value in the
+        column for those columns that contain only a single unique value.
+
+        Parameters:
+        -----------
+        df : pandas.DataFrame
+            The dataframe whose columns are to be analyzed.
+
+        Returns:
+        --------
+        dict
+            A dictionary with column names as keys and the single unique value
+            as values for those columns that have only one unique value.
+
+        Example:
+        --------
+        df = pd.DataFrame({
+            'col1': [1, 1, 1, 1], 'col2': [1, 1, 1, 1], 'col3': [5, 6, 7, 8]
+        }) result = get_fields_with_unique_values(df) print(result) # Output:
+        {'col1': 1, 'col2': 1}
+        """
+        single_unique_value_columns = {}
+
+        # Iterate through each column
+        for column in self.df.columns:
+            unique_values = self.df[column].unique()
+
+            # Only add columns where there is a single unique value
+            if len(unique_values) == 1:
+                # Store the unique value directly, not as a list
+                single_unique_value_columns[column] = unique_values[0]
+
+        return single_unique_value_columns
 
     def set_excluded_fields(self, excluded_fields: Set[str]):
         """
@@ -383,43 +444,112 @@ def extract_HDF5_datasets_to_dictionary(file_path, dataset_name):
 
 def find_single_value_columns(df):
     """
-    Finds columns in the DataFrame with a single unique value and returns a dictionary
-    with column names as keys and their unique values as dictionary values.
+    Finds columns in the DataFrame with a single unique value and returns a
+    dictionary with column names as keys and their unique values as dictionary
+    values.
 
-    Parameters:
-    df (pd.DataFrame): The input Pandas DataFrame.
+    Parameters: df (pd.DataFrame): The input Pandas DataFrame.
 
-    Returns:
-    dict: A dictionary with column names as keys and their unique values as dictionary values.
+    Returns: dict: A dictionary with column names as keys and their unique
+    values as dictionary values.
     """
     single_value_columns = {}
-    
+
     for col in df.columns:
-        unique_values = df[col].nunique()  # Get the number of unique values in the column
+        unique_values = df[
+            col
+        ].nunique()  # Get the number of unique values in the column
         if unique_values == 1:
             # If there's only one unique value, add it to the dictionary
             single_value_columns[col] = df[col].iloc[0]
-    
+
     return single_value_columns
 
 
 def find_multiple_value_columns(df):
     """
-    Finds columns in the DataFrame with multiple unique values and returns a dictionary
-    with column names as keys and the count of unique values as dictionary values.
+    Finds columns in the DataFrame with multiple unique values and returns a
+    dictionary with column names as keys and the count of unique values as
+    dictionary values.
 
-    Parameters:
-    df (pd.DataFrame): The input Pandas DataFrame.
+    Parameters: df (pd.DataFrame): The input Pandas DataFrame.
 
-    Returns:
-    dict: A dictionary with column names as keys and the count of unique values as dictionary values.
+    Returns: dict: A dictionary with column names as keys and the count of
+    unique values as dictionary values.
     """
     multiple_value_columns = {}
-    
+
     for col in df.columns:
-        unique_values_count = df[col].nunique()  # Get the number of unique values in the column
+        unique_values_count = df[
+            col
+        ].nunique()  # Get the number of unique values in the column
         if unique_values_count > 1:
             # If there's more than one unique value, add it to the dictionary
             multiple_value_columns[col] = unique_values_count
-    
+
     return multiple_value_columns
+
+
+class DataFrameAnalyzer:
+    def __init__(self, dataframe: pd.DataFrame):
+
+        self.dataframe = dataframe
+
+        self.list_of_dataframe_fields = self.dataframe.columns.tolist()
+
+        # Extract list of tunable parameter names for the provided dataframe
+        self.list_of_tunable_parameter_names_from_dataframe = [
+            column_name
+            for column_name in self.list_of_dataframe_fields
+            if column_name in constants.TUNABLE_PARAMETER_NAMES_LIST
+        ]
+
+        # Extract list of output quantity names for the provided dataframe
+        self.list_of_output_quantity_names_from_dataframe = [
+            column_name
+            for column_name in self.list_of_dataframe_fields
+            if column_name in constants.OUTPUT_QUANTITY_NAMES_LIST
+        ]
+
+        # Extract dictionary with single-valued fields and their values
+        self.single_valued_fields_dictionary = self.get_single_valued_fields()
+
+        # Extract dictionary of multivalued fields with number of unique values
+        self.multivalued_fields_dictionary = self.get_multivalued_fields()
+
+    def get_single_valued_fields(self) -> dict:
+
+        single_valued_fields_dictionary = {}
+
+        for column in self.dataframe.columns:
+            unique_values = self.dataframe[column].unique()
+
+            # Only add columns where there is a single unique value
+            if len(unique_values) == 1:
+                # Store the unique value directly, not as a list
+                single_valued_fields_dictionary[column] = unique_values[0]
+
+        return single_valued_fields_dictionary
+
+    def get_multivalued_fields(self) -> dict:
+
+        multivalued_fields_dictionary = {}
+
+        for column in self.dataframe.columns:
+            # Get the number of unique values in the column
+            unique_values_count = self.dataframe[column].nunique()
+            if unique_values_count > 1:
+                # If there's more than one unique value, add it to dictionary
+                multivalued_fields_dictionary[column] = unique_values_count
+
+        return multivalued_fields_dictionary
+
+    def group_by_reduced_tunable_parameters_list(self, filter_out_parameters: list):
+
+        self.reduced_tunable_parameters_list = list(
+            set(self.list_of_tunable_parameter_names_from_dataframe)
+            - set(self.single_valued_fields_dictionary)
+            - set(filter_out_parameters)
+        )
+
+        return self.dataframe.groupby(self.reduced_tunable_parameters_list)
