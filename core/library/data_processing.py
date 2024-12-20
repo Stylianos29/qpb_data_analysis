@@ -84,7 +84,8 @@ def load_csv(input_csv_file_path, dtype_mapping=None, converters_mapping=None):
 
     # Read the header of the .csv file to determine available fields
     with open(input_csv_file_path, "r") as f:
-        csv_header = f.readline().strip().split(",")
+        # Convert to a set for fast lookup
+        csv_header = set(f.readline().strip().split(","))
 
     # Filter mappings based on the header
     filtered_dtype_mapping = {
@@ -494,6 +495,7 @@ class DataFrameAnalyzer:
     def __init__(self, dataframe: pd.DataFrame):
 
         self.dataframe = dataframe
+        self.original_dataframe = self.dataframe
 
         self.list_of_dataframe_fields = self.dataframe.columns.tolist()
 
@@ -510,6 +512,10 @@ class DataFrameAnalyzer:
             for column_name in self.list_of_dataframe_fields
             if column_name in constants.OUTPUT_QUANTITY_NAMES_LIST
         ]
+
+        self.set_data_based_attributes()
+
+    def set_data_based_attributes(self):
 
         # Extract dictionary with single-valued fields and their values
         self.single_valued_fields_dictionary = self.get_single_valued_fields()
@@ -553,3 +559,27 @@ class DataFrameAnalyzer:
         )
 
         return self.dataframe.groupby(self.reduced_tunable_parameters_list)
+
+    def restrict_rows(self, condition: str):
+        """
+        Restricts the DataFrame to rows that satisfy the given condition.
+        
+        Args:
+            condition (str): A condition to filter rows, e.g., "parameter >= 1".
+        
+        Returns:
+            None: Modifies the DataFrameAnalyzer's DataFrame in-place.
+        """
+        try:
+            # Use `query` to filter the DataFrame based on the condition
+            self.dataframe = self.dataframe.query(condition)
+            # Recompute data-based dictionaries as the DataFrame has changed
+            self.set_data_based_attributes()
+
+        except Exception as e:
+            raise ValueError(f"Failed to apply condition '{condition}': {e}")
+
+    def restore_entire_dataframe(self):
+
+        self.dataframe = self.original_dataframe
+        self.set_data_based_attributes()
