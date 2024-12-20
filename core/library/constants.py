@@ -189,16 +189,17 @@ FILE_CONTENTS_SINGLE_VALUE_PATTERNS_DICTIONARY = {
         "regex_pattern": r"(\d+)",
         "type": int,
     },
-    "Solver_epsilon": {
-        "line_identifier": "Solver epsilon =",
-        "regex_pattern": r"(\d+\.\d+e[+-]\d+)",
-        "type": float,
-    },
-    "Maximum_solver_iterations": {
-        "line_identifier": "Max solver iters = ",
-        "regex_pattern": r"(\d+)",
-        "type": int,
-    },
+    # TODO: Very problematic. Revisit!
+    # "Solver_epsilon": {
+    #     "line_identifier": "Solver epsilon =",
+    #     "regex_pattern": r"(\d+\.\d+e[+-]\d+)",
+    #     "type": float,
+    # },
+    # "Maximum_solver_iterations": {
+    #     "line_identifier": "Max solver iters = ",
+    #     "regex_pattern": r"(\d+)",
+    #     "type": int,
+    # },
     # KL-specific parameters
     "KL_diagonal_order": {
         "line_identifier": "KL iters = ",
@@ -219,11 +220,11 @@ FILE_CONTENTS_SINGLE_VALUE_PATTERNS_DICTIONARY = {
         "regex_pattern": r"(\d+\.\d+e[+-]\d+)",
         "type": float,
     },
-    "Maximum_solver_iterations": {
-        "line_identifier": "Max solver iters = ",
-        "regex_pattern": r"(\d+)",
-        "type": int,
-    },
+    # "Maximum_solver_iterations": {
+    #     "line_identifier": "Max solver iters = ",
+    #     "regex_pattern": r"(\d+)",
+    #     "type": int,
+    # },
     "Total_calculation_time": {
         "line_identifier": "vectors in t",
         "regex_pattern": r"(\d+\.\d+)",
@@ -322,6 +323,7 @@ CONVERTERS_MAPPING = {
     "Delta_Max": lambda x: f"{float(x):.2f}",
     # Format floats to 2 decimal places
     "PCAC_mass_estimate": lambda x: ast.literal_eval(x),
+    # 
     "Average_calculation_result": lambda x: ast.literal_eval(x),
     # Format floats in exponential notation
     "Solver_epsilon": lambda x: f"{float(x):.0e}",
@@ -329,12 +331,12 @@ CONVERTERS_MAPPING = {
 
 
 AXES_LABELS_DICTIONARY = {
+    # Tunable parameters 
     "QCD_beta_value": "$\\beta$",
     "Configuration_label": "config",
     "Rho_value": "$\\rho$",
     "Bare_mass": "a$m_{bare}$",
     "PCAC_mass_estimate": "a$m_{PCAC}$",
-    "Kappa_value": "$\\kappa$",
     "Clover_coefficient": "$c_{SW}$",
     "Delta_Min": "$\\delta\\lambda_{min}^2$",
     "Delta_Max": "$\\delta\\lambda_{max}^2$",
@@ -345,6 +347,13 @@ AXES_LABELS_DICTIONARY = {
     "MSCG_epsilon": "$\\epsilon_{MSCG}$",
     "KL_diagonal_order": "n",
     "KL_scaling_factor": "$\\mu$",
+    # Output quantity
+    "Total_overhead_time": "Overhead (s)",
+    "Condition_number": "$\\kappa$",
+    "Minimum_eigenvalue_squared": "$\\lambda_{min}^2$",
+    "Maximum_eigenvalue_squared": "$\\lambda_{max}^2$",
+    "Total_number_of_Lanczos_iterations": "Total # of Lanczos algorithm iterations"
+    # "||sgn$^2$(X) - I||$^2$"
 }
 
 # TODO: Maybe I need separate lists for qpb input parameters and qpb output
