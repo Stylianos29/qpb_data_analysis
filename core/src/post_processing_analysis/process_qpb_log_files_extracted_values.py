@@ -197,9 +197,13 @@ def main(
             qpb_log_files_dataframe["MSCG_epsilon"].apply(float)
         )
 
-    if ("MSCG_epsilon" in qpb_log_files_dataframe.columns) and not (("Outer solver epsilon" in qpb_log_files_dataframe.columns)):
+    if ("MSCG_epsilon" in qpb_log_files_dataframe.columns) and not (
+        ("Outer solver epsilon" in qpb_log_files_dataframe.columns)
+    ):
         if "Solver_epsilon" in qpb_log_files_dataframe.columns:
-            qpb_log_files_dataframe = qpb_log_files_dataframe.drop(columns="Solver_epsilon")
+            qpb_log_files_dataframe = qpb_log_files_dataframe.drop(
+                columns="Solver_epsilon"
+            )
 
     #
     if ("Minimum_eigenvalue_squared" in qpb_log_files_dataframe.columns) and (
@@ -240,22 +244,49 @@ def main(
         )
     )
     if calculation_result_per_vector_dictionary:
-        # Calculate the average value and its error
-        average_calculation_result_dictionary = {
-            filename: (
-                (
-                    np.average(dataset),
-                    np.std(dataset, ddof=1) / np.sqrt(len(dataset)),
+        # TODO: Check length more comprehensively using a set:
+        # lengths = {len(arr) for arr in my_dict.values()}
+
+        # Ensure all dictionary values (NumPy arrays) have length greater than one
+        all_lengths_greater_than_one = all(
+            len(array) > 1
+            for array in calculation_result_per_vector_dictionary.values()
+        )
+        if all_lengths_greater_than_one:
+            # Calculate the average value and its error
+            average_calculation_result_dictionary = {
+                filename: (
+                    (
+                        np.average(dataset),
+                        np.std(dataset, ddof=1) / np.sqrt(len(dataset)),
+                    )
                 )
-                if len(dataset) > 1
-                else dataset[0]
+                for filename, dataset in calculation_result_per_vector_dictionary.items()
+            }
+            # Add a new column with the dictionary values
+            qpb_log_files_dataframe["Average_calculation_result"] = (
+                qpb_log_files_dataframe["Filename"].map(
+                    average_calculation_result_dictionary
+                )
             )
-            for filename, dataset in calculation_result_per_vector_dictionary.items()
-        }
-        # Add a new column with the dictionary values
-        qpb_log_files_dataframe["Average_calculation_result"] = qpb_log_files_dataframe[
-            "Filename"
-        ].map(average_calculation_result_dictionary)
+        else:
+            # Alternatively check if all NumPy arrays have length one
+            all_lengths_equal_to_one = all(
+                len(array) == 1
+                for array in calculation_result_per_vector_dictionary.values()
+            )
+            if all_lengths_equal_to_one:
+                # Pass the single value to the DataFrame without error
+                Calculation_result_with_no_error_dictionary = {
+                    filename: dataset[0]
+                    for filename, dataset in calculation_result_per_vector_dictionary.items()
+                }
+                # Add a new column with the dictionary values
+                qpb_log_files_dataframe["Calculation_result_with_no_error"] = (
+                    qpb_log_files_dataframe["Filename"].map(
+                        Calculation_result_with_no_error_dictionary
+                    )
+                )
 
     # Calculate average number of MSCG iterations
     total_number_of_MSCG_iterations_dictionary = (
@@ -271,9 +302,11 @@ def main(
             for filename, dataset in total_number_of_MSCG_iterations_dictionary.items()
         }
         # Add a new column with the dictionary values
-        qpb_log_files_dataframe["Average_number_of_MSCG_iterations"] = qpb_log_files_dataframe[
-            "Filename"
-        ].map(average_number_of_MSCG_iterations_dictionary)
+        qpb_log_files_dataframe["Average_number_of_MSCG_iterations"] = (
+            qpb_log_files_dataframe["Filename"].map(
+                average_number_of_MSCG_iterations_dictionary
+            )
+        )
 
     # Extract MS shifts
     MS_expansion_shifts_dictionary = (
@@ -292,44 +325,44 @@ def main(
             "Filename"
         ].map(MS_expansion_shifts_dictionary)
 
-# CG_total_calculation_time_per_spinor
-# Total_number_of_CG_iterations_per_spinor
+    # # Calculate average CG calculation time per spinor
+    # CG_total_calculation_time_per_spinor_dictionary = (
+    #     data_processing.extract_HDF5_datasets_to_dictionary(
+    #         input_qpb_log_files_hdf5_file_path, "CG_total_calculation_time_per_spinor"
+    #     )
+    # )
+    # if CG_total_calculation_time_per_spinor_dictionary:
+    #     # Calculate the average value and its error
+    #     average_CG_calculation_time_per_spinor_dictionary = {
+    #         filename: np.average(dataset)
+    #         for filename, dataset in CG_total_calculation_time_per_spinor_dictionary.items()
+    #     }
+    #     # Add a new column with the dictionary values
+    #     qpb_log_files_dataframe["Average_CG_calculation_time_per_spinor"] = (
+    #         qpb_log_files_dataframe["Filename"].map(
+    #             average_CG_calculation_time_per_spinor_dictionary
+    #         )
+    #     )
 
-    # Calculate average CG calculation time per spinor
-    CG_total_calculation_time_per_spinor_dictionary = (
-        data_processing.extract_HDF5_datasets_to_dictionary(
-            input_qpb_log_files_hdf5_file_path, "CG_total_calculation_time_per_spinor"
-        )
-    )
-    if CG_total_calculation_time_per_spinor_dictionary:
-        # Calculate the average value and its error
-        average_CG_calculation_time_per_spinor_dictionary = {
-            filename: np.average(dataset)
-            for filename, dataset in CG_total_calculation_time_per_spinor_dictionary.items()
-        }
-        # Add a new column with the dictionary values
-        qpb_log_files_dataframe["Average_CG_calculation_time_per_spinor"] = qpb_log_files_dataframe[
-            "Filename"
-        ].map(average_CG_calculation_time_per_spinor_dictionary)
-
-
-    # Calculate average number of CG iterations per spinor
-    total_number_of_CG_iterations_per_spinor_dictionary = (
-        data_processing.extract_HDF5_datasets_to_dictionary(
-            input_qpb_log_files_hdf5_file_path, "Total_number_of_CG_iterations_per_spinor"
-        )
-    )
-    if total_number_of_CG_iterations_per_spinor_dictionary:
-        # Calculate the average value and its error
-        average_number_of_CG_iterations_per_spinor_dictionary = {
-            filename: np.average(dataset)
-            for filename, dataset in total_number_of_CG_iterations_per_spinor_dictionary.items()
-        }
-        # Add a new column with the dictionary values
-        qpb_log_files_dataframe["Average_number_of_CG_iterations_per_spinor"] = qpb_log_files_dataframe[
-            "Filename"
-        ].map(average_number_of_CG_iterations_per_spinor_dictionary)
-
+    # # Calculate average number of CG iterations per spinor
+    # total_number_of_CG_iterations_per_spinor_dictionary = (
+    #     data_processing.extract_HDF5_datasets_to_dictionary(
+    #         input_qpb_log_files_hdf5_file_path,
+    #         "Total_number_of_CG_iterations_per_spinor",
+    #     )
+    # )
+    # if total_number_of_CG_iterations_per_spinor_dictionary:
+    #     # Calculate the average value and its error
+    #     average_number_of_CG_iterations_per_spinor_dictionary = {
+    #         filename: np.average(dataset)
+    #         for filename, dataset in total_number_of_CG_iterations_per_spinor_dictionary.items()
+    #     }
+    #     # Add a new column with the dictionary values
+    #     qpb_log_files_dataframe["Average_number_of_CG_iterations_per_spinor"] = (
+    #         qpb_log_files_dataframe["Filename"].map(
+    #             average_number_of_CG_iterations_per_spinor_dictionary
+    #         )
+    #     )
 
     # Construct the output .csv file path
     output_qpb_log_files_csv_file_path = os.path.join(
