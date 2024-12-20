@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 import textwrap
 import gvar as gv
+import numpy as np
 
 from library import constants, filesystem_utilities, data_processing
 
@@ -31,11 +32,19 @@ class DataPlotter:
         # Use provided DataFrameAnalyzer object to extract constant attributes
         self.analyzer = analyzer
 
+        self.list_of_dataframe_fields = self.analyzer.list_of_dataframe_fields
+
         self.single_valued_fields_dictionary = (
             self.analyzer.single_valued_fields_dictionary
         )
 
-        self.list_of_dataframe_fields = self.analyzer.list_of_dataframe_fields
+    def restrict_data(self, condition: str):
+
+        self.analyzer.restrict_rows(condition=condition)
+
+    def restore_original_data(self):
+
+        self.analyzer.restore_entire_dataframe()
 
     def set_pair_of_variables(
         self,
@@ -84,8 +93,12 @@ class DataPlotter:
 
         return plots_subdirectory
 
-    def construct_plot_title(
-        self, leading_substring, metadata_dictionary, title_width=105
+    def _construct_plot_title(
+        self,
+        leading_substring: str,
+        metadata_dictionary: dict,
+        title_width: int,
+        additional_excluded_fields: list = [],
     ):
         """
         Constructs a subtitle string for plots based on unique field values.
@@ -137,7 +150,9 @@ class DataPlotter:
 
         # Filter out prioritized fields from the dictionary
         excluded_fields = set(
-            list_of_fields_to_appear_first + list(additional_fields.values())
+            list_of_fields_to_appear_first
+            + list(additional_fields.values())
+            + additional_excluded_fields
         )
         remaining_fields = {
             key: value
@@ -163,11 +178,12 @@ class DataPlotter:
 
         return wrapped_plot_title
 
-    def generate_plot_path(
+    def _generate_plot_path(
         self,
         plots_subdirectory,
         plots_base_name,
         metadata_dictionary,
+        excluded_fields: list = None,
     ):
         """
         Generate a file path for a plot based on characteristic substring and
@@ -190,6 +206,13 @@ class DataPlotter:
         fields_unique_value_dictionary = (
             self.single_valued_fields_dictionary | metadata_dictionary
         )
+        # Exclude specified fields from the dictionary if provided
+        if excluded_fields is not None:
+            fields_unique_value_dictionary = {
+                field: value
+                for field, value in fields_unique_value_dictionary.items()
+                if field not in excluded_fields
+            }
 
         # Initialize characteristic substring
         if "Kernel_operator_type" in fields_unique_value_dictionary:
@@ -215,7 +238,7 @@ class DataPlotter:
 
         return plot_path
 
-    def _plot_group(self, ax, dataframe_group):
+    def _plot_group(self, ax, dataframe_group, label_string=None):
         """
         Helper method to plot a single group on the given Axes object.
 
@@ -223,19 +246,39 @@ class DataPlotter:
             ax (matplotlib.axes.Axes): The Axes object to plot on.
             dataframe_group (pd.DataFrame): The DataFrame group to plot.
         """
-        independent_data = dataframe_group[self.independent_variable_name].to_numpy()
-        dependent_data = gv.gvar(
-            dataframe_group[self.dependent_variable_name].to_numpy()
-        )
 
-        ax.errorbar(
-            independent_data,
-            gv.mean(dependent_data),
-            yerr=gv.sdev(dependent_data),
-            fmt=".",
-            markersize=8,
-            capsize=10,
-        )
+        independent_data = dataframe_group[self.independent_variable_name].to_numpy()
+        dependent_data = dataframe_group[self.dependent_variable_name].to_numpy()
+
+        # Vectorize isinstance check
+        is_tuple = np.vectorize(lambda x: isinstance(x, tuple))
+
+        if any(is_tuple(independent_data)):
+            independent_data = gv.gvar(independent_data)
+
+            independent_data = gv.mean(independent_data)
+
+        if any(is_tuple(dependent_data)):
+            dependent_data = gv.gvar(dependent_data)
+
+            ax.errorbar(
+                independent_data,
+                gv.mean(dependent_data),
+                yerr=gv.sdev(dependent_data),
+                fmt=".",
+                markersize=8,
+                capsize=10,
+                label=label_string,
+            )
+
+        else:
+            ax.scatter(
+                independent_data,
+                dependent_data,
+                marker="x",
+                # s=8,
+                label=label_string,
+            )
 
     def plot_data(
         self,
@@ -243,6 +286,12 @@ class DataPlotter:
         excluded_fields: list = None,
         dedicated_subdirectory: bool = True,
         clear_existing_plots: bool = False,
+        xaxis_log_scale: bool = False,
+        yaxis_log_scale: bool = False,
+        invert_xaxis: bool = False,
+        invert_yaxis: bool = False,
+        plot_title_width: int = 105,
+        legend_location: str = "upper left",
     ):
         # Check first if pair of variables has been set
         if (
@@ -291,7 +340,10 @@ class DataPlotter:
                 current_plots_subdirectory = self.individual_plots_subdirectory
             else:
                 current_plots_base_name = (
-                    "Combined_" + self.plots_base_name + "_grouped_by_" + constants.PARAMETERS_PRINTED_LABELS_DICTIONARY[grouping_field]
+                    "Combined_"
+                    + self.plots_base_name
+                    + "_grouped_by_"
+                    + constants.PARAMETERS_PRINTED_LABELS_DICTIONARY[grouping_field]
                 )
                 self.combined_plots_subdirectory = self.prepare_plots_subdirectory(
                     plots_base_subdirectory=self.individual_plots_subdirectory,
@@ -299,6 +351,24 @@ class DataPlotter:
                     clear_existing=clear_existing_plots,
                 )
                 current_plots_subdirectory = self.combined_plots_subdirectory
+
+        if not isinstance(plot_title_width, int):
+            raise TypeError(
+                f"Expected an integer for 'plot_title_width',"
+                f" but got '{type(plot_title_width).__name__}'."
+            )
+
+        for argument_name, argument_value in {
+            "dedicated_subdirectory": dedicated_subdirectory,
+            "clear_existing_plots": clear_existing_plots,
+            "xaxis_log_scale": xaxis_log_scale,
+            "yaxis_log_scale": yaxis_log_scale,
+        }.items():
+            if not isinstance(argument_value, bool):
+                raise TypeError(
+                    f"{argument_name} must be a boolean,"
+                    f" but got '{type(argument_value).__name__}'."
+                )
 
         dataframe_group = self.analyzer.group_by_reduced_tunable_parameters_list(
             grouping_fields_list
@@ -328,30 +398,75 @@ class DataPlotter:
             plot_title_leading_substring = ""
             if grouping_field:
                 plot_title_leading_substring = "Combined "
-            plot_title = self.construct_plot_title(
+            plot_title = self._construct_plot_title(
                 plot_title_leading_substring,
                 metadata_dictionary,
+                title_width=plot_title_width,
+                additional_excluded_fields=excluded_fields,
             )
             ax.set_title(f"{plot_title}", pad=8)
 
-            ax.set_yscale("log")
+            # Set axes scale
+            if (
+                self.independent_variable_name
+                in constants.PARAMETERS_WITH_EXPONENTIAL_FORMAT
+            ) or xaxis_log_scale:
+                ax.set_xscale("log")
+            if (
+                self.dependent_variable_name
+                in constants.PARAMETERS_WITH_EXPONENTIAL_FORMAT
+            ) or yaxis_log_scale:
+                ax.set_yscale("log")
 
-            ax.set(xlabel="N", ylabel="||sgn$^2$(X) - I||$^2$")
-            fig.subplots_adjust(left=0.13)  # Adjust left margin
+            # Invert axes
+            if (
+                self.independent_variable_name
+                in constants.PARAMETERS_WITH_EXPONENTIAL_FORMAT
+            ) or invert_xaxis:
+                fig.gca().invert_xaxis()
+            if (
+                self.dependent_variable_name
+                in constants.PARAMETERS_WITH_EXPONENTIAL_FORMAT
+            ) or invert_yaxis:
+                fig.gca().invert_yaxis()
 
-            # Set x-axis ticks to integer values only
-            ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+            ax.set(
+                xlabel=constants.AXES_LABELS_DICTIONARY[self.independent_variable_name],
+                ylabel=constants.AXES_LABELS_DICTIONARY[self.dependent_variable_name],
+            )
+            # Adjust left margin
+            fig.subplots_adjust(left=0.13)
+
+            # Set axes ticks to integer values only
+            if self.independent_variable_name in constants.PARAMETERS_OF_INTEGER_VALUE:
+                ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+            if self.dependent_variable_name in constants.PARAMETERS_OF_INTEGER_VALUE:
+                ax.yaxis.set_major_locator(MaxNLocator(integer=True))
 
             if grouping_field:
-                for _, sub_group in group.groupby(grouping_field):
-                    self._plot_group(ax, sub_group)
+                for grouping_fields_values, sub_group in group.groupby(grouping_field):
+                    label_string = str(grouping_fields_values)
+                    self._plot_group(ax, sub_group, label_string)
             else:
                 self._plot_group(ax, group)
 
-            plot_path = self.generate_plot_path(
+            if grouping_field:
+                ax.legend(loc=legend_location, title=grouping_field)
+
+            plot_path = self._generate_plot_path(
                 current_plots_subdirectory,
                 current_plots_base_name,
                 metadata_dictionary,
+                excluded_fields,
             )
             fig.savefig(plot_path)
             plt.close()
+
+    # def plot_histogram(
+    #     self, histogram_variable, grouping_field, number_of_bins=30, color="blue"
+    # ):
+
+    #     self.independent_variable_name = histogram_variable
+    #     self.dependent_variable_name = "Frequency"
+
+    # # plt.hist(data, bins=30, color='blue', alpha=0.7, edgecolor='black')  # Plot the histogram
