@@ -24,7 +24,7 @@ pip install -e .
 
 ### Key Directories
 
-#### `qpb_data_analysis/`
+#### `core/`
 This is the main Python package and contains:
 - **`library/`**: Reusable modules for tasks like file handling, calculations,
   and more.
