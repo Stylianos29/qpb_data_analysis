@@ -560,7 +560,7 @@ class DataFrameAnalyzer:
 
         return self.dataframe.groupby(self.reduced_tunable_parameters_list)
 
-    def restrict_rows(self, condition: str):
+    def restrict_data(self, condition: str):
         """
         Restricts the DataFrame to rows that satisfy the given condition.
         
