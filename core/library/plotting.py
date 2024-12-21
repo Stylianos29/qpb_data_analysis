@@ -6,16 +6,19 @@ from matplotlib.ticker import MaxNLocator
 import textwrap
 import gvar as gv
 import numpy as np
+import pandas as pd
+
 
 from library import constants, filesystem_utilities, data_processing
+from library import DataFrameAnalyzer
 
-
-class DataPlotter:
-    def __init__(
-        self,
-        analyzer: data_processing.DataFrameAnalyzer,
-        base_plots_directory: str,
-    ):
+class DataPlotter(DataFrameAnalyzer):
+    def __init__(self, dataframe: pd.DataFrame, base_plots_directory: str):
+        """
+        Initialize the DataPlotter with a DataFrame.
+        """
+        # Initialize the DataFrameAnalyzer
+        super().__init__(dataframe)
 
         if not filesystem_utilities.is_valid_directory(base_plots_directory):
             raise ValueError(f"Invalid base plots directory: '{base_plots_directory}'.")
@@ -26,45 +29,50 @@ class DataPlotter:
         self.combined_plots_subdirectory = base_plots_directory
 
         # Initialize pair of variable for plotting
-        self.independent_variable_name = None
-        self.dependent_variable_name = None
+        self.xaxis_variable_name = None
+        self.yaxis_variable = None
 
-        # Use provided DataFrameAnalyzer object to extract constant attributes
-        self.analyzer = analyzer
+        # # Use provided DataFrameAnalyzer object to extract constant attributes
+        # self = analyzer
 
-        self.list_of_dataframe_fields = self.analyzer.list_of_dataframe_fields
+        # self.list_of_dataframe_fields = self.list_of_dataframe_fields
 
-        self.single_valued_fields_dictionary = (
-            self.analyzer.single_valued_fields_dictionary
+        # self.single_valued_fields_dictionary = (
+        #     self.single_valued_fields_dictionary
+        # )
+
+        self.list_of_multivalued_fields = list(
+            self.multivalued_fields_dictionary.keys()
         )
-
-    def restrict_data(self, condition: str):
-
-        self.analyzer.restrict_rows(condition=condition)
-
-    def restore_original_data(self):
-
-        self.analyzer.restore_entire_dataframe()
 
     def set_pair_of_variables(
         self,
-        independent_variable: str,
-        dependent_variable: str,
+        xaxis_variable: str,
+        yaxis_variable: str,
+        plots_base_name: str = None,
     ):
         # Validate input
-        if independent_variable not in self.list_of_dataframe_fields:
-            raise ValueError(f"Invalid x-axis variable name {independent_variable}.")
-        self.independent_variable_name = independent_variable
+        if xaxis_variable not in self.list_of_dataframe_fields:
+            raise ValueError(f"Invalid x-axis variable name '{xaxis_variable}'.")
+        self.xaxis_variable_name = xaxis_variable
 
-        if dependent_variable not in self.list_of_dataframe_fields:
-            raise ValueError(f"Invalid y-axis variable name {independent_variable}.")
-        self.dependent_variable_name = dependent_variable
+        # For the y-axis anticipate the case of a histogram being requested
+        if (
+            yaxis_variable not in self.list_of_dataframe_fields
+            and not yaxis_variable == "Frequency"
+        ):
+            raise ValueError(f"Invalid y-axis variable name '{yaxis_variable}'.")
+        self.yaxis_variable = yaxis_variable
 
-        self.plots_base_name = (
-            self.dependent_variable_name + "_Vs_" + self.independent_variable_name
-        )
+        # Construct plots base name
+        if plots_base_name is not None:
+            self.plots_base_name = plots_base_name
+        else:
+            self.plots_base_name = (
+                self.yaxis_variable + "_Vs_" + self.xaxis_variable_name
+            )
 
-    def prepare_plots_subdirectory(
+    def _prepare_plots_subdirectory(
         self, plots_base_subdirectory=None, plots_base_name=None, clear_existing=False
     ):
 
@@ -98,7 +106,7 @@ class DataPlotter:
         leading_substring: str,
         metadata_dictionary: dict,
         title_width: int,
-        additional_excluded_fields: list = [],
+        additional_excluded_fields: list = None,
     ):
         """
         Constructs a subtitle string for plots based on unique field values.
@@ -147,6 +155,10 @@ class DataPlotter:
                     f"{constants.AXES_LABELS_DICTIONARY[additional_field]}="
                     f"{fields_unique_value_dictionary[additional_field]}"
                 )
+
+        # Initialize additional_excluded_fields to empty list if None
+        if additional_excluded_fields is None:
+            additional_excluded_fields = []
 
         # Filter out prioritized fields from the dictionary
         excluded_fields = set(
@@ -238,7 +250,9 @@ class DataPlotter:
 
         return plot_path
 
-    def _plot_group(self, ax, dataframe_group, label_string=None):
+    def _plot_group(
+        self, ax, dataframe_group, is_histogram: bool = False, label_string: str = None
+    ):
         """
         Helper method to plot a single group on the given Axes object.
 
@@ -247,38 +261,43 @@ class DataPlotter:
             dataframe_group (pd.DataFrame): The DataFrame group to plot.
         """
 
-        independent_data = dataframe_group[self.independent_variable_name].to_numpy()
-        dependent_data = dataframe_group[self.dependent_variable_name].to_numpy()
-
         # Vectorize isinstance check
         is_tuple = np.vectorize(lambda x: isinstance(x, tuple))
 
-        if any(is_tuple(independent_data)):
-            independent_data = gv.gvar(independent_data)
+        xaxis_data = dataframe_group[self.xaxis_variable_name].to_numpy()
+        if any(is_tuple(xaxis_data)):
+            xaxis_data = gv.gvar(xaxis_data)
+            # TODO: Set ability the user can request to plot the error
+            xaxis_data = gv.mean(xaxis_data)
 
-            independent_data = gv.mean(independent_data)
-
-        if any(is_tuple(dependent_data)):
-            dependent_data = gv.gvar(dependent_data)
-
-            ax.errorbar(
-                independent_data,
-                gv.mean(dependent_data),
-                yerr=gv.sdev(dependent_data),
-                fmt=".",
-                markersize=8,
-                capsize=10,
-                label=label_string,
-            )
-
+        if is_histogram:
+            # Plot the histogram
+            ax.hist(xaxis_data, bins=30, color="blue", alpha=0.7, edgecolor="black")
         else:
-            ax.scatter(
-                independent_data,
-                dependent_data,
-                marker="x",
-                # s=8,
-                label=label_string,
-            )
+            yaxis_data = dataframe_group[self.yaxis_variable].to_numpy()
+
+            if any(is_tuple(yaxis_data)):
+                yaxis_data = gv.gvar(yaxis_data)
+
+                ax.errorbar(
+                    xaxis_data,
+                    gv.mean(yaxis_data),
+                    yerr=gv.sdev(yaxis_data),
+                    fmt=".",
+                    markersize=8,
+                    capsize=10,
+                    label=label_string,
+                )
+
+            else:
+                ax.scatter(
+                    xaxis_data,
+                    yaxis_data,
+                    marker="x",
+                    # s=8,
+                    label=label_string,
+                )
+
 
     def plot_data(
         self,
@@ -290,19 +309,17 @@ class DataPlotter:
         yaxis_log_scale: bool = False,
         invert_xaxis: bool = False,
         invert_yaxis: bool = False,
+        is_histogram: bool = False,
         plot_title_width: int = 105,
         legend_location: str = "upper left",
     ):
         # Check first if pair of variables has been set
-        if (
-            self.independent_variable_name is None
-            or self.dependent_variable_name is None
-        ):
+        if self.xaxis_variable_name is None or self.yaxis_variable is None:
             raise ValueError("Pair of plotting variables not set yet.")
         # Initialize the grouping fields list
         grouping_fields_list = [
-            self.independent_variable_name,
-            self.dependent_variable_name,
+            self.xaxis_variable_name,
+            self.yaxis_variable,
         ]
 
         if excluded_fields is not None:
@@ -322,10 +339,23 @@ class DataPlotter:
 
         if grouping_field is not None:
             # TODO: Revisit the list that is checked against for validity
-            if grouping_field not in self.list_of_dataframe_fields:
+            if grouping_field not in self.list_of_multivalued_fields:
                 raise ValueError(f"Invalid grouping variable {grouping_field}.")
             # If validated then append to grouping field list
             grouping_fields_list.append(grouping_field)
+
+        for argument_name, argument_value in {
+            "dedicated_subdirectory": dedicated_subdirectory,
+            "clear_existing_plots": clear_existing_plots,
+            "xaxis_log_scale": xaxis_log_scale,
+            "yaxis_log_scale": yaxis_log_scale,
+            "is_histogram": is_histogram,
+        }.items():
+            if not isinstance(argument_value, bool):
+                raise TypeError(
+                    f"{argument_name} must be a boolean,"
+                    f" but got '{type(argument_value).__name__}'."
+                )
 
         # Initialize current plots directory
         current_plots_subdirectory = self.base_plots_directory
@@ -333,8 +363,8 @@ class DataPlotter:
         # Create a dedicated subdirectory for individual plots if no grouping
         # field has been provided
         if dedicated_subdirectory:
-            if grouping_field is None:
-                self.individual_plots_subdirectory = self.prepare_plots_subdirectory(
+            if grouping_field is None or is_histogram:
+                self.individual_plots_subdirectory = self._prepare_plots_subdirectory(
                     clear_existing=clear_existing_plots
                 )
                 current_plots_subdirectory = self.individual_plots_subdirectory
@@ -345,7 +375,7 @@ class DataPlotter:
                     + "_grouped_by_"
                     + constants.PARAMETERS_PRINTED_LABELS_DICTIONARY[grouping_field]
                 )
-                self.combined_plots_subdirectory = self.prepare_plots_subdirectory(
+                self.combined_plots_subdirectory = self._prepare_plots_subdirectory(
                     plots_base_subdirectory=self.individual_plots_subdirectory,
                     plots_base_name=current_plots_base_name,
                     clear_existing=clear_existing_plots,
@@ -358,28 +388,17 @@ class DataPlotter:
                 f" but got '{type(plot_title_width).__name__}'."
             )
 
-        for argument_name, argument_value in {
-            "dedicated_subdirectory": dedicated_subdirectory,
-            "clear_existing_plots": clear_existing_plots,
-            "xaxis_log_scale": xaxis_log_scale,
-            "yaxis_log_scale": yaxis_log_scale,
-        }.items():
-            if not isinstance(argument_value, bool):
-                raise TypeError(
-                    f"{argument_name} must be a boolean,"
-                    f" but got '{type(argument_value).__name__}'."
-                )
-
-        dataframe_group = self.analyzer.group_by_reduced_tunable_parameters_list(
+        dataframe_group = self.group_by_reduced_tunable_parameters_list(
             grouping_fields_list
         )
 
-        reduced_tunable_parameters_list = self.analyzer.reduced_tunable_parameters_list
+        reduced_tunable_parameters_list = self.reduced_tunable_parameters_list
 
         #  Initialize metadata dictionary
         metadata_dictionary = {}
         for values_combination, group in dataframe_group:
 
+            # Fill in the metadata dictionary properly
             if (
                 type(values_combination) is not tuple
                 and len(reduced_tunable_parameters_list) == 1
@@ -396,8 +415,11 @@ class DataPlotter:
             ax.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
 
             plot_title_leading_substring = ""
+            if is_histogram:
+                plot_title_leading_substring = "Histogram "
             if grouping_field:
                 plot_title_leading_substring = "Combined "
+
             plot_title = self._construct_plot_title(
                 plot_title_leading_substring,
                 metadata_dictionary,
@@ -408,47 +430,56 @@ class DataPlotter:
 
             # Set axes scale
             if (
-                self.independent_variable_name
-                in constants.PARAMETERS_WITH_EXPONENTIAL_FORMAT
+                self.xaxis_variable_name in constants.PARAMETERS_WITH_EXPONENTIAL_FORMAT
             ) or xaxis_log_scale:
                 ax.set_xscale("log")
             if (
-                self.dependent_variable_name
-                in constants.PARAMETERS_WITH_EXPONENTIAL_FORMAT
+                self.yaxis_variable in constants.PARAMETERS_WITH_EXPONENTIAL_FORMAT
             ) or yaxis_log_scale:
                 ax.set_yscale("log")
 
             # Invert axes
             if (
-                self.independent_variable_name
-                in constants.PARAMETERS_WITH_EXPONENTIAL_FORMAT
+                self.xaxis_variable_name in constants.PARAMETERS_WITH_EXPONENTIAL_FORMAT
             ) or invert_xaxis:
                 fig.gca().invert_xaxis()
             if (
-                self.dependent_variable_name
-                in constants.PARAMETERS_WITH_EXPONENTIAL_FORMAT
+                self.yaxis_variable in constants.PARAMETERS_WITH_EXPONENTIAL_FORMAT
             ) or invert_yaxis:
                 fig.gca().invert_yaxis()
 
-            ax.set(
-                xlabel=constants.AXES_LABELS_DICTIONARY[self.independent_variable_name],
-                ylabel=constants.AXES_LABELS_DICTIONARY[self.dependent_variable_name],
+            # ax.set(
+            #     xlabel=constants.AXES_LABELS_DICTIONARY[self.xaxis_variable_name],
+            #     ylabel=constants.AXES_LABELS_DICTIONARY[self.yaxis_variable],
+            # )
+
+            ax.set_xlabel(
+                xlabel=constants.AXES_LABELS_DICTIONARY[self.xaxis_variable_name]
             )
+            # , fontsize=14)
+
+            if is_histogram:
+                ax.set_ylabel("Frequency", fontsize=14)
+            else:
+                ax.set_ylabel(
+                    ylabel=constants.AXES_LABELS_DICTIONARY[self.yaxis_variable]
+                )
+                #   , fontsize=14)
             # Adjust left margin
             fig.subplots_adjust(left=0.13)
 
             # Set axes ticks to integer values only
-            if self.independent_variable_name in constants.PARAMETERS_OF_INTEGER_VALUE:
+            if self.xaxis_variable_name in constants.PARAMETERS_OF_INTEGER_VALUE:
                 ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-            if self.dependent_variable_name in constants.PARAMETERS_OF_INTEGER_VALUE:
+            if self.yaxis_variable in constants.PARAMETERS_OF_INTEGER_VALUE:
                 ax.yaxis.set_major_locator(MaxNLocator(integer=True))
 
             if grouping_field:
                 for grouping_fields_values, sub_group in group.groupby(grouping_field):
                     label_string = str(grouping_fields_values)
-                    self._plot_group(ax, sub_group, label_string)
+                    self._plot_group(ax, sub_group, is_histogram=False, label_string=label_string)
             else:
-                self._plot_group(ax, group)
+                self._plot_group(ax, group, is_histogram=is_histogram)
 
             if grouping_field:
                 ax.legend(loc=legend_location, title=grouping_field)
@@ -462,11 +493,52 @@ class DataPlotter:
             fig.savefig(plot_path)
             plt.close()
 
-    # def plot_histogram(
-    #     self, histogram_variable, grouping_field, number_of_bins=30, color="blue"
-    # ):
+    def plot_histogram(
+        self,
+        histogram_variable: str,
+        reference_field: str = None,
+        excluded_fields_list: list = None,
+        number_of_bins: int = 30,
+        color: str = "blue",
+        dedicated_subdirectory: bool = True,
+        clear_existing_plots: bool = False,
+        xaxis_log_scale: bool = False,
+        yaxis_log_scale: bool = False,
+        invert_xaxis: bool = False,
+        invert_yaxis: bool = False,
+        plot_title_width: int = 105,
+        legend_location: str = "upper left",
+    ):
+        # Construct a specific histogram base, different from the default format
+        histograms_base_name = "Histogram_of_" + histogram_variable + "_values"
+        if reference_field is not None:
+            histograms_base_name += "_by_" + reference_field
 
-    #     self.independent_variable_name = histogram_variable
-    #     self.dependent_variable_name = "Frequency"
+        # Input is validated by the "set_pair_of_variables()" method
+        self.set_pair_of_variables(
+            histogram_variable, "Frequency", plots_base_name=histograms_base_name
+        )
 
-    # # plt.hist(data, bins=30, color='blue', alpha=0.7, edgecolor='black')  # Plot the histogram
+        if reference_field is not None:
+            if excluded_fields_list is None:
+                excluded_fields_list = [reference_field]
+            else:
+                if type(excluded_fields_list) is not list:
+                    raise TypeError(
+                        "Expected a list for 'excluded_fields_list' argument."
+                    )
+                excluded_fields_list.append(reference_field)
+
+        # Input is validated by the "plot_data()" method
+        self.plot_data(
+            excluded_fields=excluded_fields_list,
+            dedicated_subdirectory=dedicated_subdirectory,
+            clear_existing_plots=clear_existing_plots,
+            xaxis_log_scale=xaxis_log_scale,
+            yaxis_log_scale=yaxis_log_scale,
+            invert_xaxis=invert_xaxis,
+            invert_yaxis=invert_yaxis,
+            is_histogram=True,
+            plot_title_width=plot_title_width,
+            legend_location=legend_location,
+        )
