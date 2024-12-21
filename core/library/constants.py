@@ -352,8 +352,8 @@ AXES_LABELS_DICTIONARY = {
     "Condition_number": "$\\kappa$",
     "Minimum_eigenvalue_squared": "$\\lambda_{min}^2$",
     "Maximum_eigenvalue_squared": "$\\lambda_{max}^2$",
-    "Total_number_of_Lanczos_iterations": "Total # of Lanczos algorithm iterations"
-    # "||sgn$^2$(X) - I||$^2$"
+    "Total_number_of_Lanczos_iterations": "Total # of Lanczos algorithm iterations",
+    "Average_calculation_result": "||sgn$^2$(X) - I||$^2$",
 }
 
 # TODO: Maybe I need separate lists for qpb input parameters and qpb output
