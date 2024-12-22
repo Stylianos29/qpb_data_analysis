@@ -1,0 +1,269 @@
+#!/bin/bash
+
+################################################################################
+# check_raw_data_files_set.sh
+#
+# Description: 
+#
+# Purpose:
+#
+# Usage:
+#
+# Flags:
+#
+# Note:
+################################################################################
+
+# CUSTOM FUNCTIONS DEFINITIONS
+
+# Function to display usage information
+usage() {
+    echo "Usage: $0 -p <data_files_set_directory>"
+    echo "  -p, --path   Specify the directory containing raw files"
+    exit 1
+}
+
+# ENVIRONMENT VARIABLES
+
+CURRENT_SCRIPT_FULL_PATH=$(realpath "$0")
+# Extract the current script's name from its full path
+CURRENT_SCRIPT_NAME="$(basename "$CURRENT_SCRIPT_FULL_PATH")"
+# Extract the current script's parent directory from its full path
+CURRENT_SCRIPT_DIRECTORY="$(dirname "$CURRENT_SCRIPT_FULL_PATH")"
+# Replace ".sh" with "_script.log" to create the log file name
+SCRIPT_LOG_FILE_NAME=$(echo "$CURRENT_SCRIPT_NAME" | sed 's/\.sh$/_script.log/')
+# Construct full path of library scripts directory if not set yet
+if [ -z "$LIBRARY_SCRIPTS_DIRECTORY_PATH" ]; then
+    LIBRARY_SCRIPTS_DIRECTORY_PATH=$(\
+                            realpath "${CURRENT_SCRIPT_DIRECTORY}/../library")
+    [[ ! -d "$LIBRARY_SCRIPTS_DIRECTORY_PATH" ]] \
+                            && echo "Invalid library scripts path." && exit 1
+fi
+
+NON_INVERT_LOG_FILES_SUCCESS_FLAG="per stochastic source"
+INVERT_LOG_FILES_SUCCESS_FLAG="CG done"
+ERROR_FILES_FAILURE_FLAG="terminated"
+
+# Export script termination message to be used for finalizing logging
+export SCRIPT_TERMINATION_MESSAGE="\n\t\t"$(echo "$CURRENT_SCRIPT_NAME" \
+                    | tr '[:lower:]' '[:upper:]')" SCRIPT EXECUTION TERMINATED"
+
+# SOURCE DEPENDENCIES
+
+# Source all library scripts from "bash_scripts/library" using a loop avoiding
+# this way name-specific sourcing and thus potential typos
+for library_script in "${LIBRARY_SCRIPTS_DIRECTORY_PATH}"/*.sh;
+do
+    # Check if the current file in the loop is a regular file
+    if [ -f "$library_script" ]; then
+        source "$library_script"
+    fi
+done
+
+# PARSE INPUT ARGUMENTS
+
+data_files_set_directory=""
+script_log_file_directory=""
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -p|--path)
+            data_files_set_directory="$2"
+            shift 2
+            ;;
+        -l|--log)
+            script_log_file_directory="$2"
+            shift 2
+            ;;
+        *)
+            echo "Error: Unknown argument '$1'"
+            usage
+            ;;
+    esac
+done
+
+# Ensure a data files set directory path is provided
+if [ -z "$data_files_set_directory" ]; then
+    echo "ERROR: No data files set directory path specified."
+    usage
+fi
+# Verify the directory exists
+check_directory_exists "$data_files_set_directory"
+data_files_set_directory_name=$(basename $data_files_set_directory)
+
+# Check if a log directory is provided
+if [ -z "$script_log_file_directory" ]; then
+    script_log_file_directory=$(dirname $data_files_set_directory)
+else
+    check_directory_exists "$script_log_file_directory"
+fi
+# Export log file path as a global variable to be used by custom functions
+SCRIPT_LOG_FILE_PATH="${script_log_file_directory}/${SCRIPT_LOG_FILE_NAME}"
+export SCRIPT_LOG_FILE_PATH
+
+# Create or override a log file. Initiate logging
+echo -e "\t\t"$(echo "$CURRENT_SCRIPT_NAME" | tr '[:lower:]' '[:upper:]') \
+                "SCRIPT EXECUTION INITIATED\n" > "$SCRIPT_LOG_FILE_PATH"
+
+# MAIN EXECUTION BODY
+log_message="Initiate inspecting '${data_files_set_directory_name}' "
+log_message+="data files set directory."
+log "INFO" "$log_message"
+
+# Create lists of filenames per file type
+list_of_qpb_error_file_paths=($(find "$data_files_set_directory" -type f -name "*.err"))
+list_of_qpb_log_file_paths=($(find "$data_files_set_directory" -type f -name "*.txt"))
+list_of_correlators_file_paths=($(find "$data_files_set_directory" -type f -name "*.dat"))
+
+# Check presence of at least one log file; exit if not
+number_of_qpb_log_files=${#list_of_qpb_log_file_paths[@]}
+if [[ $number_of_qpb_log_files -eq 0 ]]; then
+    error_message="No qpb log files found in '$data_files_set_directory'."
+    termination_output "$error_message"
+    exit 1
+else
+    log "INFO" "A total of ${number_of_qpb_log_files} qpb log files found."
+fi
+
+# Check if any error files exist
+error_files_present=false
+if [[ ${#list_of_qpb_error_file_paths[@]} -ne 0 ]]; then
+    error_files_present=true
+else
+    log "INFO" "No qpb error files (.err) found."
+fi
+
+# TODO: Work on this determination better
+# TODO: If there is a conflict with the above check, print a warning
+# Determine whether this data files set is from an "invert" qpb main program
+is_invert=false
+# Check presence of at least one correlators file
+if [[ ${#list_of_correlators_file_paths[@]} -ne 0 ]]; then
+    is_invert=true
+fi
+if [[ ! "${data_files_set_directory#*/raw/}" == *"invert"* ]]; then
+    is_invert=false
+fi
+if $is_invert; then
+    log "INFO" "Data files were generated by an 'invert' qpb main program."
+fi
+# TODO: Anticipate the case of correlators files were copied inside a non-invert
+# directory
+
+# VALIDATE LOG FILES
+
+# Specify qpb log file success flag
+LOG_FILES_SUCCESS_FLAG=$NON_INVERT_LOG_FILES_SUCCESS_FLAG
+if $is_invert; then
+    LOG_FILES_SUCCESS_FLAG=$INVERT_LOG_FILES_SUCCESS_FLAG
+fi
+# Initialize list of corrupted qpb log files
+list_of_corrupted_qpb_log_files=()
+for qpb_log_file in "${list_of_qpb_log_file_paths[@]}"; do
+    # Skip if log file does not exist
+    [[ ! -e "$qpb_log_file" ]] && continue
+    # Check if a line inside the qpb log file contains the success flag
+    if ! grep -q "$LOG_FILES_SUCCESS_FLAG" "$qpb_log_file"; then
+        list_of_corrupted_qpb_log_files+=("$qpb_log_file")
+    fi
+done
+number_of_corrupted_qpb_log_files=${#list_of_corrupted_qpb_log_files[@]}
+if [[ $number_of_corrupted_qpb_log_files -eq 0 ]]; then
+    log "INFO" "No corrupted qpb log files found!"
+else
+    log_message="A total of ${number_of_corrupted_qpb_log_files} corrupted "
+    log_message+="qpb log files found."
+    log "INFO" "$log_message"
+    echo "+ $log_message"
+
+    list_of_corrupted_qpb_error_files=()
+    list_of_corrupted_qpb_correlators_files=()
+
+    detailed_report_message="Detailed report of corrupted date files:\n"
+    # List corrupted log file and 
+    for corrupted_qpb_log_file in "${list_of_corrupted_qpb_log_files[@]}"; do
+        detailed_report_message+="-- $(basename $corrupted_qpb_log_file)\n"
+        # 
+        if $error_files_present; then
+            qpb_error_file="${corrupted_qpb_log_file%.txt}.err"
+            qpb_error_filename=$(basename $qpb_error_file)
+            # Check if the corresponding error file exists
+            if [[ ! -e "$qpb_error_file" ]]; then
+                detailed_report_message+="  * No corresponding '$qpb_error_filename' error file found.\n"
+            fi
+            # Look for the qpb error failure flag inside the error file
+            if grep -iqE "terminated|failed" "$qpb_error_file"; then
+                detailed_report_message+="  * Error file '$qpb_error_filename' confirms corruption.\n"
+                list_of_corrupted_qpb_error_files+=("$qpb_error_file")
+            fi
+        fi
+        # 
+        if $is_invert; then
+            qpb_correlators_file="${corrupted_qpb_log_file%.txt}.dat"
+            qpb_correlators_filename=$(basename $qpb_correlators_file)
+            # Check if the corresponding error file exists
+            if [[ ! -e "$qpb_correlators_file" ]]; then
+                detailed_report_message+="  * No corresponding '$qpb_correlators_filename' correlators file found.\n"
+            elif [[ ! -s "$qpb_correlators_file" ]]; then
+                detailed_report_message+="  * Empty '$qpb_correlators_filename' correlators file confirms corruption.\n"
+                list_of_corrupted_qpb_correlators_files+=("$qpb_correlators_file")
+            fi
+        fi
+    done
+    log "INFO" "$detailed_report_message"
+
+    # Ask user for the detailed report to be printed on terminal
+    read -p "Would you like a detailed report of the corrupted data files printed on terminal? ([yY]/nN) " user_response
+    # Convert the response to lowercase for easier comparison
+    user_response=$(echo "$user_response" | tr '[:upper:]' '[:lower:]')
+    # Handle the response, treating "Enter" as "yes"
+    if [[ -z "$user_response" || "$user_response" == "y" || "$user_response" == "yes" ]]; then
+        echo -e "$detailed_report_message"
+    elif [[ "$user_response" == "n" || "$user_response" == "no" ]]; then
+        echo
+        # TODO: Fill in with something
+    else
+        echo "Invalid response. Please answer with 'y', 'Y', 'yes', 'n', 'N', or 'no'."
+    fi
+    
+    # Ask user for the detailed report to be printed on terminal
+    read -p "Would you like to remove all corrupted data files? ([yY]/nN) " user_response
+    # Convert the response to lowercase for easier comparison
+    user_response=$(echo "$user_response" | tr '[:upper:]' '[:lower:]')
+    # Handle the response, treating "Enter" as "yes"
+    if [[ -z "$user_response" || "$user_response" == "y" || "$user_response" == "yes" ]]; then
+        for corrupted_qpb_log_file in "${list_of_corrupted_qpb_log_files[@]}"; do
+            rm $corrupted_qpb_log_file
+        done
+        for corrupted_qpb_error_file in "${list_of_corrupted_qpb_error_files[@]}"; do
+            rm $corrupted_qpb_error_file
+        done
+        for corrupted_qpb_correlators_file in "${list_of_corrupted_qpb_correlators_files[@]}"; do
+            rm $corrupted_qpb_correlators_file
+        done
+        log "INFO" "All corrupted data files were deleted."
+    elif [[ "$user_response" == "n" || "$user_response" == "no" ]]; then
+        echo
+        # TODO: Fill in with something
+    else
+        echo "Invalid response. Please answer with 'y', 'Y', 'yes', 'n', 'N', or 'no'."
+    fi
+
+fi
+
+# SUCCESSFUL COMPLETION OUTPUT
+
+# Construct the final message
+final_message="'${data_files_set_directory_name}' data files set "
+final_message+="validation completed!"
+# Print the final message
+echo "** $final_message"
+
+log "INFO" "${final_message}"
+
+echo -e $SCRIPT_TERMINATION_MESSAGE >> "$SCRIPT_LOG_FILE_PATH"
+
+unset SCRIPT_TERMINATION_MESSAGE
+unset SCRIPT_LOG_FILE_PATH
+
+
+# TODO: Missing log files for existing correlators files
