@@ -15,7 +15,65 @@ check_directory_exists() {
     local directory="$1"
     
     if [ ! -d "$directory" ]; then
-        echo "Error: Directory '$directory' does not exist."
+        echo "ERROR: Directory '$directory' does not exist."
         exit 1
+    fi
+}
+
+
+replace_parent_directory() {
+    # Function to replace the parent directory of a subdirectory with a new
+    # parent directory
+    # 
+    # Arguments:
+    #   - original_subdirectory: the full path to the subdirectory
+    #   - original_parent_directory: the parent directory to be replaced
+    #   - new_parent_directory: the new parent directory that will replace the
+    # old one
+    # 
+    # Returns:
+    #   - the updated path with the new parent directory
+
+    local subdirectory_path="$1"
+    local old_parent_directory="$2"
+    local new_parent_directory="$3"
+    
+    # Perform the replacement
+    echo "${subdirectory_path/$old_parent_directory/$new_parent_directory}"
+}
+
+
+log()
+{
+    local log_level="$1"
+    local message="$2"
+
+    # Log only if the global variable of the log file path has been set properly
+    if [ ! -z "$SCRIPT_LOG_FILE_PATH" ]; then
+        # Use fold to wrap the message at 80 characters
+        wrapped_message=$(echo -e \
+           "$(date '+%Y-%m-%d %H:%M:%S') [$log_level] : $message" | fold -sw 80)
+        echo -e "$wrapped_message" >> "$SCRIPT_LOG_FILE_PATH"
+    else
+        # Otherwise exit with error
+        echo "No current script's log file path has been provided." >&2
+        echo "Exiting..." >&2
+        return 1
+    fi
+}
+
+
+
+termination_output()
+{
+    local error_message="$1"
+    local script_termination_message="$2"
+    set_script_termination_message script_termination_message
+
+    echo -e "ERROR: $error_message" >&2
+    echo "Exiting..."  >&2
+    if [ -n "$LOG_FILE_PATH" ]; then
+      log "ERROR" "$error_message"
+      echo -e "$script_termination_message" >> "$LOG_FILE_PATH"
     fi
 }
