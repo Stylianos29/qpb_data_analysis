@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ################################################################################
-# check_raw_data_files_set.sh
+# validate_raw_data_files_set.sh
 #
 # Description: 
 #
