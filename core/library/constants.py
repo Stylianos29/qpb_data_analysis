@@ -414,6 +414,7 @@ OUTPUT_QUANTITY_NAMES_LIST = [
     "Average_number_of_CG_iterations_per_spinor",
     "Average_number_of_MSCG_iterations",
     "Calculation_result_per_vector",
+    "Calculation_result_with_no_error",
     "Condition_number",
     "Final_squared_relative_residual",
     "Final_squared_residual",
