@@ -157,13 +157,6 @@ def main(input_qpb_log_files_csv_file_path,
             input_qpb_log_files_csv_file_path
         )
 
-        # filtered_df = qpb_log_files_dataframe[
-        #     # (qpb_log_files_dataframe["KL_scaling_factor"] < 1.0) & 
-        #     # (qpb_log_files_dataframe["MSCG_epsilon"] == 1e-07) & 
-        #     # (qpb_log_files_dataframe["CG_epsilon"] == 1e-06) & 
-        #     (qpb_log_files_dataframe["KL_diagonal_order"] == 2)
-        # ]
-
         # Create an instance of DataAnalyzer
         analyzer = data_processing.DataAnalyzer(qpb_log_files_dataframe)
 

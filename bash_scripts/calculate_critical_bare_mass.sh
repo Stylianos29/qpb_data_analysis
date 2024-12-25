@@ -31,11 +31,6 @@ for qpb_main_program_directory in "$PROCESSED_DATA_FILES_DIRECTORY"/*; do
             continue
         fi
 
-        # DELETE THIS!
-        if [ ! "$(basename ${data_files_set_directory})" == "KL_several_config_and_mu_varying_m" ]; then
-            continue
-        fi
-        
         echo "- '$(basename ${data_files_set_directory})' data files set:"
 
         # Construct input HDF5 and .csv files paths
@@ -58,54 +53,54 @@ for qpb_main_program_directory in "$PROCESSED_DATA_FILES_DIRECTORY"/*; do
             -log_csv "$input_log_files_csv_file_path" \
             -cor_hdf5 "$input_hdf5_file_path"
 
-        input_hdf5_file_path="${data_files_set_directory}"
-        input_hdf5_file_path+="/PCAC_mass_correlator_values.h5"
+        # input_hdf5_file_path="${data_files_set_directory}"
+        # input_hdf5_file_path+="/PCAC_mass_correlator_values.h5"
 
-        # Accompany the HDF5 file with a detailed tree graph of its structure
-        h5glance "$input_hdf5_file_path" >> "${input_hdf5_file_path%.h5}_tree.txt"
+        # # Accompany the HDF5 file with a detailed tree graph of its structure
+        # h5glance "$input_hdf5_file_path" >> "${input_hdf5_file_path%.h5}_tree.txt"
 
-        # Construct path to corresponding plots subdirectory
-        plots_subdirectory_path=$PLOTS_DIRECTORY
-        plots_subdirectory_path+="/$(basename $qpb_main_program_directory)"
-        plots_subdirectory_path+="/$(basename $data_files_set_directory)"
+        # # Construct path to corresponding plots subdirectory
+        # plots_subdirectory_path=$PLOTS_DIRECTORY
+        # plots_subdirectory_path+="/$(basename $qpb_main_program_directory)"
+        # plots_subdirectory_path+="/$(basename $data_files_set_directory)"
 
-        # Create the plots subdirectory if it does not exit
-        if [ ! -d "$plots_subdirectory_path" ]; then
-            mkdir -p "$plots_subdirectory_path"
-            warning_message="   ++ WARNING: Subdirectory "
-            warning_message+="'${plots_subdirectory_path}' does not exist, so "
-            warning_message+="it was created."
-            echo "${warning_message}"
-        fi
+        # # Create the plots subdirectory if it does not exit
+        # if [ ! -d "$plots_subdirectory_path" ]; then
+        #     mkdir -p "$plots_subdirectory_path"
+        #     warning_message="   ++ WARNING: Subdirectory "
+        #     warning_message+="'${plots_subdirectory_path}' does not exist, so "
+        #     warning_message+="it was created."
+        #     echo "${warning_message}"
+        # fi
 
-        # PCAC mass estimates analysis
-        python "${SOURCE_SCRIPTS_DIRECTORY}/calculate_PCAC_mass_estimates.py" \
-            -PCAC_hdf5 "$input_hdf5_file_path" \
-            -plots_dir "$plots_subdirectory_path"
+        # # PCAC mass estimates analysis
+        # python "${SOURCE_SCRIPTS_DIRECTORY}/calculate_PCAC_mass_estimates.py" \
+        #     -PCAC_hdf5 "$input_hdf5_file_path" \
+        #     -plots_dir "$plots_subdirectory_path"
 
-        # Summary of .csv file
-        output_csv_file_path="${data_files_set_directory}"
-        output_csv_file_path+="/PCAC_mass_estimates.csv"
-        python "${SOURCE_SCRIPTS_DIRECTORY}/../utils/inspect_csv_file.py" \
-            -in_csv_path "$output_csv_file_path" \
-            --output_file "${output_csv_file_path%.csv}_summary.txt" \
-            --sample_rows 0
+        # # Summary of .csv file
+        # output_csv_file_path="${data_files_set_directory}"
+        # output_csv_file_path+="/PCAC_mass_estimates.csv"
+        # python "${SOURCE_SCRIPTS_DIRECTORY}/../utils/inspect_csv_file.py" \
+        #     -in_csv_path "$output_csv_file_path" \
+        #     --output_file "${output_csv_file_path%.csv}_summary.txt" \
+        #     --sample_rows 0
 
-        input_csv_file_path="${data_files_set_directory}"
-        input_csv_file_path+="/PCAC_mass_estimates.csv"
+        # input_csv_file_path="${data_files_set_directory}"
+        # input_csv_file_path+="/PCAC_mass_estimates.csv"
         
-        # Critical bare mass from PCAC mass estimates analysis
-        python "${SOURCE_SCRIPTS_DIRECTORY}/calculate_critical_bare_mass_from_PCAC_mass.py" \
-            -PCAC_csv "$input_csv_file_path" \
-            -plots_dir "$plots_subdirectory_path"
+        # # Critical bare mass from PCAC mass estimates analysis
+        # python "${SOURCE_SCRIPTS_DIRECTORY}/calculate_critical_bare_mass_from_PCAC_mass.py" \
+        #     -PCAC_csv "$input_csv_file_path" \
+        #     -plots_dir "$plots_subdirectory_path"
 
-        # Summary of .csv file
-        output_csv_file_path="${data_files_set_directory}"
-        output_csv_file_path+="/critical_bare_mass_from_PCAC_mass.csv"
-        python "${SOURCE_SCRIPTS_DIRECTORY}/../utils/inspect_csv_file.py" \
-            -in_csv_path "$output_csv_file_path" \
-            --output_file "${output_csv_file_path%.csv}_summary.txt" \
-            --sample_rows 0
+        # # Summary of .csv file
+        # output_csv_file_path="${data_files_set_directory}"
+        # output_csv_file_path+="/critical_bare_mass_from_PCAC_mass.csv"
+        # python "${SOURCE_SCRIPTS_DIRECTORY}/../utils/inspect_csv_file.py" \
+        #     -in_csv_path "$output_csv_file_path" \
+        #     --output_file "${output_csv_file_path%.csv}_summary.txt" \
+        #     --sample_rows 0
         
     done
 done

@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 ################################################################################
 # process_all_qpb_data_files.sh - Script for automating the processing of qpb
 # data files stored in nested subdirectories. The script utilizes two Python
@@ -57,7 +56,6 @@
 # - Both Python scripts handle their own filtering logic for file types within
 #   the given directory.
 ################################################################################
-
 
 # Define paths for the source scripts, raw data files, and processed data files.
 SOURCE_SCRIPTS_DIRECTORY="../core/src"
