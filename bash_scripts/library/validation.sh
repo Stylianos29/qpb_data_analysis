@@ -44,3 +44,42 @@ check_directory_for_changes() {
     # Changes detected, proceed with validation
     return 0
 }
+
+
+find_matching_qpb_log_files() {
+    # Function to find qpb log files matching specific patterns
+    # Parameters: 
+    #   $1: Name of the array containing paths to qpb log files
+    #   $2: Search pattern string (success or failure flags)
+    #   $3: Match mode ("include" to find matching files, "exclude" to find non-matching files)
+    #   $4: Name of the array to store matching log files (modified by the function)
+
+    local -n log_file_paths_array="$1"
+    local search_pattern="$2"
+    local match_mode="$3"
+    local -n matching_log_files_array="$4"
+
+    # Ensure the result array is empty before populating
+    matching_log_files_array=()
+
+    # Check the match mode and validate
+    if [[ "$match_mode" != "include" && "$match_mode" != "exclude" ]]; then
+        echo "Error: Invalid match mode. Use 'include' or 'exclude'."
+        return 1
+    fi
+
+    # Iterate through the log files
+    for qpb_log_file in "${log_file_paths_array[@]}"; do
+        if [[ "$match_mode" == "include" ]]; then
+            # Include files matching the search pattern
+            if grep -Eq "$search_pattern" "$qpb_log_file"; then
+                matching_log_files_array+=("$qpb_log_file")
+            fi
+        elif [[ "$match_mode" == "exclude" ]]; then
+            # Exclude files matching the search pattern
+            if ! grep -Eq "$search_pattern" "$qpb_log_file"; then
+                matching_log_files_array+=("$qpb_log_file")
+            fi
+        fi
+    done
+}
