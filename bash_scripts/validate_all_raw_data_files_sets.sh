@@ -53,8 +53,8 @@ function usage() {
     echo "Usage: $0 [--all] [-u | --usage]"
     echo
     echo "Flags:"
-    echo "  --all        Validate all data files sets, bypassing timestamp checks."
-    echo "  -u, --usage  Display this usage message and exit."
+    echo " --all      Validate all data files sets, bypassing timestamp checks."
+    echo " -u, --usage  Display this usage message and exit."
     echo
     exit 0
 }
@@ -104,8 +104,9 @@ for main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
         data_files_set_name=$(basename "$data_files_set_directory")
 
         # Construct the corresponding data files set processed data directory
-        # processed_data_files_set_directory="${data_files_set_directory/${RAW_DATA_FILES_DIRECTORY}/${PROCESSED_DATA_FILES_DIRECTORY}}"
-        processed_data_files_set_directory=$(replace_parent_directory "$data_files_set_directory" "$RAW_DATA_FILES_DIRECTORY" "$PROCESSED_DATA_FILES_DIRECTORY")
+        processed_data_files_set_directory=$(replace_parent_directory\
+                "$data_files_set_directory" "$RAW_DATA_FILES_DIRECTORY" \
+                                            "$PROCESSED_DATA_FILES_DIRECTORY")
         if [ ! -d "$processed_data_files_set_directory" ]; then
             mkdir -p "$processed_data_files_set_directory"
         fi
@@ -131,10 +132,10 @@ for main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
         echo "- Inspecting '${data_files_set_name}/' directory:"
 
         # Validate specific data files set
-        ./checks/check_raw_data_files_set.sh \
+        ./checks/validate_raw_data_files_set.sh \
             -p "$data_files_set_directory" \
             -l "$auxiliary_files_directory"
-    
+
     done
 done
 
