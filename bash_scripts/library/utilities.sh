@@ -63,6 +63,21 @@ log()
 }
 
 
+set_script_termination_message() {
+    # Accepts a variable name as an argument
+    local -n termination_message_ref="$1"
+    
+    # Check if the argument variable is empty
+    if [ -z "$termination_message_ref" ]; then
+        # Use the global variable if set, or default message otherwise
+        if [ -n "$SCRIPT_TERMINATION_MESSAGE" ]; then
+            termination_message_ref="$SCRIPT_TERMINATION_MESSAGE"
+        else
+            termination_message_ref="\n\t\t SCRIPT EXECUTION TERMINATED"
+        fi
+    fi
+}
+
 
 termination_output()
 {
@@ -72,8 +87,9 @@ termination_output()
 
     echo -e "ERROR: $error_message" >&2
     echo "Exiting..."  >&2
-    if [ -n "$LOG_FILE_PATH" ]; then
+
+    if [ -n "$SCRIPT_LOG_FILE_PATH" ]; then
       log "ERROR" "$error_message"
-      echo -e "$script_termination_message" >> "$LOG_FILE_PATH"
+      echo -e "$script_termination_message" >> "$SCRIPT_LOG_FILE_PATH"
     fi
 }
