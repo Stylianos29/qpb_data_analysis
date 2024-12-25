@@ -56,7 +56,7 @@ def main(
     log_filename,
 ):
 
-    # PERFORM VALIDITY CHECKS ON INPUT ARGUMENTS
+    # VALIDATE INPUT ARGUMENTS
 
     if not filesystem_utilities.is_valid_file(input_qpb_log_files_csv_file_path):
         error_message = "Passed qpb log files .csv file path is invalid!."

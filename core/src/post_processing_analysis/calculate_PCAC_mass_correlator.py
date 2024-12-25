@@ -62,7 +62,7 @@ def main(input_qpb_log_files_csv_file_path,
          input_correlator_values_hdf5_file_path, output_files_directory, 
          output_hdf5_filename, log_file_directory, log_filename):
 
-    # PERFORM VALIDITY CHECKS ON INPUT ARGUMENTS
+    # VALIDATE INPUT ARGUMENTS
 
     if not filesystem_utilities.is_valid_file(input_qpb_log_files_csv_file_path):
         error_message = "Passed qpb log files .csv file path is invalid!."
@@ -136,11 +136,11 @@ def main(input_qpb_log_files_csv_file_path,
     ) as hdf5_file_read, h5py.File(
         output_PCAC_mass_correlator_hdf5_file_path, "w"
     ) as hdf5_file_write:
-        
+
         # Initialize group structure of the output HDF5 file
         # NOTE: The assumption here is that the name of the raw data files
-        # directory represents the data files set (or experiment) and its parent
-        # directory the qpb main program that generated the data files
+        # directory represents the data files set and its parent directory the
+        # qpb main program that generated the data files
         parent_directory_name, last_directory_name = (
             filesystem_utilities.extract_directory_names(output_files_directory)
         )

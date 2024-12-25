@@ -72,7 +72,7 @@ from library import constants, filesystem_utilities
 def main(raw_data_files_directory, output_files_directory, 
          output_hdf5_filename, log_file_directory, log_filename):
     
-    # PERFORM VALIDITY CHECKS ON INPUT ARGUMENTS
+    # VALIDATE INPUT ARGUMENTS
 
     # Check if the provided raw data files directory is valid
     if not filesystem_utilities.is_valid_directory(raw_data_files_directory):

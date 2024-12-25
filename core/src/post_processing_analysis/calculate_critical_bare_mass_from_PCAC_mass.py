@@ -44,7 +44,7 @@ def main(input_PCAC_mass_estimates_csv_file_path,
          output_files_directory, plots_directory,
          output_critical_bare_mass_csv_filename, log_file_directory, log_filename):
 
-    # PERFORM VALIDITY CHECKS ON INPUT ARGUMENTS
+    # VALIDATE INPUT ARGUMENTS
 
     if not filesystem_utilities.is_valid_file(
                             input_PCAC_mass_estimates_csv_file_path):

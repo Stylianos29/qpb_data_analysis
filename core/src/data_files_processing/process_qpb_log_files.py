@@ -66,7 +66,7 @@ from library import extraction, filesystem_utilities
 def main(qpb_log_files_directory, output_files_directory, log_file_directory, 
             log_filename, csv_filename, hdf5_filename):
 
-    # PERFORM VALIDITY CHECKS ON INPUT ARGUMENTS
+    # VALIDATE INPUT ARGUMENTS
 
     if not filesystem_utilities.is_valid_directory(qpb_log_files_directory):
         error_message = ("Passed log files directory path is invalid or not "

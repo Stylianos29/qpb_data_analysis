@@ -40,7 +40,7 @@ def main(input_PCAC_mass_correlator_values_hdf5_file_path,
          output_files_directory, plots_directory,
          output_PCAC_mass_csv_filename, log_file_directory, log_filename):
 
-    # PERFORM VALIDITY CHECKS ON INPUT ARGUMENTS
+    # VALIDATE INPUT ARGUMENTS
 
     if not filesystem_utilities.is_valid_file(
                             input_PCAC_mass_correlator_values_hdf5_file_path):
