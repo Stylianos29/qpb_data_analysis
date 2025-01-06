@@ -375,7 +375,7 @@ elif [[ $number_of_valid_qpb_log_files -lt $number_of_qpb_log_files ]]; then
     #                                         list_of_corrupted_qpb_log_files
     number_of_corrupted_qpb_files=${#list_of_corrupted_qpb_log_files[@]}
     input_request_message="There are a total of ${number_of_corrupted_qpb_files} "
-    input_request_message+="corrupted qpb log files in the directory."
+    input_request_message+="corrupted qpb log files in the directory. "
     log "WARNING" "$input_request_message"
     input_request_message+="Would you like to like to delete all corrupted qpb "
     input_request_message+="log files? ([yY]/nN) "
