@@ -31,6 +31,11 @@ for qpb_main_program_directory in "$PROCESSED_DATA_FILES_DIRECTORY"/*; do
             continue
         fi
 
+        # # DELETE THIS!
+        # if [ ! $(basename ${data_files_set_directory}) == 'KL_several_config_varying_n' ]; then
+        #     continue
+        # fi
+
         echo "- '$(basename ${data_files_set_directory})' data files set:"
 
         # Construct input HDF5 and .csv files paths
@@ -54,12 +59,14 @@ for qpb_main_program_directory in "$PROCESSED_DATA_FILES_DIRECTORY"/*; do
         # PCAC mass correlator analysis
         python "${SOURCE_SCRIPTS_DIRECTORY}/calculate_PCAC_mass_correlator.py" \
             -log_csv "$input_log_files_csv_file_path" \
+            -in_hdf5_path "${data_files_set_directory}/qpb_log_files_multivalued_parameters.h5" \
             -cor_hdf5 "$input_hdf5_file_path"
 
         input_hdf5_file_path="${data_files_set_directory}"
         input_hdf5_file_path+="/PCAC_mass_correlator_values.h5"
 
         # Accompany the HDF5 file with a detailed tree graph of its structure
+        rm "${input_hdf5_file_path%.h5}_tree.txt"
         h5glance "$input_hdf5_file_path" >> "${input_hdf5_file_path%.h5}_tree.txt"
 
         # Construct path to corresponding plots subdirectory
@@ -88,9 +95,11 @@ for qpb_main_program_directory in "$PROCESSED_DATA_FILES_DIRECTORY"/*; do
             -in_csv_path "$output_csv_file_path" \
             --output_file "${output_csv_file_path%.csv}_summary.txt" \
             --sample_rows 0
+        
+        ########## 
 
-        input_csv_file_path="${data_files_set_directory}"
-        input_csv_file_path+="/PCAC_mass_estimates.csv"
+        # input_csv_file_path="${data_files_set_directory}"
+        # input_csv_file_path+="/PCAC_mass_estimates.csv"
         
         # # Critical bare mass from PCAC mass estimates analysis
         # python "${SOURCE_SCRIPTS_DIRECTORY}/calculate_critical_bare_mass_from_PCAC_mass.py" \
