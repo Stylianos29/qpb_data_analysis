@@ -11,7 +11,6 @@ import logging
 import pandas as pd
 import h5py
 import copy
-import textwrap
 
 from library import (
     filesystem_utilities,
@@ -52,6 +51,14 @@ from library import (
     is_flag=True,
     default=True,
     help="Enable plotting PCAC mass correlator values.",
+)
+@click.option(
+    "-zoom_in",
+    "--zoom_in_PCAC_mass_correlators_plots",
+    "zoom_in_PCAC_mass_correlators_plots",
+    is_flag=True,
+    default=True,
+    help="Enable zooming in on PCAC mass correlators plots.",
 )
 @click.option(
     "--output_PCAC_mass_estimates_csv_filename",
@@ -243,6 +250,7 @@ def main(
             ):
                 pass
                 # TODO: Log warning
+
             number_of_gauge_configurations = np.shape(
                 jackknife_replicas_of_PCAC_mass_correlator_2D_array
             )[0]
@@ -264,7 +272,9 @@ def main(
             jackknife_replicas_of_PCAC_mass_correlator_2D_array = np.array(
                 [
                     PCAC_mass_correlator_replica[: temporal_lattice_size // 2]
-                    for PCAC_mass_correlator_replica in jackknife_replicas_of_PCAC_mass_correlator_2D_array
+                    for (
+                        PCAC_mass_correlator_replica
+                    ) in jackknife_replicas_of_PCAC_mass_correlator_2D_array
                 ]
             )
 
@@ -274,12 +284,14 @@ def main(
                 jackknife_replicas_of_PCAC_mass_correlator_2D_array, axis=0
             )
 
+            # Restrict the calculation range to a possible plateau range
+            calculation_range = np.arange(
+                temporal_lattice_size // 4 - temporal_lattice_size // 8,
+                temporal_lattice_size // 4 + temporal_lattice_size // 8,
+            )
             integrated_autocorrelation_time = (
                 jackknife_analysis.calculate_integrated_autocorrelation_time(
-                    jackknife_average_PCAC_mass_correlator_array[
-                        temporal_lattice_size//4 - temporal_lattice_size//8:
-                        temporal_lattice_size//4 + temporal_lattice_size//8
-                    ]
+                    jackknife_average_PCAC_mass_correlator_array[calculation_range]
                 )
             )
 
@@ -319,6 +331,7 @@ def main(
                     )
                 )
             ]
+
             plateau_fit_PCAC_mass_estimates_list = list()
             for (
                 PCAC_mass_correlator_replica
@@ -343,13 +356,15 @@ def main(
                     gv.mean(plateau_fit_PCAC_mass_estimates_list),
                     gv.sdev(plateau_fit_PCAC_mass_estimates_list),
                     np.sqrt(number_of_gauge_configurations)
-                    * np.sqrt(2 * integrated_autocorrelation_time)
+                    * np.sqrt(2 * integrated_autocorrelation_time),
                     # TODO: Still need a justification for including this:
                     # * np.sqrt(len(plateau_indices_list)),
                 )
             )
 
             # PLOT PCAC MASS CORRELATORS
+
+            zoom_in = True
 
             if plot_PCAC_mass_correlators:
                 starting_time = 5
@@ -376,16 +391,15 @@ def main(
 
                 ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
-                # ax.set_ylim(
-                #     [
-                #         0.5 * PCAC_mass_estimate.mean,
-                #         1.5 * PCAC_mass_estimate.mean,
-                #     ]
-                # )
-
                 ax.errorbar(
                     x, gv.mean(y), yerr=gv.sdev(y), fmt=".", markersize=8, capsize=10
                 )
+
+                if zoom_in:
+                    y_limits = [0.9 * y[0].mean, 1.1 * PCAC_mass_estimate.mean]
+                    if y[0] > y[temporal_lattice_size // 4]:
+                        y_limits = [y_limits[1], y_limits[0]]
+                    ax.set_ylim(y_limits)
 
                 plateau_range_minimum = x[plateau_indices_list[0] - starting_time]
                 plateau_range_maximum = x[plateau_indices_list[-1] - starting_time]
@@ -433,390 +447,6 @@ def main(
                 fig.savefig(plot_path)
                 plt.close()
 
-
-            continue
-            # # ?????????????????????????????????????
-            # # TODO:
-
-            # if (
-            #     "Total_calculation_time_values_array"
-            #     in PCAC_mass_correlator_analysis_group
-            #     and isinstance(
-            #         PCAC_mass_correlator_analysis_group[
-            #             "Total_calculation_time_values_array"
-            #         ],
-            #         h5py.Dataset,
-            #     )
-            # ):
-            #     # if "Total_calculation_time_values_array" in dataset_names:
-            #     parameters_value_dictionary[
-            #         "Average_calculation_time_per_spinor_per_configuration"
-            #     ] = np.average(
-            #         PCAC_mass_correlator_analysis_group[
-            #             "Total_calculation_time_values_array"
-            #         ][:]
-            #     )
-
-            # # if (
-            # #     "Average_number_of_MV_multiplications_per_spinor_values_array"
-            # #     in dataset_names
-            # # ):
-            # if (
-            #     "Average_number_of_MV_multiplications_per_spinor_values_array"
-            #     in PCAC_mass_correlator_analysis_group
-            #     and isinstance(
-            #         PCAC_mass_correlator_analysis_group[
-            #             "Average_number_of_MV_multiplications_per_spinor_values_array"
-            #         ],
-            #         h5py.Dataset,
-            #     )
-            # ):
-            #     parameters_value_dictionary[
-            #         "Average_number_of_MV_multiplications_per_spinor_per_configuration"
-            #     ] = np.average(
-            #         PCAC_mass_correlator_analysis_group[
-            #             "Average_number_of_MV_multiplications_per_spinor_values_array"
-            #         ][:]
-            #     )
-
-            # OPTIMUM FIT RANGE INVESTIGATION
-
-            # Choose a lowest index cut for the PCAC mass correlator values
-            # array such that the initial erratic points are filtered out
-            LOWEST_INDEX_CUT = 4
-
-            # Ignore the second half of the PCAC mass correlator values array
-            # since its is by construction symmetrized
-            y = jackknife_average_PCAC_mass_correlator_array[
-                LOWEST_INDEX_CUT : temporal_lattice_size // 2
-            ]
-
-            # The corresponding time values must be shifted by the lowest index
-            # cut
-            x = range(LOWEST_INDEX_CUT, len(y) + LOWEST_INDEX_CUT)
-
-            # Usually at t=T/4 the time-dependent PCAC mass starts to plateau
-            PCAC_mass_plateau_fit_guess = [gv.mean(y[temporal_lattice_size // 4])]
-
-            # NOTE:
-            # Set to an arbitrary large number
-            PCAC_mass_plateau_fit_minimum_chi2 = 1000
-            minimum_number_of_points = 5
-            PCAC_mass_plateau_fit_optimum_range = (3, -3)
-
-            upper_index_cut = -1  # temporal_lattice_size // 2 - 2
-
-            # for index_cut in range(temporal_lattice_size // 8, len(x) - minimum_number_of_points):
-            for index_cut in range(len(x) - minimum_number_of_points):
-                PCAC_mass_plateau_state_fit = lsqfit.nonlinear_fit(
-                    data=(x[index_cut:upper_index_cut], y[index_cut:upper_index_cut]),
-                    p0=PCAC_mass_plateau_fit_guess,
-                    fcn=effective_mass.plateau_fit_function,
-                    debug=True,
-                )
-                PCAC_mass_plateau_fit_chi2 = PCAC_mass_plateau_state_fit.chi2 / len(
-                    x[index_cut:upper_index_cut]
-                )
-                if PCAC_mass_plateau_fit_chi2 < PCAC_mass_plateau_fit_minimum_chi2:
-                    PCAC_mass_plateau_fit_minimum_chi2 = PCAC_mass_plateau_fit_chi2
-                    PCAC_mass_plateau_fit_optimum_range = (index_cut, upper_index_cut)
-                    PCAC_plateau_fit_optimum_mass_estimate = (
-                        PCAC_mass_plateau_state_fit.p[0]
-                    )
-                else:
-                    break
-
-            # PLOT TIME DEPENDENCE OF PCAC MASS VALUES
-
-            fig, ax = plt.subplots()
-            # ax.grid()
-            plt.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
-
-            # plot_title = ""
-            # # # "Sign squared violation against scaling factor"
-            # parameter_values_subtitle=plotting.construct_plot_subtitle(
-            #                                     parameters_value_dictionary)
-            # # # f"[KL {operator_type} $n$={KL_iterations}, $\\beta$={unique_QCD_beta_value}, $c_{{SW}}$={unique_clover_coefficient}, $\\rho$={unique_rho_value}, APE iters={unique_APE_iterations}, $\\epsilon_{{MSCG}}$={unique_MSCG_epsilon}, config: {configuration_label}, $\\kappa$={condition_number:.2f}]"
-            # wrapper = textwrap.TextWrapper(width=100, initial_indent="   ")
-            # wrapped_parameter_values_subtitle = wrapper.fill(parameter_values_subtitle)
-
-            # ax.set_title(f'{plot_title}\n{wrapped_parameter_values_subtitle}', pad=7)
-
-            # ax.set_title(f'Jackknife average of $m_{{PCAC}}(t)$ values ({Operator_method} {operator_type}, $\\beta$={QCD_beta_value:.2f}, $c_{{SW}}$={int(Clover_coefficient)},\n$\\rho$={Rho_value}, APE iters={APE_iterations}, $\\mu$={KL_scaling_factor}, $\\epsilon_{{CG}}$={CG_epsilon}, $\\epsilon_{{MSCG}}$={MSCG_epsilon}, $n$={KL_iterations}, $m_b=${bare_mass})', pad=7)
-            # ax.set_title(f'Jackknife average of $m_{{PCAC}}(t)$ values ({Operator_method} {operator_type}, $\\beta$={QCD_beta_value:.2f}, $c_{{SW}}$={int(Clover_coefficient)},\n$\\rho$={Rho_value}, APE iters={APE_iterations}, $\\mu$={KL_scaling_factor}, $\\epsilon_{{CG}}$={CG_epsilon}, $n$={KL_iterations}, $m_b=${bare_mass})', pad=7)
-
-            # plot_title = ""
-
-            # parameter_values_subtitle = plotting.construct_plot_subtitle(
-            #     parameters_value_dictionary
-            # )
-            # wrapper = textwrap.TextWrapper(width=100, initial_indent="   ")
-            # wrapped_parameter_values_subtitle = wrapper.fill(parameter_values_subtitle)
-
-            # ax.set_title(f"{plot_title}\n{wrapped_parameter_values_subtitle}", pad=6)
-
-            ax.set(xlabel="$t/a$", ylabel="a$m_{PCAC}(t)$")
-
-            # Set x-axis ticks to integer values only
-            ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-
-            ax.axvline(
-                x[PCAC_mass_plateau_fit_optimum_range[0]], color="black"
-            )  # x = 0
-            ax.axvline(
-                x[PCAC_mass_plateau_fit_optimum_range[1] - 1], color="black"
-            )  # x = 0
-
-            ax.errorbar(
-                x,
-                gv.mean(y),
-                yerr=gv.sdev(y),
-                fmt=".",
-                markersize=8,
-                capsize=10,
-                # , label=f'# of configs: {number_of_gauge_configurations}'
-            )
-
-            PCAC_mass_estimate = gv.gvar(
-                gv.mean(PCAC_plateau_fit_optimum_mass_estimate),
-                np.sqrt(
-                    len(
-                        y[
-                            PCAC_mass_plateau_fit_optimum_range[
-                                0
-                            ] : PCAC_mass_plateau_fit_optimum_range[1]
-                        ]
-                    )
-                    - 1
-                )
-                * gv.sdev(PCAC_plateau_fit_optimum_mass_estimate),
-            )
-
-            x_data = np.linspace(
-                x[PCAC_mass_plateau_fit_optimum_range[0]],
-                x[PCAC_mass_plateau_fit_optimum_range[1] - 1],
-                100,
-            )
-            plt.plot(
-                x_data,
-                effective_mass.plateau_fit_function(
-                    x_data, gv.mean(PCAC_mass_estimate)
-                ),
-                "r--",
-                label=f"Plateau fit:\n- Fitting range: t/a$\in$[{x[PCAC_mass_plateau_fit_optimum_range[0]]}, {x[PCAC_mass_plateau_fit_optimum_range[1]-1]}]\n- $m^{{best\;fit}}_{{PCAC}}$={PCAC_mass_estimate:.5f}, ",
-            )
-            ax.fill_between(
-                x_data,
-                gv.mean(PCAC_mass_estimate) - gv.sdev(PCAC_mass_estimate),
-                gv.mean(PCAC_mass_estimate) + gv.sdev(PCAC_mass_estimate),
-                color="r",
-                alpha=0.2,
-            )
-
-            if y[0] > y[temporal_lattice_size // 4]:
-                ax.legend(loc="upper center")
-            else:
-                ax.legend(loc="lower center")
-
-            # plot_filename = f'Jackknife_average_PCAC_mass_correlator_values_{Operator_method}_{operator_type}_m{bare_mass}_EpsCG{CG_epsilon}_EpsMSCG{MSCG_epsilon}.png'
-            # plot_filename = plots_base_name + input_data_files_set_group.attrs[]
-            # PCAC_mass_correlator_analysis_group_name
-            # f'Jackknife_average_PCAC_mass_correlator_values_{Operator_method}_{operator_type}_m{bare_mass}_EpsCG{CG_epsilon}.png'
-            # plot_path = os.path.join(plots_subdirectory, plot_filename)
-
-            # Initialize characteristic substring
-            if "Kernel_operator_type" in fields_with_unique_values_dictionary:
-                plots_characteristic_fields_values_string = (
-                    fields_with_unique_values_dictionary["Kernel_operator_type"]
-                )
-            elif "Kernel_operator_type" in input_data_files_set_group.attrs:
-                plots_characteristic_fields_values_string = (
-                    input_data_files_set_group.attrs["Kernel_operator_type"]
-                )
-            elif "Kernel_operator_type" in PCAC_mass_correlator_analysis_group.attrs:
-                plots_characteristic_fields_values_string = (
-                    PCAC_mass_correlator_analysis_group.attrs["Kernel_operator_type"]
-                )
-            else:
-                plots_characteristic_fields_values_string = ""
-
-            for key, value in PCAC_mass_correlator_analysis_group.attrs.items():
-                if key in constants.PARAMETERS_PRINTED_LABELS_DICTIONARY:
-                    plots_characteristic_fields_values_string += (
-                        "_" + constants.PARAMETERS_PRINTED_LABELS_DICTIONARY[key]
-                    )
-                    plots_characteristic_fields_values_string += str(value)
-
-            plots_characteristic_fields_values_string = (
-                plots_characteristic_fields_values_string.replace(".", "p")
-            )
-
-            plot_path = os.path.join(
-                PCAC_mass_plots_subdirectory,
-                f"{PCAC_mass_plots_base_name}_{plots_characteristic_fields_values_string}"
-                + ".png",
-            )
-
-            fig.savefig(plot_path)
-            plt.close()
-
-            parameters_value_dictionary["PCAC_mass_estimate"] = (
-                PCAC_mass_estimate.mean,
-                PCAC_mass_estimate.sdev,
-            )
-
-            PCAC_mass_estimates_list.append(parameters_value_dictionary)
-
-            # PLOT G5-G5 CORRELATOR VALUES
-
-            jackknife_average_of_g5_g5_correlator_values_array = gv.gvar(
-                PCAC_mass_correlator_analysis_group[
-                    "jackknife_average_of_g5_g5_correlator_mean_values"
-                ][:],
-                PCAC_mass_correlator_analysis_group[
-                    "jackknife_average_of_g5_g5_correlator_error_values"
-                ][:],
-            )
-
-            fig, ax = plt.subplots()
-            # ax.grid()
-            plt.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
-
-            plot_title = ""
-            # ax.set_title(f"{plot_title}\n{wrapped_parameter_values_subtitle}", pad=6)
-
-            ax.set(xlabel="$t/a$", ylabel="g5g5(t)")
-
-            ax.set_yscale("log")
-
-            # Set x-axis ticks to integer values only
-            ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-
-            # Ignore the second half of the PCAC mass correlator values array since its
-            # been by construction symmetrized
-            y = jackknife_average_of_g5_g5_correlator_values_array[
-                LOWEST_INDEX_CUT : temporal_lattice_size - LOWEST_INDEX_CUT + 1
-            ]
-
-            # The corresponding time values must be shifted by the lowest index cut
-            x = range(LOWEST_INDEX_CUT, len(y) + LOWEST_INDEX_CUT)
-
-            ax.errorbar(
-                x, gv.mean(y), yerr=gv.sdev(y), fmt=".", markersize=8, capsize=10
-            )
-
-            plot_path = os.path.join(
-                g5_g5_plots_subdirectory,
-                f"{g5_g5_plots_base_name}_{plots_characteristic_fields_values_string}"
-                + ".png",
-            )
-
-            fig.savefig(plot_path)
-            plt.close()
-
-            # PLOT G4G5-G5 CORRELATOR VALUES
-
-            jackknife_average_of_g4g5_g5_correlator_values_array = gv.gvar(
-                PCAC_mass_correlator_analysis_group[
-                    "jackknife_average_of_g4g5_g5_correlator_mean_values"
-                ][:],
-                PCAC_mass_correlator_analysis_group[
-                    "jackknife_average_of_g4g5_g5_correlator_error_values"
-                ][:],
-            )
-
-            fig, ax = plt.subplots()
-            # ax.grid()
-            plt.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
-
-            plot_title = ""
-            # ax.set_title(f"{plot_title}\n{wrapped_parameter_values_subtitle}", pad=6)
-
-            ax.set(xlabel="$t/a$", ylabel="g4g5g5(t)")
-
-            # ax.set_yscale("log")
-
-            # Set x-axis ticks to integer values only
-            ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-
-            # Ignore the second half of the PCAC mass correlator values array since its
-            # been by construction symmetrized
-            y = jackknife_average_of_g4g5_g5_correlator_values_array[
-                LOWEST_INDEX_CUT : temporal_lattice_size - LOWEST_INDEX_CUT + 1
-            ]
-
-            # The corresponding time values must be shifted by the lowest index cut
-            x = range(LOWEST_INDEX_CUT, len(y) + LOWEST_INDEX_CUT)
-
-            ax.errorbar(
-                x, gv.mean(y), yerr=gv.sdev(y), fmt=".", markersize=8, capsize=10
-            )
-
-            plot_path = os.path.join(
-                g4g5_g5_plots_subdirectory,
-                f"{g4g5_g5_plots_base_name}_{plots_characteristic_fields_values_string}"
-                + ".png",
-            )
-
-            fig.savefig(plot_path)
-            plt.close()
-
-            # PLOT G4G5-G5 DERIVATIVE CORRELATOR VALUES
-
-            jackknife_average_of_g4g5_g5_derivative_correlator_values_array = gv.gvar(
-                PCAC_mass_correlator_analysis_group[
-                    "g4g5_g5_derivative_correlator_from_jackknife_average_of_g4g5_g5_correlator_mean_values"
-                ][:],
-                PCAC_mass_correlator_analysis_group[
-                    "g4g5_g5_derivative_correlator_from_jackknife_average_of_g4g5_g5_correlator_error_values"
-                ][:],
-            )
-
-            fig, ax = plt.subplots()
-            # ax.grid()
-            plt.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
-
-            plot_title = ""
-            # ax.set_title(f"{plot_title}\n{wrapped_parameter_values_subtitle}", pad=6)
-
-            ax.set(xlabel="$t/a$", ylabel="$\\partial$g4g5g5(t)")
-
-            ax.set_yscale("log")
-
-            # Set x-axis ticks to integer values only
-            ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-
-            # Ignore the second half of the PCAC mass correlator values array since its
-            # been by construction symmetrized
-            y = jackknife_average_of_g4g5_g5_derivative_correlator_values_array[
-                LOWEST_INDEX_CUT : temporal_lattice_size - LOWEST_INDEX_CUT + 1
-            ]
-
-            # The corresponding time values must be shifted by the lowest index cut
-            x = range(LOWEST_INDEX_CUT, len(y) + LOWEST_INDEX_CUT)
-
-            ax.errorbar(
-                x, gv.mean(y), yerr=gv.sdev(y), fmt=".", markersize=8, capsize=10
-            )
-
-            plot_path = os.path.join(
-                g4g5_g5_derivative_plots_subdirectory,
-                f"{g4g5_g5_derivative_plots_base_name}_{plots_characteristic_fields_values_string}"
-                + ".png",
-            )
-
-            fig.savefig(plot_path)
-            plt.close()
-
-            # EXPORT CALCULATED DATA
-
-            parameters_value_dictionary["PCAC_mass_estimate"] = (
-                PCAC_mass_estimate.mean,
-                PCAC_mass_estimate.sdev,
-            )
-
-            PCAC_mass_estimates_list.append(parameters_value_dictionary)
-
         # Create a DataFrame from the extracted data
         PCAC_mass_estimates_dataframe = pd.DataFrame(PCAC_mass_estimates_list)
 
@@ -835,5 +465,3 @@ def main(
 
 if __name__ == "__main__":
     main()
-
-# TODO: Include proper logging!
