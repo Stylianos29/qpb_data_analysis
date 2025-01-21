@@ -29,4 +29,3 @@ def test_construct_plot_subtitle():
 
 if __name__ == "__main__":
     unittest.main()
-
