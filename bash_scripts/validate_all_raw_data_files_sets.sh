@@ -5,7 +5,7 @@
 # files sets stored in a hierarchical directory structure.
 #
 # DESCRIPTION:
-# This script processes raw data files sets organized in a specific directory
+# This script validates raw data files sets organized in a specific directory
 # structure. Each subdirectory of "raw" represents a main program's output,
 # containing subdirectories corresponding to data files sets. The script:
 #
@@ -129,27 +129,28 @@ for main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
         check_if_file_exists "$timestamp_file_path" -c -s
 
         # Determine if the data files set directory has been modified
-        modified_data_files_set_flag=false
+        modified_raw_data_files_set_flag=false
         if check_directory_for_changes "$data_files_set_directory" \
                                                 "$timestamp_file_path"; then
-            modified_data_files_set_flag=true
+            modified_raw_data_files_set_flag=true
         fi
 
         # Skip validation if not modified and "--all" is not specified
-        if ! ($VALIDATE_ALL_FLAG || $modified_data_files_set_flag); then
-            warning_message="- Skipping '${data_files_set_name}' data files "
-            warning_message+="set, already validated."
+        if ! ($VALIDATE_ALL_FLAG || $modified_raw_data_files_set_flag); then
+            warning_message="- Skipping '${data_files_set_name}' raw data "
+            warning_message+="files set, already validated."
             echo $warning_message
             continue
         fi
 
-        # VALIDATE CURRENT DATA FILES SET
+        # VALIDATE CURRENT RAW DATA FILES SET
 
         echo "- Inspecting '${data_files_set_name}/' directory:"
 
         $working_script_path \
-            --set_dir "$data_files_set_directory" \
-            --log_dir "$auxiliary_files_directory"
+            --data_files_set_directory "$data_files_set_directory" \
+            --scripts_log_files_directory "$auxiliary_files_directory" \
+            || { echo; continue; }
 
         # Update the timestamp file after successful validation.
         update_timestamp "$data_files_set_directory" "$timestamp_file_path"
@@ -158,7 +159,7 @@ for main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
 done
 
 echo
-echo "Validating all data files sets completed!"
+echo "Validating all raw data files sets completed!"
 
 # Unset the library scripts path variable to avoid conflicts.
 unset LIBRARY_SCRIPTS_DIRECTORY_PATH

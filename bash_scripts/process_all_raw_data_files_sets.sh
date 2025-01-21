@@ -1,204 +1,202 @@
 #!/bin/bash
 
 ################################################################################
-# process_all_qpb_data_files.sh - Script for automating the processing of qpb
-# data files stored in nested subdirectories. The script utilizes two Python
-# scripts to handle the processing of qpb log files and qpb correlator data
-# files.
+# process_all_raw_data_files_sets.sh - Automates the processing of raw data
+# files sets stored in a hierarchical directory structure.
 #
-# Functionalities:
-# - Iterates through a specified raw data directory structure.
-# - Identifies subdirectories corresponding to specific qpb main programs and
-#   data files sets.
-# - Processes qpb log files and correlator data files (if present) within each
-#   data files sets directory using the appropriate Python scripts.
-# - Automatically creates corresponding output directories in the processed data
-#   directory if they do not exist.
+# DESCRIPTION:
+# This script processes raw data files sets organized in a specific directory
+# structure. Each subdirectory of "raw" represents a main program's output,
+# containing subdirectories corresponding to data files sets. The script:
 #
-# Processing Logic:
-# - **QPB Log Files:**
-#   * The Python script `process_qpb_log_files.py` is called to process any
-#     `.txt` files found in the data files sets directory.
-#   * The script automatically filters and processes qpb log files, generating
-#     output files with appropriate names in the processed data directory.
+# 1. Recursively traverses this structure to locate data files sets.
+# 2. Uses timestamp checks to avoid re-validating unmodified sets unless the
+#    "--all" flag is provided.
+# 3. For each identified data files set:
+#     a. Processes the set using "process_all_raw_data_files_sets.sh."
+#     b. Updates a timestamp file to track validation.
 #
-# - **QPB Correlator Data Files:**
-#   * The Python script `parse_qpb_correlator_files.py` is called to process any
-#     `.dat` files found in the data files sets directory.
-#   * The script parses the correlator data and generates output in HDF5 format
-#     in the processed data directory.
+# FLAGS:
+# --all       Process all raw data files sets, bypassing timestamp checks.
+# -u, --usage Display usage instructions and exit.
 #
-# Input:
-# - Paths to the raw data and processed data directories, defined as script
-#   variables.
-# - The raw data directory is expected to have a structure where:
-#   * First-level subdirectories represent qpb main programs.
-#   * Second-level subdirectories represent specific experiments or analyses
-#     (data file sets).
+# USAGE EXAMPLES:
+#   ./process_all_raw_data_files_sets.sh         # Validate only modified sets.
+#   ./process_all_raw_data_files_sets.sh --all   # Validate all sets.
+#   ./process_all_raw_data_files_sets.sh -u      # Show usage information.
 #
-# Output:
-# - Processed files are saved in a parallel directory structure under the
-#   processed data directory. These include:
-#   * Output files from processing `.txt` files (qpb log files).
-#   * Output files from parsing `.dat` files (correlator data files).
+# DEPENDENCIES:
+# - Library scripts located in the "library" directory.
+# - "process_all_raw_data_files_sets.sh" script for individual set validation.
 #
-# Directory Structure Assumptions:
-# - The raw data directory structure is as follows:
-#   * `<RAW_DATA_FILES_DIRECTORY>/<qpb_main_program>/<experiment_directory>/`
-# - The processed data directory mirrors this structure:
-#   * `<PROCESSED_DATA_FILES_DIRECTORY>/<qpb_main_program>/<experiment_directory>/`
-#
-# Additional Notes:
-# - The script ensures that only directories are processed, skipping invalid
-#   entries.
-# - If a required output subdirectory does not exist, it is created
-#   automatically with a warning message.
-# - Both Python scripts handle their own filtering logic for file types within
-#   the given directory.
 ################################################################################
 
-# Define paths for the source scripts, raw data files, and processed data files.
-SOURCE_SCRIPTS_DIRECTORY="../core/src"
+# SOURCE DEPENDENCIES
+
+export LIBRARY_SCRIPTS_DIRECTORY_PATH=$(realpath "./library")
+if [[ ! -d "$LIBRARY_SCRIPTS_DIRECTORY_PATH" ]]; then
+    echo "Invalid library scripts path."
+    exit 1
+fi
+# Source all library scripts to load utility functions.
+for library_script in "${LIBRARY_SCRIPTS_DIRECTORY_PATH}"/*.sh; do
+    [ -f "$library_script" ] && source "$library_script"
+done
+
+# ENVIRONMENT VARIABLES
+
 RAW_DATA_FILES_DIRECTORY="../data_files/raw"
+check_if_directory_exists "$RAW_DATA_FILES_DIRECTORY" || exit 1
+
 PROCESSED_DATA_FILES_DIRECTORY="../data_files/processed"
+check_if_directory_exists "$PROCESSED_DATA_FILES_DIRECTORY" || exit 1
 
-# Set a common output HDF5 filename for all qpb main programs and datasets
-OUTPUT_HDF5_FILE_NAME="pion_correlators_values.h5"
+export PYTHON_SCRIPTS_DIRECTORY="../core/src"
+check_if_directory_exists "$PYTHON_SCRIPTS_DIRECTORY" || exit 1
 
-# Loop over all subdirectories in the raw data files directory.
-# These subdirectories are expected to represent the qpb main programs that 
-# generated the respective data files.
+WORKING_SCRIPT_NAME="process_raw_data_files_set"
+working_script_path="./workflows/${WORKING_SCRIPT_NAME}.sh"
+check_if_file_exists $working_script_path || exit 1
+
+DEPENDED_SCRIPT_NAME="validate_raw_data_files_set"
+depended_script_path="./checks/${DEPENDED_SCRIPT_NAME}.sh"
+check_if_file_exists $depended_script_path || exit 1
+
+VALIDATE_ALL_FLAG=false #Initialize flag
+
+# PARSE FLAGS
+
+function usage() {
+    echo "Usage: $0 [--all] [-u | --usage]"
+    echo
+    echo "Flags:"
+    echo " --all       Validate all data files sets, bypassing timestamp checks."
+    echo " -u, --usage Display this usage message and exit."
+    echo
+    exit 0
+}
+
+# Process command-line arguments
+while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+        --all)
+            VALIDATE_ALL_FLAG=true
+            shift
+            ;;
+        -u|--usage)
+            usage
+            ;;
+        *)
+            echo "Error: Unknown flag '$1'."
+            usage
+            ;;
+    esac
+done
+
+# PROCESS ALL RAW DATA FILES SETS
+
+# Traverse the "raw" directory to process main program subdirectories
 for main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
-
-    # Ensure the current entry is a directory; skip otherwise.
-    if [ ! -d "$main_program_directory" ]; then
-        continue
-    fi
+    # Skip non-directory entries
+    [ -d "$main_program_directory" ] || continue
 
     echo
-    echo "Working within '${main_program_directory}':"
+    echo "Working within '${main_program_directory/"../"}/':"
 
-    # Loop over all subdirectories of the current main program directory.
-    # These are expected to represent specific experiments or analyses.
-    for data_files_set_directory in "$main_program_directory"/*; do
+    # Process each data files set within the current main program directory
+    for raw_data_files_set_directory in "$main_program_directory"/*; do
+        # Skip non-directory entries.
+        [ -d "$raw_data_files_set_directory" ] || continue
 
-        # Ensure the current entry is a directory; skip otherwise.
-        if [ ! -d "$data_files_set_directory" ]; then
+        # CONSTRUCT AUXILIARY FILES DIRECTORY PATH
+
+        # Convert raw directory path to corresponding processed directory path
+        processed_data_files_set_directory=$(replace_parent_directory \
+            "$raw_data_files_set_directory" "$RAW_DATA_FILES_DIRECTORY" \
+            "$PROCESSED_DATA_FILES_DIRECTORY")
+
+        # Define the auxiliary files directory path.
+        auxiliary_files_directory="${processed_data_files_set_directory}"
+        auxiliary_files_directory+="/auxiliary_files"
+
+        # Ensure the auxiliary files directory exists (create if necessary)
+        check_if_directory_exists "$auxiliary_files_directory" -c -s
+
+        # CHECK IF DATA FILES SET DIRECTORY WAS MODIFIED
+
+        # Extract the data files set name
+        data_files_set_name=$(basename "$raw_data_files_set_directory")
+
+        # Define the path to the working script timestamp file
+        working_script_timestamp_file_path=$(get_timestamp_file_path \
+            "$raw_data_files_set_directory" "$auxiliary_files_directory" \
+            "$WORKING_SCRIPT_NAME")
+
+        # Ensure the working script timestamp file exists (create if necessary)
+        check_if_file_exists "$working_script_timestamp_file_path" -c -s
+
+        # Determine if the raw data files set directory has been modified
+        modified_raw_data_files_set_flag=false
+        if check_directory_for_changes "$raw_data_files_set_directory" \
+                                    "$working_script_timestamp_file_path"; then
+            modified_raw_data_files_set_flag=true
+        fi
+
+        # Define the path to the depended script timestamp file
+        depended_script_timestamp_file_path=$(get_timestamp_file_path \
+            "$raw_data_files_set_directory" "$auxiliary_files_directory" \
+            "$DEPENDED_SCRIPT_NAME")
+
+        # Ensure the depended script timestamp file exists (create if necessary)
+        check_if_file_exists "$depended_script_timestamp_file_path" -c -s
+
+        # Determine if the raw data files set has been validated properly
+        validated_raw_data_files_set_flag=true
+        if check_directory_for_changes "$raw_data_files_set_directory" \
+                                    "$depended_script_timestamp_file_path"; then
+            validated_raw_data_files_set_flag=false
+        fi
+
+        # Skip processing if raw data files set modified but not validated yet
+        if $modified_raw_data_files_set_flag && \
+                                    ! $validated_raw_data_files_set_flag; then
+            error_message="- ERROR: '${data_files_set_name}' raw data "
+            error_message+="files set has not been validated yet, skipping..."
+            echo $error_message
+            echo
             continue
         fi
 
-        # Extract name of data files set directory
-        data_files_set_name=$(basename $data_files_set_directory)
-
-        echo "- '${data_files_set_name}' data files set:"
-
-        # Construct path to corresponding processed data files subdirectory
-        output_directory_path=$PROCESSED_DATA_FILES_DIRECTORY
-        output_directory_path+="/$(basename $main_program_directory)"
-        output_directory_path+="/${data_files_set_name}"
-
-        # Create the processed data files subdirectory if it does not exit
-        if [ ! -d "$output_directory_path" ]; then
-            mkdir -p "$output_directory_path"
-            warning_message="   ++ WARNING: Subdirectory "
-            warning_message+="'${output_directory_path}' does not exist, so "
-            warning_message+="it was created."
-            echo "${warning_message}"
+        # Skip processing if raw data files set has not been modified and
+        # "--all" is not specified
+        if ! ($VALIDATE_ALL_FLAG || $modified_raw_data_files_set_flag); then
+            warning_message="- Skipping '${data_files_set_name}' raw data "
+            warning_message+="files set, already processed."
+            echo $warning_message
+            continue
         fi
 
-        # Initialize a boolean variable for warning purposes
-        NO_DATA_FILES="True"
+        # PROCESS CURRENT RAW DATA FILES SET
 
-        # QPB LOG FILES DATASETS PROCESSING
+        echo "- Processing '${data_files_set_name}' raw data files set:"
 
-        # Create paths to the two types of output files for storing extracted
-        # values form the qpb files.
-        # NOTE: Filenames are independent of the data files sets names
-        output_csv_filename="qpb_log_files_single_valued_parameters.csv"
-        output_csv_file_path="${output_directory_path}/${output_csv_filename}"
-        output_hdf5_filename="qpb_log_files_multivalued_parameters.h5"
-        output_hdf5_file_path="${output_directory_path}/${output_hdf5_filename}"
+        $working_script_path \
+            --data_files_set_directory "$raw_data_files_set_directory" \
+            --output_files_directory "$processed_data_files_set_directory" \
+            --scripts_log_files_directory "$auxiliary_files_directory" \
+            || { echo; continue; }
 
-        # Check if current data files set subdirectory contains any .txt files
-        if find "$data_files_set_directory" \
-                            -maxdepth 1 -type f -name "*.txt" | grep -q .; then
-            
-            echo "   ++ It contains qpb log files."
-            NO_DATA_FILES="False"
-
-            # Process the current set of qpb log files
-            script_path="${SOURCE_SCRIPTS_DIRECTORY}"
-            script_path+="/data_files_processing/process_qpb_log_files.py"
-            python $script_path \
-                -qpb_log_dir "$data_files_set_directory" \
-                -out_dir "$output_directory_path" \
-                -csv_name "${output_csv_filename%.csv}_preprocessed.csv" \
-                -hdf5_name "$output_hdf5_filename"
-            
-            # Generate a summary for output .csv file and save it to a text file
-            script_path="${SOURCE_SCRIPTS_DIRECTORY}"
-            script_path+="/utils/inspect_csv_file.py"
-            python $script_path \
-                -in_csv_path "${output_csv_file_path%.csv}_preprocessed.csv" \
-                --output_file "${output_csv_file_path%.csv}_preprocessed_summary.txt" \
-                --sample_rows 0
-            
-            # Process the extracted values from the qpb log files
-            script_path="${SOURCE_SCRIPTS_DIRECTORY}/post_processing_analysis"
-            script_path+="/process_qpb_log_files_extracted_values.py"
-            python $script_path \
-                -in_csv_path "${output_csv_file_path%.csv}_preprocessed.csv" \
-                -in_hdf5_path "$output_hdf5_file_path" \
-                -out_csv $output_csv_filename
-
-            # Generate a summary for output .csv file and save it to a text file
-            script_path="${SOURCE_SCRIPTS_DIRECTORY}"
-            script_path+="/utils/inspect_csv_file.py"
-            python $script_path \
-                -in_csv_path "$output_csv_file_path" \
-                --output_file "${output_csv_file_path%.csv}_summary.txt" \
-                --sample_rows 0
-
-            # Generate and save the tree structure of the output HDF5 file
-            h5glance "$output_hdf5_file_path" \
-                                    > "${output_hdf5_file_path%.h5}_tree.txt"
-        fi
-
-        # QPB CORRELATOR FILES PARSING
-
-        # Check if the current experiment subdirectory contains any .dat files
-        if find "$data_files_set_directory" \
-                            -maxdepth 1 -type f -name "*.dat" | grep -q .; then
-
-            echo "   ++ It contains qpb correlator files."
-            NO_DATA_FILES="False"
-
-            # Call the Python script to process correlator data file in the
-            # current experiment directory. The Python script:
-            # - Distinguishes correlator data files from other file types
-            #   automatically.
-            # - Generates output files with appropriate names.
-            python "${SOURCE_SCRIPTS_DIRECTORY}/data_files_processing/parse_qpb_correlator_files.py" \
-                -raw_dir "$data_files_set_directory" \
-                -out_dir "$output_directory_path" \
-                -out_hdf5_file "$OUTPUT_HDF5_FILE_NAME"
-                
-            # TODO: Include a tree graph in the output files
-            # # Accompany the HDF5 file with a detailed tree graph of its structure
-            output_hdf5_file_path="${output_directory_path}"
-            output_hdf5_file_path+="/pion_correlators_values.h5"
-            h5glance "$output_hdf5_file_path" >> "${output_hdf5_file_path%.h5}_tree.txt"
-        fi
-
-        # If no data files were found print a warning
-        if [ NO_DATA_FILES == "True" ]; then
-            echo "   ++ WARNING: No data files were found in this directory!"
-        fi
+        # Update the timestamp file after successful processing.
+        update_timestamp "$raw_data_files_set_directory" \
+                                        "$working_script_timestamp_file_path"
 
     done
+
 done
 
 echo
-echo "Processing all qpb data_files completed!"
+echo "Processing all raw data files sets completed!"
 
-# TODO: Remove old output files when rerunning
+# Unset the library scripts path variable to avoid conflicts.
+unset PYTHON_SCRIPTS_DIRECTORY
+unset LIBRARY_SCRIPTS_DIRECTORY_PATH
