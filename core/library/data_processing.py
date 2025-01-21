@@ -98,11 +98,21 @@ def load_csv(input_csv_file_path, dtype_mapping=None, converters_mapping=None):
     }
 
     # Load the CSV file with the filtered mappings
-    return pd.read_csv(
+    dataframe = pd.read_csv(
         input_csv_file_path,
         dtype=filtered_dtype_mapping,
         converters=filtered_converters_mapping,
     )
+
+    # TODO: Fix this
+    # # Set a categorical data type with a custom order
+    # dataframe["Kernel_operator_type"] = pd.Categorical(
+    #     dataframe["Kernel_operator_type"],
+    #     categories=["Wilson", "Brillouin"],  # Custom order
+    #     ordered=True
+    # )
+
+    return dataframe
 
 
 def get_fields_with_multiple_values(df, excluded_fields=None) -> list:
@@ -217,6 +227,19 @@ class DataAnalyzer:
                 single_unique_value_columns[column] = unique_values[0]
 
         return single_unique_value_columns
+
+    def get_multivalued_fields(self) -> list:
+        multivalued_columns_list = []
+
+        # Iterate through each column
+        for column in self.df.columns:
+            unique_values = self.df[column].unique()
+
+            # Only add columns where there is more than a single unique value
+            if len(unique_values) > 1:
+                multivalued_columns_list.append(column)
+
+        return multivalued_columns_list
 
     def set_excluded_fields(self, excluded_fields: Set[str]):
         """
@@ -495,7 +518,7 @@ class DataFrameAnalyzer:
     def __init__(self, dataframe: pd.DataFrame):
 
         self.dataframe = dataframe
-        self.original_dataframe = self.dataframe
+        self.original_dataframe = self.dataframe.copy()
 
         self.list_of_dataframe_fields = self.dataframe.columns.tolist()
 
@@ -522,6 +545,11 @@ class DataFrameAnalyzer:
 
         # Extract dictionary of multivalued fields with number of unique values
         self.multivalued_fields_dictionary = self.get_multivalued_fields()
+
+        self.list_of_tunable_multivalued_parameter_names = list(
+            set(self.list_of_tunable_parameter_names_from_dataframe)
+            & set(self.multivalued_fields_dictionary.keys())
+        )
 
     def get_single_valued_fields(self) -> dict:
 
@@ -558,15 +586,20 @@ class DataFrameAnalyzer:
             - set(filter_out_parameters)
         )
 
-        return self.dataframe.groupby(self.reduced_tunable_parameters_list)
+        print(self.reduced_tunable_parameters_list)
+
+        if self.reduced_tunable_parameters_list:
+            return self.dataframe.groupby(self.reduced_tunable_parameters_list)
+        else:
+            return [(None, self.dataframe)]
 
     def restrict_data(self, condition: str):
         """
         Restricts the DataFrame to rows that satisfy the given condition.
-        
+
         Args:
             condition (str): A condition to filter rows, e.g., "parameter >= 1".
-        
+
         Returns:
             None: Modifies the DataFrameAnalyzer's DataFrame in-place.
         """
