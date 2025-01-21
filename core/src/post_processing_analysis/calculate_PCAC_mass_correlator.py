@@ -16,16 +16,16 @@ from library import constants
 
 @click.command()
 @click.option(
-    "--input_qpb_log_files_csv_file_path",
-    "input_qpb_log_files_csv_file_path",
-    "-log_csv",
+    "--input_parameter_values_csv_file_path",
+    "input_parameter_values_csv_file_path",
+    "-in_param_csv",
     default=None,
     help="Path to input .csv file containing extracted info from "
     "qpb log files sets.",
 )
 @click.option(
-    "--input_correlator_values_hdf5_file_path",
-    "input_correlator_values_hdf5_file_path",
+    "--input_correlators_hdf5_file_path",
+    "input_correlators_hdf5_file_path",
     "-cor_hdf5",
     default=None,
     help="Path to input HDF5 file containing extracted correlators values.",
@@ -58,25 +58,29 @@ from library import constants
     default=None,
     help="Specific name for the script's log file.",
 )
-def main(input_qpb_log_files_csv_file_path, 
-         input_correlator_values_hdf5_file_path, output_files_directory, 
-         output_hdf5_filename, log_file_directory, log_filename):
-
+def main(
+    input_parameter_values_csv_file_path,
+    input_correlators_hdf5_file_path,
+    output_files_directory,
+    output_hdf5_filename,
+    log_file_directory,
+    log_filename,
+):
     # VALIDATE INPUT ARGUMENTS
 
-    if not filesystem_utilities.is_valid_file(input_qpb_log_files_csv_file_path):
+    if not filesystem_utilities.is_valid_file(input_parameter_values_csv_file_path):
         error_message = "Passed qpb log files .csv file path is invalid!."
         print("ERROR:", error_message)
         sys.exit(1)
 
-    if not filesystem_utilities.is_valid_file(input_correlator_values_hdf5_file_path):
+    if not filesystem_utilities.is_valid_file(input_correlators_hdf5_file_path):
         error_message = "Passed correlator values HDF5 file path is invalid!."
         print("ERROR:", error_message)
         sys.exit(1)
 
     # If no output directory is provided, use the directory of the input file
     if output_files_directory is None:
-        output_files_directory = os.path.dirname(input_correlator_values_hdf5_file_path)
+        output_files_directory = os.path.dirname(input_correlators_hdf5_file_path)
     # Check validity if the provided
     elif not filesystem_utilities.is_valid_file(output_files_directory):
         error_message = (
@@ -102,7 +106,7 @@ def main(input_qpb_log_files_csv_file_path,
     script_name = os.path.basename(__file__)
 
     if log_filename is None:
-        log_filename = script_name.replace(".py", ".log")
+        log_filename = script_name.replace(".py", "_python_script.log")
 
     # Check for proper extensions in provided output filenames
     if not output_hdf5_filename.endswith(".h5"):
@@ -123,6 +127,34 @@ def main(input_qpb_log_files_csv_file_path,
     # Initiate logging
     logging.info(f"Script '{script_name}' execution initiated.")
 
+    # CREATE PLOTS SUBDIRECTORIES
+
+    # if plot_g5g5_correlators:
+    #     g5_g5_plots_base_name = "g5g5_correlator"
+    #     g5_g5_plots_subdirectory = filesystem_utilities.create_subdirectory(
+    #         plots_main_subdirectory,
+    #         g5_g5_plots_base_name + "s",
+    #         clear_contents=True,
+    #     )
+
+    # if plot_g4g5g5_correlators:
+    #     g4g5_g5_plots_base_name = "g4g5g5_correlator"
+    #     g4g5_g5_plots_subdirectory = filesystem_utilities.create_subdirectory(
+    #         plots_main_subdirectory,
+    #         g4g5_g5_plots_base_name + "s",
+    #         clear_contents=True,
+    #     )
+
+    # if plot_g4g5g5_derivative_correlators:
+    #     g4g5_g5_derivative_plots_base_name = "g4g5g5_derivative_correlator"
+    #     g4g5_g5_derivative_plots_subdirectory = (
+    #         filesystem_utilities.create_subdirectory(
+    #             plots_main_subdirectory,
+    #             g4g5_g5_derivative_plots_base_name + "s",
+    #             clear_contents=True,
+    #         )
+    #     )
+
     # PCAC MASS CORRELATOR VALUES CALCULATION
 
     # Construct output HDF5 file path
@@ -131,9 +163,7 @@ def main(input_qpb_log_files_csv_file_path,
     )
 
     # Open the input HDF5 file for reading and the output HDF5 file for writing
-    with h5py.File(
-        input_correlator_values_hdf5_file_path, "r"
-    ) as hdf5_file_read, h5py.File(
+    with h5py.File(input_correlators_hdf5_file_path, "r") as hdf5_file_read, h5py.File(
         output_PCAC_mass_correlator_hdf5_file_path, "w"
     ) as hdf5_file_write:
 
@@ -154,11 +184,17 @@ def main(input_qpb_log_files_csv_file_path,
         # ANALYZE .CSV FILE
 
         qpb_log_files_dataframe = data_processing.load_csv(
-            input_qpb_log_files_csv_file_path
+            input_parameter_values_csv_file_path
         )
 
         # Create an instance of DataAnalyzer
         analyzer = data_processing.DataAnalyzer(qpb_log_files_dataframe)
+
+        multivalued_fields_list = analyzer.get_multivalued_fields()
+        multivalued_fields_list = list(
+            set(multivalued_fields_list)
+            - {"Filename", "Configuration_label", "Kernel_operator_type"}
+        )
 
         # Store unique values as attributes to top-level output HDF5 groups
         for key, value in analyzer.fields_with_unique_values_dictionary.items():
@@ -200,9 +236,18 @@ def main(input_qpb_log_files_csv_file_path,
                 PCAC_mass_correlator_analysis_group_name
             )
 
+            PCAC_mass_correlator_hdf5_group.attrs["Number_of_gauge_configurations"] = (
+                number_of_gauge_configurations
+            )
+
             # Store unique values as attributes to current analysis HDF5 group
             for key, value in metadata.items():
                 PCAC_mass_correlator_hdf5_group.attrs[key] = value
+
+            # Initialize a dictionary to store multivalued fields values
+            multivalued_fields_dictionary = {}
+            for multivalued_field in multivalued_fields_list:
+                multivalued_fields_dictionary[multivalued_field] = []
 
             # Pass "g5-g5" and "g4g5-g5" datasets, corresponding to different
             # gauge links configuration files, to respective lists common for
@@ -211,6 +256,20 @@ def main(input_qpb_log_files_csv_file_path,
             g4g5_g5_correlator_values_per_configuration_list = []
 
             for qpb_log_filename in list_of_qpb_log_filenames:
+
+                # List values of multivalued fields per config labels sets
+                for multivalued_field in multivalued_fields_list:
+                    filtered_values = dataframe_group.loc[
+                        dataframe_group["Filename"] == qpb_log_filename,
+                        multivalued_field,
+                    ]
+                    if not filtered_values.empty:
+                        multivalued_fields_dictionary[multivalued_field].append(
+                            filtered_values.iloc[0]
+                        )
+                    # else:
+                    # TODO: Work edge cases better
+                    # multivalued_fields_dictionary[multivalued_field].append(None)
 
                 correlators_filename = qpb_log_filename.replace(".txt", ".dat")
 
@@ -230,6 +289,19 @@ def main(input_qpb_log_files_csv_file_path,
                     g4g5_g5_correlator_values_per_configuration_list.append(
                         g4g5_g5_dataset
                     )
+
+            for multivalued_field in multivalued_fields_list:
+                dataset = multivalued_fields_dictionary[multivalued_field]
+                if len(set(dataset)) == 1:
+                    continue
+                # Store dataset and attach brief description
+                PCAC_mass_correlator_hdf5_group.create_dataset(
+                    multivalued_field + "_values_array",
+                    data=dataset,
+                ).attrs["Description"] = (
+                    multivalued_field.replace("_", " ")
+                    + " values array per configuration label set"
+                )
 
             # Convert the list of 1D arrays into a 2D NumPy array
             g5_g5_correlator_values_per_configuration_2D_array = np.vstack(
