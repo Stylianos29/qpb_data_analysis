@@ -1,6 +1,8 @@
 from pathlib import Path
 import ast
 
+import pandas as pd
+
 
 # Define the root directory of the project
 ROOT = Path(__file__).resolve().parents[2]
@@ -189,6 +191,11 @@ FILE_CONTENTS_SINGLE_VALUE_PATTERNS_DICTIONARY = {
         "regex_pattern": r"(\d+)",
         "type": int,
     },
+    "Number_of_spinors": {
+        "line_identifier": "CG done,",
+        "regex_pattern": r"CG done, (\d+) vectors",
+        "type": int,
+    },
     # TODO: Very problematic. Revisit!
     # "Solver_epsilon": {
     #     "line_identifier": "Solver epsilon =",
@@ -323,20 +330,27 @@ CONVERTERS_MAPPING = {
     "Delta_Max": lambda x: f"{float(x):.2f}",
     # Format floats to 2 decimal places
     "PCAC_mass_estimate": lambda x: ast.literal_eval(x),
-    # 
+    #
+    "Pion_effective_mass_estimate": lambda x: ast.literal_eval(x),
+    #
     "Average_calculation_result": lambda x: ast.literal_eval(x),
     # Format floats in exponential notation
     "Solver_epsilon": lambda x: f"{float(x):.0e}",
+    # "Kernel_operator_type": lambda x: pd.Categorical(
+    #         x, categories=["Wilson", "Brillouin"], ordered=True
+    #     )
 }
 
 
 AXES_LABELS_DICTIONARY = {
-    # Tunable parameters 
+    # Tunable parameters
+    "APE_iterations": "APE iters",
     "QCD_beta_value": "$\\beta$",
     "Configuration_label": "config",
     "Rho_value": "$\\rho$",
     "Bare_mass": "a$m_{bare}$",
     "PCAC_mass_estimate": "a$m_{PCAC}$",
+    "Pion_effective_mass_estimate": "a$m_{eff.}$",
     "Clover_coefficient": "$c_{SW}$",
     "Delta_Min": "$\\delta\\lambda_{min}^2$",
     "Delta_Max": "$\\delta\\lambda_{max}^2$",
@@ -348,13 +362,17 @@ AXES_LABELS_DICTIONARY = {
     "KL_diagonal_order": "n",
     "KL_scaling_factor": "$\\mu$",
     # Output quantity
+    "Average_number_of_MV_multiplications_per_spinor_per_configuration": "Average # of MV multiplications [per spinor per config]",
+    "Average_calculation_time_per_spinor_per_configuration": "Average wall-clock time [per spinor per config] (s)",
     "Total_overhead_time": "Overhead (s)",
     "Condition_number": "$\\kappa$",
     "Minimum_eigenvalue_squared": "$\\lambda_{min}^2$",
     "Maximum_eigenvalue_squared": "$\\lambda_{max}^2$",
     "Total_number_of_Lanczos_iterations": "Total # of Lanczos algorithm iterations",
     "Average_calculation_result": "||sgn$^2$(X) - I||$^2$",
+    "Number_of_configurations": "# of configs",
 }
+
 
 # TODO: Maybe I need separate lists for qpb input parameters and qpb output
 # values
@@ -363,6 +381,8 @@ AXES_LABELS_DICTIONARY = {
 
 
 PARAMETERS_PRINTED_LABELS_DICTIONARY = {
+    # "Overlap_operator_method": "method",
+    # "Kernel_operator_type": "type",
     "QCD_beta_value": "beta",
     "Configuration_label": "config",
     "APE_iterations": "APEiters",
@@ -378,6 +398,7 @@ PARAMETERS_PRINTED_LABELS_DICTIONARY = {
     "MSCG_epsilon": "EpsMSCG",
     "KL_diagonal_order": "n",
     "KL_scaling_factor": "mu",
+    "MPI_geometry": "nodes",
 }
 
 
@@ -412,7 +433,11 @@ OUTPUT_QUANTITY_NAMES_LIST = [
     "Average_calculation_result",
     "Average_CG_calculation_time_per_spinor",
     "Average_number_of_CG_iterations_per_spinor",
-    "Average_number_of_MSCG_iterations",
+    "Average_number_of_MSCG_iterations_per_vector",
+    "Average_number_of_MSCG_iterations_per_spinor",
+    "Average_number_of_MV_multiplications_per_spinor",
+    "Average_number_of_MV_multiplications_per_spinor_per_configuration",
+    "Average_calculation_time_per_spinor_per_configuration",
     "Calculation_result_per_vector",
     "Calculation_result_with_no_error",
     "Condition_number",
@@ -435,6 +460,7 @@ OUTPUT_QUANTITY_NAMES_LIST = [
     "Total_calculation_time",
     "Total_number_of_Lanczos_iterations",
     "Total_overhead_time",
+    "Number_of_gauge_configurations",
 ]
 
 PARAMETERS_WITH_EXPONENTIAL_FORMAT = [
