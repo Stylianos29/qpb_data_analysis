@@ -25,7 +25,7 @@ from library import (
     "--input_PCAC_mass_correlator_hdf5_file_path",
     "input_PCAC_mass_correlator_hdf5_file_path",
     "-PCAC_hdf5",
-    default="/nvme/h/cy22sg1/qpb_data_analysis/data_files/processed/invert/KL_several_config_and_mu_varying_m/PCAC_mass_correlator_values.h5",
+    # default="/nvme/h/cy22sg1/qpb_data_analysis/data_files/processed/invert/KL_several_config_and_mu_varying_m/PCAC_mass_correlator_values.h5",
     required=True,
     help="Path to input HDF5 file containing extracted correlators values.",
 )
@@ -40,8 +40,8 @@ from library import (
     "--plots_directory",
     "plots_directory",
     "-plots_dir",
-    # default="../../output/plots",
-    default="../../../output/plots/invert/KL_several_config_and_mu_varying_m",
+    default="../../output/plots",
+    # default="../../../output/plots/invert/KL_several_config_and_mu_varying_m",
     help="Path to the output directory for storing plots.",
 )
 @click.option(
@@ -49,7 +49,7 @@ from library import (
     "--plot_PCAC_mass_correlators",
     "plot_PCAC_mass_correlators",
     is_flag=True,
-    default=True,
+    default=False,
     help="Enable plotting PCAC mass correlator values.",
 )
 @click.option(
@@ -57,7 +57,7 @@ from library import (
     "--zoom_in_PCAC_mass_correlators_plots",
     "zoom_in_PCAC_mass_correlators_plots",
     is_flag=True,
-    default=True,
+    default=False,
     help="Enable zooming in on PCAC mass correlators plots.",
 )
 @click.option(
@@ -86,6 +86,7 @@ def main(
     output_files_directory,
     plots_directory,
     plot_PCAC_mass_correlators,
+    zoom_in_PCAC_mass_correlators_plots,
     output_PCAC_mass_estimates_csv_filename,
     log_file_directory,
     log_filename,
@@ -159,13 +160,13 @@ def main(
 
     # CREATE PLOTS SUBDIRECTORIES
 
-    # Create plots main subdirectory if it does not exist
-    plots_main_subdirectory = filesystem_utilities.create_subdirectory(
-        plots_directory, "PCAC_mass_estimates_calculation", clear_contents=True
-    )
-
-    # Create deeper-level subdirectories if they do not exist
     if plot_PCAC_mass_correlators:
+        # Create plots main subdirectory if it does not exist
+        plots_main_subdirectory = filesystem_utilities.create_subdirectory(
+            plots_directory, "PCAC_mass_estimates_calculation"
+        )
+
+        # Create deeper-level subdirectories if they do not exist
         PCAC_mass_plots_base_name = "PCAC_mass_correlator"
         PCAC_mass_plots_subdirectory = filesystem_utilities.create_subdirectory(
             plots_main_subdirectory,
@@ -264,6 +265,44 @@ def main(
             ):
                 pass
                 # TODO: Log warning
+
+            # CALCULATE FURTHER USEFUL QUANTITIES
+
+            if (
+                "Total_calculation_time_values_array"
+                in PCAC_mass_correlator_analysis_group
+                and isinstance(
+                    PCAC_mass_correlator_analysis_group[
+                        "Total_calculation_time_values_array"
+                    ],
+                    h5py.Dataset,
+                )
+            ):
+                parameters_value_dictionary[
+                    "Average_calculation_time_per_spinor_per_configuration"
+                ] = np.average(
+                    PCAC_mass_correlator_analysis_group[
+                        "Total_calculation_time_values_array"
+                    ][:]
+                )
+
+            if (
+                "Average_number_of_MV_multiplications_per_spinor_values_array"
+                in PCAC_mass_correlator_analysis_group
+                and isinstance(
+                    PCAC_mass_correlator_analysis_group[
+                        "Average_number_of_MV_multiplications_per_spinor_values_array"
+                    ],
+                    h5py.Dataset,
+                )
+            ):
+                parameters_value_dictionary[
+                    "Average_number_of_MV_multiplications_per_spinor_per_configuration"
+                ] = np.average(
+                    PCAC_mass_correlator_analysis_group[
+                        "Average_number_of_MV_multiplications_per_spinor_values_array"
+                    ][:]
+                )
 
             # TRUNCATE PCAC MASS CORRELATORS
 
@@ -364,8 +403,6 @@ def main(
 
             # PLOT PCAC MASS CORRELATORS
 
-            zoom_in = True
-
             if plot_PCAC_mass_correlators:
                 starting_time = 5
                 y = jackknife_average_PCAC_mass_correlator_array[starting_time:]
@@ -395,7 +432,7 @@ def main(
                     x, gv.mean(y), yerr=gv.sdev(y), fmt=".", markersize=8, capsize=10
                 )
 
-                if zoom_in:
+                if zoom_in_PCAC_mass_correlators_plots:
                     y_limits = [0.9 * y[0].mean, 1.1 * PCAC_mass_estimate.mean]
                     if y[0] > y[temporal_lattice_size // 4]:
                         y_limits = [y_limits[1], y_limits[0]]
@@ -408,7 +445,8 @@ def main(
                 ax.axvline(plateau_range_maximum, color="black")
 
                 label_string = (
-                    f"Plateau fit:\n- fit range: t/a$\\in[${plateau_range_minimum}, "
+                    f"Plateau fit:\n"
+                    f"- fit range: t/a$\\in[${plateau_range_minimum}, "
                     f"{plateau_range_maximum}$]$,\n- $m^{{best\!-\!fit}}_{{PCAC}}$"
                     f"={PCAC_mass_estimate:.3f}\n"
                 )
@@ -446,6 +484,15 @@ def main(
 
                 fig.savefig(plot_path)
                 plt.close()
+
+            # EXPORT CALCULATED DATA
+
+            parameters_value_dictionary["PCAC_mass_estimate"] = (
+                PCAC_mass_estimate.mean,
+                PCAC_mass_estimate.sdev,
+            )
+
+            PCAC_mass_estimates_list.append(parameters_value_dictionary)
 
         # Create a DataFrame from the extracted data
         PCAC_mass_estimates_dataframe = pd.DataFrame(PCAC_mass_estimates_list)
