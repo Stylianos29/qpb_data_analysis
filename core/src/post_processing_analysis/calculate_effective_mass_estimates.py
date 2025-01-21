@@ -26,8 +26,8 @@ from library import (
     "--input_PCAC_mass_correlator_hdf5_file_path",
     "input_PCAC_mass_correlator_hdf5_file_path",
     "-PCAC_hdf5",
-    # default="/nvme/h/cy22sg1/qpb_data_analysis/data_files/processed/invert/KL_several_config_and_mu_varying_m/PCAC_mass_correlator_values.h5",
     required=True,
+    # default="/nvme/h/cy22sg1/qpb_data_analysis/data_files/processed/invert/Chebyshev_several_config_varying_N/PCAC_mass_correlator_values.h5",
     help="Path to input HDF5 file containing extracted correlators values.",
 )
 @click.option(
@@ -41,7 +41,8 @@ from library import (
     "--plots_directory",
     "plots_directory",
     "-plots_dir",
-    default="../../../output/plots/invert/KL_several_config_and_mu_varying_m",
+    default="../../output/plots",
+    # default="/nvme/h/cy22sg1/qpb_data_analysis/output/plots/invert/Chebyshev_several_config_varying_N",
     help="Path to the output directory for storing plots.",
 )
 @click.option(
@@ -59,6 +60,14 @@ from library import (
     is_flag=True,
     default=False,
     help="Enable plotting effective mass correlator values.",
+)
+@click.option(
+    "-zoom_in",
+    "--zoom_in_effective_mass_correlators_plots",
+    "zoom_in_effective_mass_correlators_plots",
+    is_flag=True,
+    default=False,
+    help="Enable zooming in on effective mass correlators plots.",
 )
 @click.option(
     "--output_pion_effective_mass_estimates_csv_filename",
@@ -87,6 +96,7 @@ def main(
     plots_directory,
     plot_g5g5_correlators,
     plot_effective_mass_correlators,
+    zoom_in_effective_mass_correlators_plots,
     output_pion_effective_mass_estimates_csv_filename,
     log_file_directory,
     log_filename,
@@ -160,10 +170,11 @@ def main(
 
     # CREATE PLOTS SUBDIRECTORIES
 
-    # Create main plots directory
-    plots_main_subdirectory = filesystem_utilities.create_subdirectory(
-        plots_directory, "pion_effective_mass_calculation"
-    )
+    if plot_g5g5_correlators or plot_effective_mass_correlators:
+        # Create main plots directory if it does not exist
+        plots_main_subdirectory = filesystem_utilities.create_subdirectory(
+            plots_directory, "pion_effective_mass_calculation"
+        )
 
     # Create deeper-level subdirectories if requested
     if plot_g5g5_correlators:
@@ -207,12 +218,6 @@ def main(
             PCAC_mass_correlator_analysis_group_name,
             PCAC_mass_correlator_analysis_group,
         ) in input_data_files_set_group.items():
-
-            # if (
-            #     PCAC_mass_correlator_analysis_group_name
-            #     != "PCAC_mass_correlator_analysis_98"
-            # ):
-            #     continue
 
             # Cautionary check if the item is a HDF5 group
             if not isinstance(PCAC_mass_correlator_analysis_group, h5py.Group):
@@ -262,8 +267,8 @@ def main(
 
             jackknife_replicas_of_g5g5_correlator_2D_array = np.array(
                 [
-                    momentum_correlator.symmetrization(g5_g5_correlator_replicate)
-                    for g5_g5_correlator_replicate in jackknife_replicas_of_g5g5_correlator_2D_array
+                    momentum_correlator.symmetrization(g5_g5_correlator_replica)
+                    for g5_g5_correlator_replica in jackknife_replicas_of_g5g5_correlator_2D_array
                 ]
             )
 
@@ -326,6 +331,44 @@ def main(
             ):
                 pass
                 # TODO: Log warning
+
+            # CALCULATE FURTHER USEFUL QUANTITIES
+
+            if (
+                "Total_calculation_time_values_array"
+                in PCAC_mass_correlator_analysis_group
+                and isinstance(
+                    PCAC_mass_correlator_analysis_group[
+                        "Total_calculation_time_values_array"
+                    ],
+                    h5py.Dataset,
+                )
+            ):
+                parameters_value_dictionary[
+                    "Average_calculation_time_per_spinor_per_configuration"
+                ] = np.average(
+                    PCAC_mass_correlator_analysis_group[
+                        "Total_calculation_time_values_array"
+                    ][:]
+                )
+
+            if (
+                "Average_number_of_MV_multiplications_per_spinor_values_array"
+                in PCAC_mass_correlator_analysis_group
+                and isinstance(
+                    PCAC_mass_correlator_analysis_group[
+                        "Average_number_of_MV_multiplications_per_spinor_values_array"
+                    ],
+                    h5py.Dataset,
+                )
+            ):
+                parameters_value_dictionary[
+                    "Average_number_of_MV_multiplications_per_spinor_per_configuration"
+                ] = np.average(
+                    PCAC_mass_correlator_analysis_group[
+                        "Average_number_of_MV_multiplications_per_spinor_values_array"
+                    ][:]
+                )
 
             ### CALCULATE PLATEAU AND TWO-STATE RANGE FOR EFFECTIVE MASS FIT ###
 
@@ -490,7 +533,12 @@ def main(
                     fcn=effective_mass.two_state_fit_function,
                     debug=True,
                 )
-                if optimum_Q < effective_mass_two_state_fit.Q:
+
+                if (
+                    (optimum_Q < effective_mass_two_state_fit.Q)
+                    and (effective_mass_two_state_fit.p[2] > 0)
+                    and (effective_mass_two_state_fit.p[1] > 0)
+                ):
                     optimum_Q = effective_mass_two_state_fit.Q
                     effective_mass_two_state_optimum_fit = effective_mass_two_state_fit
                     optimum_lower_index = lower_index_cut
@@ -526,7 +574,7 @@ def main(
                     gv.mean(two_state_effective_mass_estimates_list),
                     gv.sdev(two_state_effective_mass_estimates_list),
                     np.sqrt(number_of_gauge_configurations)
-                    * np.sqrt(2 * integrated_autocorrelation_time)
+                    * np.sqrt(2 * integrated_autocorrelation_time),
                     # TODO: Still need a justification for including this:
                     # * np.sqrt(len(plateau_indices_list)),
                 )
@@ -544,17 +592,18 @@ def main(
                     None,
                     leading_substring="",
                     metadata_dictionary=dict(),
-                    title_width=100,
-                    fields_unique_value_dictionary=parameters_value_dictionary,
+                    title_width=110,
+                    fields_unique_value_dictionary=fields_with_unique_values_dictionary,
                 )
                 ax.set_title(f"{plot_title}", pad=8)
 
-                ax.set_ylim(
-                    [
-                        0.5 * pion_effective_mass_estimate.mean,
-                        1.5 * pion_effective_mass_estimate.mean,
-                    ]
-                )
+                if zoom_in_effective_mass_correlators_plots:
+                    ax.set_ylim(
+                        [
+                            0.5 * pion_effective_mass_estimate.mean,
+                            1.5 * pion_effective_mass_estimate.mean,
+                        ]
+                    )
 
                 ax.set(
                     xlabel="$t/a$",
@@ -613,7 +662,7 @@ def main(
 
             # EXPORT CALCULATED DATA
 
-            parameters_value_dictionary["PCAC_mass_estimate"] = (
+            parameters_value_dictionary["Pion_effective_mass_estimate"] = (
                 pion_effective_mass_estimate.mean,
                 pion_effective_mass_estimate.sdev,
             )
@@ -629,6 +678,7 @@ def main(
         csv_file_full_path = os.path.join(
             output_files_directory, output_pion_effective_mass_estimates_csv_filename
         )
+
         # Export the DataFrame to a CSV file
         pion_effective_mass_estimates_dataframe.to_csv(csv_file_full_path, index=False)
 
