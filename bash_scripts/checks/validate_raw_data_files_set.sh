@@ -20,7 +20,7 @@ usage() {
     # Function to display usage information
 
     echo "Usage: $0 -p <data_files_set_directory>"
-    echo "  -p, --path   Specify the directory containing raw files"
+    echo "  -p, --set_dir   Specify the directory containing raw files"
     exit 1
 }
 
@@ -33,7 +33,7 @@ CURRENT_SCRIPT_NAME="$(basename "$CURRENT_SCRIPT_FULL_PATH")"
 CURRENT_SCRIPT_DIRECTORY="$(dirname "$CURRENT_SCRIPT_FULL_PATH")"
 # Replace ".sh" with "_script.log" to create the log file name
 SCRIPT_LOG_FILE_NAME=$(echo "$CURRENT_SCRIPT_NAME" | sed 's/\.sh$/_script.log/')
-# Construct full path of library scripts directory if not set yet
+# Construct full path to library scripts directory if not set yet
 if [ -z "$LIBRARY_SCRIPTS_DIRECTORY_PATH" ]; then
     LIBRARY_SCRIPTS_DIRECTORY_PATH=$(\
                             realpath "${CURRENT_SCRIPT_DIRECTORY}/../library")
@@ -68,11 +68,11 @@ data_files_set_directory=""
 script_log_file_directory=""
 while [[ $# -gt 0 ]]; do
     case $1 in
-        -p|--path)
+        -set_dir|--data_files_set_directory)
             data_files_set_directory="$2"
             shift 2
             ;;
-        -l|--log)
+        -log_dir|--scripts_log_files_directory)
             script_log_file_directory="$2"
             shift 2
             ;;
