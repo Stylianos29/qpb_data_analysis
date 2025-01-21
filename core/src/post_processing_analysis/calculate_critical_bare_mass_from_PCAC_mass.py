@@ -1,53 +1,96 @@
 import os
 import sys
-import itertools
-import ast
 
 import click
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocator
 import gvar as gv
 import lsqfit
 import logging
 import pandas as pd
-import h5py
 import copy
-import textwrap
 
-from library import filesystem_utilities, data_processing, plotting
+from library import filesystem_utilities, plotting, data_processing, fit_functions
+
+ANNOTATE_DATA_POINTS = True
 
 
 @click.command()
-@click.option("--input_PCAC_mass_estimates_csv_file_path",
-              "input_PCAC_mass_estimates_csv_file_path", "-PCAC_csv",
-              default=None,
-        help="Path to input HDF5 file containing extracted correlators values.")
-@click.option("--output_files_directory", "output_files_directory", "-out_dir",
-              default=None,
-              help="Path to directory where all output files will be stored.")
-@click.option("--plots_directory", "plots_directory", "-plots_dir",
-              default="../../output/plots",
-              help="Path to the output directory for storing plots.")
-@click.option("--output_critical_bare_mass_csv_filename",
-              "output_critical_bare_mass_csv_filename",
-              "-hdf5", default="critical_bare_mass_from_PCAC_mass.csv",
-              help="Specific name for the output HDF5 file.")
-@click.option("--log_file_directory", "log_file_directory", "-log_file_dir", 
-              default=None, 
-              help="Directory where the script's log file will be stored.")
-@click.option("--log_filename", "log_filename", "-log", 
-              default=None, 
-              help="Specific name for the script's log file.")
-
-def main(input_PCAC_mass_estimates_csv_file_path,
-         output_files_directory, plots_directory,
-         output_critical_bare_mass_csv_filename, log_file_directory, log_filename):
-
+@click.option(
+    "--input_PCAC_mass_estimates_csv_file_path",
+    "input_PCAC_mass_estimates_csv_file_path",
+    "-PCAC_csv",
+    # default="/nvme/h/cy22sg1/qpb_data_analysis/data_files/processed/invert/KL_several_config_varying_n/PCAC_mass_estimates.csv",
+    required=True,
+    help="Path to .csv file containing PCAC mass estimates.",
+)
+@click.option(
+    "--output_files_directory",
+    "output_files_directory",
+    "-out_dir",
+    default=None,
+    help="Path to directory where all output files will be stored.",
+)
+@click.option(
+    "--plots_directory",
+    "plots_directory",
+    "-plots_dir",
+    default="../../output/plots",
+    # default="/nvme/h/cy22sg1/qpb_data_analysis/output/plots/invert/KL_several_config_varying_n",
+    help="Path to the output directory for storing plots.",
+)
+@click.option(
+    "-plot_critical",
+    "--plot_critical_bare_mass",
+    "plot_critical_bare_mass",
+    is_flag=True,
+    default=False,
+    # TODO: Work it out better
+    help="Enable plotting critical bare mass.",
+)
+@click.option(
+    "-fits",
+    "--fit_for_critical_bare_mass",
+    "fit_for_critical_bare_mass",
+    is_flag=True,
+    default=False,
+    # TODO: Work it out better
+    help="Enable performing fits for the calculation of critical bare mass.",
+)
+@click.option(
+    "--output_critical_bare_mass_csv_filename",
+    "output_critical_bare_mass_csv_filename",
+    "-out_csv",
+    default="critical_bare_mass_from_PCAC_mass_estimates.csv",
+    help="Specific name for the output .csv files.",
+)
+@click.option(
+    "--log_file_directory",
+    "log_file_directory",
+    "-log_file_dir",
+    default=None,
+    help="Directory where the script's log file will be stored.",
+)
+@click.option(
+    "--log_filename",
+    "log_filename",
+    "-log",
+    default=None,
+    help="Specific name for the script's log file.",
+)
+def main(
+    input_PCAC_mass_estimates_csv_file_path,
+    output_files_directory,
+    plots_directory,
+    plot_critical_bare_mass,
+    fit_for_critical_bare_mass,
+    output_critical_bare_mass_csv_filename,
+    log_file_directory,
+    log_filename,
+):
     # VALIDATE INPUT ARGUMENTS
 
-    if not filesystem_utilities.is_valid_file(
-                            input_PCAC_mass_estimates_csv_file_path):
+    if not filesystem_utilities.is_valid_file(input_PCAC_mass_estimates_csv_file_path):
         error_message = "Passed correlator values HDF5 file path is invalid."
         print("ERROR:", error_message)
         sys.exit(1)
@@ -55,7 +98,8 @@ def main(input_PCAC_mass_estimates_csv_file_path,
     # If no output directory is provided, use the directory of the input file
     if output_files_directory is None:
         output_files_directory = os.path.dirname(
-                            input_PCAC_mass_estimates_csv_file_path)
+            input_PCAC_mass_estimates_csv_file_path
+        )
     # Check validity if the provided
     elif not filesystem_utilities.is_valid_file(output_files_directory):
         error_message = (
@@ -86,11 +130,13 @@ def main(input_PCAC_mass_estimates_csv_file_path,
     script_name = os.path.basename(__file__)
 
     if log_filename is None:
-        log_filename = script_name.replace(".py", ".log")
+        log_filename = script_name.replace(".py", "_python_script.log")
 
     # Check for proper extensions in provided output filenames
     if not output_critical_bare_mass_csv_filename.endswith(".csv"):
-        output_critical_bare_mass_csv_filename = output_critical_bare_mass_csv_filename + ".csv"
+        output_critical_bare_mass_csv_filename = (
+            output_critical_bare_mass_csv_filename + ".csv"
+        )
     if not log_filename.endswith(".log"):
         log_filename = log_filename + ".log"
 
@@ -107,222 +153,214 @@ def main(input_PCAC_mass_estimates_csv_file_path,
     # Initiate logging
     logging.info(f"Script '{script_name}' execution initiated.")
 
-    # CRITICAL BARE MASS CALCULATION
-    
-    # ANALYZE .CSV FILE
+    # CREATE PLOTS SUBDIRECTORIES
 
-    # Load the CSV file into a DataFrame
-    PCAC_mass_estimates_dataframe = pd.read_csv(
-                                        input_PCAC_mass_estimates_csv_file_path)
-
-    PCAC_mass_estimates_dataframe['PCAC_mass_estimate'] = (
-        PCAC_mass_estimates_dataframe['PCAC_mass_estimate'].apply(
-                                                        ast.literal_eval))
-
-    # Extract fields with a single unique value
-    fields_with_unique_values_dictionary = (
-        data_processing.get_fields_with_unique_values(
-            PCAC_mass_estimates_dataframe)
+    if plot_critical_bare_mass:
+        # Create main plots directory if it does not exist
+        plots_main_subdirectory = filesystem_utilities.create_subdirectory(
+            plots_directory,
+            "critical_bare_mass_calculation",
         )
 
-    # Extract list of fields with multiple unique values excluding specified
-    excluded_fields = {"Bare_mass", "Kappa_value", "PCAC_mass_estimate"}
-    list_of_fields_with_multiple_values = (
-        data_processing.get_fields_with_multiple_values(
-            PCAC_mass_estimates_dataframe, excluded_fields)
+        # Create deeper-level subdirectories if requested
+        critical_bare_mass_plots_base_name = "critical_bare_mass"
+        critical_bare_mass_plots_subdirectory = filesystem_utilities.create_subdirectory(
+            plots_main_subdirectory,
+            critical_bare_mass_plots_base_name + "_from_pion_PCAC_mass",
+            # clear_contents=True,
         )
-    
-    # Get a list of all unique field values
-    unique_combinations = [ PCAC_mass_estimates_dataframe[field].unique()
-                        for field in list_of_fields_with_multiple_values ]
 
-    plots_subdirectory = os.path.join(plots_directory,
-                                "PCAC_mass_estimated_Vs_bare_mass_values_plots")
-    # Create "plots_nested_subdirectory" if it does not exist
-    os.makedirs(plots_subdirectory, exist_ok=True)
+    # IMPORT DATASETS AND METADATA
 
-    critical_bare_mass_values_list = list()
+    PCAC_mass_estimates_dataframe = data_processing.load_csv(
+        input_PCAC_mass_estimates_csv_file_path
+    )
 
-    # Use itertools.product to create all combinations of the unique values
-    analysis_index = 0 # Initialize counter
-    for combination in itertools.product(*unique_combinations):
+    analyzer = data_processing.DataFrameAnalyzer(PCAC_mass_estimates_dataframe)
 
-        # Initialize the parameters values dictionary
-        parameters_value_dictionary = copy.deepcopy(
-                                    fields_with_unique_values_dictionary)
+    single_valued_fields_dictionary = analyzer.single_valued_fields_dictionary
 
-        # Create a filter for the current combination
-        filters = {field: value for field, value in zip(
-                        list_of_fields_with_multiple_values, combination)}
+    tunable_multivalued_parameters_list = (
+        analyzer.list_of_tunable_multivalued_parameter_names
+    )
 
-        # Extract attributes from current analysis group into the dictionary
-        for parameter, value in filters.items():
-            parameters_value_dictionary[parameter] = value
+    # TODO: Rethink this strategy of excluding "MPI_geometry" manually
+    tunable_multivalued_parameters_list = [
+        item for item in tunable_multivalued_parameters_list if item != "MPI_geometry"
+    ]
 
-        # Get the subset of the dataframe based on the current combination
-        current_combination_group = PCAC_mass_estimates_dataframe
-        for field, value in filters.items():
-            current_combination_group = current_combination_group[
-                                    current_combination_group[field] == value]
+    # Remove "Bare_mass" from the list of tunable multivalued parameters
+    if "Bare_mass" not in tunable_multivalued_parameters_list:
+        error_message = (
+            "Critical bare mass analysis cannot be performed without a range "
+            "of bare mass values data."
+        )
+        print("ERROR:", error_message)
+        sys.exit(1)
+    tunable_multivalued_parameters_list.remove("Bare_mass")
 
-        # Skip empty current_combination_groups (no data for this combination)
-        if current_combination_group.empty:
+    # ?
+
+    critical_bare_mass_values_list = []
+    for value, group in PCAC_mass_estimates_dataframe.groupby(
+        tunable_multivalued_parameters_list
+    ):
+        # Check for a minimum amount of data point
+        if group["Bare_mass"].nunique() < 3:
+            # TODO: Log warning
             continue
 
-        analysis_index += 1
+        # Initialize the parameters values dictionary
+        parameters_value_dictionary = copy.deepcopy(single_valued_fields_dictionary)
 
-        bare_mass_values_array = current_combination_group[
-            'Bare_mass'].to_numpy()
-        PCAC_mass_estimates_array = gv.gvar(current_combination_group[
-            'PCAC_mass_estimate'].to_numpy())
-        
-        # PCAC MASS VS BARE MASS PLOTS
+        # Store for later use
+        metadata_dictionary = dict(zip(tunable_multivalued_parameters_list, value))
 
-        fig, ax = plt.subplots()
-        ax.grid()
-        # plot_title = plotting.construct_plot_title('Jackknife-averaged PCAC mass against bare mass values',
-        #                                            )
-        # ax.set_title()
-        # ax.set_title(f'Jackknife-averaged PCAC mass against bare mass values \n({modified_operator_category_plus_enumeration_label}, # of configs={sample_size}, $\\beta=${BETA_VALUE}, $\\rho$={RHO}, $c_{{SW}}=${C_SW})') # T={TEMPORAL_DIRECTION_LATTICE_SIZE}
+        # Append metadata dictionary
+        parameters_value_dictionary.update(metadata_dictionary)
 
-        # plot_title = ""
-        # # # "Sign squared violation against scaling factor"
-        # parameter_values_subtitle=plotting.construct_plot_subtitle(
-        #                                         parameters_value_dictionary)
-        # # # f"[KL {operator_type} $n$={KL_iterations}, $\\beta$={unique_QCD_beta_value}, $c_{{SW}}$={unique_clover_coefficient}, $\\rho$={unique_rho_value}, APE iters={unique_APE_iterations}, $\\epsilon_{{MSCG}}$={unique_MSCG_epsilon}, config: {configuration_label}, $\\kappa$={condition_number:.2f}]"
-        # wrapper = textwrap.TextWrapper(width=100, initial_indent="   ")
-        # wrapped_parameter_values_subtitle = wrapper.fill(parameter_values_subtitle)
+        number_of_gauge_configurations_array = group[
+            "Number_of_gauge_configurations"
+        ].to_numpy()
 
-        # ax.set_title(f'{plot_title}\n{wrapped_parameter_values_subtitle}', pad=7)
-        
-        ax.set(xlabel='a$m_{{bare}}$', ylabel='a$m_{PCAC}$')
-        plt.subplots_adjust(left=0.14) # Adjust left margin
+        x = group["Bare_mass"].to_numpy()
+        y = gv.gvar(group["PCAC_mass_estimate"].to_numpy())
 
-        ax.axhline(0, color='black') # y = 0
-        ax.axvline(0, color='black') # x = 0
+        # FITS
+        if fit_for_critical_bare_mass:
 
-        # bare_mass_values_array = np.array(list(jackknife_averaged_PCAC_mass_estimates_per_bare_mass_values_dictionary.keys()))
-        # PCAC_mass_estimates_array = np.array(list(jackknife_averaged_PCAC_mass_estimates_per_bare_mass_values_dictionary.values()))
+            # Find indices of min(x) and max(x)
+            min_index = np.argmin(x)
+            max_index = np.argmax(x)
 
-        # # Sort
-        # sorted_indices = np.argsort(bare_mass_values_array)
-        # bare_mass_values_array = bare_mass_values_array[sorted_indices]
-        # PCAC_mass_estimates_array = PCAC_mass_estimates_array[sorted_indices]
+            # Get y values corresponding to min(x) and max(x)
+            y_min = y[min_index]
+            y_max = y[max_index]
 
-        # # # Filter: mPCAC > 0
-        # # filtered_indices = np.where(gv.mean(PCAC_mass_estimates_array) > 0)
-        # # bare_mass_values_array = bare_mass_values_array[filtered_indices]
-        # # PCAC_mass_estimates_array = PCAC_mass_estimates_array[filtered_indices]
+            slope = (y_max - y_min) / (np.max(x) - np.min(x))
+            x_intercept = y_min / slope + np.min(x)
+            linear_fit_p0 = gv.mean([slope, x_intercept])
+            linear_fit = lsqfit.nonlinear_fit(
+                data=(x, y),
+                p0=linear_fit_p0,
+                fcn=fit_functions.linear_function,
+                debug=True,
+            )
+            critical_bare_mass_value = linear_fit.p[1]
 
-        # # # Filter: mPCAC.mean - 3*mPCAC.sdev > 0
-        # # filtered_indices = np.where(gv.mean(PCAC_mass_estimates_array) - 3*gv.sdev(PCAC_mass_estimates_array) > 0)
-        # # bare_mass_values_array = bare_mass_values_array[filtered_indices]
-        # # PCAC_mass_estimates_array = PCAC_mass_estimates_array[filtered_indices]
+        # PLOT
 
-        # if (len(bare_mass_values_array) < 3):
-        #     continue
+        if plot_critical_bare_mass:
+            fig, ax = plt.subplots()
+            ax.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
 
-        # jackknife_samples_of_PCAC_mass_estimates_per_bare_mass_array = np.array(jackknife_samples_of_PCAC_mass_estimates_per_bare_mass_list)
-        
-        ax.errorbar(bare_mass_values_array, gv.mean(PCAC_mass_estimates_array),
-                        yerr=gv.sdev(PCAC_mass_estimates_array),
-                            fmt='.', markersize=8, capsize=10)
+            plot_title = plotting.DataPlotter._construct_plot_title(
+                None,
+                leading_substring="",
+                metadata_dictionary=metadata_dictionary,
+                title_width=100,
+                fields_unique_value_dictionary=parameters_value_dictionary,
+            )
+            ax.set_title(f"{plot_title}", pad=8)
 
-        # # Linear fit
-        # min_index = 0
-        # x = bare_mass_values_array[min_index:]
-        # y = PCAC_mass_estimates_array[min_index:]
-        # # # The initial estimate for the effective mass equals the value
-        # slope = (max(gv.mean(y)) - min(gv.mean(y)))/(max(gv.mean(x)) - min(gv.mean(x)))
-        # linear_fit_p0 = [slope, min(gv.mean(y))/slope+min(x)]
-        # linear_fit = lsqfit.nonlinear_fit(data=(x, y), p0=linear_fit_p0, fcn=fit_functions.linear_function, debug=True)
+            ax.set(xlabel="a$m_{{bare}}$", ylabel="a$m_{PCAC}$")
 
-        # A = np.array([[np.sum(x/np.square(gv.sdev(y))), np.sum(1/np.square(gv.sdev(y)))],
-        #             [np.sum(np.square(x)/np.square(gv.sdev(y))), np.sum(x/np.square(gv.sdev(y)))]])
+            ax.axvline(0, color="black")  # x = 0
+            ax.axhline(0, color="black")  # y = 0
 
-        # # Constants vector
-        # B = np.array([np.sum(gv.mean(y)/np.square(gv.sdev(y))), np.sum((gv.mean(y)*x)/np.square(gv.sdev(y)))])
-        # C = np.array([np.sum(np.square(gv.sdev(y))/np.square(gv.sdev(y))), np.sum((np.square(gv.sdev(y))*x)/np.square(gv.sdev(y)))])
+            ax.errorbar(
+                x, gv.mean(y), yerr=gv.sdev(y), fmt=".", markersize=8, capsize=10
+            )
 
+            if fit_for_critical_bare_mass:
 
-        # test_slop, test_intercept = np.linalg.solve(A, B)
-        # test_slop_error, test_intercept_error = np.linalg.solve(A, C)
+                # Linear fit
+                if gv.mean(critical_bare_mass_value) > 0:
+                    margin = 0.06
+                else:
+                    margin = -0.06
+                x_data = np.linspace(
+                    gv.mean(critical_bare_mass_value) * (1 - margin),
+                    max(gv.mean(x)) * (1 + np.abs(margin)),
+                    100,
+                )
+                y_data = fit_functions.linear_function(x_data, linear_fit.p)
+                label_string = (
+                    f"Linear fit:\n"
+                    f"- $\\chi^2$/dof={linear_fit.chi2:.2f}/{linear_fit.dof}="
+                    f"{linear_fit.chi2/linear_fit.dof:.4f}\n"
+                    f"- a$m^{{critical}}_{{bare}}$={critical_bare_mass_value:.5f}"
+                )
+                plt.plot(
+                    x_data,
+                    gv.mean(y_data),
+                    "r--",
+                    label=label_string,
+                )
+                ax.fill_between(
+                    x_data,
+                    gv.mean(y_data) - gv.sdev(critical_bare_mass_value),
+                    gv.mean(y_data) + gv.sdev(critical_bare_mass_value),
+                    color="r",
+                    alpha=0.2,
+                )
 
+                ax.legend(loc="upper left")
 
-        # # print(linear_fit.p)
-        # # print(test_slop, -test_intercept/test_slop)
-        # # print(gv.gvar(-test_intercept/test_slop, np.sqrt(np.abs(-test_intercept_error/test_slop))))
+            if ANNOTATE_DATA_POINTS:
+                for index, sample_size in enumerate(
+                    number_of_gauge_configurations_array
+                ):
+                    ax.annotate(
+                        f"{sample_size}",
+                        (x[index], gv.mean(y[index])),
+                        xytext=(-40, 10),
+                        textcoords="offset pixels",
+                        bbox=dict(facecolor="none", edgecolor="black"),
+                        arrowprops=dict(arrowstyle="->"),
+                        # connectionstyle="arc,angleA=0,armA=50,rad=10")
+                    )
 
-        # # critical_mass_value = linear_fit.p[1]
-        # # critical_mass_value = gv.gvar(-test_intercept/test_slop, np.sqrt(np.abs(-test_intercept_error/test_slop)))
-        
-        # error = np.sqrt(np.sum(((gv.mean(y) - fit_functions.linear_function(x, gv.mean(linear_fit.p)))/1)**2)/len(y)) #gv.sdev(y)
-        # critical_mass_value = gv.gvar(gv.mean(linear_fit.p[1]), error)
+            current_plots_base_name = critical_bare_mass_plots_base_name
+            plot_path = plotting.DataPlotter._generate_plot_path(
+                None,
+                critical_bare_mass_plots_subdirectory,
+                current_plots_base_name,
+                metadata_dictionary,
+                single_valued_fields_dictionary=single_valued_fields_dictionary,
+            )
 
-        # # print(critical_mass_value)
+            fig.savefig(plot_path)
+            plt.close()
 
-        # margin = 0.03
-        # # min(gv.mean(x))
-        # if ('Operator' in operator_category):
-        #     x_data = np.linspace(gv.mean(critical_mass_value)*(1+margin), max(gv.mean(x))*(1+margin), 100)
-        # else:
-        #     x_data = np.linspace(min(gv.mean(x))*(1-margin), max(gv.mean(x))*(1+margin), 100)
-        # y_data = fit_functions.linear_function(x_data, linear_fit.p)
-        # kappa_critical_linear_fit = 0.5/(critical_mass_value+4)
-        # plt.plot(x_data, gv.mean(y_data), 'r--', label=f'linear fit ($\\chi^2$/dof={linear_fit.chi2:.2f}/{linear_fit.dof}={linear_fit.chi2/linear_fit.dof:.4f}):\n$a m_c$={critical_mass_value:.5f}, $\\kappa_c$={kappa_critical_linear_fit:.6f}')
-        # ax.fill_between(x_data, gv.mean(y_data) - gv.sdev(critical_mass_value), gv.mean(y_data) + gv.sdev(critical_mass_value), color='r', alpha=0.2)
-
-        # match = re.search(r'[Nn][=_]?(\d+)', operator_enumeration)
-        # if match:
-        #     operator_enumeration_value = int(match.group(1))
-
-        # if (not 'Operator' in operator_category_label):
-        #     critical_bare_mass_values_per_operator_enumeration_dictionary[operator_enumeration_value] = (critical_mass_value, sample_size, len(bare_mass_values_array))
-        # # 0.5/(critical_mass_value + 4)
-
-        # for _ in range(len(bare_mass_values_array)):
-        #     PCAC_mass_values_dictionary['Critical bare mass value'].append((gv.mean(critical_mass_value), gv.sdev(critical_mass_value)))
-
-        #     PCAC_mass_values_dictionary['Best_fit_line_slope_mPCAC_V_mb'].append((gv.mean(linear_fit.p[0]), gv.sdev(linear_fit.p[0])))
-
-        # ax.legend(loc="upper left")
-        
-        # plot_filename = f'PCAC_mass_Vs_bare_mass_values_{operator_category_label}.png'
-        plot_filename = f'PCAC_mass_Vs_bare_mass_values_{analysis_index}'
-        plot_path = os.path.join(plots_subdirectory, plot_filename)
-
-        fig.savefig(plot_path)
-        plt.close()
-
-        # parameters_value_dictionary["Critical_bare_mass"] = (
-        #         gv.mean(PCAC_mass_estimate), gv.sdev(PCAC_mass_estimate), 
-        #     )
-
-        # TODO: Append to parameters value dictionary: critical bare mass, and
-        # the arrays of values of the excluded fields
+        # EXPORT CALCULATED DATA
+        if fit_for_critical_bare_mass:
+            parameters_value_dictionary["Critical_bare_mass"] = (
+                critical_bare_mass_value.mean,
+                critical_bare_mass_value.sdev,
+            )
 
         critical_bare_mass_values_list.append(parameters_value_dictionary)
 
-        # print("   - PCAC Vs bare mass values plot created.")
-
     # Create a DataFrame from the extracted data
-    critical_bare_mass_values_dataframe = pd.DataFrame(
-        critical_bare_mass_values_list)
+    critical_bare_mass_dataframe = pd.DataFrame(critical_bare_mass_values_list)
 
     # Construct output .csv file path
-    csv_file_full_path = os.path.join(output_files_directory,
-                                        output_critical_bare_mass_csv_filename)
-    # Export the DataFrame to a CSV file
-    critical_bare_mass_values_dataframe.to_csv(csv_file_full_path, index=False)
+    csv_file_full_path = os.path.join(
+        output_files_directory, output_critical_bare_mass_csv_filename
+    )
 
-    print(
-     "   -- Critical bare mass calculation from PCAC mass estimates completed.")
+    # Export the DataFrame to a CSV file
+    critical_bare_mass_dataframe.to_csv(csv_file_full_path, index=False)
 
     # Terminate logging
     logging.info(f"Script '{script_name}' execution terminated successfully.")
 
+    print(
+        "   -- Critical bare mass values calculation from PCAC mass "
+        "estimates completed."
+    )
+
 
 if __name__ == "__main__":
     main()
-
-# TODO: Include proper logging!
