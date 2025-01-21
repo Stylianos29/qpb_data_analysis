@@ -9,6 +9,144 @@ UTILITIES_SH_INCLUDED=1
 
 # CUSTOM FUNCTIONS DEFINITIONS
 
+check_if_directory_exists() {
+    # Function to check if a directory exists with additional options.
+    # Supports:
+    #   -s|--silent : Suppress all output
+    #   -c|--create : Create the directory if it doesn't exist
+    #   -r|--remove : Remove all files and subdirectories in the directory if it exists
+
+    local directory=""
+    local silent="false"
+    local create="false"
+    local remove="false"
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -s|--silent)
+                silent="true"
+                shift
+                ;;
+            -c|--create)
+                create="true"
+                shift
+                ;;
+            -r|--remove)
+                remove="true"
+                shift
+                ;;
+            *)
+                directory="$1"
+                shift
+                ;;
+        esac
+    done
+
+    # Validate that a directory was provided
+    if [[ -z "$directory" ]]; then
+        if [[ "$silent" == "false" ]]; then
+            echo "ERROR: No directory specified."
+        fi
+        return 1
+    fi
+
+    # Handle remove flag
+    if [[ "$remove" == "true" && -d "$directory" ]]; then
+        rm -rf "$directory"/*
+        if [[ $? -eq 0 ]]; then
+            [[ "$silent" == "false" ]] && {
+                echo "INFO: Contents of '$directory' have been removed."
+                }
+        else
+            [[ "$silent" == "false" ]] && {
+                echo "ERROR: Failed to remove contents of '$directory'."
+                }
+            return 1
+        fi
+    fi
+
+    # Check if the directory exists
+    if [ ! -d "$directory" ]; then
+        if [[ "$create" == "true" ]]; then
+            # Create the directory if it doesn't exist
+            mkdir -p "$directory"
+            if [[ $? -eq 0 ]]; then
+                [[ "$silent" == "false" ]] && {
+                    echo "INFO: Directory '$directory' has been created."
+                    }
+            else
+                [[ "$silent" == "false" ]] && {
+                    echo "ERROR: Failed to create directory '$directory'."
+                    }
+                return 1
+            fi
+        else
+            # Report error if the directory doesn't exist and create flag isn't set
+            [[ "$silent" == "false" ]] && {
+                echo "ERROR: Directory '$directory' does not exist."
+                }
+            return 1
+        fi
+    fi
+
+    return 0
+}
+
+
+check_if_file_exists() {
+    # Function to check if a given file is a regular file.
+    # Supports -s (silent) and -c (create) flags in any order.
+
+    local file=""
+    local silent="false"
+    local create="false"
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -s|--silent)
+                silent="true"
+                shift
+                ;;
+            -c|--create)
+                create="true"
+                shift
+                ;;
+            *)
+                file="$1"
+                shift
+                ;;
+        esac
+    done
+
+    # Validate that a file was provided
+    if [[ -z "$file" ]]; then
+        [[ "$silent" == "false" ]] && echo "ERROR: No file specified."
+        return 1
+    fi
+
+    # Check if the argument is a regular file
+    if [ ! -f "$file" ]; then
+        [[ "$silent" == "false" ]] && {
+            echo "ERROR: '$file' is not a valid regular file."
+            }
+
+        # If create flag is set, create the file
+        if [[ "$create" == "true" ]]; then
+            touch "$file"  # Create the file (if possible)
+            if [[ "$silent" == "false" ]]; then
+                echo "INFO: '$file' has been created."
+            fi
+        fi
+
+        return 1
+    fi
+
+    return 0
+}
+
+
 check_directory_exists() {
     # Function to check if directory exists
     
@@ -79,8 +217,7 @@ set_script_termination_message() {
 }
 
 
-termination_output()
-{
+termination_output() {
     local error_message="$1"
     local script_termination_message="$2"
     set_script_termination_message script_termination_message
@@ -92,4 +229,14 @@ termination_output()
       log "ERROR" "$error_message"
       echo -e "$script_termination_message" >> "$SCRIPT_LOG_FILE_PATH"
     fi
+}
+
+
+failed_python_script() {
+    local python_script_path="$1"
+
+    error_message="!! Executing '$(basename $python_script_path)' failed!"
+    termination_output "$error_message"
+
+    exit 1
 }

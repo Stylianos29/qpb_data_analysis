@@ -9,41 +9,83 @@ VALIDATION_SH_INCLUDED=1
 
 # CUSTOM FUNCTIONS DEFINITIONS
 
-check_directory_for_changes() {
-    # Function to check if a directory has changed since the last validation.
-    # Arguments:
-    #   $1: DATA_SET_DIRECTORY - Directory to check.
-    #   $2: TIMESTAMP_DIRECTORY - Directory where timestamp files are stored.
-
-    local DATA_SET_DIRECTORY="$1"
-    local TIMESTAMP_DIRECTORY="$2"
+get_timestamp_file_path() {
     
-    local TIMESTAMP_FILE="$TIMESTAMP_DIRECTORY/"
-    TIMESTAMP_FILE+="$(basename "$DATA_SET_DIRECTORY").timestamp"
+    local DATA_FILES_SET_DIRECTORY="$1"
+    local TIMESTAMP_DIRECTORY="$2"
+    local SCRIPT_NAME="$3"
 
-    # Ensure the timestamp directory exists
-    mkdir -p "$TIMESTAMP_DIRECTORY"
+    # Validate input
+    check_if_directory_exists $DATA_FILES_SET_DIRECTORY || { 
+                            echo "Invalid data files set directory."; exit 1;}
+    check_if_directory_exists $TIMESTAMP_DIRECTORY || { 
+                            echo "Invalid timestamp directory."; exit 1;}
+    
+    # Construct the timestamp file path
+    local TIMESTAMP_FILE="$TIMESTAMP_DIRECTORY/"
+    if [ -n "$SCRIPT_NAME" ]; then
+        TIMESTAMP_FILE+="${SCRIPT_NAME}.timestamp"
+    else
+        TIMESTAMP_FILE+="$(basename "$DATA_FILES_SET_DIRECTORY").timestamp"
+    fi
+
+    echo "$TIMESTAMP_FILE"
+}
+
+check_directory_for_changes() {
+
+    local DATA_FILES_SET_DIRECTORY="$1"
+    local TIMESTAMP_FILE="$2"
+
+    # Validate input
+    check_if_directory_exists "$DATA_FILES_SET_DIRECTORY" || { 
+        echo "ERROR: Invalid data files set directory."; exit 1; 
+    }
+    check_if_file_exists "$TIMESTAMP_FILE" -s || { 
+        echo "ERROR: Invalid timestamp file."; exit 1; 
+    }
 
     # Get the current modification time of the data files directory
     local CURRENT_TIMESTAMP
-    CURRENT_TIMESTAMP=$(stat -c %Y "$DATA_SET_DIRECTORY")
+    CURRENT_TIMESTAMP=$(stat -c %Y "$DATA_FILES_SET_DIRECTORY")
 
-    # Check if a stored timestamp file exists
-    if [[ -f "$TIMESTAMP_FILE" ]]; then
-        local STORED_TIMESTAMP
-        STORED_TIMESTAMP=$(cat "$TIMESTAMP_FILE")
+    # Extract the stored timestamp, removing the script name prefix if provided
+    local STORED_TIMESTAMP
+    STORED_TIMESTAMP=$(cat "$TIMESTAMP_FILE")
 
-        if [[ "$CURRENT_TIMESTAMP" -le "$STORED_TIMESTAMP" ]]; then
-            # No changes detected, skip validation
-            return 1
-        fi
+    # Check if the current timestamp is less than or equal to the stored one
+    if [[ "$CURRENT_TIMESTAMP" -le "$STORED_TIMESTAMP" ]]; then
+        # No changes detected, skip validation
+        return 1
     fi
 
-    # Update the timestamp file with the latest modification time
-    echo "$CURRENT_TIMESTAMP" > "$TIMESTAMP_FILE"
     # Changes detected, proceed with validation
     return 0
 }
+
+
+update_timestamp() {
+    # TODO: description
+
+    local DATA_FILES_SET_DIRECTORY="$1"
+    local TIMESTAMP_FILE="$2"
+
+    # Validate input
+    check_if_directory_exists "$DATA_FILES_SET_DIRECTORY" || { 
+        echo "ERROR: Invalid data files set directory."; exit 1; 
+    }
+    check_if_file_exists "$TIMESTAMP_FILE" -s || { 
+        echo "ERROR: Invalid timestamp file."; exit 1; 
+    }
+
+    # Get the current modification time of the data files directory
+    local CURRENT_TIMESTAMP
+    CURRENT_TIMESTAMP=$(stat -c %Y "$DATA_FILES_SET_DIRECTORY")
+
+    # Update the timestamp file
+    echo "${CURRENT_TIMESTAMP}" > "$TIMESTAMP_FILE"
+}
+
 
 
 find_matching_qpb_log_files() {
