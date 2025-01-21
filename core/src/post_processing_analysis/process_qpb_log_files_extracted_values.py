@@ -14,24 +14,31 @@ from library import data_processing
 
 @click.command()
 @click.option(
-    "--input_qpb_log_files_csv_file_path",
-    "input_qpb_log_files_csv_file_path",
+    "--input_csv_file_path",
+    "input_csv_file_path",
     "-in_csv_path",
-    default=None,
+    required=True,
     help="Path to .csv file containing extracted info from qpb log files sets.",
 )
 @click.option(
-    "--input_qpb_log_files_hdf5_file_path",
-    "input_qpb_log_files_hdf5_file_path",
+    "--input_hdf5_file_path",
+    "input_hdf5_file_path",
     "-in_hdf5_path",
-    default=None,
+    required=True,
     help="Path to HDF5 file containing extracted info from qpb log files sets.",
 )
 @click.option(
-    "--output_qpb_log_files_csv_filename",
-    "output_qpb_log_files_csv_filename",
-    "-out_csv",
+    "--output_files_directory",
+    "output_files_directory",
+    "-out_dir",
     default=None,
+    help="Directory where all the generated output files will be stored.",
+)
+@click.option(
+    "--output_csv_filename",
+    "output_csv_filename",
+    "-out_csv",
+    default="processed_qpb_log_files_extracted_values.csv",
     help="Specific name for the output .csv file.",
 )
 @click.option(
@@ -49,47 +56,54 @@ from library import data_processing
     help="Specific name for the script's log file.",
 )
 def main(
-    input_qpb_log_files_csv_file_path,
-    input_qpb_log_files_hdf5_file_path,
-    output_qpb_log_files_csv_filename,
+    input_csv_file_path,
+    input_hdf5_file_path,
+    output_files_directory,
+    output_csv_filename,
     log_file_directory,
     log_filename,
 ):
-
     # VALIDATE INPUT ARGUMENTS
 
-    if not filesystem_utilities.is_valid_file(input_qpb_log_files_csv_file_path):
+    if not filesystem_utilities.is_valid_file(input_csv_file_path):
         error_message = "Passed qpb log files .csv file path is invalid!."
         print("ERROR:", error_message)
         sys.exit(1)
 
-    if not filesystem_utilities.is_valid_file(input_qpb_log_files_hdf5_file_path):
+    if not filesystem_utilities.is_valid_file(input_hdf5_file_path):
         error_message = "Passed correlator values HDF5 file path is invalid!."
         print("ERROR:", error_message)
         sys.exit(1)
 
-    if output_qpb_log_files_csv_filename is None:
-        output_qpb_log_files_csv_filename = os.path.basename(
-            input_qpb_log_files_csv_file_path
-        )
+    if output_files_directory is not None:
+        if not filesystem_utilities.is_valid_directory(output_files_directory):
+            error_message = (
+                "Passed output files directory path is invalid or " "not a directory."
+            )
+            print("ERROR:", error_message)
+            print("Exiting...")
+            sys.exit(1)
+    else:
+        output_files_directory = os.path.dirname(input_csv_file_path)
 
     # Specify current script's log file directory
-    if log_file_directory is None:
-        log_file_directory = os.path.dirname(input_qpb_log_files_csv_file_path)
-    elif not filesystem_utilities.is_valid_directory(log_file_directory):
-        error_message = (
-            "Passed directory path to store script's log file is "
-            "invalid or not a directory."
-        )
-        print("ERROR:", error_message)
-        print("Exiting...")
-        sys.exit(1)
+    if log_file_directory is not None:
+        if not filesystem_utilities.is_valid_directory(log_file_directory):
+            error_message = (
+                "Passed directory path to store script's log file is "
+                "invalid or not a directory."
+            )
+            print("ERROR:", error_message)
+            print("Exiting...")
+            sys.exit(1)
+    else:
+        log_file_directory = output_files_directory
 
     # Get the script's filename
     script_name = os.path.basename(__file__)
 
     if log_filename is None:
-        log_filename = script_name.replace(".py", ".log")
+        log_filename = script_name.replace(".py", "_python_script.log")
 
     # Check for proper extensions in provided output filenames
     if not log_filename.endswith(".log"):
@@ -110,7 +124,7 @@ def main(
 
     # PROCESS EXTRACTED QPB PARAMETERS AND OUTPUT VALUES
 
-    qpb_log_files_dataframe = pd.read_csv(input_qpb_log_files_csv_file_path)
+    qpb_log_files_dataframe = pd.read_csv(input_csv_file_path)
 
     # Replace term "Standard" with "Wilson".
     if "Kernel_operator_type" in qpb_log_files_dataframe.columns:
@@ -153,6 +167,7 @@ def main(
             )  # Remove the first element and convert back to string
         )
 
+    # TODO: Unacceptable!
     if not "Number_of_vectors" in qpb_log_files_dataframe.columns:
         qpb_log_files_dataframe["Number_of_vectors"] = 1
 
@@ -215,32 +230,32 @@ def main(
             float
         )
 
-    # Take the square root of the "Minimum_eigenvalue_squared" value
-    if "Minimum_eigenvalue_squared" in qpb_log_files_dataframe.columns:
-        qpb_log_files_dataframe["Minimum_eigenvalue"] = np.sqrt(
-            qpb_log_files_dataframe["Minimum_eigenvalue_squared"].apply(float)
-        )
-        # # Remove "Minimum_eigenvalue_squared"
-        # qpb_log_files_dataframe.drop(
-        #     columns=["Minimum_eigenvalue_squared"], inplace=True
-        # )
+    # # Take the square root of the "Minimum_eigenvalue_squared" value
+    # if "Minimum_eigenvalue_squared" in qpb_log_files_dataframe.columns:
+    #     qpb_log_files_dataframe["Minimum_eigenvalue"] = np.sqrt(
+    #         qpb_log_files_dataframe["Minimum_eigenvalue_squared"].apply(float)
+    #     )
+    #     # # Remove "Minimum_eigenvalue_squared"
+    #     # qpb_log_files_dataframe.drop(
+    #     #     columns=["Minimum_eigenvalue_squared"], inplace=True
+    #     # )
 
-    # Take the square root of the "Maximum_eigenvalue_squared" value
-    if "Maximum_eigenvalue_squared" in qpb_log_files_dataframe.columns:
-        qpb_log_files_dataframe["Maximum_eigenvalue"] = np.sqrt(
-            qpb_log_files_dataframe["Maximum_eigenvalue_squared"].apply(float)
-        )
-        # # Remove "Maximum_eigenvalue_squared"
-        # qpb_log_files_dataframe.drop(
-        #     columns=["Maximum_eigenvalue_squared"], inplace=True
-        # )
+    # # Take the square root of the "Maximum_eigenvalue_squared" value
+    # if "Maximum_eigenvalue_squared" in qpb_log_files_dataframe.columns:
+    #     qpb_log_files_dataframe["Maximum_eigenvalue"] = np.sqrt(
+    #         qpb_log_files_dataframe["Maximum_eigenvalue_squared"].apply(float)
+    #     )
+    #     # # Remove "Maximum_eigenvalue_squared"
+    #     # qpb_log_files_dataframe.drop(
+    #     #     columns=["Maximum_eigenvalue_squared"], inplace=True
+    #     # )
 
     # INPUT HDF5 FILE
 
     # Calculate average calculation result
     calculation_result_per_vector_dictionary = (
         data_processing.extract_HDF5_datasets_to_dictionary(
-            input_qpb_log_files_hdf5_file_path, "Calculation_result_per_vector"
+            input_hdf5_file_path, "Calculation_result_per_vector"
         )
     )
     if calculation_result_per_vector_dictionary:
@@ -291,7 +306,7 @@ def main(
     # Calculate average number of MSCG iterations
     total_number_of_MSCG_iterations_dictionary = (
         data_processing.extract_HDF5_datasets_to_dictionary(
-            input_qpb_log_files_hdf5_file_path, "Total_number_of_MSCG_iterations"
+            input_hdf5_file_path, "Total_number_of_MSCG_iterations"
         )
     )
     if total_number_of_MSCG_iterations_dictionary:
@@ -302,16 +317,26 @@ def main(
             for filename, dataset in total_number_of_MSCG_iterations_dictionary.items()
         }
         # Add a new column with the dictionary values
-        qpb_log_files_dataframe["Average_number_of_MSCG_iterations"] = (
-            qpb_log_files_dataframe["Filename"].map(
-                average_number_of_MSCG_iterations_dictionary
+        # Forward operator applications case
+        if not "Number_of_spinors" in qpb_log_files_dataframe.columns:
+            qpb_log_files_dataframe["Average_number_of_MSCG_iterations_per_vector"] = (
+                qpb_log_files_dataframe["Filename"].map(
+                    average_number_of_MSCG_iterations_dictionary
+                )
             )
-        )
+        # Inversions case
+        else:
+            qpb_log_files_dataframe["Average_number_of_MSCG_iterations_per_spinor"] = (
+                qpb_log_files_dataframe["Filename"].map(
+                    average_number_of_MSCG_iterations_dictionary
+                )
+                / qpb_log_files_dataframe["Number_of_spinors"].unique()[0]
+            )
 
     # Extract MS shifts
     MS_expansion_shifts_dictionary = (
         data_processing.extract_HDF5_datasets_to_dictionary(
-            input_qpb_log_files_hdf5_file_path, "MS_expansion_shifts"
+            input_hdf5_file_path, "MS_expansion_shifts"
         )
     )
     if MS_expansion_shifts_dictionary:
@@ -328,7 +353,7 @@ def main(
     # # Calculate average CG calculation time per spinor
     # CG_total_calculation_time_per_spinor_dictionary = (
     #     data_processing.extract_HDF5_datasets_to_dictionary(
-    #         input_qpb_log_files_hdf5_file_path, "CG_total_calculation_time_per_spinor"
+    #         input_hdf5_file_path, "CG_total_calculation_time_per_spinor"
     #     )
     # )
     # if CG_total_calculation_time_per_spinor_dictionary:
@@ -344,39 +369,99 @@ def main(
     #         )
     #     )
 
-    # # Calculate average number of CG iterations per spinor
-    # total_number_of_CG_iterations_per_spinor_dictionary = (
-    #     data_processing.extract_HDF5_datasets_to_dictionary(
-    #         input_qpb_log_files_hdf5_file_path,
-    #         "Total_number_of_CG_iterations_per_spinor",
-    #     )
-    # )
-    # if total_number_of_CG_iterations_per_spinor_dictionary:
-    #     # Calculate the average value and its error
-    #     average_number_of_CG_iterations_per_spinor_dictionary = {
-    #         filename: np.average(dataset)
-    #         for filename, dataset in total_number_of_CG_iterations_per_spinor_dictionary.items()
-    #     }
-    #     # Add a new column with the dictionary values
-    #     qpb_log_files_dataframe["Average_number_of_CG_iterations_per_spinor"] = (
-    #         qpb_log_files_dataframe["Filename"].map(
-    #             average_number_of_CG_iterations_per_spinor_dictionary
-    #         )
-    #     )
+    # Calculate average number of CG iterations per spinor
+    total_number_of_CG_iterations_per_spinor_dictionary = (
+        data_processing.extract_HDF5_datasets_to_dictionary(
+            input_hdf5_file_path,
+            "Total_number_of_CG_iterations_per_spinor",
+        )
+    )
+    if total_number_of_CG_iterations_per_spinor_dictionary:
+        # Calculate the average value and its error
+        average_number_of_CG_iterations_per_spinor_dictionary = {
+            filename: np.average(dataset)
+            for filename, dataset in total_number_of_CG_iterations_per_spinor_dictionary.items()
+        }
+        # Add a new column with the dictionary values
+        qpb_log_files_dataframe["Average_number_of_CG_iterations_per_spinor"] = (
+            qpb_log_files_dataframe["Filename"].map(
+                average_number_of_CG_iterations_per_spinor_dictionary
+            )
+        )
+
+    # Forward operator applications
+    if not "Number_of_spinors" in qpb_log_files_dataframe.columns:
+        # Chebyshev case
+        if (
+            qpb_log_files_dataframe["Overlap_operator_method"].unique()[0]
+            == "Chebyshev"
+        ):
+            qpb_log_files_dataframe[
+                "Average_number_of_MV_multiplications_per_vector"
+            ] = (
+                2 * qpb_log_files_dataframe["Total_number_of_Lanczos_iterations"] + 1
+            ) + (
+                2 * qpb_log_files_dataframe["Number_of_Chebyshev_terms"] - 1
+            )
+
+        # KL case
+        elif qpb_log_files_dataframe["Overlap_operator_method"].unique()[0] == "KL":
+            if (
+                "Average_number_of_MSCG_iterations_per_vector"
+                in qpb_log_files_dataframe.columns
+            ):
+                qpb_log_files_dataframe[
+                    "Average_number_of_MV_multiplications_per_vector"
+                ] = (
+                    2
+                    * qpb_log_files_dataframe[
+                        "Average_number_of_MSCG_iterations_per_vector"
+                    ]
+                    + 1
+                )
+    # Inversions
+    else:
+        # Chebyshev case
+        if (
+            qpb_log_files_dataframe["Overlap_operator_method"].unique()[0]
+            == "Chebyshev"
+        ):
+            qpb_log_files_dataframe[
+                "Average_number_of_MV_multiplications_per_spinor"
+            ] = (
+                2 * qpb_log_files_dataframe["Total_number_of_Lanczos_iterations"] + 1
+            ) + (
+                2
+                * qpb_log_files_dataframe["Average_number_of_CG_iterations_per_spinor"]
+                + 1
+            ) * (
+                2 * qpb_log_files_dataframe["Number_of_Chebyshev_terms"] - 1
+            )
+
+        elif qpb_log_files_dataframe["Overlap_operator_method"].unique()[0] == "KL":
+            qpb_log_files_dataframe[
+                "Average_number_of_MV_multiplications_per_spinor"
+            ] = (
+                2
+                * qpb_log_files_dataframe[
+                    "Average_number_of_MSCG_iterations_per_spinor"
+                ]
+                + 1
+            )
 
     # Construct the output .csv file path
     output_qpb_log_files_csv_file_path = os.path.join(
-        os.path.dirname(input_qpb_log_files_csv_file_path),
-        output_qpb_log_files_csv_filename,
+        os.path.dirname(input_csv_file_path),
+        output_csv_filename,
     )
 
     # Export modified DataFrame back to the same .csv file
     qpb_log_files_dataframe.to_csv(output_qpb_log_files_csv_file_path, index=False)
 
-    print("   -- Processing QPB log files extracted information completed.")
-
     # Terminate logging
     logging.info(f"Script '{script_name}' execution terminated successfully.")
+
+    print("   -- Processing extracted values from qpb log files completed.")
 
 
 if __name__ == "__main__":
