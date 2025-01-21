@@ -44,8 +44,10 @@ def extract_parameters_values_from_filename(filename, logger=None):
     matched_segments = []  # List to store all matched parts of the filename
 
     # Apply each regex pattern to the filename
-    for (parameter_name, parameter_info) in \
-                    constants.FILENAME_SINGLE_VALUE_PATTERNS_DICTIONARY.items():
+    for (
+        parameter_name,
+        parameter_info,
+    ) in constants.FILENAME_SINGLE_VALUE_PATTERNS_DICTIONARY.items():
         regex_pattern = parameter_info["pattern"]
         expected_type = parameter_info["type"]
 
@@ -61,17 +63,17 @@ def extract_parameters_values_from_filename(filename, logger=None):
 
             try:
                 # Convert to the expected type
-                extracted_values_dictionary[parameter_name] = expected_type(
-                                                                    raw_value)
+                extracted_values_dictionary[parameter_name] = expected_type(raw_value)
             except ValueError:
                 # Handle type conversion errors
                 if logger:
-                    logger.warning(f"Could not convert {raw_value} to "\
-                            f"{expected_type.__name__} for {parameter_name}.")
+                    logger.warning(
+                        f"Could not convert {raw_value} to "
+                        f"{expected_type.__name__} for {parameter_name}."
+                    )
 
     # Create a regex pattern to match all matched segments
-    matched_segments_combined_pattern = "|".join(map(re.escape, \
-                                                            matched_segments))
+    matched_segments_combined_pattern = "|".join(map(re.escape, matched_segments))
     # Split the filename by the matched pattern and filter out empty strings
     non_matched_segments = [
         segment.strip("_")
@@ -86,8 +88,7 @@ def extract_parameters_values_from_filename(filename, logger=None):
     return extracted_values_dictionary
 
 
-def extract_parameters_values_from_file_contents(file_contents_list, 
-                                                                logger=None):
+def extract_parameters_values_from_file_contents(file_contents_list, logger=None):
     """
     Extract parameter values from file contents based on patterns defined in
     FILE_CONTENTS_SINGLE_VALUE_PATTERNS_DICTIONARY.
@@ -103,15 +104,18 @@ def extract_parameters_values_from_file_contents(file_contents_list,
     # Initialize result dictionary
     extracted_values = {}
 
-    for parameter_name, parameter_info in \
-            constants.FILE_CONTENTS_SINGLE_VALUE_PATTERNS_DICTIONARY.items():
+    for (
+        parameter_name,
+        parameter_info,
+    ) in constants.FILE_CONTENTS_SINGLE_VALUE_PATTERNS_DICTIONARY.items():
         line_identifier = parameter_info["line_identifier"]
         regex_pattern = parameter_info["regex_pattern"]
         expected_type = parameter_info["type"]
 
         # Search for the line containing the parameter
-        relevant_line = next((line for line in file_contents_list \
-                                            if line_identifier in line), None)
+        relevant_line = next(
+            (line for line in file_contents_list if line_identifier in line), None
+        )
 
         if relevant_line:
             # Apply regex to extract the value
@@ -123,33 +127,38 @@ def extract_parameters_values_from_file_contents(file_contents_list,
                 # Preprocess the value if it contains 'p' instead of '.'
                 if "p" in raw_value and expected_type in {float, int}:
                     raw_value = raw_value.replace("p", ".")
-                    
+
                 try:
                     # Convert to the expected type
                     extracted_values[parameter_name] = expected_type(raw_value)
                 except ValueError:
                     if logger:
-                        logger.warning(f"Failed to convert '{raw_value}' "\
-                                    f"to {expected_type} for {parameter_name}.")
+                        logger.warning(
+                            f"Failed to convert '{raw_value}' "
+                            f"to {expected_type} for {parameter_name}."
+                        )
             else:
                 if logger:
-                    logger.warning(f"Regex pattern '{regex_pattern}' did not "\
-                                                f"match for {parameter_name}.")
+                    logger.warning(
+                        f"Regex pattern '{regex_pattern}' did not "
+                        f"match for {parameter_name}."
+                    )
 
     return extracted_values
 
 
-def extract_multivalued_parameters_from_file_contents(file_contents_list, 
-                                                                logger=None):
-    
+def extract_multivalued_parameters_from_file_contents(file_contents_list, logger=None):
+
     # Initialize a dictionary to store multivalued parameters
     multivalued_parameters = {}
 
     # Loop through each line in the file contents
     for line in file_contents_list:
         # Check for each multivalued parameter in the dictionary
-        for parameter, pattern_details in \
-                constants.FILE_CONTENTS_MULTIVALUED_PATTERNS_DICTIONARY.items():
+        for (
+            parameter,
+            pattern_details,
+        ) in constants.FILE_CONTENTS_MULTIVALUED_PATTERNS_DICTIONARY.items():
             # If the line contains the line identifier for the current parameter
             if pattern_details["line_identifier"] in line:
                 # Find all matches using the regex pattern
@@ -162,7 +171,8 @@ def extract_multivalued_parameters_from_file_contents(file_contents_list,
                     # Convert extracted values to correct type and add to list
                     for match in matches:
                         multivalued_parameters[parameter].append(
-                                                pattern_details["type"](match))
+                            pattern_details["type"](match)
+                        )
 
     # Convert lists to numpy arrays
     for key, value in multivalued_parameters.items():
