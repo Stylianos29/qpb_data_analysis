@@ -12,6 +12,7 @@ import pandas as pd
 from library import constants, filesystem_utilities, data_processing
 from library import DataFrameAnalyzer
 
+
 class DataPlotter(DataFrameAnalyzer):
     def __init__(self, dataframe: pd.DataFrame, base_plots_directory: str):
         """
@@ -106,6 +107,7 @@ class DataPlotter(DataFrameAnalyzer):
         leading_substring: str,
         metadata_dictionary: dict,
         title_width: int,
+        fields_unique_value_dictionary=None,
         additional_excluded_fields: list = None,
     ):
         """
@@ -133,9 +135,10 @@ class DataPlotter(DataFrameAnalyzer):
             "Chebyshev": "Number_of_Chebyshev_terms",
         }
 
-        fields_unique_value_dictionary = (
-            self.single_valued_fields_dictionary | metadata_dictionary
-        )
+        if fields_unique_value_dictionary is None:
+            fields_unique_value_dictionary = (
+                self.single_valued_fields_dictionary | metadata_dictionary
+            )
 
         # Start building the subtitle with the prioritized fields
         prioritized_fields_substring = "".join(
@@ -195,6 +198,7 @@ class DataPlotter(DataFrameAnalyzer):
         plots_subdirectory,
         plots_base_name,
         metadata_dictionary,
+        single_valued_fields_dictionary=None,
         excluded_fields: list = None,
     ):
         """
@@ -215,8 +219,11 @@ class DataPlotter(DataFrameAnalyzer):
             characteristic substring.
         """
 
+        if single_valued_fields_dictionary is None:
+            single_valued_fields_dictionary = self.single_valued_fields_dictionary
+
         fields_unique_value_dictionary = (
-            self.single_valued_fields_dictionary | metadata_dictionary
+            single_valued_fields_dictionary | metadata_dictionary
         )
         # Exclude specified fields from the dictionary if provided
         if excluded_fields is not None:
@@ -242,6 +249,22 @@ class DataPlotter(DataFrameAnalyzer):
                 )
                 plots_characteristic_fields_values_string += str(value)
 
+        plots_characteristic_fields_values_string = (
+            plots_characteristic_fields_values_string.replace(".", "p")
+        )
+        plots_characteristic_fields_values_string = (
+            plots_characteristic_fields_values_string.replace(" ", "")
+        )
+        plots_characteristic_fields_values_string = (
+            plots_characteristic_fields_values_string.replace("(", "")
+        )
+        plots_characteristic_fields_values_string = (
+            plots_characteristic_fields_values_string.replace(")", "")
+        )
+        plots_characteristic_fields_values_string = (
+            plots_characteristic_fields_values_string.replace(",", "")
+        )
+
         # Construct the plot path
         plot_path = os.path.join(
             plots_subdirectory,
@@ -264,25 +287,27 @@ class DataPlotter(DataFrameAnalyzer):
         # Vectorize isinstance check
         is_tuple = np.vectorize(lambda x: isinstance(x, tuple))
 
-        xaxis_data = dataframe_group[self.xaxis_variable_name].to_numpy()
-        if any(is_tuple(xaxis_data)):
-            xaxis_data = gv.gvar(xaxis_data)
+        self.xaxis_data = dataframe_group[self.xaxis_variable_name].to_numpy()
+        if any(is_tuple(self.xaxis_data)):
+            self.xaxis_data = gv.gvar(self.xaxis_data)
             # TODO: Set ability the user can request to plot the error
-            xaxis_data = gv.mean(xaxis_data)
+            self.xaxis_data = gv.mean(self.xaxis_data)
 
         if is_histogram:
             # Plot the histogram
-            ax.hist(xaxis_data, bins=30, color="blue", alpha=0.7, edgecolor="black")
+            ax.hist(
+                self.xaxis_data, bins=30, color="blue", alpha=0.7, edgecolor="black"
+            )
         else:
-            yaxis_data = dataframe_group[self.yaxis_variable].to_numpy()
+            self.yaxis_data = dataframe_group[self.yaxis_variable].to_numpy()
 
-            if any(is_tuple(yaxis_data)):
-                yaxis_data = gv.gvar(yaxis_data)
+            if any(is_tuple(self.yaxis_data)):
+                self.yaxis_data = gv.gvar(self.yaxis_data)
 
                 ax.errorbar(
-                    xaxis_data,
-                    gv.mean(yaxis_data),
-                    yerr=gv.sdev(yaxis_data),
+                    self.xaxis_data,
+                    gv.mean(self.yaxis_data),
+                    yerr=gv.sdev(self.yaxis_data),
                     fmt=".",
                     markersize=8,
                     capsize=10,
@@ -291,13 +316,12 @@ class DataPlotter(DataFrameAnalyzer):
 
             else:
                 ax.scatter(
-                    xaxis_data,
-                    yaxis_data,
+                    self.xaxis_data,
+                    self.yaxis_data,
                     marker="x",
                     # s=8,
                     label=label_string,
                 )
-
 
     def plot_data(
         self,
@@ -312,6 +336,8 @@ class DataPlotter(DataFrameAnalyzer):
         is_histogram: bool = False,
         plot_title_width: int = 105,
         legend_location: str = "upper left",
+        plot_title_leading_substring: str = "",
+        customize_fn=None,
     ):
         # Check first if pair of variables has been set
         if self.xaxis_variable_name is None or self.yaxis_variable is None:
@@ -388,6 +414,8 @@ class DataPlotter(DataFrameAnalyzer):
                 f" but got '{type(plot_title_width).__name__}'."
             )
 
+        print(grouping_fields_list)
+
         dataframe_group = self.group_by_reduced_tunable_parameters_list(
             grouping_fields_list
         )
@@ -406,7 +434,7 @@ class DataPlotter(DataFrameAnalyzer):
                 metadata_dictionary[reduced_tunable_parameters_list[0]] = (
                     values_combination
                 )
-            else:
+            elif len(reduced_tunable_parameters_list) > 1:
                 metadata_dictionary = dict(
                     zip(reduced_tunable_parameters_list, list(values_combination))
                 )
@@ -416,9 +444,9 @@ class DataPlotter(DataFrameAnalyzer):
 
             plot_title_leading_substring = ""
             if is_histogram:
-                plot_title_leading_substring = "Histogram "
+                plot_title_leading_substring += "Histogram "
             if grouping_field:
-                plot_title_leading_substring = "Combined "
+                plot_title_leading_substring += "Combined "
 
             plot_title = self._construct_plot_title(
                 plot_title_leading_substring,
@@ -477,12 +505,18 @@ class DataPlotter(DataFrameAnalyzer):
             if grouping_field:
                 for grouping_fields_values, sub_group in group.groupby(grouping_field):
                     label_string = str(grouping_fields_values)
-                    self._plot_group(ax, sub_group, is_histogram=False, label_string=label_string)
+                    self._plot_group(
+                        ax, sub_group, is_histogram=False, label_string=label_string
+                    )
             else:
                 self._plot_group(ax, group, is_histogram=is_histogram)
 
             if grouping_field:
                 ax.legend(loc=legend_location, title=grouping_field)
+
+            # Apply additional customizations if provided
+            if customize_fn is not None:
+                customize_fn(ax)
 
             plot_path = self._generate_plot_path(
                 current_plots_subdirectory,
