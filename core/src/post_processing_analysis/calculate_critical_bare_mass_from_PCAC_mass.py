@@ -20,7 +20,7 @@ ANNOTATE_DATA_POINTS = True
     "--input_PCAC_mass_estimates_csv_file_path",
     "input_PCAC_mass_estimates_csv_file_path",
     "-PCAC_csv",
-    # default="/nvme/h/cy22sg1/qpb_data_analysis/data_files/processed/invert/KL_several_config_varying_n/PCAC_mass_estimates.csv",
+    default="/nvme/h/cy22sg1/qpb_data_analysis/data_files/processed/invert/Chebyshev_several_config_varying_N/PCAC_mass_estimates.csv",
     required=True,
     help="Path to .csv file containing PCAC mass estimates.",
 )
@@ -35,8 +35,8 @@ ANNOTATE_DATA_POINTS = True
     "--plots_directory",
     "plots_directory",
     "-plots_dir",
-    default="../../output/plots",
-    # default="/nvme/h/cy22sg1/qpb_data_analysis/output/plots/invert/KL_several_config_varying_n",
+    # default="../../output/plots",
+    default="/nvme/h/cy22sg1/qpb_data_analysis/output/plots/invert/Chebyshev_several_config_varying_N",
     help="Path to the output directory for storing plots.",
 )
 @click.option(
@@ -44,7 +44,7 @@ ANNOTATE_DATA_POINTS = True
     "--plot_critical_bare_mass",
     "plot_critical_bare_mass",
     is_flag=True,
-    default=False,
+    default=True,
     # TODO: Work it out better
     help="Enable plotting critical bare mass.",
 )
@@ -53,7 +53,7 @@ ANNOTATE_DATA_POINTS = True
     "--fit_for_critical_bare_mass",
     "fit_for_critical_bare_mass",
     is_flag=True,
-    default=False,
+    default=True,
     # TODO: Work it out better
     help="Enable performing fits for the calculation of critical bare mass.",
 )
@@ -166,7 +166,7 @@ def main(
         critical_bare_mass_plots_base_name = "critical_bare_mass"
         critical_bare_mass_plots_subdirectory = filesystem_utilities.create_subdirectory(
             plots_main_subdirectory,
-            critical_bare_mass_plots_base_name + "_from_pion_PCAC_mass",
+            critical_bare_mass_plots_base_name + "_from_PCAC_mass",
             # clear_contents=True,
         )
 
@@ -227,6 +227,7 @@ def main(
         y = gv.gvar(group["PCAC_mass_estimate"].to_numpy())
 
         # FITS
+
         if fit_for_critical_bare_mass:
 
             # Find indices of min(x) and max(x)
