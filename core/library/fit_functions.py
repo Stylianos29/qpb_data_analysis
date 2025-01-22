@@ -24,6 +24,12 @@ def simple_exponential_function(x, p):
 
     return p[0] * np.exp(-p[1] * x)
 
+def power_law(x, p0, p1, p2):
+    return p0 + p1 / x**p2
+
+
+def shifted_exponential(x, p0, p1, p2, p3):
+    return p0 + p1 * np.exp( -p2*(x - p3))
 
 def critical_mass_optimum_range(
     bare_mass_values_array, average_squared_effective_mass_estimates_array, sample_size
