@@ -333,6 +333,7 @@ CONVERTERS_MAPPING = {
     #
     "Pion_effective_mass_estimate": lambda x: ast.literal_eval(x),
     #
+    "Critical_bare_mass": lambda x: ast.literal_eval(x),
     "Average_calculation_result": lambda x: ast.literal_eval(x),
     # Format floats in exponential notation
     "Solver_epsilon": lambda x: f"{float(x):.0e}",
@@ -349,8 +350,6 @@ AXES_LABELS_DICTIONARY = {
     "Configuration_label": "config",
     "Rho_value": "$\\rho$",
     "Bare_mass": "a$m_{bare}$",
-    "PCAC_mass_estimate": "a$m_{PCAC}$",
-    "Pion_effective_mass_estimate": "a$m_{eff.}$",
     "Clover_coefficient": "$c_{SW}$",
     "Delta_Min": "$\\delta\\lambda_{min}^2$",
     "Delta_Max": "$\\delta\\lambda_{max}^2$",
@@ -363,6 +362,7 @@ AXES_LABELS_DICTIONARY = {
     "KL_scaling_factor": "$\\mu$",
     # Output quantity
     "Average_number_of_MV_multiplications_per_spinor_per_configuration": "Average # of MV multiplications [per spinor per config]",
+    "number_of_MV_multiplications_for_constant_PCAC_mass": "# of MV multiplications [per spinor per config]",
     "Average_calculation_time_per_spinor_per_configuration": "Average wall-clock time [per spinor per config] (s)",
     "Total_overhead_time": "Overhead (s)",
     "Condition_number": "$\\kappa$",
@@ -371,6 +371,9 @@ AXES_LABELS_DICTIONARY = {
     "Total_number_of_Lanczos_iterations": "Total # of Lanczos algorithm iterations",
     "Average_calculation_result": "||sgn$^2$(X) - I||$^2$",
     "Number_of_configurations": "# of configs",
+    "PCAC_mass_estimate": "a$m_{PCAC}$",
+    "Pion_effective_mass_estimate": "a$m_{eff.}$",
+    "Critical_bare_mass": "a$m^{{critical}}_{{bare}}$",
 }
 
 
