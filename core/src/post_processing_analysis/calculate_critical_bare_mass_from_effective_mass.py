@@ -219,9 +219,13 @@ def main(
         number_of_gauge_configurations_array = group[
             "Number_of_gauge_configurations"
         ].to_numpy()
+        bare_mass__values_array = group["Bare_mass"].to_numpy()
+        pion_effective_mass_estimates_array = gv.gvar(
+            group["Pion_effective_mass_estimate"].to_numpy()
+        )
 
-        x = group["Bare_mass"].to_numpy()
-        y = gv.gvar(group["Pion_effective_mass_estimate"].to_numpy())
+        x = bare_mass__values_array
+        y = pion_effective_mass_estimates_array
         y = np.square(y)
 
         # FITS
@@ -266,6 +270,11 @@ def main(
         # PLOT
 
         if plot_critical_bare_mass:
+
+            x = bare_mass__values_array
+            y = pion_effective_mass_estimates_array
+            y = np.square(y)
+
             fig, ax = plt.subplots()
             ax.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
 
@@ -351,6 +360,11 @@ def main(
                         color="g",
                         alpha=0.2,
                     )
+
+                if len(bare_mass__values_array) != len(
+                    number_of_gauge_configurations_array
+                ):
+                    print("It's them!")
 
                 if ANNOTATE_DATA_POINTS:
                     for index, sample_size in enumerate(
