@@ -7,7 +7,7 @@ import textwrap
 import gvar as gv
 import numpy as np
 import pandas as pd
-
+import copy
 
 from library import constants, filesystem_utilities, data_processing
 from library import DataFrameAnalyzer
@@ -198,7 +198,7 @@ class DataPlotter(DataFrameAnalyzer):
         plots_subdirectory,
         plots_base_name,
         metadata_dictionary,
-        single_valued_fields_dictionary=None,
+        single_valued_fields_dictionary: dict = None,
         excluded_fields: list = None,
     ):
         """
@@ -220,11 +220,22 @@ class DataPlotter(DataFrameAnalyzer):
         """
 
         if single_valued_fields_dictionary is None:
-            single_valued_fields_dictionary = self.single_valued_fields_dictionary
+            single_valued_fields_dictionary = copy.deepcopy(
+                self.single_valued_fields_dictionary
+                )
+            # self.single_valued_fields_dictionary
 
-        fields_unique_value_dictionary = (
-            single_valued_fields_dictionary | metadata_dictionary
-        )
+        # print(type(self.single_valued_fields_dictionary))
+        # print(type(metadata_dictionary))
+
+        fields_unique_value_dictionary = {
+            **single_valued_fields_dictionary,
+            **metadata_dictionary,
+        }
+
+        # fields_unique_value_dictionary = (
+        #     single_valued_fields_dictionary | metadata_dictionary
+        # )
         # Exclude specified fields from the dictionary if provided
         if excluded_fields is not None:
             fields_unique_value_dictionary = {
@@ -399,7 +410,7 @@ class DataPlotter(DataFrameAnalyzer):
                     "Combined_"
                     + self.plots_base_name
                     + "_grouped_by_"
-                    + constants.PARAMETERS_PRINTED_LABELS_DICTIONARY[grouping_field]
+                    + constants.PARAMETERS_PRINTED_LABELS_DICTIONARY.get(grouping_field, "")
                 )
                 self.combined_plots_subdirectory = self._prepare_plots_subdirectory(
                     plots_base_subdirectory=self.individual_plots_subdirectory,
@@ -522,7 +533,7 @@ class DataPlotter(DataFrameAnalyzer):
                 current_plots_subdirectory,
                 current_plots_base_name,
                 metadata_dictionary,
-                excluded_fields,
+                excluded_fields=excluded_fields,
             )
             fig.savefig(plot_path)
             plt.close()
