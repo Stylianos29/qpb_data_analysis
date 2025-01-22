@@ -104,13 +104,19 @@ def load_csv(input_csv_file_path, dtype_mapping=None, converters_mapping=None):
         converters=filtered_converters_mapping,
     )
 
-    # TODO: Fix this
-    # # Set a categorical data type with a custom order
-    # dataframe["Kernel_operator_type"] = pd.Categorical(
-    #     dataframe["Kernel_operator_type"],
-    #     categories=["Wilson", "Brillouin"],  # Custom order
-    #     ordered=True
-    # )
+    # Define the expected unique values
+    expected_values = {"Wilson", "Brillouin"}
+    # Check unique values in the column
+    actual_values = set(dataframe["Kernel_operator_type"].unique())
+    # Verify the conditions
+    if actual_values == expected_values:
+        # Set a categorical data type with a custom order
+        dataframe["Kernel_operator_type"] = pd.Categorical(
+            dataframe["Kernel_operator_type"],
+            categories=["Wilson", "Brillouin"],  # Custom order
+            ordered=True
+        )
+
 
     return dataframe
 
@@ -580,11 +586,19 @@ class DataFrameAnalyzer:
 
     def group_by_reduced_tunable_parameters_list(self, filter_out_parameters: list):
 
-        self.reduced_tunable_parameters_list = list(
-            set(self.list_of_tunable_parameter_names_from_dataframe)
-            - set(self.single_valued_fields_dictionary)
-            - set(filter_out_parameters)
-        )
+        # self.reduced_tunable_parameters_list = list(
+        #     set(self.list_of_tunable_parameter_names_from_dataframe)
+        #     - set(self.single_valued_fields_dictionary)
+        #     - set(filter_out_parameters)
+        # )
+
+        self.reduced_tunable_parameters_list = [
+            item
+            for item in self.list_of_tunable_multivalued_parameter_names
+            if item not in filter_out_parameters
+        ]
+
+        self.list_of_tunable_multivalued_parameter_names
 
         print(self.reduced_tunable_parameters_list)
 
