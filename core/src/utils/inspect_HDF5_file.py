@@ -67,28 +67,48 @@ import sys
 import click
 import h5py
 
-sys.path.append('../../')
+sys.path.append("../../")
 from library import filesystem_utilities
 
 
 @click.command()
-@click.option("--hdf5_file_path", "hdf5_file_path",
-                "-hdf5", default=None,
-                help="Path to the HDF5 file to be inspected.")
-@click.option("--list_groups", is_flag=True,
-              help="List top-level groups in the HDF5 file.")
-@click.option("--list_subgroups", is_flag=True,
-              help="List first-level subgroups of all main groups.")
-@click.option("--list_attributes", is_flag=True,
-              help="List attributes of the specified group or dataset.")
-@click.option("--show_dataset", "dataset_name", default=None,
-              help="Show the content of the specified dataset. "\
-                                                "Example: '/group/dataset'")
-@click.option("--show_sample", is_flag=True,
-              help="Show a sample of a dataset (first 5 elements).")
-
-def main(hdf5_file_path, list_groups, list_subgroups, list_attributes, \
-                                                    dataset_name, show_sample):
+@click.option(
+    "--hdf5_file_path",
+    "hdf5_file_path",
+    "-hdf5",
+    default=None,
+    help="Path to the HDF5 file to be inspected.",
+)
+@click.option(
+    "--list_groups", is_flag=True, help="List top-level groups in the HDF5 file."
+)
+@click.option(
+    "--list_subgroups",
+    is_flag=True,
+    help="List first-level subgroups of all main groups.",
+)
+@click.option(
+    "--list_attributes",
+    is_flag=True,
+    help="List attributes of the specified group or dataset.",
+)
+@click.option(
+    "--show_dataset",
+    "dataset_name",
+    default=None,
+    help="Show the content of the specified dataset. " "Example: '/group/dataset'",
+)
+@click.option(
+    "--show_sample", is_flag=True, help="Show a sample of a dataset (first 5 elements)."
+)
+def main(
+    hdf5_file_path,
+    list_groups,
+    list_subgroups,
+    list_attributes,
+    dataset_name,
+    show_sample,
+):
 
     # Check provided path to HDF5 file
     if not filesystem_utilities.is_valid_file(hdf5_file_path):
@@ -96,13 +116,13 @@ def main(hdf5_file_path, list_groups, list_subgroups, list_attributes, \
         print("Exiting...")
         sys.exit(1)
 
-    with h5py.File(hdf5_file_path, 'r') as hdf5_file:
+    with h5py.File(hdf5_file_path, "r") as hdf5_file:
         if list_groups:
             # List all top-level groups
             print("\nTop-level groups in the HDF5 file:")
             for group_name in hdf5_file:
                 print(f"- {group_name}")
-        
+
         if list_subgroups:
             # List first-level subgroups for each main group
             subgroups = set()
@@ -110,11 +130,10 @@ def main(hdf5_file_path, list_groups, list_subgroups, list_attributes, \
                 main_group = hdf5_file[group_name]
                 for subgroup_name in main_group:
                     subgroups.add(subgroup_name)
-            
+
             print("\nUnique first-level subgroups across all main groups:")
             for subgroup in sorted(subgroups):
                 print(f"- {subgroup}")
-
 
         # TODO: Check validity of the provided "dataset_name"
         if list_attributes:
@@ -130,7 +149,7 @@ def main(hdf5_file_path, list_groups, list_subgroups, list_attributes, \
                 print("\nAttributes of the HDF5 file:")
                 for attr_name, attr_value in hdf5_file.attrs.items():
                     print(f"  {attr_name}: {attr_value}")
-        
+
         if dataset_name:
             # Show content of a specific dataset
             dataset = hdf5_file[dataset_name]
@@ -140,7 +159,7 @@ def main(hdf5_file_path, list_groups, list_subgroups, list_attributes, \
             else:
                 # Show the entire dataset (be cautious with large datasets)
                 print(f"\nContent of {dataset_name}: {dataset[:]}")
-        
+
         # Optionally, count the number of groups
         if not any([list_groups, list_subgroups, list_attributes, dataset_name]):
             # If no flags are provided, print the number of main groups
