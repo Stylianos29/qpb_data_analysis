@@ -14,7 +14,9 @@ from library import filesystem_utilities, data_processing
     required=True,
     help="Path to the CSV file to be inspected.",
 )
-@click.option("--generate_output_file", is_flag=True, help="Write output to a .txt file.")
+@click.option(
+    "--generate_output_file", is_flag=True, help="Write output to a .txt file."
+)
 @click.option(
     "--list_fields", is_flag=True, help="List all fields (columns) in the CSV file."
 )
@@ -60,7 +62,8 @@ def main(
             output_files_directory = os.path.dirname(csv_file_path)
 
     output_file_path = os.path.join(
-        output_files_directory, os.path.basename(csv_file_path).replace(".csv", ".txt")
+        output_files_directory,
+        os.path.basename(csv_file_path).replace(".csv", "_summary.txt"),
     )
 
     def write_or_print(content):
