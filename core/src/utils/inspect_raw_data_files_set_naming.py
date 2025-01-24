@@ -246,7 +246,6 @@ def main(
     # Print a few values to verify
     print(dataframe["test_string"].head())
 
-
     # Overlap_operator_method
 
     # Terminate logging
