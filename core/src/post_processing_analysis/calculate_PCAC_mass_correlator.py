@@ -221,6 +221,10 @@ def main(
             # Now 'group' contains the subset for this combination of values
             list_of_qpb_log_filenames = dataframe_group["Filename"].tolist()
 
+            list_of_configuration_labels = dataframe_group[
+                "Configuration_label"
+            ].tolist()
+
             number_of_gauge_configurations = len(list_of_qpb_log_filenames)
 
             if number_of_gauge_configurations == 1:
@@ -289,6 +293,12 @@ def main(
                     g4g5_g5_correlator_values_per_configuration_list.append(
                         g4g5_g5_dataset
                     )
+
+            # TODO: comment
+            PCAC_mass_correlator_hdf5_group.create_dataset(
+                "list_of_configuration_labels",
+                data=list_of_configuration_labels,
+            ).attrs["Description"] = "List of configuration labels"
 
             for multivalued_field in multivalued_fields_list:
                 dataset = multivalued_fields_dictionary[multivalued_field]
@@ -385,7 +395,7 @@ def main(
             """
 
             # Jackknife samples of the g4g5-g5 derivate correlators
-            jackknife_samples_of_g4g5_g5_derivative_correlator_2D_list = list()
+            jackknife_samples_of_g4g5_g5_derivative_correlator_2D_list = []
             for index in range(len(jackknife_samples_of_g4g5_g5_correlator_2D_array)):
                 jackknife_samples_of_g4g5_g5_derivative_correlator_2D_list.append(
                     momentum_correlator.centered_difference_correlator_derivative(
@@ -424,7 +434,7 @@ def main(
             ] = "Centered difference derivative from average of g4g5-g5 correlator. Error values."
 
             # Jackknife samples of the time-dependent PCAC mass values
-            jackknife_samples_of_PCAC_mass_correlator_values_list = list()
+            jackknife_samples_of_PCAC_mass_correlator_values_list = []
             for index in range(len(jackknife_samples_of_g5_g5_correlator_2D_array)):
 
                 jackknife_sample_of_PCAC_mass_values = (
