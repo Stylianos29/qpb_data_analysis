@@ -211,7 +211,7 @@ def main(
         }
 
         # List to pass values to dataframe
-        pion_effective_mass_estimates_list = list()
+        pion_effective_mass_estimates_list = []
 
         # Loop over all PCAC mass correlator Jackknife analysis groups
         for (
@@ -549,7 +549,7 @@ def main(
 
             # TWO-STATE FIT ON EVERY REPLICA DATASET
 
-            two_state_effective_mass_estimates_list = list()
+            two_state_effective_mass_estimates_list = []
             for (
                 effective_mass_correlator_replica
             ) in effective_mass_correlator_replicas_2D_array:
@@ -591,9 +591,14 @@ def main(
                 plot_title = plotting.DataPlotter._construct_plot_title(
                     None,
                     leading_substring="",
-                    metadata_dictionary=dict(),
+                    # metadata_dictionary=dict(),
+                    metadata_dictionary=metadata_dictionary,
                     title_width=110,
                     fields_unique_value_dictionary=fields_with_unique_values_dictionary,
+                    additional_excluded_fields=[
+                        "Average_calculation_time_per_spinor_per_configuration",
+                        "Average_number_of_MV_multiplications_per_spinor_per_configuration",
+                    ],
                 )
                 ax.set_title(f"{plot_title}", pad=8)
 
