@@ -19,7 +19,6 @@ from library import (
     constants,
 )
 
-ANNOTATE_DATA_POINTS = False
 REFERENCE_BARE_MASS = 0.1
 REFERENCE_EFFECTIVE_MASS = 0.15
 
@@ -54,7 +53,6 @@ REFERENCE_EFFECTIVE_MASS = 0.15
     "plot_critical_bare_mass",
     is_flag=True,
     default=False,
-    # TODO: Work it out better
     help="Enable plotting critical bare mass.",
 )
 @click.option(
@@ -63,8 +61,15 @@ REFERENCE_EFFECTIVE_MASS = 0.15
     "plot_calculation_cost",
     is_flag=True,
     default=False,
-    # TODO: Work it out better
     help="Enable plotting critical bare mass.",
+)
+@click.option(
+    "-annotate",
+    "--annotate_data_points",
+    "annotate_data_points",
+    is_flag=True,
+    default=False,
+    help="Enable annotating the data points.",
 )
 @click.option(
     "--output_calculation_cost_csv_filename",
@@ -93,6 +98,7 @@ def main(
     plots_directory,
     plot_critical_bare_mass,
     plot_calculation_cost,
+    annotate_data_points,
     output_calculation_cost_csv_filename,
     log_file_directory,
     log_filename,
@@ -237,6 +243,8 @@ def main(
         parameters_value_dictionary = copy.deepcopy(single_valued_fields_dictionary)
 
         # Store for later use
+        if not isinstance(value, tuple):
+            value = [value]
         metadata_dictionary = dict(zip(tunable_multivalued_parameters_list, value))
 
         # Append metadata dictionary
@@ -416,7 +424,7 @@ def main(
 
             ax.legend(loc="lower right")
 
-            if ANNOTATE_DATA_POINTS:
+            if annotate_data_points:
                 for index, sample_size in enumerate(
                     number_of_gauge_configurations_array
                 ):
