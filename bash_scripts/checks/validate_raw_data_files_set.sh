@@ -394,7 +394,7 @@ elif [[ $number_of_valid_qpb_log_files -lt $number_of_qpb_log_files ]]; then
                 rm -f "${corrupted_qpb_log_file%.txt}.err"
                 rm -f "${corrupted_qpb_log_file%.txt}.dat"
             done
-            warning_message="All all corrupted qpb log files were deleted."
+            warning_message="All corrupted qpb log files were deleted."
             log "WARNING" "$warning_message"
             echo -e "$warning_message"
             break
@@ -442,7 +442,7 @@ if [[ ${number_of_faulty_qpb_files} -gt 0 ]]; then
                 rm -f "${faulty_qpb_log_file%.txt}.err"
                 rm -f "${faulty_qpb_log_file%.txt}.dat"
             done
-            warning_message="All all faulty qpb log files were deleted."
+            warning_message="All faulty qpb log files were deleted."
             log "WARNING" "$warning_message"
             echo -e "$warning_message"
             break
