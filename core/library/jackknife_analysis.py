@@ -25,7 +25,7 @@ class JackknifeAnalysis:
 
     def jackknife_replicas(self):
 
-        jackknife_replicas_2D_list = list()
+        jackknife_replicas_2D_list = []
         for index_to_remove in range(self.sample_size):
 
             reduced_original_2D_array = np.delete(
