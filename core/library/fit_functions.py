@@ -24,12 +24,14 @@ def simple_exponential_function(x, p):
 
     return p[0] * np.exp(-p[1] * x)
 
+
 def power_law(x, p0, p1, p2):
     return p0 + p1 / x**p2
 
 
 def shifted_exponential(x, p0, p1, p2, p3):
-    return p0 + p1 * np.exp( -p2*(x - p3))
+    return p0 + p1 * np.exp(-p2 * (x - p3))
+
 
 def critical_mass_optimum_range(
     bare_mass_values_array, average_squared_effective_mass_estimates_array, sample_size
@@ -62,7 +64,7 @@ def critical_mass_optimum_range(
     maximum_value = 0  # Arbitrary value
     min_key = tuple()
     min_key = (0, maximum_number_of_parameters + 1)
-    fit_parameters = list()
+    fit_parameters = []
 
     for upper_index_cut in range(minimum_upper_index_cut, total_number_of_data_points):
         # Maintain a distance with upper index such that enough data points are used for fitting
