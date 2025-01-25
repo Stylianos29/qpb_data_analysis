@@ -16,7 +16,7 @@ def replicate_directory_structure(source_directory, target_directory):
 
         return
 
-    new_subdirectories_lists = list()
+    new_subdirectories_lists = []
     # Walk through the source directory
     for root, dirs, _ in os.walk(source_directory):
         # Calculate the relative path from the source directory
