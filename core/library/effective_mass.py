@@ -173,7 +173,7 @@ def optimum_range(xrange, effective_mass, fitting_function_name, fit_p0):
     chi_square_dict = dict()
     minimum_value = 1000  # Arbitrary value
     min_key = tuple()
-    fit_parameters = list()
+    fit_parameters = []
     # for upper_index_cut in range(temporal_direction_lattice_size):
     upper_index_cut = temporal_direction_lattice_size - 1
     # Maintain a distance with upper index such that enough data points are used for fitting
