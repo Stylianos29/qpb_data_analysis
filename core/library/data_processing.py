@@ -114,9 +114,8 @@ def load_csv(input_csv_file_path, dtype_mapping=None, converters_mapping=None):
         dataframe["Kernel_operator_type"] = pd.Categorical(
             dataframe["Kernel_operator_type"],
             categories=["Wilson", "Brillouin"],  # Custom order
-            ordered=True
+            ordered=True,
         )
-
 
     return dataframe
 
