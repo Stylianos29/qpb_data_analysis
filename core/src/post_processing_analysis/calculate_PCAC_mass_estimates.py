@@ -198,7 +198,7 @@ def main(
         }
 
         # List to pass values to dataframe
-        PCAC_mass_estimates_list = list()
+        PCAC_mass_estimates_list = []
 
         # Loop over all PCAC mass correlator Jackknife analysis groups
         for (
@@ -226,6 +226,11 @@ def main(
 
             # Append metadata dictionary
             parameters_value_dictionary.update(metadata_dictionary)
+
+            # Store Jackknife analysis identifier
+            parameters_value_dictionary["Jackknife_analysis_identifier"] = (
+                PCAC_mass_correlator_analysis_group_name
+            )
 
             # Import Jackknife replicas datasets of PCAC mass correlators
             jackknife_replicas_of_PCAC_mass_correlator_2D_array = (
@@ -371,7 +376,7 @@ def main(
                 )
             ]
 
-            plateau_fit_PCAC_mass_estimates_list = list()
+            plateau_fit_PCAC_mass_estimates_list = []
             for (
                 PCAC_mass_correlator_replica
             ) in jackknife_replicas_of_PCAC_mass_correlator_2D_array:
@@ -414,9 +419,14 @@ def main(
                 plot_title = plotting.DataPlotter._construct_plot_title(
                     None,
                     leading_substring="",
-                    metadata_dictionary=dict(),
+                    # metadata_dictionary=dict(),
+                    metadata_dictionary=metadata_dictionary,
                     title_width=100,
                     fields_unique_value_dictionary=parameters_value_dictionary,
+                    additional_excluded_fields=[
+                        "Average_calculation_time_per_spinor_per_configuration",
+                        "Average_number_of_MV_multiplications_per_spinor_per_configuration",
+                    ],
                 )
                 ax.set_title(f"{plot_title}", pad=8)
 
@@ -485,14 +495,14 @@ def main(
                 fig.savefig(plot_path)
                 plt.close()
 
-            # EXPORT CALCULATED DATA
-
             parameters_value_dictionary["PCAC_mass_estimate"] = (
                 PCAC_mass_estimate.mean,
                 PCAC_mass_estimate.sdev,
             )
 
             PCAC_mass_estimates_list.append(parameters_value_dictionary)
+
+        # EXPORT CALCULATED DATA
 
         # Create a DataFrame from the extracted data
         PCAC_mass_estimates_dataframe = pd.DataFrame(PCAC_mass_estimates_list)
