@@ -222,7 +222,7 @@ class DataPlotter(DataFrameAnalyzer):
         if single_valued_fields_dictionary is None:
             single_valued_fields_dictionary = copy.deepcopy(
                 self.single_valued_fields_dictionary
-                )
+            )
             # self.single_valued_fields_dictionary
 
         # print(type(self.single_valued_fields_dictionary))
@@ -410,7 +410,9 @@ class DataPlotter(DataFrameAnalyzer):
                     "Combined_"
                     + self.plots_base_name
                     + "_grouped_by_"
-                    + constants.PARAMETERS_PRINTED_LABELS_DICTIONARY.get(grouping_field, "")
+                    + constants.PARAMETERS_PRINTED_LABELS_DICTIONARY.get(
+                        grouping_field, ""
+                    )
                 )
                 self.combined_plots_subdirectory = self._prepare_plots_subdirectory(
                     plots_base_subdirectory=self.individual_plots_subdirectory,
@@ -505,7 +507,7 @@ class DataPlotter(DataFrameAnalyzer):
                 )
                 #   , fontsize=14)
             # Adjust left margin
-            fig.subplots_adjust(left=0.13)
+            fig.subplots_adjust(left=0.14)
 
             # Set axes ticks to integer values only
             if self.xaxis_variable_name in constants.PARAMETERS_OF_INTEGER_VALUE:
