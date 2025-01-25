@@ -149,7 +149,7 @@ def main(
     # EXTRACT SINGLE-VALUED PARAMETERS
 
     # Create list to pass values to dataframe
-    parameters_values_list = list()
+    parameters_values_list = []
     # Loop over all .txt files in the QPB log files directory
     for qpb_log_file_full_path in glob.glob(
         os.path.join(qpb_log_files_directory, "*.txt")
