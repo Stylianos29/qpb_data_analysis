@@ -210,7 +210,9 @@ def main(
         # Initialize the parameters values dictionary
         parameters_value_dictionary = copy.deepcopy(single_valued_fields_dictionary)
 
-        # Store for later use
+        # Store metadata for later use
+        if not isinstance(value, tuple):
+            value = [value]
         metadata_dictionary = dict(zip(tunable_multivalued_parameters_list, value))
 
         # Append metadata dictionary
