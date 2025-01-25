@@ -363,6 +363,7 @@ AXES_LABELS_DICTIONARY = {
     # Output quantity
     "Average_number_of_MV_multiplications_per_spinor_per_configuration": "Average # of MV multiplications [per spinor per config]",
     "number_of_MV_multiplications_for_constant_PCAC_mass": "# of MV multiplications [per spinor per config]",
+    "number_of_MV_multiplications_for_constant_bare_mass": "# of MV multiplications [per spinor per config]",
     "Average_calculation_time_per_spinor_per_configuration": "Average wall-clock time [per spinor per config] (s)",
     "Total_overhead_time": "Overhead (s)",
     "Condition_number": "$\\kappa$",
