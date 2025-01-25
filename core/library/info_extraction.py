@@ -73,7 +73,7 @@ class AnalyzeDataset:
     def extract_content_from_file(self):
 
         # Pass the file content in a list as the dictionary value
-        self.contents_array = list()
+        self.contents_array = []
         with open(self.dataset_file_path, "r") as file:
             lines = file.readlines()
             for line in lines:
@@ -226,9 +226,9 @@ class invert_log_file:
 
     def __init__(self, invert_log_file_full_path):
 
-        self.CG_iterations_list = list()
-        self.multi_shift_CG_iterations_list = list()
-        self.time_per_vector_inversion_list = list()
+        self.CG_iterations_list = []
+        self.multi_shift_CG_iterations_list = []
+        self.time_per_vector_inversion_list = []
 
         with open(invert_log_file_full_path, "r") as file:
             for line in file:
