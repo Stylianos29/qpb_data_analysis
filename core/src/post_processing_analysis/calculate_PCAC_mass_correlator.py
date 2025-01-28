@@ -1,5 +1,4 @@
 import os
-import sys
 
 import click
 import numpy as np
@@ -7,11 +6,13 @@ import gvar as gv
 import logging
 import h5py
 
-from library import momentum_correlator
-from library import jackknife_analysis
-from library import filesystem_utilities
-from library import data_processing
-from library import constants
+from library import (
+    momentum_correlator,
+    jackknife_analysis,
+    filesystem_utilities,
+    data_processing,
+    constants,
+)
 
 
 @click.command()
@@ -19,15 +20,19 @@ from library import constants
     "--input_parameter_values_csv_file_path",
     "input_parameter_values_csv_file_path",
     "-in_param_csv",
-    default=None,
-    help="Path to input .csv file containing extracted info from "
-    "qpb log files sets.",
+    required=True,
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, readable=True),
+    help=(
+        "Path to input .csv file containing processed info extracted from qpb "
+        "log files."
+    ),
 )
 @click.option(
     "--input_correlators_hdf5_file_path",
     "input_correlators_hdf5_file_path",
     "-cor_hdf5",
-    default=None,
+    required=True,
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, readable=True),
     help="Path to input HDF5 file containing extracted correlators values.",
 )
 @click.option(
@@ -35,6 +40,7 @@ from library import constants
     "output_files_directory",
     "-out_dir",
     default=None,
+    callback=filesystem_utilities.validate_directory,
     help="Path to directory where all output files will be stored.",
 )
 @click.option(
@@ -42,13 +48,20 @@ from library import constants
     "output_hdf5_filename",
     "-hdf5",
     default="PCAC_mass_correlator_values.h5",
+    callback=filesystem_utilities.validate_output_HDF5_filename,
     help="Specific name for the output HDF5 file.",
+)
+@click.option(
+    "--disable-logging",
+    is_flag=True,
+    help="Disable logging entirely.",
 )
 @click.option(
     "--log_file_directory",
     "log_file_directory",
     "-log_file_dir",
     default=None,
+    callback=filesystem_utilities.validate_directory,
     help="Directory where the script's log file will be stored.",
 )
 @click.option(
@@ -56,6 +69,7 @@ from library import constants
     "log_filename",
     "-log",
     default=None,
+    callback=filesystem_utilities.validate_script_log_filename,
     help="Specific name for the script's log file.",
 )
 def main(
@@ -66,53 +80,16 @@ def main(
     log_file_directory,
     log_filename,
 ):
-    # VALIDATE INPUT ARGUMENTS
 
-    if not filesystem_utilities.is_valid_file(input_parameter_values_csv_file_path):
-        error_message = "Passed qpb log files .csv file path is invalid!."
-        print("ERROR:", error_message)
-        sys.exit(1)
-
-    if not filesystem_utilities.is_valid_file(input_correlators_hdf5_file_path):
-        error_message = "Passed correlator values HDF5 file path is invalid!."
-        print("ERROR:", error_message)
-        sys.exit(1)
+    # HANDLE EMPTY INPUT ARGUMENTS
 
     # If no output directory is provided, use the directory of the input file
     if output_files_directory is None:
         output_files_directory = os.path.dirname(input_correlators_hdf5_file_path)
-    # Check validity if the provided
-    elif not filesystem_utilities.is_valid_file(output_files_directory):
-        error_message = (
-            "Passed output files directory path is invalid " "or not a directory."
-        )
-        print("ERROR:", error_message)
-        print("Exiting...")
-        sys.exit(1)
 
     # Specify current script's log file directory
     if log_file_directory is None:
         log_file_directory = output_files_directory
-    elif not filesystem_utilities.is_valid_directory(log_file_directory):
-        error_message = (
-            "Passed directory path to store script's log file is "
-            "invalid or not a directory."
-        )
-        print("ERROR:", error_message)
-        print("Exiting...")
-        sys.exit(1)
-
-    # Get the script's filename
-    script_name = os.path.basename(__file__)
-
-    if log_filename is None:
-        log_filename = script_name.replace(".py", "_python_script.log")
-
-    # Check for proper extensions in provided output filenames
-    if not output_hdf5_filename.endswith(".h5"):
-        output_hdf5_filename = output_hdf5_filename + ".h5"
-    if not log_filename.endswith(".log"):
-        log_filename = log_filename + ".log"
 
     # INITIATE LOGGING
 
@@ -186,6 +163,9 @@ def main(
         qpb_log_files_dataframe = data_processing.load_csv(
             input_parameter_values_csv_file_path
         )
+
+        new_analyzer = data_processing.DataFrameAnalyzer(qpb_log_files_dataframe)
+        print(new_analyzer.list_of_tunable_multivalued_parameter_names)
 
         # Create an instance of DataAnalyzer
         analyzer = data_processing.DataAnalyzer(qpb_log_files_dataframe)
