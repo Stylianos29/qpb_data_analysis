@@ -1,5 +1,6 @@
 import os
 
+import click
 import logging
 import textwrap
 
@@ -104,3 +105,59 @@ def extract_directory_names(directory_path):
     last_directory_name = os.path.basename(os.path.normpath(directory_path))
 
     return parent_directory_name, last_directory_name
+
+def validate_file(ctx, param, value):
+    if value is None:
+        return None  # Skip validation for None
+    # Validate the file path using click.Path
+    path_type = click.Path(exists=True, file_okay=True, dir_okay=False, readable=True)
+    return path_type.convert(value, param, ctx)
+
+
+def validate_directory(ctx, param, value):
+    if value is None:
+        return None  # Skip validation for None
+    # Validate the directory path using click.Path
+    path_type = click.Path(exists=True, file_okay=True, dir_okay=True, readable=True)
+    return path_type.convert(value, param, ctx)
+
+
+def validate_output_HDF5_filename(ctx, param, value):
+    if not value.endswith(".h5"):
+        raise click.BadParameter(
+            f"The file name '{value}' is invalid. Output HDF5 file names must "
+            "end with '.h5'."
+        )
+    return value
+
+def validate_output_csv_filename(ctx, param, value):
+    if not value.endswith(".csv"):
+        raise click.BadParameter(
+            f"The file name '{value}' is invalid. Output csv file names must "
+            "end with '.csv'."
+        )
+    return value
+
+
+def validate_script_log_filename(ctx, param, value):
+    # Get the script's filename
+    script_name = os.path.basename(__file__)
+
+    # If no log filename is provided, generate a default name
+    if value is None:
+        default_log_filename = script_name.replace(".py", "_python_script.log")
+        click.echo(f"No log filename provided. Using default: {default_log_filename}")
+        return default_log_filename
+
+    # Validate the provided log filename (e.g., ensure it's a valid string)
+    if not value.strip():  # Ensure it's not empty or just spaces
+        raise click.BadParameter("Log filename cannot be an empty string.")
+
+    if not value.endswith(".log"):
+        raise click.BadParameter(
+            f"The file name '{value}' is invalid. Current script's log file "
+            "names must end with '.log'."
+        )
+
+    return value
+
