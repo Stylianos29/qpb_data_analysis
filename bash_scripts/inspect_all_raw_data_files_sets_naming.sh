@@ -45,7 +45,8 @@ done
 
 # ENVIRONMENT VARIABLES
 
-RAW_DATA_FILES_DIRECTORY="../data_files/raw"
+# RAW_DATA_FILES_DIRECTORY="../data_files/raw"
+RAW_DATA_FILES_DIRECTORY="/nvme/h/cy22sg1/scratch/raw_qpb_data_files"
 check_if_directory_exists "$RAW_DATA_FILES_DIRECTORY" || exit 1
 
 PROCESSED_DATA_FILES_DIRECTORY="../data_files/processed"

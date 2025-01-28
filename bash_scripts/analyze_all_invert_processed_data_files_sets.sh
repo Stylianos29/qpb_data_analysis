@@ -45,7 +45,8 @@ done
 
 # ENVIRONMENT VARIABLES
 
-RAW_DATA_FILES_DIRECTORY="../data_files/raw"
+# RAW_DATA_FILES_DIRECTORY="../data_files/raw"
+RAW_DATA_FILES_DIRECTORY="/nvme/h/cy22sg1/scratch/raw_qpb_data_files"
 check_if_directory_exists "$RAW_DATA_FILES_DIRECTORY" || exit 1
 
 export PROCESSED_DATA_FILES_DIRECTORY="../data_files/processed"
@@ -130,7 +131,7 @@ for main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
         # Extract the data files set name
         data_files_set_name=$(basename "$raw_data_files_set_directory")
 
-        # if [[ ! $data_files_set_name == 'KL_several_config_varying_n' ]]; then
+        # if [[ ! $data_files_set_name == 'Chebyshev_several_config_varying_N' ]]; then
         #     continue
         # fi
 
