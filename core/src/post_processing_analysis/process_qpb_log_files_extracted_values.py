@@ -1,5 +1,4 @@
 import os
-import sys
 import ast
 
 import numpy as np
@@ -8,51 +7,73 @@ import pandas as pd
 import logging
 import h5py
 
-from library import filesystem_utilities
-from library import data_processing
+from library import filesystem_utilities, data_processing
 
 
 @click.command()
 @click.option(
+    "-in_param_csv",
     "--input_csv_file_path",
     "input_csv_file_path",
-    "-in_csv_path",
     required=True,
-    help="Path to .csv file containing extracted info from qpb log files sets.",
+    callback=filesystem_utilities.validate_input_csv_file,
+    help=(
+        "Path to .csv file containing extracted single-valued parameter "
+        "values from qpb log files sets."
+    ),
 )
 @click.option(
+    "-in_param_hdf5",
     "--input_hdf5_file_path",
     "input_hdf5_file_path",
-    "-in_hdf5_path",
     required=True,
-    help="Path to HDF5 file containing extracted info from qpb log files sets.",
+    callback=filesystem_utilities.validate_input_HDF5_file,
+    help=(
+        "Path to .csv file containing extracted multivalued parameter "
+        "values from qpb log files sets."
+    ),
 )
 @click.option(
+    "-out_dir",
     "--output_files_directory",
     "output_files_directory",
-    "-out_dir",
     default=None,
-    help="Directory where all the generated output files will be stored.",
+    callback=filesystem_utilities.validate_directory,
+    help="Path to directory where all output files will be stored.",
 )
 @click.option(
+    "-out_csv_name",
     "--output_csv_filename",
     "output_csv_filename",
-    "-out_csv",
     default="processed_qpb_log_files_extracted_values.csv",
-    help="Specific name for the output .csv file.",
+    callback=filesystem_utilities.validate_output_csv_filename,
+    help=(
+        "Specific name for the output .csv file containing processed values of "
+        "single-valued parameters from qpb log files."
+    ),
 )
 @click.option(
+    "-log_on",
+    "--enable_logging",
+    "enable_logging",
+    is_flag=True,
+    default=False,
+    help="Enable logging.",
+)
+@click.option(
+    "-log_file_dir",
     "--log_file_directory",
     "log_file_directory",
-    "-log_file_dir",
     default=None,
+    callback=filesystem_utilities.validate_script_log_file_directory,
     help="Directory where the script's log file will be stored.",
 )
 @click.option(
+    "-log_name",
     "--log_filename",
     "log_filename",
-    "-log",
     default=None,
+    callback=filesystem_utilities.validate_script_log_filename,
     help="Specific name for the script's log file.",
 )
 def main(
@@ -60,61 +81,26 @@ def main(
     input_hdf5_file_path,
     output_files_directory,
     output_csv_filename,
+    enable_logging,
     log_file_directory,
     log_filename,
 ):
-    # VALIDATE INPUT ARGUMENTS
+    # HANDLE EMPTY INPUT ARGUMENTS
 
-    if not filesystem_utilities.is_valid_file(input_csv_file_path):
-        error_message = "Passed qpb log files .csv file path is invalid!."
-        print("ERROR:", error_message)
-        sys.exit(1)
-
-    if not filesystem_utilities.is_valid_file(input_hdf5_file_path):
-        error_message = "Passed correlator values HDF5 file path is invalid!."
-        print("ERROR:", error_message)
-        sys.exit(1)
-
-    if output_files_directory is not None:
-        if not filesystem_utilities.is_valid_directory(output_files_directory):
-            error_message = (
-                "Passed output files directory path is invalid or " "not a directory."
-            )
-            print("ERROR:", error_message)
-            print("Exiting...")
-            sys.exit(1)
-    else:
-        output_files_directory = os.path.dirname(input_csv_file_path)
-
-    # Specify current script's log file directory
-    if log_file_directory is not None:
-        if not filesystem_utilities.is_valid_directory(log_file_directory):
-            error_message = (
-                "Passed directory path to store script's log file is "
-                "invalid or not a directory."
-            )
-            print("ERROR:", error_message)
-            print("Exiting...")
-            sys.exit(1)
-    else:
-        log_file_directory = output_files_directory
-
-    # Get the script's filename
-    script_name = os.path.basename(__file__)
-
-    if log_filename is None:
-        log_filename = script_name.replace(".py", "_python_script.log")
-
-    # Check for proper extensions in provided output filenames
-    if not log_filename.endswith(".log"):
-        log_filename = log_filename + ".log"
+    # If no output directory is provided, use the directory of the input file
+    if output_files_directory is None:
+        output_files_directory = output_files_directory = os.path.dirname(
+            input_csv_file_path
+        )
 
     # INITIATE LOGGING
 
-    filesystem_utilities.setup_logging(log_file_directory, log_filename)
+    filesystem_utilities.setup_logging(log_file_directory, log_filename, enable_logging)
 
-    # # Create a logger instance for the current script using the script's name.
-    # logger = logging.getLogger(__name__)
+    # Create a logger instance for the current script using the script's name.
+    logger = None
+    if enable_logging:
+        logging.getLogger(__name__)
 
     # Get the script's filename
     script_name = os.path.basename(__file__)
@@ -122,135 +108,148 @@ def main(
     # Initiate logging
     logging.info(f"Script '{script_name}' execution initiated.")
 
-    # PROCESS EXTRACTED QPB PARAMETERS AND OUTPUT VALUES
+    ## PROCESS EXTRACTED SINGLE-VALUED PARAMETER VALUES ##
 
-    qpb_log_files_dataframe = pd.read_csv(input_csv_file_path)
+    # Load single-valued parameter values .csv file to a dataframe
+    single_valued_parameters_dataframe = pd.read_csv(input_csv_file_path)
+
+    # STRING-VALUED PARAMETERS
 
     # Replace term "Standard" with "Wilson".
-    if "Kernel_operator_type" in qpb_log_files_dataframe.columns:
-        qpb_log_files_dataframe["Kernel_operator_type"] = qpb_log_files_dataframe[
-            "Kernel_operator_type"
-        ].replace("Standard", "Wilson")
+    if "Kernel_operator_type" in single_valued_parameters_dataframe.columns:
+        single_valued_parameters_dataframe["Kernel_operator_type"] = (
+            single_valued_parameters_dataframe["Kernel_operator_type"].replace(
+                "Standard", "Wilson"
+            )
+        )
+    logging.info(
+        f"Replaced 'Kernel_operator_type' string values 'Standard' with 'Wilson'."
+    )
 
     # Ensure the "Configuration_label" field has 7-digit strings
-    if "Configuration_label" in qpb_log_files_dataframe.columns:
-        qpb_log_files_dataframe["Configuration_label"] = (
-            qpb_log_files_dataframe["Configuration_label"].astype(str).str.zfill(7)
+    if "Configuration_label" in single_valued_parameters_dataframe.columns:
+        single_valued_parameters_dataframe["Configuration_label"] = (
+            single_valued_parameters_dataframe["Configuration_label"]
+            .astype(str)
+            .str.zfill(7)
         )
+    logging.info(
+        f"Replaced 'Kernel_operator_type' string values 'Standard' with 'Wilson'."
+    )
 
     # Ensure "QCD_beta_value" field values are formatted as strings with two
     # decimal places
-    if "QCD_beta_value" in qpb_log_files_dataframe.columns:
-        qpb_log_files_dataframe["QCD_beta_value"] = qpb_log_files_dataframe[
-            "QCD_beta_value"
-        ].apply(lambda x: f"{float(x):.2f}")
+    if "QCD_beta_value" in single_valued_parameters_dataframe.columns:
+        single_valued_parameters_dataframe["QCD_beta_value"] = (
+            single_valued_parameters_dataframe["QCD_beta_value"].apply(
+                lambda x: f"{float(x):.2f}"
+            )
+        )
 
     # Extract 'Temporal_lattice_size' and 'Spatial_lattice_size'
-    if "Lattice_geometry" in qpb_log_files_dataframe.columns:
-        qpb_log_files_dataframe["Temporal_lattice_size"] = qpb_log_files_dataframe[
-            "Lattice_geometry"
-        ].apply(lambda x: int(ast.literal_eval(x)[0]))
-        qpb_log_files_dataframe["Spatial_lattice_size"] = qpb_log_files_dataframe[
-            "Lattice_geometry"
-        ].apply(lambda x: int(ast.literal_eval(x)[1]))
+    if "Lattice_geometry" in single_valued_parameters_dataframe.columns:
+        single_valued_parameters_dataframe["Temporal_lattice_size"] = (
+            single_valued_parameters_dataframe["Lattice_geometry"].apply(
+                lambda x: int(ast.literal_eval(x)[0])
+            )
+        )
+        single_valued_parameters_dataframe["Spatial_lattice_size"] = (
+            single_valued_parameters_dataframe["Lattice_geometry"].apply(
+                lambda x: int(ast.literal_eval(x)[1])
+            )
+        )
 
         # Remove 'Lattice_geometry'
-        qpb_log_files_dataframe.drop(columns=["Lattice_geometry"], inplace=True)
+        single_valued_parameters_dataframe.drop(
+            columns=["Lattice_geometry"], inplace=True
+        )
 
     # Modify the "MPI_geometry" field
-    if "MPI_geometry" in qpb_log_files_dataframe.columns:
-        qpb_log_files_dataframe["MPI_geometry"] = qpb_log_files_dataframe[
+    if "MPI_geometry" in single_valued_parameters_dataframe.columns:
+        single_valued_parameters_dataframe[
             "MPI_geometry"
-        ].apply(
+        ] = single_valued_parameters_dataframe["MPI_geometry"].apply(
             lambda x: str(
                 ast.literal_eval(x)[1:]
             )  # Remove the first element and convert back to string
         )
 
+    # INTEGER-TYPE PARAMETERS
+
     # TODO: Unacceptable!
-    if not "Number_of_vectors" in qpb_log_files_dataframe.columns:
-        qpb_log_files_dataframe["Number_of_vectors"] = 1
+    if not "Number_of_vectors" in single_valued_parameters_dataframe.columns:
+        single_valued_parameters_dataframe["Number_of_vectors"] = 1
 
     # APE_iterations with Initial_APE_iterations
-    if "Initial_APE_iterations" in qpb_log_files_dataframe.columns:
-        if "APE_iterations" in qpb_log_files_dataframe.columns:
-            qpb_log_files_dataframe["APE_iterations"] = pd.to_numeric(
-                qpb_log_files_dataframe["APE_iterations"], errors="coerce"
+    if "Initial_APE_iterations" in single_valued_parameters_dataframe.columns:
+        if "APE_iterations" in single_valued_parameters_dataframe.columns:
+            single_valued_parameters_dataframe["APE_iterations"] = pd.to_numeric(
+                single_valued_parameters_dataframe["APE_iterations"], errors="coerce"
             ) + pd.to_numeric(
-                qpb_log_files_dataframe["Initial_APE_iterations"], errors="coerce"
+                single_valued_parameters_dataframe["Initial_APE_iterations"],
+                errors="coerce",
             )
             # Remove 'Initial_APE_iterations'
-            qpb_log_files_dataframe.drop(
+            single_valued_parameters_dataframe.drop(
                 columns=["Initial_APE_iterations"], inplace=True
             )
         else:
-            qpb_log_files_dataframe.rename(
+            single_valued_parameters_dataframe.rename(
                 columns={"Initial_APE_iterations": "APE_iterations"}, inplace=True
             )
 
     # Ensure "Clover_coefficient" field values are integers (0 or 1)
-    if "Clover_coefficient" in qpb_log_files_dataframe.columns:
-        qpb_log_files_dataframe["Clover_coefficient"] = qpb_log_files_dataframe[
-            "Clover_coefficient"
-        ].astype(int)
+    if "Clover_coefficient" in single_valued_parameters_dataframe.columns:
+        single_valued_parameters_dataframe["Clover_coefficient"] = (
+            single_valued_parameters_dataframe["Clover_coefficient"].astype(int)
+        )
+
+    # FLOAT-TYPE PARAMETERS
 
     # Take the square root of the "Solver_epsilon" value
-    if "Solver_epsilon" in qpb_log_files_dataframe.columns:
-        qpb_log_files_dataframe["Solver_epsilon"] = np.sqrt(
-            qpb_log_files_dataframe["Solver_epsilon"].apply(float)
+    if "Solver_epsilon" in single_valued_parameters_dataframe.columns:
+        single_valued_parameters_dataframe["Solver_epsilon"] = np.sqrt(
+            single_valued_parameters_dataframe["Solver_epsilon"].apply(float)
         )
 
     # Take the square root of the "CG_epsilon" value
-    if "CG_epsilon" in qpb_log_files_dataframe.columns:
-        qpb_log_files_dataframe["CG_epsilon"] = np.sqrt(
-            qpb_log_files_dataframe["CG_epsilon"].apply(float)
+    if "CG_epsilon" in single_valued_parameters_dataframe.columns:
+        single_valued_parameters_dataframe["CG_epsilon"] = np.sqrt(
+            single_valued_parameters_dataframe["CG_epsilon"].apply(float)
         )
 
     # Take the square root of the "MSCG_epsilon" value
-    if "MSCG_epsilon" in qpb_log_files_dataframe.columns:
-        qpb_log_files_dataframe["MSCG_epsilon"] = np.sqrt(
-            qpb_log_files_dataframe["MSCG_epsilon"].apply(float)
+    if "MSCG_epsilon" in single_valued_parameters_dataframe.columns:
+        single_valued_parameters_dataframe["MSCG_epsilon"] = np.sqrt(
+            single_valued_parameters_dataframe["MSCG_epsilon"].apply(float)
         )
 
-    if ("MSCG_epsilon" in qpb_log_files_dataframe.columns) and not (
-        ("Outer solver epsilon" in qpb_log_files_dataframe.columns)
+    if ("MSCG_epsilon" in single_valued_parameters_dataframe.columns) and not (
+        ("Outer solver epsilon" in single_valued_parameters_dataframe.columns)
     ):
-        if "Solver_epsilon" in qpb_log_files_dataframe.columns:
-            qpb_log_files_dataframe = qpb_log_files_dataframe.drop(
-                columns="Solver_epsilon"
+        if "Solver_epsilon" in single_valued_parameters_dataframe.columns:
+            single_valued_parameters_dataframe = (
+                single_valued_parameters_dataframe.drop(columns="Solver_epsilon")
             )
 
     #
-    if ("Minimum_eigenvalue_squared" in qpb_log_files_dataframe.columns) and (
-        "Maximum_eigenvalue_squared" in qpb_log_files_dataframe.columns
-    ):
-        qpb_log_files_dataframe["Condition_number"] = qpb_log_files_dataframe[
-            "Maximum_eigenvalue_squared"
-        ].apply(float) / qpb_log_files_dataframe["Minimum_eigenvalue_squared"].apply(
+    if (
+        "Minimum_eigenvalue_squared" in single_valued_parameters_dataframe.columns
+    ) and ("Maximum_eigenvalue_squared" in single_valued_parameters_dataframe.columns):
+        single_valued_parameters_dataframe[
+            "Condition_number"
+        ] = single_valued_parameters_dataframe["Maximum_eigenvalue_squared"].apply(
+            float
+        ) / single_valued_parameters_dataframe[
+            "Minimum_eigenvalue_squared"
+        ].apply(
             float
         )
 
-    # # Take the square root of the "Minimum_eigenvalue_squared" value
-    # if "Minimum_eigenvalue_squared" in qpb_log_files_dataframe.columns:
-    #     qpb_log_files_dataframe["Minimum_eigenvalue"] = np.sqrt(
-    #         qpb_log_files_dataframe["Minimum_eigenvalue_squared"].apply(float)
-    #     )
-    #     # # Remove "Minimum_eigenvalue_squared"
-    #     # qpb_log_files_dataframe.drop(
-    #     #     columns=["Minimum_eigenvalue_squared"], inplace=True
-    #     # )
+    ## PROCESS EXTRACTED MULTIVALUED PARAMETER VALUES ##
 
-    # # Take the square root of the "Maximum_eigenvalue_squared" value
-    # if "Maximum_eigenvalue_squared" in qpb_log_files_dataframe.columns:
-    #     qpb_log_files_dataframe["Maximum_eigenvalue"] = np.sqrt(
-    #         qpb_log_files_dataframe["Maximum_eigenvalue_squared"].apply(float)
-    #     )
-    #     # # Remove "Maximum_eigenvalue_squared"
-    #     # qpb_log_files_dataframe.drop(
-    #     #     columns=["Maximum_eigenvalue_squared"], inplace=True
-    #     # )
-
-    # INPUT HDF5 FILE
+    # TODO: extract_HDF5_datasets_to_dictionary() custom function opens the
+    # input HDF5 file every time it is called. Better open the file only once.
 
     # Calculate average calculation result
     calculation_result_per_vector_dictionary = (
@@ -279,8 +278,8 @@ def main(
                 for filename, dataset in calculation_result_per_vector_dictionary.items()
             }
             # Add a new column with the dictionary values
-            qpb_log_files_dataframe["Average_calculation_result"] = (
-                qpb_log_files_dataframe["Filename"].map(
+            single_valued_parameters_dataframe["Average_calculation_result"] = (
+                single_valued_parameters_dataframe["Filename"].map(
                     average_calculation_result_dictionary
                 )
             )
@@ -297,10 +296,10 @@ def main(
                     for filename, dataset in calculation_result_per_vector_dictionary.items()
                 }
                 # Add a new column with the dictionary values
-                qpb_log_files_dataframe["Calculation_result_with_no_error"] = (
-                    qpb_log_files_dataframe["Filename"].map(
-                        Calculation_result_with_no_error_dictionary
-                    )
+                single_valued_parameters_dataframe[
+                    "Calculation_result_with_no_error"
+                ] = single_valued_parameters_dataframe["Filename"].map(
+                    Calculation_result_with_no_error_dictionary
                 )
 
     # Calculate average number of MSCG iterations
@@ -313,24 +312,26 @@ def main(
         # Calculate the average value and its error
         average_number_of_MSCG_iterations_dictionary = {
             filename: np.sum(dataset)
-            / qpb_log_files_dataframe["Number_of_vectors"].unique()[0]
+            / single_valued_parameters_dataframe["Number_of_vectors"].unique()[0]
             for filename, dataset in total_number_of_MSCG_iterations_dictionary.items()
         }
         # Add a new column with the dictionary values
         # Forward operator applications case
-        if not "Number_of_spinors" in qpb_log_files_dataframe.columns:
-            qpb_log_files_dataframe["Average_number_of_MSCG_iterations_per_vector"] = (
-                qpb_log_files_dataframe["Filename"].map(
-                    average_number_of_MSCG_iterations_dictionary
-                )
+        if not "Number_of_spinors" in single_valued_parameters_dataframe.columns:
+            single_valued_parameters_dataframe[
+                "Average_number_of_MSCG_iterations_per_vector"
+            ] = single_valued_parameters_dataframe["Filename"].map(
+                average_number_of_MSCG_iterations_dictionary
             )
         # Inversions case
         else:
-            qpb_log_files_dataframe["Average_number_of_MSCG_iterations_per_spinor"] = (
-                qpb_log_files_dataframe["Filename"].map(
+            single_valued_parameters_dataframe[
+                "Average_number_of_MSCG_iterations_per_spinor"
+            ] = (
+                single_valued_parameters_dataframe["Filename"].map(
                     average_number_of_MSCG_iterations_dictionary
                 )
-                / qpb_log_files_dataframe["Number_of_spinors"].unique()[0]
+                / single_valued_parameters_dataframe["Number_of_spinors"].unique()[0]
             )
 
     # Extract MS shifts
@@ -346,9 +347,11 @@ def main(
             for filename, dataset in MS_expansion_shifts_dictionary.items()
         }
         # Add a new column with the dictionary values
-        qpb_log_files_dataframe["MS_expansion_shifts"] = qpb_log_files_dataframe[
-            "Filename"
-        ].map(MS_expansion_shifts_dictionary)
+        single_valued_parameters_dataframe["MS_expansion_shifts"] = (
+            single_valued_parameters_dataframe["Filename"].map(
+                MS_expansion_shifts_dictionary
+            )
+        )
 
     # # Calculate average CG calculation time per spinor
     # CG_total_calculation_time_per_spinor_dictionary = (
@@ -363,8 +366,8 @@ def main(
     #         for filename, dataset in CG_total_calculation_time_per_spinor_dictionary.items()
     #     }
     #     # Add a new column with the dictionary values
-    #     qpb_log_files_dataframe["Average_CG_calculation_time_per_spinor"] = (
-    #         qpb_log_files_dataframe["Filename"].map(
+    #     single_valued_parameters_dataframe["Average_CG_calculation_time_per_spinor"] = (
+    #         single_valued_parameters_dataframe["Filename"].map(
     #             average_CG_calculation_time_per_spinor_dictionary
     #         )
     #     )
@@ -383,38 +386,45 @@ def main(
             for filename, dataset in total_number_of_CG_iterations_per_spinor_dictionary.items()
         }
         # Add a new column with the dictionary values
-        qpb_log_files_dataframe["Average_number_of_CG_iterations_per_spinor"] = (
-            qpb_log_files_dataframe["Filename"].map(
-                average_number_of_CG_iterations_per_spinor_dictionary
-            )
+        single_valued_parameters_dataframe[
+            "Average_number_of_CG_iterations_per_spinor"
+        ] = single_valued_parameters_dataframe["Filename"].map(
+            average_number_of_CG_iterations_per_spinor_dictionary
         )
 
     # Forward operator applications
-    if not "Number_of_spinors" in qpb_log_files_dataframe.columns:
+    if not "Number_of_spinors" in single_valued_parameters_dataframe.columns:
         # Chebyshev case
         if (
-            qpb_log_files_dataframe["Overlap_operator_method"].unique()[0]
+            single_valued_parameters_dataframe["Overlap_operator_method"].unique()[0]
             == "Chebyshev"
         ):
-            qpb_log_files_dataframe[
+            single_valued_parameters_dataframe[
                 "Average_number_of_MV_multiplications_per_vector"
             ] = (
-                2 * qpb_log_files_dataframe["Total_number_of_Lanczos_iterations"] + 1
+                2
+                * single_valued_parameters_dataframe[
+                    "Total_number_of_Lanczos_iterations"
+                ]
+                + 1
             ) + (
-                2 * qpb_log_files_dataframe["Number_of_Chebyshev_terms"] - 1
+                2 * single_valued_parameters_dataframe["Number_of_Chebyshev_terms"] - 1
             )
 
         # KL case
-        elif qpb_log_files_dataframe["Overlap_operator_method"].unique()[0] == "KL":
+        elif (
+            single_valued_parameters_dataframe["Overlap_operator_method"].unique()[0]
+            == "KL"
+        ):
             if (
                 "Average_number_of_MSCG_iterations_per_vector"
-                in qpb_log_files_dataframe.columns
+                in single_valued_parameters_dataframe.columns
             ):
-                qpb_log_files_dataframe[
+                single_valued_parameters_dataframe[
                     "Average_number_of_MV_multiplications_per_vector"
                 ] = (
                     2
-                    * qpb_log_files_dataframe[
+                    * single_valued_parameters_dataframe[
                         "Average_number_of_MSCG_iterations_per_vector"
                     ]
                     + 1
@@ -423,45 +433,58 @@ def main(
     else:
         # Chebyshev case
         if (
-            qpb_log_files_dataframe["Overlap_operator_method"].unique()[0]
+            single_valued_parameters_dataframe["Overlap_operator_method"].unique()[0]
             == "Chebyshev"
         ):
-            qpb_log_files_dataframe[
+            single_valued_parameters_dataframe[
                 "Average_number_of_MV_multiplications_per_spinor"
             ] = (
-                2 * qpb_log_files_dataframe["Total_number_of_Lanczos_iterations"] + 1
+                2
+                * single_valued_parameters_dataframe[
+                    "Total_number_of_Lanczos_iterations"
+                ]
+                + 1
             ) + (
                 2
-                * qpb_log_files_dataframe["Average_number_of_CG_iterations_per_spinor"]
+                * single_valued_parameters_dataframe[
+                    "Average_number_of_CG_iterations_per_spinor"
+                ]
                 + 1
             ) * (
-                2 * qpb_log_files_dataframe["Number_of_Chebyshev_terms"] - 1
+                2 * single_valued_parameters_dataframe["Number_of_Chebyshev_terms"] - 1
             )
 
-        elif qpb_log_files_dataframe["Overlap_operator_method"].unique()[0] == "KL":
-            qpb_log_files_dataframe[
+        elif (
+            single_valued_parameters_dataframe["Overlap_operator_method"].unique()[0]
+            == "KL"
+        ):
+            single_valued_parameters_dataframe[
                 "Average_number_of_MV_multiplications_per_spinor"
             ] = (
                 2
-                * qpb_log_files_dataframe[
+                * single_valued_parameters_dataframe[
                     "Average_number_of_MSCG_iterations_per_spinor"
                 ]
                 + 1
             )
 
+    # EXPORT PROCESSED VALUES
+
     # Construct the output .csv file path
     output_qpb_log_files_csv_file_path = os.path.join(
-        os.path.dirname(input_csv_file_path),
+        output_files_directory,
         output_csv_filename,
     )
 
     # Export modified DataFrame back to the same .csv file
-    qpb_log_files_dataframe.to_csv(output_qpb_log_files_csv_file_path, index=False)
+    single_valued_parameters_dataframe.to_csv(
+        output_qpb_log_files_csv_file_path, index=False
+    )
 
     # Terminate logging
     logging.info(f"Script '{script_name}' execution terminated successfully.")
 
-    print("   -- Processing extracted values from qpb log files completed.")
+    click.echo("   -- Processing extracted values from qpb log files completed.")
 
 
 if __name__ == "__main__":
