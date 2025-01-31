@@ -141,8 +141,6 @@ def main(
 
     # INITIATE LOGGING
 
-    enable_logging = False
-
     filesystem_utilities.setup_logging(log_file_directory, log_filename, enable_logging)
 
     # Create a logger instance for the current script using the script's name.
