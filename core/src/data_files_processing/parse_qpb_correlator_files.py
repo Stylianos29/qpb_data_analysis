@@ -1,19 +1,26 @@
 """
-Script Name: parse_qpb_correlator_files.py
+data_files_processing/parse_qpb_correlator_files.py
 
 Summary:
     This script processes correlator data stored in .dat files within a
     specified directory and converts it into HDF5 format for efficient storage
     and retrieval. It extracts specific correlator values based on predefined
-    identifiers and organizes the data into groups within the HDF5 file.
+    identifiers and organizes the data into structured groups within the HDF5
+    file.
 
 Inputs:
-    - qpb_correlators_files_directory (str): Path to the directory containing the input
-      .dat files with qpb correlator data.
-    - output_files_directory (str): Path to the directory where the output HDF5
-      file will be saved.
-    - output_hdf5_filename (str): Name of the output HDF5 file (should include
-      '.h5' extension).
+    - qpb_correlators_files_directory (str): Path to the directory containing
+      the input .dat files with qpb correlator data.
+    - output_files_directory (str, optional): Path to the directory where the
+      output HDF5 file will be saved. If not provided, defaults to the input
+      directory.
+    - output_hdf5_filename (str, optional): Name of the output HDF5 file 
+      (should include '.h5' extension).
+    - enable_logging (bool, optional): Flag to enable logging. Default is False.
+    - log_file_directory (str, optional): Directory where the script's log file
+      will be stored. Required if logging is enabled.
+    - log_filename (str, optional): Specific name for the script's log file. 
+      Required if logging is enabled.
 
 Outputs:
     - An HDF5 file containing groups for each input .dat file, with datasets
@@ -26,13 +33,28 @@ Outputs:
         - "g1-g1"
         - "g2-g2"
         - "g3-g3"
-      Each dataset contains the corresponding correlator values as NumPy arrays.
+      Each dataset stores extracted correlator values as NumPy arrays.
+
+Processing Steps:
+    1. Validate input arguments and directories.
+    2. Set up logging if enabled.
+    3. Create the HDF5 file and define its group structure.
+    4. Iterate over all .dat files in the input directory:
+       - Read each file and extract correlator values based on identifiers.
+       - Store extracted values as NumPy arrays.
+       - Save the data into the HDF5 file under a subgroup named after the 
+         original .dat filename.
+    5. Log the number of processed files and finalize execution.
 
 Usage:
     Run the script from the command line as follows:
-        python parse_pion_correlator_files_to_HDF5.py --qpb_correlators_files_directory
-        <path_to_data> --output_files_directory <path_to_hdf5>
+        python parse_qpb_correlator_files.py
+        --qpb_correlators_files_directory <path_to_data>
+        --output_files_directory <path_to_hdf5>
         --output_hdf5_filename <output_filename.h5>
+        --enable_logging
+        --log_file_directory <log_directory>
+        --log_filename <log_filename.log>
 
 Example:
     Given .dat files in the specified data directory, the script will generate
@@ -42,121 +64,91 @@ Example:
 
 import glob
 import os
-import sys
 
-import click
-import h5py
 import numpy as np
+import h5py
+import click
 import logging
 
-from library import constants, filesystem_utilities
+from library import constants, filesystem_utilities, RAW_DATA_FILES_DIRECTORY
 
 
 @click.command()
 @click.option(
+    "-cors_dir",
     "--qpb_correlators_files_directory",
     "qpb_correlators_files_directory",
-    "-raw_dir",
-    default=None,
+    required=True,
+    callback=filesystem_utilities.validate_directory,
     help="Directory where the correlator files to be analyzed are stored.",
 )
 @click.option(
+    "-out_dir",
     "--output_files_directory",
     "output_files_directory",
-    "-out_dir",
     default=None,
-    help="Directory where the HDF5 file will be stored.",
+    callback=filesystem_utilities.validate_directory,
+    help="Path to directory where all output files will be stored.",
 )
 @click.option(
+    "-out_hdf5_name",
     "--output_hdf5_filename",
     "output_hdf5_filename",
-    "-out_hdf5_file",
-    default="qpb_correlators_values.h5",
-    help="Name of the output HDF5 file.",
+    default="qpb_log_files_multivalued_parameters.h5",
+    callback=filesystem_utilities.validate_output_HDF5_filename,
+    help=(
+        "Specific name for the output HDF5 file containing extracted values of "
+        "multivalued parameters from qpb log files."
+    ),
 )
 @click.option(
+    "-log_on",
+    "--enable_logging",
+    "enable_logging",
+    is_flag=True,
+    default=False,
+    help="Enable logging.",
+)
+@click.option(
+    "-log_file_dir",
     "--log_file_directory",
     "log_file_directory",
-    "-log_file_dir",
     default=None,
+    callback=filesystem_utilities.validate_script_log_file_directory,
     help="Directory where the script's log file will be stored.",
 )
 @click.option(
+    "-log_name",
     "--log_filename",
     "log_filename",
-    "-log",
     default=None,
+    callback=filesystem_utilities.validate_script_log_filename,
     help="Specific name for the script's log file.",
 )
 def main(
     qpb_correlators_files_directory,
     output_files_directory,
     output_hdf5_filename,
+    enable_logging,
     log_file_directory,
     log_filename,
 ):
+    # HANDLE EMPTY INPUT ARGUMENTS
 
-    # VALIDATE INPUT ARGUMENTS
-
-    # Check if the provided raw data files directory is valid
-    if not filesystem_utilities.is_valid_directory(qpb_correlators_files_directory):
-        error_message = (
-            "The specified raw data files directory is invalid or does not exist."
-        )
-        print("ERROR:", error_message)
-        print("Exiting...")
-        sys.exit(1)
-
-    # Ensure the directory contains at least one ".dat" file
-    if not bool(glob.glob(os.path.join(qpb_correlators_files_directory, "*.dat"))):
-        error_message = (
-            f"No '.dat' files were found in the specified directory: "
-            f"'{qpb_correlators_files_directory}'."
-        )
-        print("ERROR:", error_message)
-        print("Exiting...")
-        sys.exit(1)
-
-    # Check if the provided output data files directory is valid
-    if not filesystem_utilities.is_valid_directory(output_files_directory):
-        # logging.error("The HDF5 file directory path is invalid")
-        error_message = (
-            "The specified output data files directory is " "invalid or does not exist."
-        )
-        print("ERROR:", error_message)
-        print("Exiting...")
-        sys.exit(1)
-
-    # Specify current script's log file directory
-    if log_file_directory is None:
-        log_file_directory = output_files_directory
-    elif not filesystem_utilities.is_valid_directory(log_file_directory):
-        error_message = (
-            "The specified directory path to store script's log "
-            "file is invalid or not a directory."
-        )
-        print("ERROR:", error_message)
-        print("Exiting...")
-        sys.exit(1)
-
-    # Get the script's filename
-    script_name = os.path.basename(__file__)
-
-    if log_filename is None:
-        log_filename = script_name.replace(".py", "_python_script.log")
-
-    # Check for proper extensions in provided output filenames
-    if not output_hdf5_filename.endswith(".h5"):
-        output_hdf5_filename = output_hdf5_filename + ".h5"
-    if not log_filename.endswith(".log"):
-        log_filename = log_filename + ".log"
+    # If no output directory is provided, use the directory of the input file
+    if output_files_directory is None:
+        output_files_directory = os.path.dirname(qpb_correlators_files_directory)
 
     # INITIATE LOGGING
 
-    filesystem_utilities.setup_logging(log_file_directory, log_filename)
+    enable_logging = False
 
-    # # Create a logger instance for the current script using the script's name.
-    # logger = logging.getLogger(__name__)
+    filesystem_utilities.setup_logging(log_file_directory, log_filename, enable_logging)
+
+    # Create a logger instance for the current script using the script's name.
+    logger = None
+    if enable_logging:
+        logging.getLogger(__name__)
 
     # Get the script's filename
     script_name = os.path.basename(__file__)
@@ -164,29 +156,24 @@ def main(
     # Initiate logging
     logging.info(f"Script '{script_name}' execution initiated.")
 
-    # PARSE RAW CORRELATOR CORRELATOR DATA FILES IN SPECIFIED DIRECTORY
+    # PARSE RAW CORRELATORS DATA FILES
 
     output_hdf5_file_path = os.path.join(output_files_directory, output_hdf5_filename)
     # Open the HDF5 file in 'w' mode (write, replace existing file)
     with h5py.File(output_hdf5_file_path, "w") as hdf5_file:
 
-        # Initialize group structure of the HDF5 file
-        # NOTE: The assumption here is that the name of the raw data files
-        # directory represents the data files set (or experiment) and its parent
-        # directory the qpb main program that generated the data files
-        parent_directory_name, last_directory_name = (
-            filesystem_utilities.extract_directory_names(
-                qpb_correlators_files_directory
-            )
+        # The top HDF5 file groups mirror the directory structure of the data
+        # files set directory itself and its parent directories relative to the
+        # 'data_files/raw/' directory
+        data_files_set_group = filesystem_utilities.create_hdf5_group_structure(
+            hdf5_file, RAW_DATA_FILES_DIRECTORY, qpb_correlators_files_directory, logger
         )
-        qpb_main_program_group = hdf5_file.create_group(parent_directory_name)
-        data_files_set_group = qpb_main_program_group.create_group(last_directory_name)
 
         # Loop over all .dat files in log files directory
-        for data_file_full_path in glob.glob(
-            os.path.join(qpb_correlators_files_directory, "*.dat")
+        for count, correlators_file_full_path in enumerate(
+            glob.glob(os.path.join(qpb_correlators_files_directory, "*.dat")), start=1
         ):
-            data_file = os.path.basename(data_file_full_path)
+            correlators_filename = os.path.basename(correlators_file_full_path)
 
             # Create a dictionary with correlator identifiers as keys, each
             # initialized to an empty list for storing correlator values.
@@ -195,7 +182,7 @@ def main(
                 correlator_values_dictionary[correlator_identifier] = []
 
             # Read each correlators values file and fill in the empty lists
-            with open(data_file_full_path, "r") as file:
+            with open(correlators_file_full_path, "r") as file:
                 lines = file.readlines()
 
                 for line in lines:
@@ -203,6 +190,7 @@ def main(
 
                     # Check and append values for each correlator identifier
                     # NOTE: The identifier is always placed in the last column
+                    # and value in the 4 one
                     for correlator_identifier in constants.CORRELATOR_IDENTIFIERS_LIST:
                         if columns[-1] == correlator_identifier:
                             correlator_values_dictionary[correlator_identifier].append(
@@ -215,24 +203,32 @@ def main(
                     correlator_values_dictionary[correlator_identifier]
                 )
 
-            # Create a subgroup in the HDF5 file for this data file
-            data_files_group = data_files_set_group.create_group(data_file)
+            # Create a subgroup in the HDF5 file for this correlators file
+            correlators_file_group = data_files_set_group.create_group(
+                correlators_filename
+            )
+
+            # EXPORT CORRELATORS VALUES
 
             # Store each correlator array in the correlator group
             for correlator_identifier in constants.CORRELATOR_IDENTIFIERS_LIST:
-                data_files_group.create_dataset(
+                correlators_file_group.create_dataset(
                     correlator_identifier,
                     data=correlator_values_dictionary[correlator_identifier],
                 )
 
+    logging.info(
+        f"A total of {count} qpb correlators files "
+        f"were parsed for correlator values extraction from the "
+        f"'{os.path.basename(qpb_correlators_files_directory)}' raw data "
+        "files set directory."
+    )
+
     # Terminate logging
     logging.info(f"Script '{script_name}' execution terminated successfully.")
 
-    print("   -- Parsing raw correlators files completed.")
+    click.echo("   -- Parsing raw correlators files completed.")
 
 
 if __name__ == "__main__":
     main()
-
-# TODO: Include logging properly
-# TODO: Perform checks on the size of the extracted correlator datasets

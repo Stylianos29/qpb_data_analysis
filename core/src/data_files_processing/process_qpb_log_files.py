@@ -1,86 +1,120 @@
-# TODO: Revisit this detailed commentary
 """
-Log Files Analysis Script
+data_files_processing/process_qpb_log_files.py
 
-This script processes log files stored in a specified directory passed by the
-user and extracts relevant parameter values from the files contents and
-filenames. It then compiles these extracted values into a Pandas DataFrame and
-exports the data to a CSV file.
+Summary:
+    This script processes log files stored in a specified directory provided by
+    the user, extracting relevant parameter values from both the file contents
+    and filenames. It then compiles these extracted values into structured data
+    formats, exporting them to both CSV and HDF5 files for further analysis.
 
-Input: 1. `qpb_log_files_directory`: Directory containing the log files to be
-analyzed. 2. `output_files_directory`: Directory where the generated output CSV
-file will  be stored. 3. `filename_analysis`: Flag to perform analysis on
-filenames of the log files. 4. `append_to_dataframe`: Flag to append new data to
-an existing CSV file instead
-  of creating a new one.
+Input:
+1. `qpb_log_files_directory` (Required): Directory containing the qpb
+    log files to be analyzed.
+2. `output_files_directory` (Optional): Directory where the generated output CSV
+   and HDF5 files will be stored.
+   - If not provided, the directory of the input log files will be used.
+3. `output_csv_filename` (Optional): Name of the CSV file storing extracted
+   single-valued parameter values.
+4. `output_hdf5_filename` (Optional): Name of the HDF5 file storing extracted
+   multi-valued parameter values.
+5. `enable_logging` (Optional, Flag): Enables logging if set.
+6. `log_file_directory` (Optional): Directory where the script's log file will
+   be stored.
+7. `log_filename` (Optional): Name of the script's log file.
 
-Output: 1. A CSV file containing the extracted parameter values from the log
-files. 2. A log file
+Output:
+    1. A CSV file containing extracted single-valued parameter values
+    from the log files. 2. An HDF5 file containing extracted multi-valued
+    parameter values. 3. A log file (if logging is enabled) documenting the
+    script's execution and potential issues.
 
-Functionality: 1. The script uses regex patterns to extract specific parameter
-values from both the contents and filenames of the log files. 2. It performs
-preliminary checks to ensure the log files contain necessary parameter values.
-3. Extracted values are stored in a Pandas DataFrame. 4. The DataFrame is then
-exported to a CSV file. If the append flag is set, new data is appended to the
-existing CSV file.
+Functionality:
+    1. Uses regex patterns to extract specific parameter values
+    from both log file contents and filenames. 2. Ensures extracted parameter
+    values meet predefined validity conditions before storing them. 3.
+    Constructs a Pandas DataFrame to organize single-valued parameter values and
+    exports it to a CSV file. 4. Organizes multi-valued parameter values in an
+    HDF5 hierarchical structure. 5. Logs execution details, warnings, and errors
+    for traceability and debugging.
 
-Usage: - Run the script with the appropriate options to specify the log files
-directory, output directory, and flags for filename analysis and appending data.
+Usage:
+    - Execute the script with appropriate options to specify the log files
+    directory, output directory, and filenames for generated CSV and HDF5 files.
+    - Enable logging if required for tracking script execution.
 """
 
 import glob
 import os
-import sys
 
-import click
 import pandas as pd
-import logging
 import h5py
+import click
+import logging
 
-from library import extraction, filesystem_utilities
+from library import extraction, filesystem_utilities, RAW_DATA_FILES_DIRECTORY
 
 
 @click.command()
 @click.option(
+    "-qpb_log_dir",
     "--qpb_log_files_directory",
     "qpb_log_files_directory",
-    "-qpb_log_dir",
-    default=None,
-    help="Directory where the log files to be analyzed are stored.",
+    required=True,
+    callback=filesystem_utilities.validate_directory,
+    help="Directory where the qpb log files to be analyzed are stored.",
 )
 @click.option(
+    "-out_dir",
     "--output_files_directory",
     "output_files_directory",
-    "-out_dir",
     default=None,
-    help="Directory where all the generated output files will be stored.",
+    callback=filesystem_utilities.validate_directory,
+    help="Path to directory where all output files will be stored.",
 )
 @click.option(
+    "-out_csv_name",
     "--output_csv_filename",
     "output_csv_filename",
-    "-out_csv_name",
     default="qpb_log_files_single_valued_parameters.csv",
-    help="Specific name for the qpb log files .csv output file.",
+    callback=filesystem_utilities.validate_output_csv_filename,
+    help=(
+        "Specific name for the output .csv file containing extracted values of "
+        "single-valued parameters from qpb log files."
+    ),
 )
 @click.option(
+    "-out_hdf5_name",
     "--output_hdf5_filename",
     "output_hdf5_filename",
-    "-out_hdf5_name",
     default="qpb_log_files_multivalued_parameters.h5",
-    help="Specific name for the qpb log files HDF5 output file.",
+    callback=filesystem_utilities.validate_output_HDF5_filename,
+    help=(
+        "Specific name for the output HDF5 file containing extracted values of "
+        "multivalued parameters from qpb log files."
+    ),
 )
 @click.option(
+    "-log_on",
+    "--enable_logging",
+    "enable_logging",
+    is_flag=True,
+    default=False,
+    help="Enable logging.",
+)
+@click.option(
+    "-log_file_dir",
     "--log_file_directory",
     "log_file_directory",
-    "-log_file_dir",
     default=None,
+    callback=filesystem_utilities.validate_script_log_file_directory,
     help="Directory where the script's log file will be stored.",
 )
 @click.option(
+    "-log_name",
     "--log_filename",
     "log_filename",
-    "-log",
     default=None,
+    callback=filesystem_utilities.validate_script_log_filename,
     help="Specific name for the script's log file.",
 )
 def main(
@@ -88,60 +122,27 @@ def main(
     output_files_directory,
     output_csv_filename,
     output_hdf5_filename,
+    enable_logging,
     log_file_directory,
     log_filename,
 ):
+    # HANDLE EMPTY INPUT ARGUMENTS
 
-    # VALIDATE INPUT ARGUMENTS
-
-    if not filesystem_utilities.is_valid_directory(qpb_log_files_directory):
-        error_message = (
-            "Passed log files directory path is invalid or not " "a directory."
-        )
-        print("ERROR:", error_message)
-        print("Exiting...")
-        sys.exit(1)
-
-    if not filesystem_utilities.is_valid_directory(output_files_directory):
-        error_message = (
-            "Passed output files directory path is invalid or " "not a directory."
-        )
-        print("ERROR:", error_message)
-        print("Exiting...")
-        sys.exit(1)
-
-    # Specify current script's log file directory
-    if log_file_directory is None:
-        log_file_directory = output_files_directory
-    elif not filesystem_utilities.is_valid_directory(log_file_directory):
-        error_message = (
-            "Passed directory path to store script's log file is "
-            "invalid or not a directory."
-        )
-        print("ERROR:", error_message)
-        print("Exiting...")
-        sys.exit(1)
-
-    # Get the script's filename
-    script_name = os.path.basename(__file__)
-
-    if log_filename is None:
-        log_filename = script_name.replace(".py", ".log")
-
-    # Check for proper extensions in provided filenames
-    if not output_csv_filename.endswith(".csv"):
-        output_csv_filename = output_csv_filename + ".csv"
-    if not output_hdf5_filename.endswith(".h5"):
-        output_hdf5_filename = output_hdf5_filename + ".h5"
-    if not log_filename.endswith(".log"):
-        log_filename = log_filename + ".log"
+    # If no output directory is provided, use the directory of the input file
+    if output_files_directory is None:
+        output_files_directory = os.path.dirname(qpb_log_files_directory)
 
     # INITIATE LOGGING
 
-    filesystem_utilities.setup_logging(log_file_directory, log_filename)
+    filesystem_utilities.setup_logging(log_file_directory, log_filename, enable_logging)
 
     # Create a logger instance for the current script using the script's name.
-    logger = logging.getLogger(__name__)
+    logger = None
+    if enable_logging:
+        logging.getLogger(__name__)
+
+    # Get the script's filename
+    script_name = os.path.basename(__file__)
 
     # Initiate logging
     logging.info(f"Script '{script_name}' execution initiated.")
@@ -149,16 +150,16 @@ def main(
     # EXTRACT SINGLE-VALUED PARAMETERS
 
     # Create list to pass values to dataframe
-    parameters_values_list = []
-    # Loop over all .txt files in the QPB log files directory
-    for qpb_log_file_full_path in glob.glob(
-        os.path.join(qpb_log_files_directory, "*.txt")
+    single_valued_parameter_values_list = []
+    # Loop over all .txt files in the qpb log files directory
+    for count, qpb_log_file_full_path in enumerate(
+        glob.glob(os.path.join(qpb_log_files_directory, "*.txt")), start=1
     ):
         # Extract the filename from the full path
         qpb_log_filename = os.path.basename(qpb_log_file_full_path)
 
         # Initialize a dictionary to store extracted parameter values
-        extracted_values_dictionary = dict()
+        extracted_values_dictionary = {}
 
         # Add the filename to the dictionary
         extracted_values_dictionary["Filename"] = qpb_log_filename
@@ -174,41 +175,57 @@ def main(
 
         # Extract parameter values from the contents of the file
         extracted_single_valued_parameters_from_file_contents_dictionary = (
-            extraction.extract_parameters_values_from_file_contents(
+            extraction.extract_single_valued_parameter_values_from_file_contents(
                 qpb_log_file_contents_list, logger
             )
         )
 
-        # Merge extracted values from file contents into the main dictionary
-        # File contents are considered the primary source of truth
+        # Add values from file contents into extracted values dictionary
         extracted_values_dictionary.update(
             extracted_single_valued_parameters_from_file_contents_dictionary
         )
 
-        # Compare and update the dictionary with values from the filename
-        for key, value in extracted_values_from_filename_dictionary.items():
-            if key in extracted_values_dictionary:
-                # If the key exists in both dictionaries, compare their values
-                file_contents_value = extracted_values_dictionary[key]
-                if file_contents_value != value:
-                    # Log a warning if values differ, favoring file contents
-                    if logger:
-                        logger.warning(
-                            f"Discrepancy for parameter '{key}': "
-                            f"filename value='{value}' "
-                            f"vs file contents value='{file_contents_value}'. "
-                            "Using the value from file contents."
-                        )
-            else:
-                # Add parameters that exist only in filename to the dictionary
-                # TODO: This must be accompanied by appropriate checks
-                extracted_values_dictionary[key] = value
+        # Add values from 'extracted_values_from_filename_dictionary' into
+        # 'extracted_values_dictionary' only if their parameter names are not
+        # already present, ensuring existing values remain unchanged.
+        for (
+            parameter_name,
+            filename_value,
+        ) in extracted_values_from_filename_dictionary.items():
+            extracted_values_dictionary.setdefault(parameter_name, filename_value)
 
-        # Append the fully constructed dictionary to the list of parameters
-        parameters_values_list.append(extracted_values_dictionary)
+        # Check for common keys between the
+        # 'extracted_values_from_filename_dictionary' and
+        # 'extracted_values_dictionary' dictionaries. If the values are
+        # different, log a warning to indicate a potential mismatch.
+        # NOTE: Values from file contents supersede those from filename
+        for parameter_name in (
+            extracted_values_from_filename_dictionary.keys()
+            & extracted_values_dictionary.keys()
+        ):
+            if (
+                extracted_values_from_filename_dictionary[parameter_name]
+                != extracted_values_dictionary[parameter_name]
+            ):
+                logging.warning(
+                    f"Mismatch for '{parameter_name}' parameter in file {qpb_log_filename}. "
+                    f"Filename value: {extracted_values_from_filename_dictionary[parameter_name]}, "
+                    f"file contents value: {extracted_values_dictionary[parameter_name]}."
+                )
+
+        # Append extracted values dictionary to the list of parameters
+        single_valued_parameter_values_list.append(extracted_values_dictionary)
+
+    logging.info(
+        f"A total of {count} qpb log files were parsed for parameter values "
+        f"extraction from the '{os.path.basename(qpb_log_files_directory)}' "
+        "raw data files set directory."
+    )
+
+    # EXPORT EXTRACTED SINGLE-VALUED PARAMETER VALUES
 
     # Convert the list of parameter dictionaries into a Pandas DataFrame
-    parameter_values_dataframe = pd.DataFrame(parameters_values_list)
+    parameter_values_dataframe = pd.DataFrame(single_valued_parameter_values_list)
 
     # Save the DataFrame to a CSV file in the output directory
     csv_file_full_path = os.path.join(output_files_directory, output_csv_filename)
@@ -216,7 +233,7 @@ def main(
     # Export dataframe to .cvs file
     parameter_values_dataframe.to_csv(csv_file_full_path, index=False)
     logging.info(
-        f"Extracted multivalued parameters are stored in the "
+        f"Extracted single-valued parameters are stored in the "
         f"'{output_csv_filename}' file."
     )
 
@@ -225,20 +242,19 @@ def main(
     hdf5_file_full_path = os.path.join(output_files_directory, output_hdf5_filename)
     with h5py.File(hdf5_file_full_path, "w") as hdf5_file:
 
-        # Initialize group structure of the HDF5 file
-        # NOTE: The assumption here is that the name of the raw data files
-        # directory represents the data files set (or experiment) and its parent
-        # directory the qpb main program that generated the data files
-        parent_directory_name, last_directory_name = (
-            filesystem_utilities.extract_directory_names(qpb_log_files_directory)
+        # The top HDF5 file groups mirror the directory structure of the data
+        # files set directory itself and its parent directories relative to the
+        # 'data_files/raw/' directory
+        data_files_set_group = filesystem_utilities.create_hdf5_group_structure(
+            hdf5_file,
+            RAW_DATA_FILES_DIRECTORY,
+            qpb_log_files_directory,
+            logger,
         )
-        qpb_main_program_group = hdf5_file.create_group(parent_directory_name)
-        data_files_set_group = qpb_main_program_group.create_group(last_directory_name)
 
         for qpb_log_file_full_path in glob.glob(
             os.path.join(qpb_log_files_directory, "*.txt")
         ):
-
             # Read the contents of the log file into a list of lines
             with open(qpb_log_file_full_path, "r") as file:
                 qpb_log_file_contents_list = file.readlines()
@@ -256,6 +272,8 @@ def main(
                 )
             )
 
+            # EXPORT EXTRACTED MULTIVALUED PARAMETER VALUES
+
             # Loop through each multivalued parameter and store it as a dataset
             for (
                 parameter,
@@ -272,10 +290,8 @@ def main(
     # Terminate logging
     logging.info(f"Script '{script_name}' execution terminated successfully.")
 
-    print("   -- Parsing raw qpb log files completed.")
+    click.echo("   -- Parsing raw qpb log files completed.")
 
 
 if __name__ == "__main__":
     main()
-
-# TODO: Included a terminating message
