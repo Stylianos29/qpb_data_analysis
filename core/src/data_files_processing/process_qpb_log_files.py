@@ -134,18 +134,13 @@ def main(
 
     # INITIATE LOGGING
 
-    filesystem_utilities.setup_logging(log_file_directory, log_filename, enable_logging)
+    # Setup logging
+    logger = filesystem_utilities.LoggingWrapper(
+        log_file_directory, log_filename, enable_logging
+    )
 
-    # Create a logger instance for the current script using the script's name.
-    logger = None
-    if enable_logging:
-        logging.getLogger(__name__)
-
-    # Get the script's filename
-    script_name = os.path.basename(__file__)
-
-    # Initiate logging
-    logging.info(f"Script '{script_name}' execution initiated.")
+    # Log script start
+    logger.initiate_script_logging()
 
     # EXTRACT SINGLE-VALUED PARAMETERS
 
@@ -288,7 +283,7 @@ def main(
     )
 
     # Terminate logging
-    logging.info(f"Script '{script_name}' execution terminated successfully.")
+    logger.terminate_script_logging()
 
     click.echo("   -- Parsing raw qpb log files completed.")
 
