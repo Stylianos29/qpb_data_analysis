@@ -3,13 +3,14 @@ import shutil
 
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
+from matplotlib.ticker import ScalarFormatter
 import textwrap
 import gvar as gv
 import numpy as np
 import pandas as pd
 import copy
 
-from library import constants, filesystem_utilities, data_processing
+from library import constants, filesystem_utilities
 from library import DataFrameAnalyzer
 
 
@@ -147,6 +148,7 @@ class DataPlotter(DataFrameAnalyzer):
             if field in fields_unique_value_dictionary
         )
 
+
         # Dynamically add an additional field based on Overlap_operator_method
         overlap_operator_method = fields_unique_value_dictionary.get(
             "Overlap_operator_method"
@@ -155,7 +157,7 @@ class DataPlotter(DataFrameAnalyzer):
             additional_field = additional_fields[overlap_operator_method]
             if additional_field in fields_unique_value_dictionary:
                 prioritized_fields_substring += (
-                    f"{constants.AXES_LABELS_DICTIONARY[additional_field]}="
+                    f"{constants.TITLE_LABELS_DICTIONARY[additional_field]}="
                     f"{fields_unique_value_dictionary[additional_field]}"
                 )
 
@@ -177,9 +179,9 @@ class DataPlotter(DataFrameAnalyzer):
 
         # Add remaining fields to the subtitle
         remaining_fields_substring = ", ".join(
-            f"{constants.AXES_LABELS_DICTIONARY[key]}={value}"
+            f"{constants.TITLE_LABELS_DICTIONARY[key]}={value}"
             for key, value in remaining_fields.items()
-            if key in constants.AXES_LABELS_DICTIONARY
+            if key in constants.TITLE_LABELS_DICTIONARY
         )
 
         # Construct the combined title
@@ -524,12 +526,12 @@ class DataPlotter(DataFrameAnalyzer):
             else:
                 self._plot_group(ax, group, is_histogram=is_histogram)
 
-            if grouping_field:
-                ax.legend(loc=legend_location, title=grouping_field)
-
             # Apply additional customizations if provided
             if customize_fn is not None:
                 customize_fn(ax)
+
+            if grouping_field:
+                ax.legend(loc=legend_location, title=grouping_field, framealpha=1.0)
 
             plot_path = self._generate_plot_path(
                 current_plots_subdirectory,
@@ -589,3 +591,121 @@ class DataPlotter(DataFrameAnalyzer):
             plot_title_width=plot_title_width,
             legend_location=legend_location,
         )
+
+
+#################
+
+
+def plot_correlator(
+    y_values,
+    xlabel,
+    ylabel,
+    base_name,
+    subdirectory,
+    metadata_dict,
+    tunable_parameters_dict,
+    starting_time: int = 0,
+    yaxis_log_scale: bool = False,
+):
+    """Generalized function to plot correlators."""
+    y = y_values[starting_time:]
+    x = np.arange(starting_time, len(y) + starting_time)
+
+    fig, ax = plt.subplots()
+    ax.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
+
+    plot_title = DataPlotter._construct_plot_title(
+        None,
+        leading_substring="",
+        metadata_dictionary=metadata_dict,
+        title_width=100,
+        fields_unique_value_dictionary=tunable_parameters_dict,
+    )
+    ax.set_title(f"{plot_title}", pad=8)
+
+    ax.set(xlabel=xlabel, ylabel=ylabel)
+    fig.subplots_adjust(left=0.15)  # Adjust left margin
+
+    # Force scientific notation when values are below 1e-4
+    formatter = ScalarFormatter(useMathText=True)
+    formatter.set_powerlimits(
+        (-4, 4)
+    )  # Scientific notation for |values| < 1e-4 or > 1e4
+    ax.yaxis.set_major_formatter(formatter)
+
+    # Adjust the position of the offset text (scientific notation)
+    # TODO: Make the offset text bold
+    offset_text = ax.yaxis.get_offset_text()
+    offset_text.set_x(-0.15)  # Move left (negative values move it further left)
+    offset_text.set_y(-0.05)  # Move down (negative values move it further down)
+
+    if yaxis_log_scale:
+        ax.set_yscale("log")
+
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+
+    ax.errorbar(x, gv.mean(y), yerr=gv.sdev(y), fmt=".", markersize=8, capsize=10)
+
+    plot_path = DataPlotter._generate_plot_path(
+        None,
+        subdirectory,
+        base_name,
+        metadata_dict,
+        single_valued_fields_dictionary=tunable_parameters_dict,
+    )
+
+    fig.savefig(plot_path)
+    plt.close()
+
+
+
+
+def generic_plot(
+    x_values,
+    y_values,
+    xlabel,
+    ylabel,
+    base_name,
+    base_plots_directory,
+    metadata_dict,
+    tunable_parameters_dict,
+    yaxis_log_scale: bool = False,
+):
+    x = x_values
+    y = y_values
+
+    fig, ax = plt.subplots()
+    ax.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
+
+    plot_title = DataPlotter._construct_plot_title(
+        None,
+        leading_substring="",
+        metadata_dictionary=metadata_dict,
+        title_width=100,
+        fields_unique_value_dictionary=tunable_parameters_dict,
+    )
+    ax.set_title(f"{plot_title}", pad=8)
+
+    ax.set(xlabel=xlabel, ylabel=ylabel)
+    # fig.subplots_adjust(left=0.15)  # Adjust left margin
+
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+
+    ax.scatter(x, y, marker=".") #, markersize=8, capsize=10)
+    # ax.errorbar(x, gv.mean(y), yerr=gv.sdev(y), fmt=".", markersize=8, capsize=10)
+
+    plots_subdirectory = DataPlotter._prepare_plots_subdirectory(
+        None,
+        base_plots_directory, base_name
+    )
+
+    plot_path = DataPlotter._generate_plot_path(
+        None,
+        plots_subdirectory,
+        base_name,
+        metadata_dict,
+        single_valued_fields_dictionary=tunable_parameters_dict,
+    )
+
+    fig.savefig(plot_path)
+    plt.close()
