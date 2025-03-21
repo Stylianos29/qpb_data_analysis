@@ -4,8 +4,6 @@ import gvar as gv
 from scipy.stats import t
 import warnings
 
-warnings.filterwarnings("ignore")
-
 
 def linear_function(x, p):
     """Parameters: 1. p[0]: slope 2. p[1]: x-intercept (critical mass)."""
@@ -17,6 +15,10 @@ def quadratic_function(x, p):
     """Looks like linear fit."""
 
     return (p[2] * x + p[0]) * (x - p[1])
+
+    # return p[0] + p[1] * x + p[2] * x**2
+
+    # return p[0] * (x - p[1])
 
 
 def simple_exponential_function(x, p):
@@ -122,3 +124,9 @@ def chi_squared_minimized_plateau_fit(data_array):
     denominator = np.sum(inverse_squared_data_array)
 
     return numerator / denominator
+
+
+def calculate_mean_and_error(values):
+    mean = np.mean(values)
+    error_of_the_mean = np.std(values) / np.sqrt(len(values))
+    return mean, error_of_the_mean

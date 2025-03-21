@@ -52,9 +52,6 @@ class JackknifeAnalysis:
             self.jackknife_replicas_of_original_2D_array, ddof=0, axis=0
         )
 
-        # print(jackknife_error**2)
-        # print(covariance_matrix)
-
         return gv.gvar(jackknife_average, jackknife_error)
         # return gv.gvar(jackknife_average, covariance_matrix)
 
@@ -108,7 +105,25 @@ def jackknife_correlated_error(jackknife_replicas, tau_int=0.5):
     return np.sqrt(variance)
 
 
-import numpy as np
+def calculate_jackknife_average_array(jackknife_samples_2D_array):
+    """
+    Computes the jackknife average and standard error for a given 2D array of jackknife samples.
+
+    Parameters:
+    - jackknife_samples_2D_array (np.ndarray): A 2D array where each row represents a jackknife sample.
+    - number_of_gauge_configurations (int): The total number of gauge configurations used in the jackknife resampling.
+
+    Returns:
+    - gvar.GVar: A generalized variable object containing the mean and standard error of the jackknife samples.
+    """
+
+    number_of_gauge_configurations = np.shape(jackknife_samples_2D_array)[0]
+
+    return gv.gvar(
+        np.average(jackknife_samples_2D_array, axis=0),
+        np.sqrt(number_of_gauge_configurations - 1)
+        * np.std(jackknife_samples_2D_array, ddof=0, axis=0),
+    )
 
 
 def weighted_mean(values, errors, factor=1):

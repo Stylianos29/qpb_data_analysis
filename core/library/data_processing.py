@@ -1,6 +1,6 @@
 import os
-import ast
 
+import numpy as np
 import pandas as pd
 import itertools
 import h5py
@@ -374,10 +374,6 @@ def extract_datasets_to_dict(hdf5_file_path, dataset_name, group_level=3):
     return data_dict
 
 
-import pandas as pd
-import h5py
-
-
 class DataHandler:
     def __init__(
         self,
@@ -543,7 +539,10 @@ class DataFrameAnalyzer:
 
         self.set_data_based_attributes()
 
+    # TODO: This must be renamed as the update method
     def set_data_based_attributes(self):
+
+        self.list_of_dataframe_fields = self.dataframe.columns.tolist()
 
         # Extract dictionary with single-valued fields and their values
         self.single_valued_fields_dictionary = self.get_single_valued_fields()
@@ -555,6 +554,12 @@ class DataFrameAnalyzer:
             set(self.list_of_tunable_parameter_names_from_dataframe)
             & set(self.multivalued_fields_dictionary.keys())
         )
+
+        self.tunable_single_valued_parameters_dictionary = {
+            parameter: value
+            for parameter, value in self.single_valued_fields_dictionary.items()
+            if parameter in self.list_of_tunable_parameter_names_from_dataframe
+        }
 
     def get_single_valued_fields(self) -> dict:
 
@@ -602,7 +607,9 @@ class DataFrameAnalyzer:
         print(self.reduced_tunable_parameters_list)
 
         if self.reduced_tunable_parameters_list:
-            return self.dataframe.groupby(self.reduced_tunable_parameters_list)
+            return self.dataframe.groupby(
+                self.reduced_tunable_parameters_list, observed=True
+            )
         else:
             return [(None, self.dataframe)]
 
@@ -629,3 +636,150 @@ class DataFrameAnalyzer:
 
         self.dataframe = self.original_dataframe
         self.set_data_based_attributes()
+
+
+class TableGenerator(DataFrameAnalyzer):
+    def __init__(self, dataframe: pd.DataFrame):
+        self.dataframe = dataframe
+
+    def generate_table(self, group_by_columns: list, aggregation_functions: dict):
+        """
+        Generate a table by grouping the DataFrame based on the specified columns
+        and applying the specified aggregation functions.
+
+        Parameters:
+        -----------
+        group_by_columns : list
+            A list of column names to group the DataFrame by.
+        aggregation_functions : dict
+            A dictionary mapping column names to aggregation functions.
+
+        Returns:
+        --------
+        pd.DataFrame
+            The generated table.
+        """
+        return self.dataframe.groupby(group_by_columns).agg(aggregation_functions)
+
+
+class HDF5Analyzer:
+    def __init__(self, hdf5_file_path: str):
+        """
+        Initialize the HDF5Analyzer.
+
+        Parameters:
+        -----------
+        hdf5_file_path : str
+            Path to the HDF5 file to analyze.
+        """
+        self.hdf5_file_path = hdf5_file_path
+        self.hdf5_file = h5py.File(hdf5_file_path, "r")
+
+    def list_datasets(self, group_path: str = "/") -> List[str]:
+        """
+        List all datasets in the specified group.
+
+        Parameters:
+        -----------
+        group_path : str, optional
+            Path to the group to list datasets from. Default is the root group.
+
+        Returns:
+        --------
+        List[str]
+            A list of dataset names in the specified group.
+        """
+        datasets = []
+
+        def visitor_func(name, obj):
+            if isinstance(obj, h5py.Dataset):
+                datasets.append(name)
+
+        self.hdf5_file[group_path].visititems(visitor_func)
+        return datasets
+
+    def get_dataset(self, dataset_path: str):
+        """
+        Retrieve a dataset from the HDF5 file.
+
+        Parameters:
+        -----------
+        dataset_path : str
+            Path to the dataset to retrieve.
+
+        Returns:
+        --------
+        np.ndarray
+            The dataset as a NumPy array.
+        """
+        return self.hdf5_file[dataset_path][()]
+
+    def get_attributes(self, object_path: str) -> Dict[str, any]:
+        """
+        Retrieve attributes of a specified object (group or dataset).
+
+        Parameters:
+        -----------
+        object_path : str
+            Path to the object to retrieve attributes from.
+
+        Returns:
+        --------
+        Dict[str, any]
+            A dictionary of attributes.
+        """
+        obj = self.hdf5_file[object_path]
+        return dict(obj.attrs)
+
+    def list_common_datasets(self, group_path: str) -> List[str]:
+        """
+        List common dataset names for all subgroups of a specific group.
+
+        Parameters:
+        -----------
+        group_path : str
+            Path to the group to analyze.
+
+        Returns:
+        --------
+        List[str]
+            A list of common dataset names.
+        """
+        subgroups = [obj for obj in self.hdf5_file[group_path].values() if isinstance(obj, h5py.Group)]
+        if not subgroups:
+            return []
+
+        common_datasets = set(subgroups[0].keys())
+        for subgroup in subgroups[1:]:
+            common_datasets.intersection_update(subgroup.keys())
+
+        return list(common_datasets)
+
+    def get_common_dataset_values(self, group_path: str, dataset_name: str) -> Dict[str, np.ndarray]:
+        """
+        Get values of a common dataset from all subgroups of a specific group.
+
+        Parameters:
+        -----------
+        group_path : str
+            Path to the group to analyze.
+        dataset_name : str
+            Name of the common dataset to retrieve values for.
+
+        Returns:
+        --------
+        Dict[str, np.ndarray]
+            A dictionary with subgroup names as keys and dataset values as NumPy arrays.
+        """
+        dataset_values = {}
+        subgroups = [obj for obj in self.hdf5_file[group_path].values() if isinstance(obj, h5py.Group)]
+        
+        for subgroup in subgroups:
+            if dataset_name in subgroup:
+                dataset_values[subgroup.name] = subgroup[dataset_name][()]
+        
+        return dataset_values
+
+    def close(self):
+        """Close the HDF5 file."""
+        self.hdf5_file.close()

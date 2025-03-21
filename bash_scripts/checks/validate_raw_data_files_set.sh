@@ -119,6 +119,7 @@ log "INFO" "$log_message"
 
 # COUNT THE NUMBERS OF DATA FILES BY TYPE
 
+# TODO: File paths are stored in these arrays and not file names.
 # Create lists of filenames per file type
 list_of_qpb_error_file_paths=($(\
                     find "$data_files_set_directory" -type f -name "*.err"))
@@ -157,11 +158,81 @@ fi
 if [[ $correlators_files_present == true ]]; then
     output_message+=", and ${number_of_qpb_correlators_files} qpb correlators "
     output_message+="files."
+
+    # initialize is_invert
+    is_invert=true
 else
     output_message+=", and no qpb correlators files."
 fi
 log "INFO" "$output_message"
 echo -e "++ $output_message"
+
+
+stored_qpb_error_files_list_file_path="${script_log_file_directory}"
+stored_qpb_error_files_list_file_path+="/list_of_stored_qpb_error_files.txt"
+check_if_file_exists "$stored_qpb_error_files_list_file_path" -c -s
+
+# Read the stored qpb log files list into an array
+mapfile -t list_of_stored_qpb_error_files < "$stored_qpb_error_files_list_file_path"
+# Initialize an array to store new qpb log file paths
+list_of_new_qpb_error_file_paths=()
+# Compare the two arrays and find new qpb log file paths
+for qpb_error_file in "${list_of_qpb_error_file_paths[@]}"; do
+    if [[ ! " ${list_of_stored_qpb_error_files[*]} " =~ " ${qpb_error_file} " ]]; then
+        list_of_new_qpb_error_file_paths+=("$qpb_error_file")
+    fi
+done
+# Assign the contents of the "list_of_new_qpb_error_file_paths" array to the
+# "list_of_qpb_error_file_paths" array, superseding its contents
+list_of_qpb_error_file_paths=("${list_of_new_qpb_error_file_paths[@]}")
+
+
+stored_qpb_log_files_list_file_path="${script_log_file_directory}"
+stored_qpb_log_files_list_file_path+="/list_of_stored_qpb_log_files.txt"
+check_if_file_exists "$stored_qpb_log_files_list_file_path" -c -s
+
+# Read the stored qpb log files list into an array
+mapfile -t list_of_stored_qpb_log_files < "$stored_qpb_log_files_list_file_path"
+# Initialize an array to store new qpb log file paths
+list_of_new_qpb_log_file_paths=()
+# Compare the two arrays and find new qpb log file paths
+for qpb_log_file in "${list_of_qpb_log_file_paths[@]}"; do
+    if [[ ! " ${list_of_stored_qpb_log_files[*]} " =~ " ${qpb_log_file} " ]]; then
+        list_of_new_qpb_log_file_paths+=("$qpb_log_file")
+    fi
+done
+# TODO: Anticipate the case of 0 new qpb log files
+
+# Assign the contents of the "list_of_new_qpb_log_file_paths" array to the
+# "list_of_qpb_log_file_paths" array, superseding its contents
+list_of_qpb_log_file_paths=("${list_of_new_qpb_log_file_paths[@]}")
+
+
+stored_qpb_correlators_files_list_file_path="${script_log_file_directory}"
+stored_qpb_correlators_files_list_file_path+="/list_of_stored_qpb_correlators_files.txt"
+check_if_file_exists "$stored_qpb_correlators_files_list_file_path" -c -s
+
+# Read the stored qpb log files list into an array
+mapfile -t list_of_stored_qpb_correlators_files < "$stored_qpb_correlators_files_list_file_path"
+# Initialize an array to store new qpb log file paths
+list_of_new_qpb_correlators_file_paths=()
+# Compare the two arrays and find new qpb log file paths
+for qpb_correlators_file in "${list_of_qpb_correlators_file_paths[@]}"; do
+    if [[ ! " ${list_of_stored_qpb_correlators_files[*]} " =~ " ${qpb_correlators_file} " ]]; then
+        list_of_new_qpb_correlators_file_paths+=("$qpb_correlators_file")
+    fi
+done
+# Assign the contents of the "list_of_new_qpb_correlators_file_paths" array to the
+# "list_of_qpb_correlators_file_paths" array, superseding its contents
+list_of_qpb_correlators_file_paths=("${list_of_new_qpb_correlators_file_paths[@]}")
+
+# Print the sum of the length of all three array variables
+sum_of_lengths=$(( ${#list_of_new_qpb_error_file_paths[@]} + ${#list_of_new_qpb_log_file_paths[@]} + ${#list_of_new_qpb_correlators_file_paths[@]} ))
+echo "A total of $sum_of_lengths new qpb files were added to the directory."
+
+echo "Error: ${#list_of_qpb_error_file_paths[@]}"
+echo "Log: ${#list_of_qpb_log_file_paths[@]}"
+echo "Correlators: ${#list_of_qpb_correlators_file_paths[@]}"
 
 # IDENTIFY QPB MAIN PROGRAM TYPE: INVERT OR NON-INVERT
 
@@ -183,14 +254,23 @@ while true; do
         "$INVERT_LOG_FILES_SUCCESS_FLAG" "include" list_of_invert_qpb_log_files
     number_of_invert_qpb_log_files=${#list_of_invert_qpb_log_files[@]}
 
+    echo "TEST: $number_of_invert_qpb_log_files"
+
     # Check for no valid qpb log file types in the directory at all.
     if [[ $number_of_non_invert_qpb_log_files -eq 0 && \
                                 $number_of_invert_qpb_log_files -eq 0 ]]; then
-        error_message="All data files were found to be corrupted. Validation "
-        error_message+="process will stop immediately! It is recommended that "
-        error_message+="new data files are provided for this data files set."
-        termination_output "$error_message"
-        exit 1
+        error_message="All data files were found to be corrupted."
+        # "Validation "
+        # error_message+="process will stop immediately! It is recommended that "
+        # error_message+="new data files are provided for this data files set."
+        # termination_output "$error_message"
+        # exit 1
+
+        for qpb_log_file in "${list_of_qpb_log_file_paths[@]}"; do
+            rm "$qpb_log_file"
+        done
+
+        break
     # Check for conflicting qpb log file types in the directory.
     elif [[ $number_of_non_invert_qpb_log_files -gt 0 && \
                                 $number_of_invert_qpb_log_files -gt 0 ]]; then
@@ -269,14 +349,15 @@ while true; do
     fi
 done
 
-# Conclusively determine the qpb main program type.
-if [[ $number_of_non_invert_qpb_log_files -eq 0 ]]; then
-    is_invert=true
-    log_message="Data files were generated by an 'invert' qpb main program."
-    log "INFO" "$log_message"
-else
-    is_invert=false
-fi
+# TODO: This needs to be restored.
+# # Conclusively determine the qpb main program type.
+# if [[ $number_of_non_invert_qpb_log_files -eq 0 ]]; then
+#     is_invert=true
+#     log_message="Data files were generated by an 'invert' qpb main program."
+#     log "INFO" "$log_message"
+# else
+#     is_invert=false
+# fi
 
 # Warn if "invert" is found in the relative path of a non-invert data files set
 # directory.
@@ -767,6 +848,21 @@ if [[ $is_invert == true ]]; then
         done
     fi
 fi
+
+# EXPORT LIST OF QPB FILES TO LIST FILES
+
+# Write the contents of the "list_of_qpb_log_file_paths" array to a file
+list_of_qpb_error_file_paths=($(\
+                    find "$data_files_set_directory" -type f -name "*.err"))
+printf "%s\n" "${list_of_qpb_error_file_paths[@]}" > "$stored_qpb_error_files_list_file_path"
+# Write the contents of the "list_of_qpb_log_file_paths" array to a file
+list_of_qpb_log_file_paths=($(\
+                    find "$data_files_set_directory" -type f -name "*.txt"))
+printf "%s\n" "${list_of_qpb_log_file_paths[@]}" > "$stored_qpb_log_files_list_file_path"
+# Write the contents of the "list_of_qpb_log_file_paths" array to a file
+list_of_qpb_correlators_file_paths=($(\
+                    find "$data_files_set_directory" -type f -name "*.dat"))
+printf "%s\n" "${list_of_qpb_correlators_file_paths[@]}" > "$stored_qpb_correlators_files_list_file_path"
 
 # SUCCESSFUL COMPLETION OUTPUT
 

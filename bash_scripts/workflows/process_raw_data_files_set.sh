@@ -207,6 +207,7 @@ python $python_script_path \
     --output_files_directory "$output_directory_path" \
     --output_csv_filename "$PREPROCESSED_CSV_FILENAME" \
     --output_hdf5_filename "$PREPROCESSED_HDF5_FILENAME" \
+    --enable_logging \
     --log_file_directory "$auxiliary_files_directory" \
     || failed_python_script $python_script_path
 
@@ -252,8 +253,8 @@ python_script_path+="/process_qpb_log_files_extracted_values.py"
 check_if_file_exists "$python_script_path" || exit 1
 
 python $python_script_path \
-    --input_csv_file_path $preprocessed_csv_file_path \
-    --input_hdf5_file_path $preprocessed_hdf5_file_path \
+    --input_single_valued_csv_file_path $preprocessed_csv_file_path \
+    --input_multivalued_hdf5_file_path $preprocessed_hdf5_file_path \
     --output_files_directory "$output_directory_path" \
     --output_csv_filename $PROCESSED_VALUES_CSV_FILENAME \
     --log_file_directory "$auxiliary_files_directory" \
@@ -296,6 +297,7 @@ if find "$raw_data_files_set_directory" \
         --qpb_correlators_files_directory "$raw_data_files_set_directory" \
         --output_files_directory "$output_directory_path" \
         --output_hdf5_filename "$CORRELATORS_VALUES_HDF5_FILENAME" \
+        --enable_logging \
         --log_file_directory "$auxiliary_files_directory" \
     || failed_python_script $python_script_path
 

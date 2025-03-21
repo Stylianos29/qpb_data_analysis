@@ -1,3 +1,18 @@
+# TODO: Write a detailed introductory commentary
+"""
+post_processing_analysis/process_qpb_log_files_extracted_values.py
+
+Summary:
+
+Input:
+
+Output:
+
+Functionality:
+
+Usage:
+"""
+
 import os
 import sys
 
@@ -15,34 +30,36 @@ import copy
 from library import (
     filesystem_utilities,
     effective_mass,
-    plotting,
+    custom_plotting,
     momentum_correlator,
     jackknife_analysis,
+    PROCESSED_DATA_FILES_DIRECTORY,
 )
 
 
 @click.command()
 @click.option(
-    "--input_PCAC_mass_correlator_hdf5_file_path",
-    "input_PCAC_mass_correlator_hdf5_file_path",
-    "-PCAC_hdf5",
+    "-in_jack_hdf5",
+    "--input_correlators_jackknife_analysis_hdf5_file_path",
+    "input_correlators_jackknife_analysis_hdf5_file_path",
     required=True,
-    # default="/nvme/h/cy22sg1/qpb_data_analysis/data_files/processed/invert/Chebyshev_several_config_varying_N/PCAC_mass_correlator_values.h5",
-    help="Path to input HDF5 file containing extracted correlators values.",
+    callback=filesystem_utilities.validate_input_HDF5_file,
+    help="Path to HDF5 file containing extracted correlators values.",
 )
 @click.option(
+    "-out_dir",
     "--output_files_directory",
     "output_files_directory",
-    "-out_dir",
     default=None,
+    callback=filesystem_utilities.validate_directory,
     help="Path to directory where all output files will be stored.",
 )
 @click.option(
+    "-plots_dir",
     "--plots_directory",
     "plots_directory",
-    "-plots_dir",
-    default="../../output/plots",
-    # default="/nvme/h/cy22sg1/qpb_data_analysis/output/plots/invert/Chebyshev_several_config_varying_N",
+    default="../../../output/plots",
+    callback=filesystem_utilities.validate_directory,
     help="Path to the output directory for storing plots.",
 )
 @click.option(
@@ -70,219 +87,241 @@ from library import (
     help="Enable zooming in on effective mass correlators plots.",
 )
 @click.option(
+    "-out_csv_name",
     "--output_pion_effective_mass_estimates_csv_filename",
     "output_pion_effective_mass_estimates_csv_filename",
-    "-out_csv",
     default="pion_effective_mass_estimates.csv",
-    help="Specific name for the output HDF5 file.",
+    callback=filesystem_utilities.validate_output_csv_filename,
+    help="Specific name for the output .csv file.",
 )
 @click.option(
+    "-log_on",
+    "--enable_logging",
+    "enable_logging",
+    is_flag=True,
+    default=False,
+    help="Enable logging.",
+)
+@click.option(
+    "-log_file_dir",
     "--log_file_directory",
     "log_file_directory",
-    "-log_file_dir",
     default=None,
+    callback=filesystem_utilities.validate_script_log_file_directory,
     help="Directory where the script's log file will be stored.",
 )
 @click.option(
+    "-log_name",
     "--log_filename",
     "log_filename",
-    "-log",
     default=None,
+    callback=filesystem_utilities.validate_script_log_filename,
     help="Specific name for the script's log file.",
 )
 def main(
-    input_PCAC_mass_correlator_hdf5_file_path,
+    input_correlators_jackknife_analysis_hdf5_file_path,
     output_files_directory,
     plots_directory,
     plot_g5g5_correlators,
     plot_effective_mass_correlators,
     zoom_in_effective_mass_correlators_plots,
     output_pion_effective_mass_estimates_csv_filename,
+    enable_logging,
     log_file_directory,
     log_filename,
 ):
-    # VALIDATE INPUT ARGUMENTS
-
-    if not filesystem_utilities.is_valid_file(
-        input_PCAC_mass_correlator_hdf5_file_path
-    ):
-        error_message = "Passed correlator values HDF5 file path is invalid."
-        print("ERROR:", error_message)
-        sys.exit(1)
+    # HANDLE EMPTY INPUT ARGUMENTS
 
     # If no output directory is provided, use the directory of the input file
     if output_files_directory is None:
         output_files_directory = os.path.dirname(
-            input_PCAC_mass_correlator_hdf5_file_path
+            input_correlators_jackknife_analysis_hdf5_file_path
         )
-    # Check validity if the provided
-    elif not filesystem_utilities.is_valid_file(output_files_directory):
-        error_message = (
-            "Passed output files directory path is invalid " "or not a directory."
-        )
-        print("ERROR:", error_message)
-        print("Exiting...")
-        sys.exit(1)
-
-    if not filesystem_utilities.is_valid_directory(plots_directory):
-        error_message = "The specified plots directory path is invalid."
-        print("ERROR:", error_message)
-        sys.exit(1)
-
-    # Specify current script's log file directory
-    if log_file_directory is None:
-        log_file_directory = output_files_directory
-    elif not filesystem_utilities.is_valid_directory(log_file_directory):
-        error_message = (
-            "Passed directory path to store script's log file is "
-            "invalid or not a directory."
-        )
-        print("ERROR:", error_message)
-        print("Exiting...")
-        sys.exit(1)
-
-    # Get the script's filename
-    script_name = os.path.basename(__file__)
-
-    if log_filename is None:
-        log_filename = script_name.replace(".py", "_python_script.log")
-
-    # Check for proper extensions in provided output filenames
-    if not output_pion_effective_mass_estimates_csv_filename.endswith(".csv"):
-        output_pion_effective_mass_estimates_csv_filename = (
-            output_pion_effective_mass_estimates_csv_filename + ".csv"
-        )
-    if not log_filename.endswith(".log"):
-        log_filename = log_filename + ".log"
 
     # INITIATE LOGGING
 
-    filesystem_utilities.setup_logging(log_file_directory, log_filename)
+    # Setup logging
+    logger = filesystem_utilities.LoggingWrapper(
+        log_file_directory, log_filename, enable_logging
+    )
 
-    # # Create a logger instance for the current script using the script's name.
-    # logger = logging.getLogger(__name__)
-
-    # Get the script's filename
-    script_name = os.path.basename(__file__)
-
-    # Initiate logging
-    logging.info(f"Script '{script_name}' execution initiated.")
+    # Log script start
+    logger.initiate_script_logging()
 
     # CREATE PLOTS SUBDIRECTORIES
 
-    if plot_g5g5_correlators or plot_effective_mass_correlators:
-        # Create main plots directory if it does not exist
+    # Create main plots directory if does not exist if any plots were requested
+    if any([plot_g5g5_correlators, plot_effective_mass_correlators]):
         plots_main_subdirectory = filesystem_utilities.create_subdirectory(
-            plots_directory, "pion_effective_mass_calculation"
+            plots_directory,
+            "Effective_mass_calculation",
         )
 
-    # Create deeper-level subdirectories if requested
+    # Create deeper-level subdirectories if specific plots were requested
     if plot_g5g5_correlators:
+        g5g5_plots_base_name = "g5g5_correlator"
         g5g5_plots_subdirectory = filesystem_utilities.create_subdirectory(
-            plots_main_subdirectory, "g5g5_correlator_values", clear_contents=True
+            plots_main_subdirectory,
+            g5g5_plots_base_name + "_values",
+            clear_contents=True,
         )
-
+        logger.info("Subdirectory for g5-g5 correlator plots created.")
     if plot_effective_mass_correlators:
+        effective_mass_plots_base_name = "effective_mass_correlator"
         effective_mass_plots_subdirectory = filesystem_utilities.create_subdirectory(
-            plots_main_subdirectory, "effective_mass_correlator", clear_contents=True
+            plots_main_subdirectory,
+            effective_mass_plots_base_name + "_values",
+            clear_contents=True,
         )
+        logger.info("Subdirectory for pion effective mass correlator plots created.")
 
     # IMPORT DATASETS AND METADATA
 
     # Open the input HDF5 file for reading
-    with h5py.File(input_PCAC_mass_correlator_hdf5_file_path, "r") as hdf5_file:
+    with h5py.File(
+        input_correlators_jackknife_analysis_hdf5_file_path, "r"
+    ) as hdf5_file:
 
-        # Initialize group structure of the output HDF5 file
-        # NOTE: The assumption here is that the name of the raw data files
-        # directory represents the data files set and its parent
-        # directory the qpb main program that generated the data files
-        parent_directory_name, data_files_set_name = (
-            filesystem_utilities.extract_directory_names(output_files_directory)
+        # Construct the path to the processed data files set directory
+        processed_data_files_set_directory = os.path.dirname(
+            input_correlators_jackknife_analysis_hdf5_file_path
         )
+        # The top HDF5 file groups (for both HDF5 files) mirror the directory
+        # structure of the data files set directory itself and its parent
+        # directories relative to the 'PROCESSED_DATA_FILES_DIRECTORY' directory
+        input_data_files_set_group = filesystem_utilities.get_hdf5_target_group(
+            hdf5_file,
+            PROCESSED_DATA_FILES_DIRECTORY,
+            processed_data_files_set_directory,
+            logger=None,
+        )
+        logger.info("Top groups of the input HDF5 file identified.")
 
-        # Select input HDF5 file's group to read
-        input_qpb_main_program_group = hdf5_file[parent_directory_name]
-        input_data_files_set_group = input_qpb_main_program_group[data_files_set_name]
+        # Ensure if input HDF5 file contains any data before initiating analysis
+        if not filesystem_utilities.has_subgroups(input_data_files_set_group):
+            logger.critical(
+                "Input HDF5 file does not contain any data to analyze!", to_console=True
+            )
+            sys.exit(1)
 
-        # Extract attributes of top-level groups into a dictionary
-        fields_with_unique_values_dictionary = {
+        # Extract attributes of top-level groups into a dictionary.
+        # NOTE: By construction the attributes of the top level groups are the
+        # values of the parameters with a single unique value
+        single_valued_parameters_dictionary = {
             parameter: attribute
             for parameter, attribute in input_data_files_set_group.attrs.items()
         }
 
         # List to pass values to dataframe
         pion_effective_mass_estimates_list = []
-
         # Loop over all PCAC mass correlator Jackknife analysis groups
         for (
-            PCAC_mass_correlator_analysis_group_name,
-            PCAC_mass_correlator_analysis_group,
+            correlators_jackknife_analysis_group_name,
+            correlators_jackknife_analysis_group,
         ) in input_data_files_set_group.items():
 
             # Cautionary check if the item is a HDF5 group
-            if not isinstance(PCAC_mass_correlator_analysis_group, h5py.Group):
-                # TODO: Log warning
+            if not isinstance(correlators_jackknife_analysis_group, h5py.Group):
+                logger.warning(
+                    f"'{correlators_jackknife_analysis_group_name}' is not a "
+                    "subgroup of the input HDF5 file.",
+                    to_console=True,
+                )
                 continue
+
+            # STORE PARAMETER VALUES AND DATASETS FOR CURRENT JACKKNIFE ANALYSIS
 
             # Initialize the parameters values dictionary
             parameters_value_dictionary = copy.deepcopy(
-                fields_with_unique_values_dictionary
+                single_valued_parameters_dictionary
             )
 
-            # Create a separate metadata dictionary for later use
-            metadata_dictionary = dict()
+            # Create a separate metadata dictionary containing attribute values
+            # from the current jackknife analysis subgroup for later use.
+            # NOTE: By design, the attributes of jackknife analysis subgroups
+            # correspond to specific values of the multivalued parameters used
+            # in forming the jackknife analysis dataframe groupings. Other
+            # multivalued parameters that were not used in these groupings were
+            # not stored as attributes. Instead, they were stored as datasets,
+            # containing lists of values for each specific jackknife analysis
+            # grouping.
+            metadata_dictionary = {}
             for (
                 parameter,
                 attribute,
-            ) in PCAC_mass_correlator_analysis_group.attrs.items():
+            ) in correlators_jackknife_analysis_group.attrs.items():
                 metadata_dictionary[parameter] = attribute
 
-            # Append metadata dictionary
+            # Merge the metadata dictionary into the parameters values dictionary.
             parameters_value_dictionary.update(metadata_dictionary)
 
-            # Import g5-g5 correlator Jackknife average dataset
+            # Store jackknife analysis identifier
+            parameters_value_dictionary["Jackknife_analysis_identifier"] = (
+                correlators_jackknife_analysis_group_name
+            )
+
+            # Import jackknife average of the g5-g5 correlator from both mean
+            # and error values datasets
+
+            # TODO: Assign these datasets names to a centralized constant such
+            # that any changes to names do not break down the whole script
             jackknife_average_g5g5_correlator_array = gv.gvar(
-                PCAC_mass_correlator_analysis_group[
-                    "jackknife_average_of_g5_g5_correlator_mean_values"
+                correlators_jackknife_analysis_group[
+                    "Jackknife_average_of_g5_g5_correlator_mean_values"
                 ][:],
-                PCAC_mass_correlator_analysis_group[
-                    "jackknife_average_of_g5_g5_correlator_error_values"
+                correlators_jackknife_analysis_group[
+                    "Jackknife_average_of_g5_g5_correlator_error_values"
                 ][:],
+            )
+            logger.info(
+                "Jackknife average of g5-g5 correlator dataset was loaded as "
+                "a NumPy array."
             )
 
             # Import Jackknife replicas datasets of g5-g5 correlators
-            jackknife_replicas_of_g5g5_correlator_2D_array = (
-                PCAC_mass_correlator_analysis_group[
-                    "jackknife_samples_of_g5_g5_correlator_2D_array"
+            jackknife_samples_of_g5g5_correlators_2D_array = (
+                correlators_jackknife_analysis_group[
+                    "Jackknife_samples_of_g5_g5_correlator_2D_array"
                 ][:]
+            )
+            logger.info(
+                "Jackknife samples of g5-g5 correlators datasets were loaded "
+                "as a NumPy 2D array."
             )
 
             # SYMMETRIZE G5-G5 CORRELATORS
 
+            # Precautionary symmetrization of the g5g-g5 correlators
             jackknife_average_g5g5_correlator_array = (
                 momentum_correlator.symmetrization(
                     jackknife_average_g5g5_correlator_array
                 )
             )
+            logger.info("Jackknife average of g5-g5 correlators was symmetrized.")
 
-            jackknife_replicas_of_g5g5_correlator_2D_array = np.array(
+            jackknife_samples_of_g5g5_correlators_2D_array = np.array(
                 [
                     momentum_correlator.symmetrization(g5_g5_correlator_replica)
-                    for g5_g5_correlator_replica in jackknife_replicas_of_g5g5_correlator_2D_array
+                    for g5_g5_correlator_replica in jackknife_samples_of_g5g5_correlators_2D_array
                 ]
             )
+            logger.info("Jackknife samples of g5-g5 correlators were symmetrized.")
 
             # CALCULATE EFFECTIVE MASS CORRELATORS
 
-            # Halved effective mass replica correlator values from Jackknife
+            # Halved effective mass replica correlator values from jackknife
             # replicas of g5g5 correlator values
             effective_mass_correlator_replicas_2D_array = np.array(
                 [
                     effective_mass.calculate_two_state_periodic_effective_mass_correlator(
                         g5_g5_correlator_replica
                     )
-                    for g5_g5_correlator_replica in jackknife_replicas_of_g5g5_correlator_2D_array
+                    for g5_g5_correlator_replica in jackknife_samples_of_g5g5_correlators_2D_array
                 ]
+            )
+            logger.info(
+                "Jackknife samples of pion effective mass correlators were "
+                "calculated."
             )
 
             jackknife_average_effective_mass_correlator = np.mean(
@@ -295,6 +334,8 @@ def main(
                 )
             )
 
+            integrated_autocorrelation_time = 1
+
             jackknife_average_effective_mass_correlator = gv.gvar(
                 jackknife_average_effective_mass_correlator,
                 jackknife_analysis.jackknife_correlated_error(
@@ -302,12 +343,18 @@ def main(
                     integrated_autocorrelation_time,
                 ),
             )
+            logger.info(
+                "Jackknife average of the pion effective mass correlators was "
+                "calculated."
+            )
 
             # VALIDATE VALUES OF IMPORTANT PARAMETERS
 
             # Ensuring the important parameter values of temporal lattice size
             # and number of gauge configurations are stored and available
-            temporal_lattice_size = len(jackknife_average_g5g5_correlator_array)
+            temporal_lattice_size = np.shape(
+                jackknife_samples_of_g5g5_correlators_2D_array
+            )[1]
             if "Temporal_lattice_size" not in parameters_value_dictionary:
                 parameters_value_dictionary["Temporal_lattice_size"] = (
                     temporal_lattice_size
@@ -316,10 +363,15 @@ def main(
                 parameters_value_dictionary["Temporal_lattice_size"]
                 != temporal_lattice_size
             ):
-                pass
-                # TODO: Log warning
+                logger.warning(
+                    f"{correlators_jackknife_analysis_group_name}: Discrepancy "
+                    "between the stored temporal lattice size value and the "
+                    "size of the PCAC mass correlators NumPy 2D array.",
+                    to_console=True,
+                )
+
             number_of_gauge_configurations = np.shape(
-                jackknife_replicas_of_g5g5_correlator_2D_array
+                jackknife_samples_of_g5g5_correlators_2D_array
             )[0]
             if "Number_of_gauge_configurations" not in parameters_value_dictionary:
                 parameters_value_dictionary["Number_of_gauge_configurations"] = (
@@ -329,34 +381,46 @@ def main(
                 parameters_value_dictionary["Number_of_gauge_configurations"]
                 != number_of_gauge_configurations
             ):
-                pass
-                # TODO: Log warning
+                logger.warning(
+                    f"{correlators_jackknife_analysis_group_name}: Discrepancy "
+                    "between the stored number of gauge configurations value "
+                    "and the size of the PCAC mass correlators NumPy 2D array.",
+                    to_console=True,
+                )
+            logger.info(
+                "The values for temporal lattice size and the number of gauge "
+                "configurations were validated."
+            )
 
             # CALCULATE FURTHER USEFUL QUANTITIES
 
             if (
-                "Total_calculation_time_values_array"
-                in PCAC_mass_correlator_analysis_group
+                "Adjusted_average_core_hours_per_spinor"
+                in correlators_jackknife_analysis_group
                 and isinstance(
-                    PCAC_mass_correlator_analysis_group[
-                        "Total_calculation_time_values_array"
+                    correlators_jackknife_analysis_group[
+                        "Adjusted_average_core_hours_per_spinor"
                     ],
                     h5py.Dataset,
                 )
             ):
                 parameters_value_dictionary[
-                    "Average_calculation_time_per_spinor_per_configuration"
+                    "Adjusted_average_core_hours_per_spinor_per_configuration"
                 ] = np.average(
-                    PCAC_mass_correlator_analysis_group[
-                        "Total_calculation_time_values_array"
+                    correlators_jackknife_analysis_group[
+                        "Adjusted_average_core_hours_per_spinor"
                     ][:]
                 )
+            logger.info(
+                "The adjusted average core hours per spinor per configuration "
+                "was calculated."
+            )
 
             if (
                 "Average_number_of_MV_multiplications_per_spinor_values_array"
-                in PCAC_mass_correlator_analysis_group
+                in correlators_jackknife_analysis_group
                 and isinstance(
-                    PCAC_mass_correlator_analysis_group[
+                    correlators_jackknife_analysis_group[
                         "Average_number_of_MV_multiplications_per_spinor_values_array"
                     ],
                     h5py.Dataset,
@@ -365,27 +429,41 @@ def main(
                 parameters_value_dictionary[
                     "Average_number_of_MV_multiplications_per_spinor_per_configuration"
                 ] = np.average(
-                    PCAC_mass_correlator_analysis_group[
+                    correlators_jackknife_analysis_group[
                         "Average_number_of_MV_multiplications_per_spinor_values_array"
                     ][:]
                 )
+            logger.info(
+                "The average number of mv multiplications per spinor per "
+                "configuration was calculated."
+            )
+
+            logger.info(
+                f"{correlators_jackknife_analysis_group_name}: Parameter "
+                "values dictionary created and filled."
+            )
 
             ### CALCULATE PLATEAU AND TWO-STATE RANGE FOR EFFECTIVE MASS FIT ###
+            """
+            In this section The aim.
+            """
 
             # CALCULATE GUESS PARAMETERS FOR G5G5 CORRELATORS SINGLE-STATE FITS
+            """
+            Fitting begins with a naive guess of the amplitude of the g5-g5
+            time-dependent correlator C(t) and the pion effective mass estimate.
+            Assuming that either the left or the right symmetric part of C(t)
+            has a A e^(-m t) form.
+            """
 
-            """Fitting begins with a naive guess of the amplitude of the
-            g5-g5 time-dependent correlator C(t) and the effective mass
-            estimate. Assuming that either the left or the right symmetric part
-            of C(t) has a A e^(-m t) form """
-            """Usually the time-dependent pion effective mass values at
-            about t=T/4 are a good estimate of the plateau fit effective mass
-            estimate, and this the reason it can be used as an effective mass
-            guess for the single-state g5-g5 correlator, and correspondingly for
-            its amplitude."""
-
+            # NOTE: Usually the time-dependent pion effective mass values at
+            # about t=T/4 are a good estimate of the plateau fit effective mass
+            # estimate, and this the reason it can be used as a naive effective
+            # mass guess for the single-state g5-g5 correlator, and
+            # correspondingly for its amplitude.
             guess_index = temporal_lattice_size // 4
 
+            # Pion effective mass guess
             single_state_non_periodic_effective_mass_correlator = effective_mass.calculate_single_state_non_periodic_effective_mass_correlator(
                 jackknife_average_g5g5_correlator_array
             )
@@ -393,6 +471,7 @@ def main(
                 single_state_non_periodic_effective_mass_correlator[guess_index]
             )
 
+            # Amplitude factor guess
             amplitude_factor_guess = (
                 momentum_correlator.amplitude_of_single_state_non_periodic_correlator(
                     jackknife_average_g5g5_correlator_array,
@@ -403,14 +482,31 @@ def main(
             amplitude_factor_guess = gv.mean(amplitude_factor_guess)
 
             # EXTRACT BETTER GUESS PARAMETERS FROM SINGLE STATE NON PERIODIC FIT
+            """
+            Improve fitting guess parameters by fitting on the jackknife average
+            of the g5-g5 correlator a single-state non-periodic exponential
+            function using the naive guesses for pion effective mass estimate
+            and aptitude factor previously calculated.
+
+            The choice of the single-state non-periodic exponential function to
+            be used for this fitting was made for simplicity. However, its
+            non-periodicity restricts its usefulness to half the (periodic)
+            g5-g5 correlator.
+            """
 
             y = jackknife_average_g5g5_correlator_array
             x = np.arange(len(y))
 
-            # A limited fit range
+            # Set arbitrarily (T//4-T//8, T//4+T//8) as the fitting range
+
+            # NOTE: The reason this range was chose is because it is expected to
+            # exhibit the smoothest behavior for single-state exponential
+            # fitting
             single_state_non_periodic_fit_range = np.arange(
                 guess_index - guess_index // 2, guess_index + guess_index // 2
             )
+            # Use the previously calculated pion effective mass estimate and
+            # aptitude factor as guess parameters for fitting
             g5_g5_correlator_single_state_non_periodic_fit_p0 = [
                 amplitude_factor_guess,
                 effective_mass_guess,
@@ -425,20 +521,30 @@ def main(
                 debug=True,
             )
 
-            # PLOT G5-G5 CORRELATOR FOR TESTING GUESS PARAMETERS IF REQUESTED
+            # PLOT G5-G5 CORRELATOR FOR ASSESSING GUESS PARAMETERS IF REQUESTED
+            """
+            Plotting the jackknife average of the g5-g5 correlator, if
+            requested, to evaluate the fit of the single-state non-periodic
+            exponential function and assess the quality of the resulting
+            best-fit parameters.
+            """
 
             if plot_g5g5_correlators:
+
                 # Exclude first point for a more symmetrical shape
-                x = x[1:]
-                y = y[1:]
+                starting_time = 1
+                y = jackknife_average_g5g5_correlator_array[starting_time:]
+                x = np.arange(starting_time, len(y) + starting_time)
 
                 fig, ax = plt.subplots()
+
                 ax.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
 
                 ax.set(xlabel="$t/a$", ylabel="$C(t)$")
                 ax.set_yscale("log")
+                ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
-                plot_title = plotting.DataPlotter._construct_plot_title(
+                plot_title = custom_plotting.DataPlotter._construct_plot_title(
                     None,
                     leading_substring="",
                     metadata_dictionary=metadata_dictionary,
@@ -447,10 +553,21 @@ def main(
                 )
                 ax.set_title(f"{plot_title}", pad=8)
 
-                ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-
                 ax.errorbar(
                     x, gv.mean(y), yerr=gv.sdev(y), fmt=".", markersize=8, capsize=10
+                )
+
+                ax.axvline(
+                    x[single_state_non_periodic_fit_range.min()],
+                    color="green",
+                    linestyle="--",
+                    alpha=0.5,
+                )
+                ax.axvline(
+                    x[single_state_non_periodic_fit_range.max()],
+                    color="green",
+                    linestyle="--",
+                    alpha=0.5,
                 )
 
                 # Plot single-state periodic curve using fit non-periodic parameters
@@ -473,20 +590,25 @@ def main(
                     label=label_string,
                 )
 
-                ax.legend(loc="upper center")
+                ax.legend(loc="upper center", framealpha=1.0)
 
                 current_plots_base_name = "g5g5_average_correlator"
-                plot_path = plotting.DataPlotter._generate_plot_path(
+                plot_path = custom_plotting.DataPlotter._generate_plot_path(
                     None,
                     g5g5_plots_subdirectory,
                     current_plots_base_name,
                     metadata_dictionary,
-                    single_valued_fields_dictionary=fields_with_unique_values_dictionary,
+                    single_valued_fields_dictionary=parameters_value_dictionary,
                 )
                 fig.savefig(plot_path)
                 plt.close()
 
             # PLATEAU RANGE FOR EFFECTIVE MASS CORRELATOR
+            """
+            Use the resulting best-fit parameters from the the single-state
+            non-periodic exponential function fit on the jackknife average of
+            the g5-g5 correlator to calculate 
+            """
 
             sigma_criterion_factor = 1.0
             plateau_indices_list = []
@@ -588,13 +710,13 @@ def main(
                 fig, ax = plt.subplots()
                 ax.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
 
-                plot_title = plotting.DataPlotter._construct_plot_title(
+                plot_title = custom_plotting.DataPlotter._construct_plot_title(
                     None,
                     leading_substring="",
-                    # metadata_dictionary=dict(),
+                    # metadata_dictionary={},
                     metadata_dictionary=metadata_dictionary,
                     title_width=110,
-                    fields_unique_value_dictionary=fields_with_unique_values_dictionary,
+                    fields_unique_value_dictionary=single_valued_parameters_dictionary,
                     additional_excluded_fields=[
                         "Average_calculation_time_per_spinor_per_configuration",
                         "Average_number_of_MV_multiplications_per_spinor_per_configuration",
@@ -654,12 +776,12 @@ def main(
                 ax.legend(loc="upper right")
 
                 current_plots_base_name = "effective_mass_correlator"
-                plot_path = plotting.DataPlotter._generate_plot_path(
+                plot_path = custom_plotting.DataPlotter._generate_plot_path(
                     None,
                     effective_mass_plots_subdirectory,
                     current_plots_base_name,
                     metadata_dictionary,
-                    single_valued_fields_dictionary=fields_with_unique_values_dictionary,
+                    single_valued_fields_dictionary=single_valued_parameters_dictionary,
                 )
 
                 fig.savefig(plot_path)
@@ -687,10 +809,10 @@ def main(
         # Export the DataFrame to a CSV file
         pion_effective_mass_estimates_dataframe.to_csv(csv_file_full_path, index=False)
 
-    # Terminate logging
-    logging.info(f"Script '{script_name}' execution terminated successfully.")
+    click.echo("   -- Pion effective mass estimates calculation completed.")
 
-    print("   -- Pion effective mass estimates calculation completed.")
+    # Terminate logging
+    logger.terminate_script_logging()
 
 
 if __name__ == "__main__":

@@ -49,7 +49,6 @@ import os
 import pandas as pd
 import h5py
 import click
-import logging
 
 from library import extraction, filesystem_utilities, RAW_DATA_FILES_DIRECTORY
 
@@ -202,7 +201,7 @@ def main(
                 extracted_values_from_filename_dictionary[parameter_name]
                 != extracted_values_dictionary[parameter_name]
             ):
-                logging.warning(
+                logger.warning(
                     f"Mismatch for '{parameter_name}' parameter in file {qpb_log_filename}. "
                     f"Filename value: {extracted_values_from_filename_dictionary[parameter_name]}, "
                     f"file contents value: {extracted_values_dictionary[parameter_name]}."
@@ -211,7 +210,7 @@ def main(
         # Append extracted values dictionary to the list of parameters
         single_valued_parameter_values_list.append(extracted_values_dictionary)
 
-    logging.info(
+    logger.info(
         f"A total of {count} qpb log files were parsed for parameter values "
         f"extraction from the '{os.path.basename(qpb_log_files_directory)}' "
         "raw data files set directory."
@@ -227,7 +226,7 @@ def main(
 
     # Export dataframe to .cvs file
     parameter_values_dataframe.to_csv(csv_file_full_path, index=False)
-    logging.info(
+    logger.info(
         f"Extracted single-valued parameters are stored in the "
         f"'{output_csv_filename}' file."
     )
@@ -277,7 +276,7 @@ def main(
                 # Create a dataset for each parameter in the file
                 qpb_log_file_group.create_dataset(parameter, data=values)
 
-    logging.info(
+    logger.info(
         f"Extracted multivalued parameters are stored in the "
         f"'{output_hdf5_filename}' file."
     )

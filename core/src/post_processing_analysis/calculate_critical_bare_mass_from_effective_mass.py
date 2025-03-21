@@ -1,3 +1,18 @@
+# TODO: Write a detailed introductory commentary
+"""
+post_processing_analysis/process_qpb_log_files_extracted_values.py
+
+Summary:
+
+Input:
+
+Output:
+
+Functionality:
+
+Usage:
+"""
+
 import os
 import sys
 
@@ -10,7 +25,12 @@ import logging
 import pandas as pd
 import copy
 
-from library import filesystem_utilities, plotting, data_processing, fit_functions
+from library import (
+    filesystem_utilities,
+    custom_plotting,
+    data_processing,
+    fit_functions,
+)
 
 ANNOTATE_DATA_POINTS = True
 
@@ -35,7 +55,7 @@ ANNOTATE_DATA_POINTS = True
     "--plots_directory",
     "plots_directory",
     "-plots_dir",
-    default="../../output/plots",
+    default="../../../output/plots",
     # default="/nvme/h/cy22sg1/qpb_data_analysis/output/plots/invert/KL_several_config_varying_n",
     help="Path to the output directory for storing plots.",
 )
@@ -156,11 +176,11 @@ def main(
     if plot_critical_bare_mass:
         # Create main plots directory if it does not exist
         plots_main_subdirectory = filesystem_utilities.create_subdirectory(
-            plots_directory, "critical_bare_mass_calculation"
+            plots_directory, "Critical_bare_mass_calculation"
         )
 
         # Create deeper-level subdirectories if requested
-        critical_bare_mass_plots_base_name = "critical_bare_mass"
+        critical_bare_mass_plots_base_name = "Critical_bare_mass"
         critical_bare_mass_plots_subdirectory = filesystem_utilities.create_subdirectory(
             plots_main_subdirectory,
             critical_bare_mass_plots_base_name + "_from_pion_effective_mass",
@@ -200,7 +220,8 @@ def main(
 
     critical_bare_mass_values_list = []
     for value, group in effective_mass_estimates_dataframe.groupby(
-        tunable_multivalued_parameters_list
+        tunable_multivalued_parameters_list,
+        observed=True,
     ):
         # Check for a minimum amount of data point
         if group["Bare_mass"].nunique() < 3:
@@ -221,28 +242,42 @@ def main(
         number_of_gauge_configurations_array = group[
             "Number_of_gauge_configurations"
         ].to_numpy()
-        bare_mass__values_array = group["Bare_mass"].to_numpy()
+        bare_mass_values_array = group["Bare_mass"].to_numpy()
         pion_effective_mass_estimates_array = gv.gvar(
             group["Pion_effective_mass_estimate"].to_numpy()
         )
 
-        x = bare_mass__values_array
+        x = bare_mass_values_array
         y = pion_effective_mass_estimates_array
         y = np.square(y)
+
+        mask = x < 0.2  # & (x > 0.05)  # 0.11
+
+        if len(x[mask]) <= 4:
+            continue
 
         # FITS
         if fit_for_critical_bare_mass:
 
+            # Linear fit
+
+            condition = x < 0.1
+
+            x = x[condition]
+            y = y[condition]
+
             # Find indices of min(x) and max(x)
-            min_index = np.argmin(x)
             max_index = np.argmax(x)
+            min_index = np.argmin(x)
 
             # Get y values corresponding to min(x) and max(x)
+            x_min = x[min_index]
+            x_max = x[max_index]
             y_min = y[min_index]
             y_max = y[max_index]
 
-            slope = (y_max - y_min) / (np.max(x) - np.min(x))
-            x_intercept = y_min / slope + np.min(x)
+            slope = (y_max - y_min) / (x_max - x_min)
+            x_intercept = y_min / slope + x_min
             linear_fit_p0 = gv.mean([slope, x_intercept])
             linear_fit = lsqfit.nonlinear_fit(
                 data=(x, y),
@@ -257,10 +292,36 @@ def main(
             if len(y):
                 FIT_QUADRATIC_FUNCTION = True
 
+                condition = bare_mass_values_array < 0.1
+
+                x = bare_mass_values_array[condition]
+                y = pion_effective_mass_estimates_array[condition]
+                y = np.square(y)
+
+                # Find indices of min(x) and max(x)
+                min_index = np.argmin(x)
+                max_index = np.argmax(x)
+
+                # Get y values corresponding to min(x) and max(x)
+                x_min = x[min_index]
+                x_max = x[max_index]
+                y_min = y[min_index]
+                y_max = y[max_index]
+
+                # slope = (y_max - y_min) / (x_max - x_min)
+                # x_intercept = y_min / slope + x_min
+                # quadratic_fit_p0 = gv.mean([slope, x_intercept])
+
+                # quadratic_fit_p0 = [
+                #     gv.mean(linear_fit.p[0]),
+                #     gv.mean(critical_bare_mass_value),
+                #     # 0.01 * gv.mean(critical_bare_mass_value)*0,
+                #     0.1*gv.mean(linear_fit.p[0])/gv.mean(critical_bare_mass_value)
+                # ]
                 quadratic_fit_p0 = [
+                    0.1,
                     gv.mean(linear_fit.p[0]),
-                    gv.mean(critical_bare_mass_value),
-                    0.1 * gv.mean(critical_bare_mass_value),
+                    gv.mean(linear_fit.p[1]),
                 ]
                 quadratic_fit = lsqfit.nonlinear_fit(
                     data=(x, y),
@@ -273,14 +334,14 @@ def main(
 
         if plot_critical_bare_mass:
 
-            x = bare_mass__values_array
+            x = bare_mass_values_array
             y = pion_effective_mass_estimates_array
             y = np.square(y)
 
             fig, ax = plt.subplots()
             ax.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
 
-            plot_title = plotting.DataPlotter._construct_plot_title(
+            plot_title = custom_plotting.DataPlotter._construct_plot_title(
                 None,
                 leading_substring="",
                 metadata_dictionary=metadata_dictionary,
@@ -309,13 +370,25 @@ def main(
 
             if fit_for_critical_bare_mass:
 
+                # condition = x < 0.1
+
+                # x = x[condition]
+                # y = y[condition]
+
                 # Linear fit
                 margin = 0.06
-                x_data = np.linspace(
-                    gv.mean(critical_bare_mass_value) * (1 - margin),
-                    max(gv.mean(x)) * (1 + margin),
-                    100,
-                )
+                if x_min > 0:
+                    x_data = np.linspace(
+                        gv.mean(critical_bare_mass_value) * (1 - margin),
+                        x_max * (1 + margin),
+                        100,
+                    )
+                else:
+                    x_data = np.linspace(
+                        x_min * (1 - margin),
+                        x_max * (1 + margin),
+                        100,
+                    )
                 y_data = fit_functions.linear_function(x_data, linear_fit.p)
                 label_string = (
                     f"Linear fit:\n"
@@ -340,13 +413,23 @@ def main(
                 # Quadratic fit
                 if FIT_QUADRATIC_FUNCTION:
                     # margin =
+
+                    # condition = bare_mass_values_array < 0
+
+                    x = bare_mass_values_array
+                    y = pion_effective_mass_estimates_array
+                    y = np.square(y)
+
                     x_data = np.linspace(
-                        # min(gv.mean(x)) * (1 - margin),
+                        # np.min(x) * (1 - margin),
                         gv.mean(critical_bare_mass_value) * (1 - margin),
-                        max(gv.mean(x)) * (1 + margin),
+                        np.max(x) * (1 + margin),
                         100,
                     )
-                    y_data = fit_functions.quadratic_function(x_data, quadratic_fit.p)
+                    y_data = fit_functions.quadratic_function(
+                        x_data,
+                        quadratic_fit.p,
+                    )
 
                     label_string = (
                         f"Quadratic fit:\n"
@@ -362,11 +445,6 @@ def main(
                         color="g",
                         alpha=0.2,
                     )
-
-                if len(bare_mass__values_array) != len(
-                    number_of_gauge_configurations_array
-                ):
-                    print("It's them!")
 
                 if ANNOTATE_DATA_POINTS:
                     for index, sample_size in enumerate(
@@ -385,7 +463,7 @@ def main(
                 ax.legend(loc="upper left")
 
             current_plots_base_name = critical_bare_mass_plots_base_name
-            plot_path = plotting.DataPlotter._generate_plot_path(
+            plot_path = custom_plotting.DataPlotter._generate_plot_path(
                 None,
                 critical_bare_mass_plots_subdirectory,
                 current_plots_base_name,

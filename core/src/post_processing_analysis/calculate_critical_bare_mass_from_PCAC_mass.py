@@ -1,3 +1,18 @@
+# TODO: Write a detailed introductory commentary
+"""
+post_processing_analysis/process_qpb_log_files_extracted_values.py
+
+Summary:
+
+Input:
+
+Output:
+
+Functionality:
+
+Usage:
+"""
+
 import os
 import sys
 import itertools
@@ -13,39 +28,48 @@ import h5py
 import copy
 from collections import Counter
 
-from library import filesystem_utilities, plotting, data_processing, fit_functions
+from library import (
+    filesystem_utilities,
+    custom_plotting,
+    data_processing,
+    fit_functions,
+    PROCESSED_DATA_FILES_DIRECTORY,
+)
+
+UPPER_BARE_MASS_CUT = 0.15
 
 
 @click.command()
 @click.option(
+    "-in_PCAC_csv",
     "--input_PCAC_mass_estimates_csv_file_path",
     "input_PCAC_mass_estimates_csv_file_path",
-    "-PCAC_csv",
-    # default="/nvme/h/cy22sg1/qpb_data_analysis/data_files/processed/invert/Chebyshev_several_config_varying_N/PCAC_mass_estimates.csv",
     required=True,
-    help="Path to .csv file containing PCAC mass estimates.",
+    callback=filesystem_utilities.validate_input_csv_file,
+    help="Path to .csv file containing calculated PCAC mass estimates.",
 )
 @click.option(
-    "--input_PCAC_mass_correlator_hdf5_file_path",
-    "input_PCAC_mass_correlator_hdf5_file_path",
-    "-PCAC_hdf5",
-    # default="/nvme/h/cy22sg1/qpb_data_analysis/data_files/processed/invert/KL_several_config_and_mu_varying_m/PCAC_mass_correlator_values.h5",
+    "-in_jack_hdf5",
+    "--input_correlators_jackknife_analysis_hdf5_file_path",
+    "input_correlators_jackknife_analysis_hdf5_file_path",
+    callback=filesystem_utilities.validate_input_HDF5_file,
     required=True,
     help="Path to input HDF5 file containing extracted correlators values.",
 )
 @click.option(
+    "-out_dir",
     "--output_files_directory",
     "output_files_directory",
-    "-out_dir",
     default=None,
+    callback=filesystem_utilities.validate_directory,
     help="Path to directory where all output files will be stored.",
 )
 @click.option(
+    "-plots_dir",
     "--plots_directory",
     "plots_directory",
-    "-plots_dir",
-    default="../../output/plots",
-    # default="/nvme/h/cy22sg1/qpb_data_analysis/output/plots/invert/Chebyshev_several_config_varying_N",
+    default="../../../output/plots",
+    callback=filesystem_utilities.validate_directory,
     help="Path to the output directory for storing plots.",
 )
 @click.option(
@@ -73,102 +97,67 @@ from library import filesystem_utilities, plotting, data_processing, fit_functio
     help="Enable annotating the data points.",
 )
 @click.option(
+    "-out_csv_name",
     "--output_critical_bare_mass_csv_filename",
     "output_critical_bare_mass_csv_filename",
-    "-out_csv",
     default="critical_bare_mass_from_PCAC_mass_estimates.csv",
+    callback=filesystem_utilities.validate_output_csv_filename,
     help="Specific name for the output .csv files.",
 )
 @click.option(
+    "-log_on",
+    "--enable_logging",
+    "enable_logging",
+    is_flag=True,
+    default=False,
+    help="Enable logging.",
+)
+@click.option(
+    "-log_file_dir",
     "--log_file_directory",
     "log_file_directory",
-    "-log_file_dir",
     default=None,
+    callback=filesystem_utilities.validate_script_log_file_directory,
     help="Directory where the script's log file will be stored.",
 )
 @click.option(
+    "-log_name",
     "--log_filename",
     "log_filename",
-    "-log",
     default=None,
+    callback=filesystem_utilities.validate_script_log_filename,
     help="Specific name for the script's log file.",
 )
 def main(
     input_PCAC_mass_estimates_csv_file_path,
-    input_PCAC_mass_correlator_hdf5_file_path,
+    input_correlators_jackknife_analysis_hdf5_file_path,
     output_files_directory,
     plots_directory,
     plot_critical_bare_mass,
     fit_for_critical_bare_mass,
     annotate_data_points,
     output_critical_bare_mass_csv_filename,
+    enable_logging,
     log_file_directory,
     log_filename,
 ):
-    # VALIDATE INPUT ARGUMENTS
-
-    if not filesystem_utilities.is_valid_file(input_PCAC_mass_estimates_csv_file_path):
-        error_message = "Passed correlator values HDF5 file path is invalid."
-        print("ERROR:", error_message)
-        sys.exit(1)
+    # HANDLE EMPTY INPUT ARGUMENTS
 
     # If no output directory is provided, use the directory of the input file
     if output_files_directory is None:
         output_files_directory = os.path.dirname(
             input_PCAC_mass_estimates_csv_file_path
         )
-    # Check validity if the provided
-    elif not filesystem_utilities.is_valid_file(output_files_directory):
-        error_message = (
-            "Passed output files directory path is invalid " "or not a directory."
-        )
-        print("ERROR:", error_message)
-        print("Exiting...")
-        sys.exit(1)
-
-    if not filesystem_utilities.is_valid_directory(plots_directory):
-        error_message = "The specified plots directory path is invalid."
-        print("ERROR:", error_message)
-        sys.exit(1)
-
-    # Specify current script's log file directory
-    if log_file_directory is None:
-        log_file_directory = output_files_directory
-    elif not filesystem_utilities.is_valid_directory(log_file_directory):
-        error_message = (
-            "Passed directory path to store script's log file is "
-            "invalid or not a directory."
-        )
-        print("ERROR:", error_message)
-        print("Exiting...")
-        sys.exit(1)
-
-    # Get the script's filename
-    script_name = os.path.basename(__file__)
-
-    if log_filename is None:
-        log_filename = script_name.replace(".py", "_python_script.log")
-
-    # Check for proper extensions in provided output filenames
-    if not output_critical_bare_mass_csv_filename.endswith(".csv"):
-        output_critical_bare_mass_csv_filename = (
-            output_critical_bare_mass_csv_filename + ".csv"
-        )
-    if not log_filename.endswith(".log"):
-        log_filename = log_filename + ".log"
 
     # INITIATE LOGGING
 
-    filesystem_utilities.setup_logging(log_file_directory, log_filename)
+    # Setup logging
+    logger = filesystem_utilities.LoggingWrapper(
+        log_file_directory, log_filename, enable_logging
+    )
 
-    # # Create a logger instance for the current script using the script's name.
-    # logger = logging.getLogger(__name__)
-
-    # Get the script's filename
-    script_name = os.path.basename(__file__)
-
-    # Initiate logging
-    logging.info(f"Script '{script_name}' execution initiated.")
+    # Log script start
+    logger.initiate_script_logging()
 
     # CREATE PLOTS SUBDIRECTORIES
 
@@ -176,96 +165,156 @@ def main(
         # Create main plots directory if it does not exist
         plots_main_subdirectory = filesystem_utilities.create_subdirectory(
             plots_directory,
-            "critical_bare_mass_calculation",
+            "Critical_bare_mass_calculation",
         )
 
         # Create deeper-level subdirectories if requested
-        critical_bare_mass_plots_base_name = "critical_bare_mass"
-        critical_bare_mass_plots_subdirectory = filesystem_utilities.create_subdirectory(
-            plots_main_subdirectory,
-            critical_bare_mass_plots_base_name + "_from_PCAC_mass",
-            # clear_contents=True,
+        critical_bare_mass_plots_base_name = "Critical_bare_mass"
+        critical_bare_mass_plots_subdirectory = (
+            filesystem_utilities.create_subdirectory(
+                plots_main_subdirectory,
+                critical_bare_mass_plots_base_name + "_from_PCAC_mass",
+                clear_contents=True,
+            )
         )
+        logger.info("Subdirectory for critical bare mass plots created.")
 
     # IMPORT DATASETS AND METADATA
 
-    # Boolean variable indicating he 
-    critical_bare_mass_values_calculated = False
-
-    # Load the .csv file to a dataframe
-    PCAC_mass_estimates_dataframe = data_processing.load_csv(
-        input_PCAC_mass_estimates_csv_file_path
-    )
-
-    analyzer = data_processing.DataFrameAnalyzer(PCAC_mass_estimates_dataframe)
-
-    single_valued_fields_dictionary = analyzer.single_valued_fields_dictionary
-
-    tunable_multivalued_parameters_list = (
-        analyzer.list_of_tunable_multivalued_parameter_names
-    )
-
-    # TODO: Rethink this strategy of excluding "MPI_geometry" manually
-    tunable_multivalued_parameters_list = [
-        item for item in tunable_multivalued_parameters_list if item != "MPI_geometry"
-    ]
-
-    # Remove "Bare_mass" from the list of tunable multivalued parameters
-    if "Bare_mass" not in tunable_multivalued_parameters_list:
-        error_message = (
-            "Critical bare mass analysis cannot be performed without a range "
-            "of bare mass values data."
-        )
-        print("ERROR:", error_message)
-        sys.exit(1)
-    tunable_multivalued_parameters_list.remove("Bare_mass")
-
-    # Initialize list with parameter values for the output dataframe
-    critical_bare_mass_values_list = []
-
     # Open the input HDF5 file for reading and the output HDF5 file for writing
-    with h5py.File(input_PCAC_mass_correlator_hdf5_file_path, "r") as hdf5_file_read:
+    with h5py.File(
+        input_correlators_jackknife_analysis_hdf5_file_path, "r"
+    ) as hdf5_file_read:
 
-        # Initialize group structure of the output HDF5 file
-        # NOTE: The assumption here is that the name of the raw data files
-        # directory represents the data files set (or experiment) and its parent
-        # directory the qpb main program that generated the data files
-        parent_directory_name, last_directory_name = (
-            filesystem_utilities.extract_directory_names(output_files_directory)
+        # Construct the path to the processed data files set directory
+        processed_data_files_set_directory = os.path.dirname(
+            input_correlators_jackknife_analysis_hdf5_file_path
+        )
+        # The top HDF5 file groups (for both HDF5 files) mirror the directory
+        # structure of the data files set directory itself and its parent
+        # directories relative to the 'PROCESSED_DATA_FILES_DIRECTORY' directory
+        input_data_files_set_group = filesystem_utilities.get_hdf5_target_group(
+            hdf5_file_read,
+            PROCESSED_DATA_FILES_DIRECTORY,
+            processed_data_files_set_directory,
+            logger=None,
+        )
+        logger.info("Top groups of the input HDF5 file identified.")
+
+        # Ensure if input HDF5 file contains any data before initiating analysis
+        if not filesystem_utilities.has_subgroups(input_data_files_set_group):
+            logger.critical(
+                "Input HDF5 file does not contain any data to analyze!", to_console=True
+            )
+            sys.exit(1)
+
+        # Analyze input PCAC mass estimates .csv file
+        PCAC_mass_estimates_dataframe = data_processing.load_csv(
+            input_PCAC_mass_estimates_csv_file_path
         )
 
-        # Select input HDF5 file's group to read
-        input_qpb_main_program_group = hdf5_file_read[parent_directory_name]
-        input_data_files_set_group = input_qpb_main_program_group[last_directory_name]
+        analyzer = data_processing.DataFrameAnalyzer(PCAC_mass_estimates_dataframe)
 
-        for value, group in PCAC_mass_estimates_dataframe.groupby(
-            tunable_multivalued_parameters_list
+        # Store names and values of tunable parameters with unique values
+        single_valued_fields_dictionary = copy.deepcopy(
+            analyzer.single_valued_fields_dictionary
+        )
+
+        # CONSTRUCT LIST OF RELEVANT MULTIVALUED TUNABLE PARAMETERS FOR GROUPING
+
+        # Groupings will be based on tunable parameters with more than one
+        # unique values (multivalued)
+        tunable_multivalued_parameter_names_list = copy.deepcopy(
+            analyzer.list_of_tunable_multivalued_parameter_names
+        )
+
+        # Exclude "MPI_geometry" from tunable multivalued parameters list
+        # NOTE: The "MPI_geometry" parameter affects only computation speed,
+        # not the results. Excluding it ensures proper grouping based on all
+        # relevant tunable multivalued parameters.
+        tunable_multivalued_parameter_names_list = [
+            parameter_name
+            for parameter_name in tunable_multivalued_parameter_names_list
+            if parameter_name != "MPI_geometry"
+        ]
+
+        # Exclude "Bare_mass" from tunable multivalued parameters list since the
+        # final grouping must be based on "Bare_mass" values.
+        tunable_multivalued_parameter_names_list = [
+            parameter_name
+            for parameter_name in tunable_multivalued_parameter_names_list
+            if parameter_name != "Bare_mass"
+        ]
+
+        # LOOP OVER ALL RELEVANT TUNABLE PARAMETERS GROUPINGS
+
+        # Initialize list with parameter values for the output dataframe
+        critical_bare_mass_values_list = []
+
+        # Include counting the iterations for later use
+        for critical_bare_mass_calculation_index, (
+            combination_of_values,
+            dataframe_group,
+        ) in enumerate(
+            PCAC_mass_estimates_dataframe.groupby(
+                tunable_multivalued_parameter_names_list,
+                observed=True,
+            )
         ):
-            # Check for a minimum amount of data point
-            if group["Bare_mass"].nunique() < 3:
-                # TODO: Log warning
-                continue
+            # Define a unique name for each grouping as a separate calculation
+            critical_bare_mass_calculation_group_name = (
+                f"CRITICAL_BARE_MASS_"
+                f"CALCULATION_{critical_bare_mass_calculation_index}"
+            )
 
-            critical_bare_mass_values_calculated = True
+            # STORE PARAMETER VALUES AND DATASETS AND VALIDATE DATA
 
-            list_of_Jackknife_analysis_identifiers = group[
+            # Store specific tunable multivalued parameter names and values in a
+            # dedicated metadata dictionary for later use
+            if not isinstance(combination_of_values, tuple):
+                combination_of_values = [combination_of_values]
+            metadata_dictionary = dict(
+                zip(tunable_multivalued_parameter_names_list, combination_of_values)
+            )
+            logger.info(
+                f"'{critical_bare_mass_calculation_group_name}' grouping values: "
+                f"{metadata_dictionary}."
+            )
+
+            bare_mass_values_array = dataframe_group["Bare_mass"].to_numpy()
+
+            # Check for a minimum amount of data points
+            sufficient_number_of_data_points = True
+
+            bare_mass_values_for_fitting_array = bare_mass_values_array
+            if UPPER_BARE_MASS_CUT is not None:
+                condition = bare_mass_values_array < UPPER_BARE_MASS_CUT
+                bare_mass_values_for_fitting_array = bare_mass_values_array[condition]
+
+            if len(bare_mass_values_for_fitting_array) < 3:
+                logger.warning(
+                    "At least three (bare mass, PCAC mass) data points are "
+                    "necessary for the calculating the critical bare mass."
+                )
+                sufficient_number_of_data_points = False
+
+            # Check for a gauge configuration duplicates
+            list_of_jackknife_analysis_identifiers = dataframe_group[
                 "Jackknife_analysis_identifier"
             ].to_list()
-
             # Construct a flattened list of all the labels of all the gauge
             # links configurations used to calculate the PCAC mass estimates and
             # eventually the critical bare mass
             list_of_configuration_labels = list(
                 itertools.chain.from_iterable(
                     [
-                        input_data_files_set_group[Jackknife_analysis_identifier][
-                            "list_of_configuration_labels"
+                        input_data_files_set_group[jackknife_analysis_identifier][
+                            "List_of_gauge_configuration_labels"
                         ][:]
-                        for Jackknife_analysis_identifier in list_of_Jackknife_analysis_identifiers
+                        for jackknife_analysis_identifier in list_of_jackknife_analysis_identifiers
                     ]
                 )
             )
-
             # Look for duplicates
             if len(list_of_configuration_labels) != len(
                 set(list_of_configuration_labels)
@@ -275,37 +324,41 @@ def main(
                 duplicates_dictionary = {
                     label: count for label, count in counter.items() if count > 1
                 }
-                # TODO: Log warning
-                print(
-                    "WARNING:",
-                    "The following gauge links configurations have been used "
-                    "more than once in the calculation of the critical bare mass:",
+                logger.warning(
+                    f"{critical_bare_mass_calculation_group_name}: The "
+                    "following gauge links configurations have been used more "
+                    "than once in the calculation of the critical bare mass "
+                    "for this specific grouping (configuration label, counts):"
+                    f"{duplicates_dictionary}",
+                    to_console=True,
                 )
-                print("Configuration label, counts")
-                for label, count in duplicates_dictionary.items():
-                    print(label, count)
 
             # Initialize the parameters values dictionary
             parameters_value_dictionary = copy.deepcopy(single_valued_fields_dictionary)
-
-            # Store for later use
-            if not isinstance(value, tuple):
-                value = [value]
-            metadata_dictionary = dict(zip(tunable_multivalued_parameters_list, value))
-
             # Append metadata dictionary
             parameters_value_dictionary.update(metadata_dictionary)
+            logger.info("The parameter values dictionary was filled properly.")
 
-            number_of_gauge_configurations_array = group[
+            number_of_gauge_configurations_array = dataframe_group[
                 "Number_of_gauge_configurations"
             ].to_numpy()
 
-            x = group["Bare_mass"].to_numpy()
-            y = gv.gvar(group["PCAC_mass_estimate"].to_numpy())
+            PCAC_mass_estimates_array = gv.gvar(
+                dataframe_group["PCAC_mass_estimate"].to_numpy()
+            )
 
-            # FITS
+            PCAC_mass_estimates_for_fitting_array = PCAC_mass_estimates_array
+            if UPPER_BARE_MASS_CUT is not None:
+                PCAC_mass_estimates_for_fitting_array = PCAC_mass_estimates_array[
+                    condition
+                ]
 
-            if fit_for_critical_bare_mass:
+            # LINEAR FIT ON BARE MASS VS PCAC MASS ESTIMATES DATA POINTS
+
+            if fit_for_critical_bare_mass and sufficient_number_of_data_points:
+
+                x = bare_mass_values_for_fitting_array
+                y = PCAC_mass_estimates_for_fitting_array
 
                 # Find indices of min(x) and max(x)
                 min_index = np.argmin(x)
@@ -326,22 +379,22 @@ def main(
                 )
                 critical_bare_mass_value = linear_fit.p[1]
 
-            # PLOT
+            # PLOT BARE MASS VS PCAC MASS ESTIMATES DATA POINTS
 
             if plot_critical_bare_mass:
+
+                x = bare_mass_values_array
+                y = PCAC_mass_estimates_array
+
                 fig, ax = plt.subplots()
                 ax.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
 
-                plot_title = plotting.DataPlotter._construct_plot_title(
+                plot_title = custom_plotting.DataPlotter._construct_plot_title(
                     None,
                     leading_substring="",
                     metadata_dictionary=metadata_dictionary,
-                    title_width=100,
+                    title_width=105,
                     fields_unique_value_dictionary=parameters_value_dictionary,
-                    additional_excluded_fields=[
-                        "Average_calculation_time_per_spinor_per_configuration",
-                        "Average_number_of_MV_multiplications_per_spinor_per_configuration",
-                    ],
                 )
                 ax.set_title(f"{plot_title}", pad=8)
 
@@ -354,7 +407,7 @@ def main(
                     x, gv.mean(y), yerr=gv.sdev(y), fmt=".", markersize=8, capsize=10
                 )
 
-                if fit_for_critical_bare_mass:
+                if fit_for_critical_bare_mass and sufficient_number_of_data_points:
 
                     # Linear fit
                     if gv.mean(critical_bare_mass_value) > 0:
@@ -363,7 +416,8 @@ def main(
                         margin = -0.06
                     x_data = np.linspace(
                         gv.mean(critical_bare_mass_value) * (1 - margin),
-                        max(gv.mean(x)) * (1 + np.abs(margin)),
+                        np.max(bare_mass_values_for_fitting_array)
+                        * (1 + np.abs(margin)),
                         100,
                     )
                     y_data = fit_functions.linear_function(x_data, linear_fit.p)
@@ -404,7 +458,7 @@ def main(
                         )
 
                 current_plots_base_name = critical_bare_mass_plots_base_name
-                plot_path = plotting.DataPlotter._generate_plot_path(
+                plot_path = custom_plotting.DataPlotter._generate_plot_path(
                     None,
                     critical_bare_mass_plots_subdirectory,
                     current_plots_base_name,
@@ -416,17 +470,23 @@ def main(
                 plt.close()
 
             # EXPORT CALCULATED DATA
-            if fit_for_critical_bare_mass:
+
+            if fit_for_critical_bare_mass and sufficient_number_of_data_points:
                 parameters_value_dictionary["Critical_bare_mass"] = (
                     critical_bare_mass_value.mean,
                     critical_bare_mass_value.sdev,
                 )
 
-            critical_bare_mass_values_list.append(parameters_value_dictionary)
+                critical_bare_mass_values_list.append(parameters_value_dictionary)
 
-    # EXPORT CALCULATED DATA
+        # Check if list is empty before exporting
+        if not critical_bare_mass_values_list:
+            logger.warning(
+                "Critical bare mass values calculation produced no results.",
+                to_console=True,
+            )
+            sys.exit(1)
 
-    if critical_bare_mass_values_calculated:
         # Create a DataFrame from the extracted data
         critical_bare_mass_dataframe = pd.DataFrame(critical_bare_mass_values_list)
 
@@ -438,16 +498,13 @@ def main(
         # Export the DataFrame to a CSV file
         critical_bare_mass_dataframe.to_csv(csv_file_full_path, index=False)
 
-        # Terminate logging
-        logging.info(f"Script '{script_name}' execution terminated successfully.")
-    
-        print(
-            "   -- Critical bare mass values calculation from PCAC mass "
-            "estimates completed."
-        )
+    click.echo(
+        "   -- Critical bare mass values calculation from PCAC mass "
+        "estimates completed."
+    )
 
-    else:
-        print("   -- WARNING", "No output .csv file was generated.")
+    # Terminate logging
+    logger.terminate_script_logging()
 
 
 if __name__ == "__main__":

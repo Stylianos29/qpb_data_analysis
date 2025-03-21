@@ -1,3 +1,20 @@
+# TODO: Write a detailed introductory commentary
+# TODO: Add more logging messages
+# TODO: There should be a centralized class/function for plotting
+"""
+post_processing_analysis/process_qpb_log_files_extracted_values.py
+
+Summary:
+
+Input:
+
+Output:
+
+Functionality:
+
+Usage:
+"""
+
 import os
 import sys
 
@@ -7,7 +24,6 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 import gvar as gv
 import lsqfit
-import logging
 import pandas as pd
 import h5py
 import copy
@@ -15,37 +31,40 @@ import copy
 from library import (
     filesystem_utilities,
     effective_mass,
-    plotting,
+    custom_plotting,
     jackknife_analysis,
+    momentum_correlator,
+    PROCESSED_DATA_FILES_DIRECTORY,
 )
 
 
 @click.command()
 @click.option(
-    "--input_PCAC_mass_correlator_hdf5_file_path",
-    "input_PCAC_mass_correlator_hdf5_file_path",
-    "-PCAC_hdf5",
-    # default="/nvme/h/cy22sg1/qpb_data_analysis/data_files/processed/invert/KL_several_config_and_mu_varying_m/PCAC_mass_correlator_values.h5",
+    "-in_jack_hdf5",
+    "--input_correlators_jackknife_analysis_hdf5_file_path",
+    "input_correlators_jackknife_analysis_hdf5_file_path",
     required=True,
-    help="Path to input HDF5 file containing extracted correlators values.",
+    callback=filesystem_utilities.validate_input_HDF5_file,
+    help="Path to HDF5 file containing extracted correlators values.",
 )
 @click.option(
+    "-out_dir",
     "--output_files_directory",
     "output_files_directory",
-    "-out_dir",
     default=None,
+    callback=filesystem_utilities.validate_directory,
     help="Path to directory where all output files will be stored.",
 )
 @click.option(
+    "-plots_dir",
     "--plots_directory",
     "plots_directory",
-    "-plots_dir",
-    default="../../output/plots",
-    # default="../../../output/plots/invert/KL_several_config_and_mu_varying_m",
+    default="../../../output/plots",
+    callback=filesystem_utilities.validate_directory,
     help="Path to the output directory for storing plots.",
 )
 @click.option(
-    "-plot_PCAC_mass",
+    "-plot_PCAC_corr",
     "--plot_PCAC_mass_correlators",
     "plot_PCAC_mass_correlators",
     is_flag=True,
@@ -61,182 +80,189 @@ from library import (
     help="Enable zooming in on PCAC mass correlators plots.",
 )
 @click.option(
+    "-out_csv_name",
     "--output_PCAC_mass_estimates_csv_filename",
     "output_PCAC_mass_estimates_csv_filename",
-    "-hdf5",
     default="PCAC_mass_estimates.csv",
-    help="Specific name for the output HDF5 file.",
+    callback=filesystem_utilities.validate_output_csv_filename,
+    help="Specific name for the output .csv file.",
 )
 @click.option(
+    "-log_on",
+    "--enable_logging",
+    "enable_logging",
+    is_flag=True,
+    default=False,
+    help="Enable logging.",
+)
+@click.option(
+    "-log_file_dir",
     "--log_file_directory",
     "log_file_directory",
-    "-log_file_dir",
     default=None,
+    callback=filesystem_utilities.validate_script_log_file_directory,
     help="Directory where the script's log file will be stored.",
 )
 @click.option(
+    "-log_name",
     "--log_filename",
     "log_filename",
-    "-log",
     default=None,
+    callback=filesystem_utilities.validate_script_log_filename,
     help="Specific name for the script's log file.",
 )
 def main(
-    input_PCAC_mass_correlator_hdf5_file_path,
+    input_correlators_jackknife_analysis_hdf5_file_path,
     output_files_directory,
     plots_directory,
     plot_PCAC_mass_correlators,
     zoom_in_PCAC_mass_correlators_plots,
     output_PCAC_mass_estimates_csv_filename,
+    enable_logging,
     log_file_directory,
     log_filename,
 ):
-    # VALIDATE INPUT ARGUMENTS
-
-    if not filesystem_utilities.is_valid_file(
-        input_PCAC_mass_correlator_hdf5_file_path
-    ):
-        error_message = "Passed correlator values HDF5 file path is invalid."
-        print("ERROR:", error_message)
-        sys.exit(1)
+    # HANDLE EMPTY INPUT ARGUMENTS
 
     # If no output directory is provided, use the directory of the input file
     if output_files_directory is None:
         output_files_directory = os.path.dirname(
-            input_PCAC_mass_correlator_hdf5_file_path
+            input_correlators_jackknife_analysis_hdf5_file_path
         )
-    # Check validity if the provided
-    elif not filesystem_utilities.is_valid_file(output_files_directory):
-        error_message = (
-            "Passed output files directory path is invalid " "or not a directory."
-        )
-        print("ERROR:", error_message)
-        print("Exiting...")
-        sys.exit(1)
-
-    if not filesystem_utilities.is_valid_directory(plots_directory):
-        error_message = "The specified plots directory path is invalid."
-        print("ERROR:", error_message)
-        sys.exit(1)
-
-    # Specify current script's log file directory
-    if log_file_directory is None:
-        log_file_directory = output_files_directory
-    elif not filesystem_utilities.is_valid_directory(log_file_directory):
-        error_message = (
-            "Passed directory path to store script's log file is "
-            "invalid or not a directory."
-        )
-        print("ERROR:", error_message)
-        print("Exiting...")
-        sys.exit(1)
-
-    # Get the script's filename
-    script_name = os.path.basename(__file__)
-
-    if log_filename is None:
-        log_filename = script_name.replace(".py", "_python_script.log")
-
-    # Check for proper extensions in provided output filenames
-    if not output_PCAC_mass_estimates_csv_filename.endswith(".csv"):
-        output_PCAC_mass_estimates_csv_filename = (
-            output_PCAC_mass_estimates_csv_filename + ".csv"
-        )
-    if not log_filename.endswith(".log"):
-        log_filename = log_filename + ".log"
 
     # INITIATE LOGGING
 
-    filesystem_utilities.setup_logging(log_file_directory, log_filename)
+    # Setup logging
+    logger = filesystem_utilities.LoggingWrapper(
+        log_file_directory, log_filename, enable_logging
+    )
 
-    # # Create a logger instance for the current script using the script's name.
-    # logger = logging.getLogger(__name__)
-
-    # Get the script's filename
-    script_name = os.path.basename(__file__)
-
-    # Initiate logging
-    logging.info(f"Script '{script_name}' execution initiated.")
+    # Log script start
+    logger.initiate_script_logging()
 
     # CREATE PLOTS SUBDIRECTORIES
 
+    # Create plots main subdirectory if it does not exist if requested
+    plots_main_subdirectory = filesystem_utilities.create_subdirectory(
+        plots_directory,
+        "PCAC_mass_estimates_calculation",
+        clear_contents=True,
+    )
     if plot_PCAC_mass_correlators:
-        # Create plots main subdirectory if it does not exist
-        plots_main_subdirectory = filesystem_utilities.create_subdirectory(
-            plots_directory, "PCAC_mass_estimates_calculation"
-        )
 
         # Create deeper-level subdirectories if they do not exist
         PCAC_mass_plots_base_name = "PCAC_mass_correlator"
         PCAC_mass_plots_subdirectory = filesystem_utilities.create_subdirectory(
             plots_main_subdirectory,
-            PCAC_mass_plots_base_name + "s",
+            PCAC_mass_plots_base_name + "_values",
             clear_contents=True,
         )
+        logger.info("Subdirectory for PCAC mass correlator plots created.")
 
     # IMPORT DATASETS AND METADATA
 
     # Open the input HDF5 file for reading and the output HDF5 file for writing
-    with h5py.File(input_PCAC_mass_correlator_hdf5_file_path, "r") as hdf5_file_read:
+    with h5py.File(
+        input_correlators_jackknife_analysis_hdf5_file_path, "r"
+    ) as hdf5_file:
 
-        # Initialize group structure of the output HDF5 file
-        # NOTE: The assumption here is that the name of the raw data files
-        # directory represents the data files set (or experiment) and its parent
-        # directory the qpb main program that generated the data files
-        parent_directory_name, last_directory_name = (
-            filesystem_utilities.extract_directory_names(output_files_directory)
+        # Construct the path to the processed data files set directory
+        processed_data_files_set_directory = os.path.dirname(
+            input_correlators_jackknife_analysis_hdf5_file_path
         )
+        # The top HDF5 file groups (for both HDF5 files) mirror the directory
+        # structure of the data files set directory itself and its parent
+        # directories relative to the 'PROCESSED_DATA_FILES_DIRECTORY' directory
+        input_data_files_set_group = filesystem_utilities.get_hdf5_target_group(
+            hdf5_file,
+            PROCESSED_DATA_FILES_DIRECTORY,
+            processed_data_files_set_directory,
+            logger=None,
+        )
+        logger.info("Top groups of the input HDF5 file identified.")
 
-        # Select input HDF5 file's group to read
-        input_qpb_main_program_group = hdf5_file_read[parent_directory_name]
-        input_data_files_set_group = input_qpb_main_program_group[last_directory_name]
+        # Check if input HDF5 file contains any data before initiating analysis
+        if not filesystem_utilities.has_subgroups(input_data_files_set_group):
+            logger.critical(
+                "Input HDF5 file does not contain any data to analyze!", to_console=True
+            )
+            sys.exit(1)
 
-        # Extract attributes of top-level groups into a dictionary
-        fields_with_unique_values_dictionary = {
+        # Extract attributes of top-level groups into a dictionary.
+        # NOTE: By construction the attributes of the top level groups are the
+        # values of the parameters with a single unique value
+        single_valued_parameters_dictionary = {
             parameter: attribute
             for parameter, attribute in input_data_files_set_group.attrs.items()
         }
 
         # List to pass values to dataframe
         PCAC_mass_estimates_list = []
-
-        # Loop over all PCAC mass correlator Jackknife analysis groups
+        # Loop over all PCAC mass correlator jackknife analysis groups
         for (
-            PCAC_mass_correlator_analysis_group_name,
-            PCAC_mass_correlator_analysis_group,
+            correlators_jackknife_analysis_group_name,
+            correlators_jackknife_analysis_group,
         ) in input_data_files_set_group.items():
 
             # Cautionary check if the item is a HDF5 group
-            if not isinstance(PCAC_mass_correlator_analysis_group, h5py.Group):
-                # TODO: Log warning
+            if not isinstance(correlators_jackknife_analysis_group, h5py.Group):
+                logger.warning(
+                    f"'{correlators_jackknife_analysis_group_name}' is not a "
+                    "subgroup of the input HDF5 file.",
+                    to_console=True,
+                )
                 continue
+
+            # STORE PARAMETER VALUES AND DATASETS FOR CURRENT JACKKNIFE ANALYSIS
 
             # Initialize the parameters values dictionary
             parameters_value_dictionary = copy.deepcopy(
-                fields_with_unique_values_dictionary
+                single_valued_parameters_dictionary
             )
 
-            # Create a separate metadata dictionary for later use
-            metadata_dictionary = dict()
+            # Create a separate metadata dictionary containing attribute values
+            # from the current jackknife analysis subgroup for later use.
+            # NOTE: By design, the attributes of jackknife analysis subgroups
+            # correspond to specific values of the multivalued parameters used
+            # in forming the jackknife analysis dataframe groupings. Other
+            # multivalued parameters that were not used in these groupings were
+            # not stored as attributes. Instead, they were stored as datasets,
+            # containing lists of values for each specific jackknife analysis
+            # grouping.
+            metadata_dictionary = {}
             for (
                 parameter,
                 attribute,
-            ) in PCAC_mass_correlator_analysis_group.attrs.items():
+            ) in correlators_jackknife_analysis_group.attrs.items():
                 metadata_dictionary[parameter] = attribute
 
-            # Append metadata dictionary
+            # Merge the metadata dictionary into the parameters values dictionary.
             parameters_value_dictionary.update(metadata_dictionary)
 
-            # Store Jackknife analysis identifier
+            # Store jackknife analysis identifier
             parameters_value_dictionary["Jackknife_analysis_identifier"] = (
-                PCAC_mass_correlator_analysis_group_name
+                correlators_jackknife_analysis_group_name
             )
 
-            # Import Jackknife replicas datasets of PCAC mass correlators
-            jackknife_replicas_of_PCAC_mass_correlator_2D_array = (
-                PCAC_mass_correlator_analysis_group[
-                    "jackknife_samples_of_PCAC_mass_correlator_values_2D_array"
+            # Import jackknife samples datasets of PCAC mass correlators
+            jackknife_samples_of_PCAC_mass_correlators_2D_array = (
+                correlators_jackknife_analysis_group[
+                    "Jackknife_samples_of_PCAC_mass_correlator_values_2D_array"
                 ][:]
+            )
+            if (
+                np.isnan(jackknife_samples_of_PCAC_mass_correlators_2D_array).any()
+                or np.isinf(jackknife_samples_of_PCAC_mass_correlators_2D_array).any()
+            ):
+                logger.warning(
+                    f"{correlators_jackknife_analysis_group_name}: Jackknife "
+                    "samples of PCAC mass correlators arrays contain NaN "
+                    "or inf values and cannot be processed. Skipping..."
+                )
+                continue
+            logger.info(
+                f"Jackknife samples of PCAC mass correlators were loaded as a "
+                "NumPy 2D array."
             )
 
             # VALIDATE VALUES OF IMPORTANT PARAMETERS
@@ -244,7 +270,7 @@ def main(
             # Ensuring the important parameter values of temporal lattice size
             # and number of gauge configurations are stored and available
             temporal_lattice_size = np.shape(
-                jackknife_replicas_of_PCAC_mass_correlator_2D_array
+                jackknife_samples_of_PCAC_mass_correlators_2D_array
             )[1]
             if "Temporal_lattice_size" not in parameters_value_dictionary:
                 parameters_value_dictionary["Temporal_lattice_size"] = (
@@ -254,11 +280,15 @@ def main(
                 parameters_value_dictionary["Temporal_lattice_size"]
                 != temporal_lattice_size
             ):
-                pass
-                # TODO: Log warning
+                logger.warning(
+                    f"{correlators_jackknife_analysis_group_name}: Discrepancy "
+                    "between the stored temporal lattice size value and the "
+                    "size of the PCAC mass correlators NumPy 2D array.",
+                    to_console=True,
+                )
 
             number_of_gauge_configurations = np.shape(
-                jackknife_replicas_of_PCAC_mass_correlator_2D_array
+                jackknife_samples_of_PCAC_mass_correlators_2D_array
             )[0]
             if "Number_of_gauge_configurations" not in parameters_value_dictionary:
                 parameters_value_dictionary["Number_of_gauge_configurations"] = (
@@ -268,35 +298,47 @@ def main(
                 parameters_value_dictionary["Number_of_gauge_configurations"]
                 != number_of_gauge_configurations
             ):
-                pass
-                # TODO: Log warning
+                logger.warning(
+                    f"{correlators_jackknife_analysis_group_name}: Discrepancy "
+                    "between the stored number of gauge configurations value "
+                    "and the size of the PCAC mass correlators NumPy 2D array.",
+                    to_console=True,
+                )
+            logger.info(
+                "The values for temporal lattice size and the number of gauge "
+                "configurations were validated."
+            )
 
             # CALCULATE FURTHER USEFUL QUANTITIES
 
             if (
-                "Total_calculation_time_values_array"
-                in PCAC_mass_correlator_analysis_group
+                "Adjusted_average_core_hours_per_spinor_values_list"
+                in correlators_jackknife_analysis_group
                 and isinstance(
-                    PCAC_mass_correlator_analysis_group[
-                        "Total_calculation_time_values_array"
+                    correlators_jackknife_analysis_group[
+                        "Adjusted_average_core_hours_per_spinor_values_list"
                     ],
                     h5py.Dataset,
                 )
             ):
                 parameters_value_dictionary[
-                    "Average_calculation_time_per_spinor_per_configuration"
+                    "Adjusted_average_core_hours_per_spinor_per_configuration"
                 ] = np.average(
-                    PCAC_mass_correlator_analysis_group[
-                        "Total_calculation_time_values_array"
+                    correlators_jackknife_analysis_group[
+                        "Adjusted_average_core_hours_per_spinor_values_list"
                     ][:]
                 )
+            logger.info(
+                "The adjusted average core hours per spinor per configuration "
+                "was calculated."
+            )
 
             if (
-                "Average_number_of_MV_multiplications_per_spinor_values_array"
-                in PCAC_mass_correlator_analysis_group
+                "Average_number_of_MV_multiplications_per_spinor_values_list"
+                in correlators_jackknife_analysis_group
                 and isinstance(
-                    PCAC_mass_correlator_analysis_group[
-                        "Average_number_of_MV_multiplications_per_spinor_values_array"
+                    correlators_jackknife_analysis_group[
+                        "Average_number_of_MV_multiplications_per_spinor_values_list"
                     ],
                     h5py.Dataset,
                 )
@@ -304,28 +346,57 @@ def main(
                 parameters_value_dictionary[
                     "Average_number_of_MV_multiplications_per_spinor_per_configuration"
                 ] = np.average(
-                    PCAC_mass_correlator_analysis_group[
-                        "Average_number_of_MV_multiplications_per_spinor_values_array"
+                    correlators_jackknife_analysis_group[
+                        "Average_number_of_MV_multiplications_per_spinor_values_list"
                     ][:]
                 )
+            logger.info(
+                "The average number of mv multiplications per spinor per "
+                "configuration was calculated."
+            )
+
+            logger.info(
+                f"{correlators_jackknife_analysis_group_name}: Parameter "
+                "values dictionary created and filled."
+            )
 
             # TRUNCATE PCAC MASS CORRELATORS
 
+            # jackknife_average_of_correlators_jackknife_array = (
+            #     momentum_correlator.symmetrization(
+            #         jackknife_average_of_correlators_jackknife_array
+            #     )
+            # )
+
             # Ignore the second half of the PCAC mass correlators arrays since
             # they are by construction symmetrized
-            jackknife_replicas_of_PCAC_mass_correlator_2D_array = np.array(
+            upper_index_cut = temporal_lattice_size // 2 + 1
+            jackknife_samples_of_PCAC_mass_correlators_2D_array = np.array(
                 [
-                    PCAC_mass_correlator_replica[: temporal_lattice_size // 2]
+                    momentum_correlator.symmetrization(correlators_jackknife_replica)[
+                        :upper_index_cut
+                    ]
                     for (
-                        PCAC_mass_correlator_replica
-                    ) in jackknife_replicas_of_PCAC_mass_correlator_2D_array
+                        correlators_jackknife_replica
+                    ) in jackknife_samples_of_PCAC_mass_correlators_2D_array
                 ]
+            )
+            logger.info(
+                "All PCAC mass correlator jackknife replicas were symmetrized, "
+                f"then truncated at index {upper_index_cut}. Values at and  "
+                "beyond this index were discarded."
+            )
+
+            jackknife_average_of_correlators_jackknife_array = (
+                jackknife_analysis.calculate_jackknife_average_array(
+                    jackknife_samples_of_PCAC_mass_correlators_2D_array
+                )
             )
 
             # CALCULATE JACKKNIFE AVERAGE MASS CORRELATORS
 
-            jackknife_average_PCAC_mass_correlator_array = np.mean(
-                jackknife_replicas_of_PCAC_mass_correlator_2D_array, axis=0
+            jackknife_average_correlators_jackknife_array = np.mean(
+                jackknife_samples_of_PCAC_mass_correlators_2D_array, axis=0
             )
 
             # Restrict the calculation range to a possible plateau range
@@ -335,17 +406,19 @@ def main(
             )
             integrated_autocorrelation_time = (
                 jackknife_analysis.calculate_integrated_autocorrelation_time(
-                    jackknife_average_PCAC_mass_correlator_array[calculation_range]
+                    jackknife_average_correlators_jackknife_array[calculation_range]
                 )
             )
 
             if integrated_autocorrelation_time < 1:
                 integrated_autocorrelation_time = 1
 
-            jackknife_average_PCAC_mass_correlator_array = gv.gvar(
-                jackknife_average_PCAC_mass_correlator_array,
+            integrated_autocorrelation_time = 1
+
+            jackknife_average_correlators_jackknife_array = gv.gvar(
+                jackknife_average_correlators_jackknife_array,
                 jackknife_analysis.jackknife_correlated_error(
-                    jackknife_replicas_of_PCAC_mass_correlator_2D_array,
+                    jackknife_samples_of_PCAC_mass_correlators_2D_array,
                     integrated_autocorrelation_time,
                 ),
             )
@@ -358,7 +431,7 @@ def main(
             minimum_number_of_data_points = temporal_lattice_size // 8
             while len(plateau_indices_list) < minimum_number_of_data_points:
                 plateau_indices_list = effective_mass.plateau_indices_range(
-                    jackknife_average_PCAC_mass_correlator_array,
+                    jackknife_average_correlators_jackknife_array,
                     sigma_criterion_factor,
                     3,
                 )
@@ -369,7 +442,7 @@ def main(
             PCAC_mass_plateau_fit_guess = [
                 np.mean(
                     gv.mean(
-                        jackknife_average_PCAC_mass_correlator_array[
+                        jackknife_average_correlators_jackknife_array[
                             plateau_indices_list
                         ]
                     )
@@ -378,11 +451,11 @@ def main(
 
             plateau_fit_PCAC_mass_estimates_list = []
             for (
-                PCAC_mass_correlator_replica
-            ) in jackknife_replicas_of_PCAC_mass_correlator_2D_array:
+                correlators_jackknife_replica
+            ) in jackknife_samples_of_PCAC_mass_correlators_2D_array:
                 y = gv.gvar(
-                    PCAC_mass_correlator_replica,
-                    gv.sdev(jackknife_average_PCAC_mass_correlator_array),
+                    correlators_jackknife_replica,
+                    gv.sdev(jackknife_average_correlators_jackknife_array),
                 )
                 x = np.arange(len(y))
                 PCAC_mass_plateau_state_fit = lsqfit.nonlinear_fit(
@@ -409,22 +482,36 @@ def main(
             # PLOT PCAC MASS CORRELATORS
 
             if plot_PCAC_mass_correlators:
-                starting_time = 5
-                y = jackknife_average_PCAC_mass_correlator_array[starting_time:]
+                starting_time = 1
+                y = jackknife_average_correlators_jackknife_array[starting_time:]
                 x = np.arange(starting_time, len(y) + starting_time)
 
                 fig, ax = plt.subplots()
                 ax.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
 
-                plot_title = plotting.DataPlotter._construct_plot_title(
+                # Remove excluded title fields from parameters_value_dictionary
+                excluded_title_fields = [
+                    "Number_of_vectors",
+                    "Delta_Min",
+                    "Delta_Max",
+                    "Lanczos_epsilon",
+                    "Number_of_gauge_configurations",
+                ]
+                filtered_parameters_value_dictionary = {
+                    k: v
+                    for k, v in parameters_value_dictionary.items()
+                    if k not in excluded_title_fields
+                }
+
+                plot_title = custom_plotting.DataPlotter._construct_plot_title(
                     None,
                     leading_substring="",
-                    # metadata_dictionary=dict(),
+                    # metadata_dictionary={},
                     metadata_dictionary=metadata_dictionary,
-                    title_width=100,
-                    fields_unique_value_dictionary=parameters_value_dictionary,
+                    title_width=90,
+                    fields_unique_value_dictionary=filtered_parameters_value_dictionary,
                     additional_excluded_fields=[
-                        "Average_calculation_time_per_spinor_per_configuration",
+                        "Adjusted_average_core_hours_per_spinor_per_configuration",
                         "Average_number_of_MV_multiplications_per_spinor_per_configuration",
                     ],
                 )
@@ -451,8 +538,8 @@ def main(
                 plateau_range_minimum = x[plateau_indices_list[0] - starting_time]
                 plateau_range_maximum = x[plateau_indices_list[-1] - starting_time]
 
-                ax.axvline(plateau_range_minimum, color="black")
-                ax.axvline(plateau_range_maximum, color="black")
+                # ax.axvline(plateau_range_minimum, color="black")
+                # ax.axvline(plateau_range_maximum, color="black")
 
                 label_string = (
                     f"Plateau fit:\n"
@@ -478,18 +565,18 @@ def main(
                     alpha=0.2,
                 )
 
-                if y[0] > y[temporal_lattice_size // 4]:
-                    ax.legend(loc="upper center")
-                else:
-                    ax.legend(loc="lower center")
+                # if y[0] > y[temporal_lattice_size // 4]:
+                #     ax.legend(loc="upper center")
+                # else:
+                #     ax.legend(loc="lower center")
 
                 current_plots_base_name = PCAC_mass_plots_base_name
-                plot_path = plotting.DataPlotter._generate_plot_path(
+                plot_path = custom_plotting.DataPlotter._generate_plot_path(
                     None,
                     PCAC_mass_plots_subdirectory,
                     current_plots_base_name,
                     metadata_dictionary,
-                    single_valued_fields_dictionary=fields_with_unique_values_dictionary,
+                    single_valued_fields_dictionary=single_valued_parameters_dictionary,
                 )
 
                 fig.savefig(plot_path)
@@ -504,6 +591,13 @@ def main(
 
         # EXPORT CALCULATED DATA
 
+        # Check if list is empty before exporting
+        if not PCAC_mass_estimates_list:
+            logger.warning(
+                "PCAC mass estimates analysis produced no results.", to_console=True
+            )
+            sys.exit(1)
+
         # Create a DataFrame from the extracted data
         PCAC_mass_estimates_dataframe = pd.DataFrame(PCAC_mass_estimates_list)
 
@@ -514,10 +608,10 @@ def main(
         # Export the DataFrame to a CSV file
         PCAC_mass_estimates_dataframe.to_csv(csv_file_full_path, index=False)
 
-    # Terminate logging
-    logging.info(f"Script '{script_name}' execution terminated successfully.")
+    click.echo("   -- PCAC mass estimates calculation completed!")
 
-    print("   -- PCAC mass estimates calculation completed.")
+    # Terminate logging
+    logger.terminate_script_logging()
 
 
 if __name__ == "__main__":

@@ -12,8 +12,12 @@ data_files/raw/*
 data_files/processed/*
 !data_files/processed/README.md
 
-output/plots/*
+output/*
 !output/plots/README.md
+!output/tables/README.md
 
-examples/*
+examples/plots/*
+!examples/plots/plotting_data_files_set_template.ipynb
+examples/tables/*
+!examples/tables/table_of_data_files_set_template.ipynb
 !examples/README.md

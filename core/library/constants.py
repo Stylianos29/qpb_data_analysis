@@ -1,11 +1,17 @@
 from pathlib import Path
 import ast
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 
 import pandas as pd
 
 
 # Define the root directory of the project
 ROOT = Path(__file__).resolve().parents[2]
+# TODO: Revisit its usefulness
+RAW_DATA_FILES_DIRECTORY = "/nvme/h/cy22sg1/scratch/raw_qpb_data_files/"
+PROCESSED_DATA_FILES_DIRECTORY = "../data_files/processed/"
+# TODO: Validate provided constant directories. Relative paths do not make sense
 
 # Log files filenames might contain specific labels corresponding to
 # parameters next to their values. Listed below are the parameters and their
@@ -29,11 +35,15 @@ FILENAME_SINGLE_VALUE_PATTERNS_DICTIONARY = {
         "pattern": r"config(?P<Configuration_label>\d+)",
         "type": str,
     },
+    "MPI_geometry": {
+        "pattern": r"_cores(?P<MPI_geometry>\d{3})",
+        "type": str,
+    },
     "Number_of_vectors": {"pattern": r"NVecs(?P<Number_of_vectors>\d+)", "type": int},
     "APE_iterations": {"pattern": r"APEiters(?P<APE_iterations>\d+)", "type": int},
     "Rho_value": {"pattern": r"rho(?P<Rho_value>\d+p?\d*)", "type": float},
-    "Bare_mass": {"pattern": r"m(?P<Bare_mass>\d+p?\d*)", "type": float},
-    "Kappa_value": {"pattern": r"kappa(?P<Kappa_value>\d+p?\d*)", "type": float},
+    "Bare_mass": {"pattern": r"m(?P<Bare_mass>-?\d+p?\d*)", "type": float},
+    "Kappa_value": {"pattern": r"kappa(?P<Kappa_value>-?\d+p?\d*)", "type": float},
     "Clover_coefficient": {
         "pattern": r"cSW(?P<Clover_coefficient>\d+p?\d*)",
         "type": float,
@@ -72,6 +82,11 @@ FILENAME_SINGLE_VALUE_PATTERNS_DICTIONARY = {
 # value type
 FILE_CONTENTS_SINGLE_VALUE_PATTERNS_DICTIONARY = {
     # General parameters
+    "Cluster_partition": {
+        "line_identifier": "Partition:",
+        "regex_pattern": r"Partition:\s*(.+)",
+        "type": str,
+    },
     "Kernel_operator_type": {
         "line_identifier": "Dslash operator is",
         "regex_pattern": r"Dslash operator is (.+)",
@@ -122,15 +137,19 @@ FILE_CONTENTS_SINGLE_VALUE_PATTERNS_DICTIONARY = {
         "regex_pattern": r"(\d+(\.\d+)?)",
         "type": float,
     },
-    # TODO: Investigate whether identifier: "Mass = " needs to be added as well
     "Bare_mass": {
         "line_identifier": "mass = ",
-        "regex_pattern": r"(\d+(\.\d+)?)",
+        "regex_pattern": r"(-?\d+(\.\d+)?)",
         "type": float,
+    },
+    "Number_of_vectors": {
+        "line_identifier": "Done,",
+        "regex_pattern": r"Done,\s*(\d+)\s*vectors",
+        "type": int,
     },
     "Kappa_value": {
         "line_identifier": "kappa = ",
-        "regex_pattern": r"(\d+(\.\d+)?)",
+        "regex_pattern": r"(-?\d+(\.\d+)?)",
         "type": float,
     },
     # NOTE: The Clover coefficient is an integer number, 0 or 1.  But it is
@@ -252,13 +271,13 @@ FILE_CONTENTS_MULTIVALUED_PATTERNS_DICTIONARY = {
         "type": int,
     },
     "Total_number_of_MSCG_iterations": {
-        "line_identifier": "msCG converged, t = ",
+        "line_identifier": "msCG converged, t",
         "regex_pattern": r"After (\d+) iterations msCG converged,",
         "type": int,
     },
     "MSCG_total_calculation_time": {
         "line_identifier": "msCG converged, t",
-        "regex_pattern": r"(\d+\.\d+)",
+        "regex_pattern": r", t = (\d+\.\d+)",
         "type": float,
     },
     "Total_number_of_CG_iterations_per_spinor": {
@@ -303,6 +322,13 @@ FILE_CONTENTS_MULTIVALUED_PATTERNS_DICTIONARY = {
     },
 }
 
+MAIN_PROGRAM_TYPE_MAPPING = {
+    "|| Sign^2(X) - 1 ||^2": "sign_squared_violation",
+    "|| Sign^2(X) ||^2": "sign_squared_values",
+    "||[D^+D, DD^+]||": "normality",
+    "GW diff": "ginsparg_wilson_relation",
+    "CG done": "invert",
+}
 
 CORRELATOR_IDENTIFIERS_LIST = [
     "1-1",
@@ -321,6 +347,13 @@ DTYPE_MAPPING = {
 }
 
 
+def safe_literal_eval(value):
+    try:
+        return ast.literal_eval(value)
+    except (ValueError, SyntaxError):
+        return value
+
+
 CONVERTERS_MAPPING = {
     # Format floats to 2 decimal places
     "QCD_beta_value": lambda x: f"{float(x):.2f}",
@@ -329,12 +362,16 @@ CONVERTERS_MAPPING = {
     # Format floats to 2 decimal places
     "Delta_Max": lambda x: f"{float(x):.2f}",
     # Format floats to 2 decimal places
-    "PCAC_mass_estimate": lambda x: ast.literal_eval(x),
+    "PCAC_mass_estimate": lambda x: safe_literal_eval(x),
     #
     "Pion_effective_mass_estimate": lambda x: ast.literal_eval(x),
     #
     "Critical_bare_mass": lambda x: ast.literal_eval(x),
-    "Average_calculation_result": lambda x: ast.literal_eval(x),
+    # TODO: Add the rest of the 'Average_calculation_result' variations
+    "Average_calculation_result": lambda x: safe_literal_eval(x),
+    "Average_sign_squared_values": lambda x: ast.literal_eval(x),
+    "Average_sign_squared_violation_values": lambda x: ast.literal_eval(x),
+    "Average_ginsparg_wilson_relation_values": lambda x: ast.literal_eval(x),
     # Format floats in exponential notation
     "Solver_epsilon": lambda x: f"{float(x):.0e}",
     # "Kernel_operator_type": lambda x: pd.Categorical(
@@ -343,11 +380,12 @@ CONVERTERS_MAPPING = {
 }
 
 
-AXES_LABELS_DICTIONARY = {
+TITLE_LABELS_DICTIONARY = {
     # Tunable parameters
     "APE_iterations": "APE iters",
+    "APE_alpha": "$\\alpha_{APE}$",
     "QCD_beta_value": "$\\beta$",
-    "Configuration_label": "config",
+    "Configuration_label": "config label",
     "Rho_value": "$\\rho$",
     "Bare_mass": "a$m_{bare}$",
     "Clover_coefficient": "$c_{SW}$",
@@ -360,23 +398,61 @@ AXES_LABELS_DICTIONARY = {
     "MSCG_epsilon": "$\\epsilon_{MSCG}$",
     "KL_diagonal_order": "n",
     "KL_scaling_factor": "$\\mu$",
+    "Number_of_vectors": "# of random vecs",
+    "Kappa_value": "$\\kappa$",
     # Output quantity
-    "Average_number_of_MV_multiplications_per_spinor_per_configuration": "Average # of MV multiplications [per spinor per config]",
-    "number_of_MV_multiplications_for_constant_PCAC_mass": "# of MV multiplications [per spinor per config]",
-    "number_of_MV_multiplications_for_constant_bare_mass": "# of MV multiplications [per spinor per config]",
-    "Average_calculation_time_per_spinor_per_configuration": "Average wall-clock time [per spinor per config] (s)",
-    "Total_overhead_time": "Overhead (s)",
     "Condition_number": "$\\kappa$",
     "Minimum_eigenvalue_squared": "$\\lambda_{min}^2$",
     "Maximum_eigenvalue_squared": "$\\lambda_{max}^2$",
+    "Number_of_gauge_configurations": "# of configs",
+}
+
+
+AXES_LABELS_DICTIONARY = {
+    # Output quantity
+    "Average_number_of_MV_multiplications_per_spinor_per_configuration": "Average # of MV multiplications [per spinor per config]",
+    "Average_number_of_MV_multiplications_per_vector": "Average # of MV multiplications per vector",
+    "Number_of_MV_multiplications_for_constant_PCAC_mass": "# of MV multiplications [per spinor per config]",
+    "Number_of_MV_multiplications_for_constant_bare_mass": "# of MV multiplications [per spinor per config]",
+    "Average_calculation_time_per_spinor_per_configuration": "Average wall-clock time [per spinor per config] (s)",
+    "Average_core_hours_per_vector": "Average cost of calculation per vector (core-hours)",
+    "Average_core_hours_per_spinor": "Average cost of calculation per spinor (core-hours)",
+    "Average_core_hours_per_spinor_per_configuration": "Average core-hours [per spinor per config] (h)",
+    "Adjusted_average_core_hours_per_spinor_per_configuration": "Average core-hours [per spinor per config] (h)",
+    "Core_hours_for_constant_PCAC_mass": "Average core-hours [per spinor per config] (h)",
+    "Total_overhead_time": "Overhead (s)",
+    "Total_calculation_time": "Total wall-clock time (s)",
+    "Average_wall_clock_time_per_vector": "Average wall-clock time per vector (s)",
+    "Average_wall_clock_time_per_spinor": "Average wall-clock time per spinor (s)",
     "Total_number_of_Lanczos_iterations": "Total # of Lanczos algorithm iterations",
-    "Average_calculation_result": "||sgn$^2$(X) - I||$^2$",
-    "Number_of_configurations": "# of configs",
+    # "Average_calculation_result": "||sgn$^2$(X) - I||$^2$",
     "PCAC_mass_estimate": "a$m_{PCAC}$",
     "Pion_effective_mass_estimate": "a$m_{eff.}$",
     "Critical_bare_mass": "a$m^{{critical}}_{{bare}}$",
+    "Number_of_cores": "# of cores",
 }
 
+AXES_LABELS_DICTIONARY.update(TITLE_LABELS_DICTIONARY)
+
+# TITLE_LABELS_DICTIONARY.update(
+#     {
+#         "Overlap_operator_method": "",
+#         "Kernel_operator_type": "",
+#     }
+# )
+
+MAIN_PROGRAM_TYPE_AXES_LABEL = {
+    "Average_sign_squared_violation_values": "||(sgn$^2$(X) - I)$\\eta$||$^2$ / ||$\\eta$||$^2$",
+    "Sign_squared_violation_with_no_error": "||(sgn$^2$(X) - I)$\\eta$||$^2$ / ||$\\eta$||$^2$",
+    "Average_sign_squared_values": "||sgn$^2$(X)||$^2$",
+    "Sign_squared_value_with_no_error": "||sgn$^2$(X)||$^2$",
+    "Average_normality_values": "||$aD_{ov.}^{\\dagger} aD_{ov.} - aD_{ov.} aD_{ov.}^{\\dagger}$||$^2$",
+    "Normality_with_no_error": "||$aD_{ov.}^{\\dagger} aD_{ov.} - aD_{ov.} aD_{ov.}^{\\dagger}$||$^2$",
+    "Average_ginsparg_wilson_relation_values": "||$\\gamma_5 aD_{ov.} + aD_{ov.} \\gamma_5 - aD_{ov.} \\gamma_5 aD_{ov.}$||$^2$",
+    "Ginsparg_wilson_relation_with_no_error": "||$\\gamma_5 aD_{ov.} + aD_{ov.} \\gamma_5 - aD_{ov.} \\gamma_5 aD_{ov.}$||$^2$",
+}
+
+AXES_LABELS_DICTIONARY.update(MAIN_PROGRAM_TYPE_AXES_LABEL)
 
 # TODO: Maybe I need separate lists for qpb input parameters and qpb output
 # values
@@ -385,8 +461,8 @@ AXES_LABELS_DICTIONARY = {
 
 
 PARAMETERS_PRINTED_LABELS_DICTIONARY = {
-    # "Overlap_operator_method": "method",
-    # "Kernel_operator_type": "type",
+    "Overlap_operator_method": "method",
+    "Kernel_operator_type": "kernel",
     "QCD_beta_value": "beta",
     "Configuration_label": "config",
     "APE_iterations": "APEiters",
@@ -402,7 +478,7 @@ PARAMETERS_PRINTED_LABELS_DICTIONARY = {
     "MSCG_epsilon": "EpsMSCG",
     "KL_diagonal_order": "n",
     "KL_scaling_factor": "mu",
-    "MPI_geometry": "nodes",
+    "MPI_geometry": "cores",
 }
 
 
@@ -478,4 +554,72 @@ PARAMETERS_WITH_EXPONENTIAL_FORMAT = [
 PARAMETERS_OF_INTEGER_VALUE = [
     "KL_diagonal_order",
     "Number_of_Chebyshev_terms",
+]
+
+MARKER_STYLES = [
+    "o",  # Circle
+    "^",  # Triangle Up
+    "v",  # Triangle Down
+    "<",  # Triangle Left
+    ">",  # Triangle Right
+    "p",  # Pentagon
+    # "8",  # Octagon
+    "D",  # Diamond
+    "s",  # Square
+    "d",  # Thin Diamond
+    "h",  # Hexagon2
+    "*",  # Star
+    "X",  # X-shaped marker
+    "P",  # Plus (filled)
+    "x",  # X (cross)
+    "H",  # Hexagon1
+    # "|",  # Vertical Line
+    # "_",  # Horizontal Line
+    # ".",  # Point
+    # ",",  # Pixel (small point)
+    # "+",  # Plus
+    # "h",  # Alternate Hexagon
+    # "H",  # Alternate Hexagon (filled)
+    # "p",  # Alternate Pentagon
+    # "*",  # Alternate Star
+    # "X",  # Alternate X
+    # "1",  # Tri-down (Alternative)
+    # "2",  # Tri-up (Alternative)
+    # "3",  # Tri-left (Alternative)
+    # "4",  # Tri-right (Alternative)
+]
+
+
+# MARKER_COLORS = list(plt.cm.tab40.colors)
+# Get the default color cycle
+#
+# DEFAULT_COLORS = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+
+# DEFAULT_COLORS = plt.cm.tab20.colors
+
+# num_colors = 20
+# colormap = cm.get_cmap("turbo", num_colors)  # 'viridis' has good contrast #turbo
+# DEFAULT_COLORS = [colormap(i) for i in range(num_colors)]
+
+DEFAULT_COLORS = [
+    "blue",
+    "red",
+    "cyan",
+    "magenta",
+    "darkgoldenrod",  # Dark yellow option
+    "green",
+    "black",
+    "orange",
+    "purple",
+    "brown",
+    # "pink",
+    "gray",
+    "lime",
+    "teal",
+    # "olive",
+    "maroon",
+    "gold",
+    "navy",
+    "violet",
+    "indigo",
 ]

@@ -4,14 +4,54 @@ import shutil
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from matplotlib.ticker import ScalarFormatter
+from matplotlib import cm
 import textwrap
 import gvar as gv
 import numpy as np
 import pandas as pd
 import copy
+import hashlib
+
+from matplotlib.markers import MarkerStyle
 
 from library import constants, filesystem_utilities
 from library import DataFrameAnalyzer
+import inspect
+
+
+def stable_int_hash(value):
+    value_str = str(value)  # Convert to string to handle different types
+    return int(hashlib.md5(value_str.encode()).hexdigest(), 16)  # Convert hex to int
+
+
+def stable_index_mapping(
+    grouping_field_values, total_number_of_grouping_field_values, all_unique_values
+):
+    """
+    Maps 'grouping_field_values' to a unique integer in [0,
+    total_number_of_grouping_field_values - 1] based on a deterministic ordering
+    of all unique values.
+
+    Parameters:
+        grouping_field_values (any type): The value to hash uniquely.
+        total_number_of_grouping_field_values (int): The total number of unique
+        values. all_unique_values (iterable): A list or set containing all
+        possible unique values.
+
+    Returns:
+        int: A unique integer in the range [0,
+        total_number_of_grouping_field_values - 1].
+    """
+    # Sort the unique values to ensure deterministic ordering
+    ordered_values = sorted(
+        all_unique_values, key=str
+    )  # Sorting ensures stability across runs
+
+    # Create a mapping from values to unique indices
+    value_to_index = {value: idx for idx, value in enumerate(ordered_values)}
+
+    # Return the unique index for the given grouping_field_values
+    return value_to_index[grouping_field_values]
 
 
 class DataPlotter(DataFrameAnalyzer):
@@ -108,7 +148,9 @@ class DataPlotter(DataFrameAnalyzer):
         leading_substring: str,
         metadata_dictionary: dict,
         title_width: int,
-        fields_unique_value_dictionary=None,
+        exclude_prioritized_fields_substring: bool = False,
+        excluded_title_fields: list = None,
+        fields_unique_value_dictionary: dict = None,
         additional_excluded_fields: list = None,
     ):
         """
@@ -141,13 +183,20 @@ class DataPlotter(DataFrameAnalyzer):
                 self.single_valued_fields_dictionary | metadata_dictionary
             )
 
+            # Exclude specified fields from the dictionary if provided
+            if excluded_title_fields is not None:
+                fields_unique_value_dictionary = {
+                    field: value
+                    for field, value in fields_unique_value_dictionary.items()
+                    if field not in excluded_title_fields
+                }
+
         # Start building the subtitle with the prioritized fields
         prioritized_fields_substring = "".join(
             f"{fields_unique_value_dictionary[field]} "
             for field in list_of_fields_to_appear_first
             if field in fields_unique_value_dictionary
         )
-
 
         # Dynamically add an additional field based on Overlap_operator_method
         overlap_operator_method = fields_unique_value_dictionary.get(
@@ -188,6 +237,9 @@ class DataPlotter(DataFrameAnalyzer):
         plot_title = leading_substring + prioritized_fields_substring.strip()
         if remaining_fields_substring:
             plot_title += ", " + remaining_fields_substring
+
+        if exclude_prioritized_fields_substring:
+            plot_title = remaining_fields_substring
 
         # Wrap
         wrapper = textwrap.TextWrapper(width=title_width, initial_indent="   ")
@@ -248,15 +300,33 @@ class DataPlotter(DataFrameAnalyzer):
 
         # Initialize characteristic substring
         if "Kernel_operator_type" in fields_unique_value_dictionary:
-            plots_characteristic_fields_values_string = fields_unique_value_dictionary[
-                "Kernel_operator_type"
-            ]
+            plots_characteristic_fields_values_string = (
+                "_" + fields_unique_value_dictionary["Kernel_operator_type"]
+            )
         else:
             plots_characteristic_fields_values_string = ""
 
+        overlap_operator_method = fields_unique_value_dictionary.get(
+            "Overlap_operator_method", ""
+        ).replace(" operator", "")
+
+        if overlap_operator_method != "":
+            if plots_base_name.startswith("Combined_"):
+                plots_base_name = (
+                    "Combined_"
+                    + overlap_operator_method
+                    + "_"
+                    + plots_base_name[len("Combined_") :]
+                )
+            else:
+                plots_base_name = overlap_operator_method + "_" + plots_base_name
+
         # Append metadata information
         for key, value in metadata_dictionary.items():
-            if key in constants.PARAMETERS_PRINTED_LABELS_DICTIONARY:
+            if (
+                key in constants.PARAMETERS_PRINTED_LABELS_DICTIONARY
+                and key != "Kernel_operator_type"
+            ):
                 plots_characteristic_fields_values_string += (
                     "_" + constants.PARAMETERS_PRINTED_LABELS_DICTIONARY[key]
                 )
@@ -281,13 +351,21 @@ class DataPlotter(DataFrameAnalyzer):
         # Construct the plot path
         plot_path = os.path.join(
             plots_subdirectory,
-            f"{plots_base_name}_{plots_characteristic_fields_values_string}.png",
+            f"{plots_base_name}{plots_characteristic_fields_values_string}.png",
         )
 
         return plot_path
 
     def _plot_group(
-        self, ax, dataframe_group, is_histogram: bool = False, label_string: str = None
+        self,
+        ax,
+        dataframe_group,
+        is_histogram: bool = False,
+        label_string: str = None,
+        marker_style: str = ".",
+        marker_facecolors: str = "full",
+        marker_color=None,
+        fitting_fn=None,
     ):
         """
         Helper method to plot a single group on the given Axes object.
@@ -299,6 +377,8 @@ class DataPlotter(DataFrameAnalyzer):
 
         # Vectorize isinstance check
         is_tuple = np.vectorize(lambda x: isinstance(x, tuple))
+
+        # TODO: Set ability the user can request to only the mean
 
         self.xaxis_data = dataframe_group[self.xaxis_variable_name].to_numpy()
         if any(is_tuple(self.xaxis_data)):
@@ -314,32 +394,63 @@ class DataPlotter(DataFrameAnalyzer):
         else:
             self.yaxis_data = dataframe_group[self.yaxis_variable].to_numpy()
 
+            if marker_facecolors == "full":
+                marker_facecolors = marker_color
+
             if any(is_tuple(self.yaxis_data)):
                 self.yaxis_data = gv.gvar(self.yaxis_data)
+                # else:
 
                 ax.errorbar(
                     self.xaxis_data,
                     gv.mean(self.yaxis_data),
                     yerr=gv.sdev(self.yaxis_data),
-                    fmt=".",
-                    markersize=8,
+                    fmt=marker_style,
+                    markerfacecolor=marker_facecolors,
+                    # markersize=8,
                     capsize=10,
                     label=label_string,
+                    color=marker_color,
                 )
 
             else:
+                # Plot the data points
                 ax.scatter(
                     self.xaxis_data,
                     self.yaxis_data,
-                    marker="x",
-                    # s=8,
+                    marker=marker_style,
+                    facecolors=marker_facecolors,
+                    # marker="x",
                     label=label_string,
+                    color=marker_color,
                 )
+
+            if fitting_fn:
+                # # Perform linear fit
+                # fit_params = np.polyfit(self.xaxis_data, self.yaxis_data, 1)
+                # fit_fn = np.poly1d(fit_params)
+
+                # # Plot the linear fit
+                # ax.plot(
+                #     self.xaxis_data,
+                #     fit_fn(self.xaxis_data),
+                #     color="red",
+                #     linestyle="--",
+                #     label=f"Fit: y={fit_params[0]:.2f}x + {fit_params[1]:.2f}",
+                # )
+
+                # ax.legend()
+                fitting_fn(self)
 
     def plot_data(
         self,
         grouping_field: str = None,
+        sorting_field: str = None,
+        sort_ascending: bool = False,
+        labeling_field=None,
         excluded_fields: list = None,
+        excluded_title_fields: list = None,
+        exclude_prioritized_fields_substring: bool = False,
         dedicated_subdirectory: bool = True,
         clear_existing_plots: bool = False,
         xaxis_log_scale: bool = False,
@@ -347,10 +458,23 @@ class DataPlotter(DataFrameAnalyzer):
         invert_xaxis: bool = False,
         invert_yaxis: bool = False,
         is_histogram: bool = False,
+        include_plot_title: bool = True,
+        include_legend: bool = True,
+        enable_hashed_enumeration: bool = False,
+        varying_marker_style: bool = False,
+        custom_marker_style: str = None,
+        custom_marker_color: str = None,
+        alternating_marker_fillings: bool = False,
+        marker_facecolors: str = "full",
         plot_title_width: int = 105,
+        left_margin_adjustment: float = 0.14,
+        right_margin_adjustment: float = 0.9,
+        bottom_margin_adjustment: float = 0.12,
+        top_margin_adjustment: float = 0.88,
         legend_location: str = "upper left",
-        plot_title_leading_substring: str = "",
+        plot_title_leading_substring: str = None,
         customize_fn=None,
+        fitting_fn=None,
     ):
         # Check first if pair of variables has been set
         if self.xaxis_variable_name is None or self.yaxis_variable is None:
@@ -429,7 +553,7 @@ class DataPlotter(DataFrameAnalyzer):
                 f" but got '{type(plot_title_width).__name__}'."
             )
 
-        print(grouping_fields_list)
+        # print(grouping_fields_list)
 
         dataframe_group = self.group_by_reduced_tunable_parameters_list(
             grouping_fields_list
@@ -441,35 +565,49 @@ class DataPlotter(DataFrameAnalyzer):
         metadata_dictionary = {}
         for values_combination, group in dataframe_group:
 
-            # Fill in the metadata dictionary properly
-            if (
-                type(values_combination) is not tuple
-                and len(reduced_tunable_parameters_list) == 1
-            ):
-                metadata_dictionary[reduced_tunable_parameters_list[0]] = (
-                    values_combination
-                )
-            elif len(reduced_tunable_parameters_list) > 1:
-                metadata_dictionary = dict(
-                    zip(reduced_tunable_parameters_list, list(values_combination))
-                )
+            if sorting_field is not None:
+                # Sort the group DataFrame by "sorting_field" in ascending order
+                group = group.sort_values(by=sorting_field, ascending=sort_ascending)
+
+            # # Fill in the metadata dictionary properly
+            # if (
+            #     type(values_combination) is not tuple
+            #     and len(reduced_tunable_parameters_list) == 1
+            # ):
+            #     metadata_dictionary[reduced_tunable_parameters_list[0]] = (
+            #         values_combination
+            #     )
+            # elif len(reduced_tunable_parameters_list) > 1:
+            #     metadata_dictionary = dict(
+            #         zip(reduced_tunable_parameters_list, list(values_combination))
+            #     )
+
+            if not isinstance(values_combination, tuple):
+                values_combination = [values_combination]
+            metadata_dictionary = dict(
+                zip(reduced_tunable_parameters_list, values_combination)
+            )
 
             fig, ax = plt.subplots()
             ax.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
 
-            plot_title_leading_substring = ""
-            if is_histogram:
-                plot_title_leading_substring += "Histogram "
-            if grouping_field:
-                plot_title_leading_substring += "Combined "
+            if include_plot_title:
+                if plot_title_leading_substring is None:
+                    plot_title_leading_substring = ""
+                    if is_histogram:
+                        plot_title_leading_substring += "Histogram "
+                    if grouping_field:
+                        plot_title_leading_substring += "Combined "
 
-            plot_title = self._construct_plot_title(
-                plot_title_leading_substring,
-                metadata_dictionary,
-                title_width=plot_title_width,
-                additional_excluded_fields=excluded_fields,
-            )
-            ax.set_title(f"{plot_title}", pad=8)
+                plot_title = self._construct_plot_title(
+                    plot_title_leading_substring,
+                    metadata_dictionary,
+                    exclude_prioritized_fields_substring=exclude_prioritized_fields_substring,
+                    title_width=plot_title_width,
+                    excluded_title_fields=excluded_title_fields,
+                    additional_excluded_fields=excluded_fields,
+                )
+                ax.set_title(f"{plot_title}", pad=8)
 
             # Set axes scale
             if (
@@ -497,7 +635,10 @@ class DataPlotter(DataFrameAnalyzer):
             # )
 
             ax.set_xlabel(
-                xlabel=constants.AXES_LABELS_DICTIONARY[self.xaxis_variable_name]
+                # xlabel=constants.AXES_LABELS_DICTIONARY[self.xaxis_variable_name]
+                xlabel=constants.AXES_LABELS_DICTIONARY.get(
+                    self.xaxis_variable_name, ""
+                )
             )
             # , fontsize=14)
 
@@ -505,11 +646,18 @@ class DataPlotter(DataFrameAnalyzer):
                 ax.set_ylabel("Frequency", fontsize=14)
             else:
                 ax.set_ylabel(
-                    ylabel=constants.AXES_LABELS_DICTIONARY[self.yaxis_variable]
+                    ylabel=constants.AXES_LABELS_DICTIONARY.get(
+                        self.yaxis_variable, None
+                    )
                 )
                 #   , fontsize=14)
             # Adjust left margin
-            fig.subplots_adjust(left=0.14)
+            fig.subplots_adjust(
+                left=left_margin_adjustment,
+                right=right_margin_adjustment,
+                bottom=bottom_margin_adjustment,
+                top=top_margin_adjustment,
+            )
 
             # Set axes ticks to integer values only
             if self.xaxis_variable_name in constants.PARAMETERS_OF_INTEGER_VALUE:
@@ -518,20 +666,129 @@ class DataPlotter(DataFrameAnalyzer):
                 ax.yaxis.set_major_locator(MaxNLocator(integer=True))
 
             if grouping_field:
-                for grouping_fields_values, sub_group in group.groupby(grouping_field):
-                    label_string = str(grouping_fields_values)
+
+                total_number_of_grouping_field_values = group[grouping_field].nunique()
+
+                # Generate a stable unique ID mapping
+                config_label_to_id_dict = {
+                    label: idx for idx, label in enumerate(sorted(group[grouping_field].unique()))
+                }
+
+                for count, (grouping_field_values, sub_group) in enumerate(
+                    group.groupby(
+                        grouping_field,
+                        observed=True,
+                        sort=False,
+                    )
+                ):
+
+                    if labeling_field is not None:
+                        if isinstance(labeling_field, list):
+                            label_value = (
+                                sub_group[labeling_field[0]].values[0],
+                                sub_group[labeling_field[1]].values[0],
+                            )
+                        else:
+                            label_value = sub_group[labeling_field].values[0]
+                    else:
+                        label_value = grouping_field_values
+                        # labeling_field = grouping_field
+
+                    if isinstance(label_value, tuple):
+                        label_string = f"{label_value[0]} ($\\kappa_{{\\mathbb{{X}}^2}}$={label_value[1]:.2f})"
+                    elif isinstance(label_value, float):
+                        label_string = f"{label_value:.2f}"
+                    else:
+                        label_string = str(label_value)
+
+                    if varying_marker_style:
+                        if enable_hashed_enumeration:
+                            unique_value = config_label_to_id_dict[grouping_field_values]
+                            # (
+                            #     stable_int_hash(grouping_field_values)
+                            #     % total_number_of_grouping_field_values
+                            # )
+                        else:
+                            unique_value = count
+
+                        marker_index = unique_value % len(constants.MARKER_STYLES)
+                        marker_style = constants.MARKER_STYLES[marker_index]
+
+                        color_index = unique_value % len(constants.DEFAULT_COLORS)
+                        # print(grouping_field_values, unique_value, color_index, config_label_to_id_dict[grouping_field_values])
+                        marker_color = constants.DEFAULT_COLORS[color_index]
+
+                    else:
+                        marker_style = "."
+                        # TODO: I prefer "x" for not gvar values
+                        marker_color = "blue"
+
+                    if custom_marker_color is not None:
+                        marker_color = custom_marker_color
+
+                    if custom_marker_style is not None:
+                        marker_style = custom_marker_style
+
+                    if marker_facecolors != "none":
+                        marker_facecolors = marker_color
+
+                    # TODO: Introduce an optional shift to "count" to allow for
+                    # switching the order the  marker fillings alternate
+                    if alternating_marker_fillings:
+                        if count % 2 == 0:
+                            marker_facecolors = marker_color
+                        else:
+                            marker_facecolors = "none"
+
                     self._plot_group(
-                        ax, sub_group, is_histogram=False, label_string=label_string
+                        ax,
+                        sub_group,
+                        is_histogram=False,
+                        marker_style=marker_style,
+                        label_string=label_string,
+                        marker_color=marker_color,
+                        marker_facecolors=marker_facecolors,
+                        fitting_fn=fitting_fn,
                     )
             else:
-                self._plot_group(ax, group, is_histogram=is_histogram)
-
-            # Apply additional customizations if provided
-            if customize_fn is not None:
-                customize_fn(ax)
+                self._plot_group(
+                    ax, group, is_histogram=is_histogram, fitting_fn=fitting_fn
+                )
 
             if grouping_field:
-                ax.legend(loc=legend_location, title=grouping_field, framealpha=1.0)
+                if labeling_field:
+                    if isinstance(labeling_field, list):
+                        if labeling_field[0] == "Kernel_operator_type":
+                            legend_title = f"Kernel ({labeling_field[1]})"
+                        else:
+                            legend_title = f"{labeling_field[0]} ({labeling_field[1]})"
+                    else:
+                        legend_title = labeling_field
+                else:
+                    legend_title = grouping_field
+
+                legend_title = legend_title.replace("_", " ") + ":"
+
+                legend_title = legend_title.replace(" operator", "")
+
+                if include_legend:
+                    ax.legend(loc=legend_location, title=legend_title, framealpha=1.0)
+                    # ax.legend(loc=legend_location, title=legend_title, framealpha=1.0).set_title("")
+
+            # Apply additional customizations if provided
+
+            if customize_fn is not None:
+                customize_fn_args = inspect.signature(customize_fn).parameters
+                if len(customize_fn_args) == 3:
+                    customize_fn(
+                        ax, metadata_dictionary=metadata_dictionary, group=group
+                    )
+                elif len(customize_fn_args) == 2:
+                    customize_fn(ax, metadata_dictionary=metadata_dictionary)
+                elif len(customize_fn_args) == 1:
+                    customize_fn(ax)
+                else:
+                    raise ValueError("No arguments passed to customize_fn.")
 
             plot_path = self._generate_plot_path(
                 current_plots_subdirectory,
@@ -620,6 +877,12 @@ def plot_correlator(
         metadata_dictionary=metadata_dict,
         title_width=100,
         fields_unique_value_dictionary=tunable_parameters_dict,
+        excluded_title_fields=[
+            "Number_of_vectors",
+            "Delta_Min",
+            "Delta_Max",
+            "Lanczos_epsilon",
+        ],
     )
     ax.set_title(f"{plot_title}", pad=8)
 
@@ -658,8 +921,6 @@ def plot_correlator(
     plt.close()
 
 
-
-
 def generic_plot(
     x_values,
     y_values,
@@ -691,12 +952,11 @@ def generic_plot(
 
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
-    ax.scatter(x, y, marker=".") #, markersize=8, capsize=10)
+    ax.scatter(x, y, marker=".")  # , markersize=8, capsize=10)
     # ax.errorbar(x, gv.mean(y), yerr=gv.sdev(y), fmt=".", markersize=8, capsize=10)
 
     plots_subdirectory = DataPlotter._prepare_plots_subdirectory(
-        None,
-        base_plots_directory, base_name
+        None, base_plots_directory, base_name
     )
 
     plot_path = DataPlotter._generate_plot_path(

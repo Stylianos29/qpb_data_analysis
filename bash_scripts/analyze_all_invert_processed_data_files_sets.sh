@@ -132,8 +132,9 @@ for main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
         data_files_set_name=$(basename "$raw_data_files_set_directory")
 
         # if [[ ! $data_files_set_name == 'Chebyshev_several_config_varying_N' ]]; then
-        #     continue
-        # fi
+        if [[ ! $data_files_set_name == 'KL_several_config_varying_n' ]]; then
+            continue
+        fi
 
         # Define the path to the working script timestamp file
         working_script_timestamp_file_path=$(get_timestamp_file_path \
@@ -164,7 +165,7 @@ for main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
                                 "$depended_script_timestamp_file_path"; then
             processed_raw_data_files_set_flag=false
         fi
-        
+
         is_invert_flag=false
         if $processed_raw_data_files_set_flag; then
             # Check if the current data files set directory contains any .dat files
@@ -196,7 +197,7 @@ for main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
         # "--all" is not specified
         if ! ($VALIDATE_ALL_FLAG || $modified_raw_data_files_set_flag); then
             warning_message="- Skipping '${data_files_set_name}' processed "
-            warning_message+="data files set, already processed."
+            warning_message+="data files set, already analyzed."
             echo $warning_message
             continue
         fi
@@ -221,7 +222,7 @@ for main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
 done
 
 echo
-echo "Processing all raw data files sets completed!"
+echo "Analyzing all invert data files sets completed!"
 
 # Unset the library scripts path variable to avoid conflicts.
 unset PLOTS_DIRECTORY

@@ -68,7 +68,6 @@ import os
 import numpy as np
 import h5py
 import click
-import logging
 
 from library import constants, filesystem_utilities, RAW_DATA_FILES_DIRECTORY
 
@@ -210,7 +209,7 @@ def main(
                     data=correlator_values_dictionary[correlator_identifier],
                 )
 
-    logging.info(
+    logger.info(
         f"A total of {count} qpb correlators files "
         f"were parsed for correlator values extraction from the "
         f"'{os.path.basename(qpb_correlators_files_directory)}' raw data "

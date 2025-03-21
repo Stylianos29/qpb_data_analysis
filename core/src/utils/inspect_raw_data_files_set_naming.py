@@ -251,7 +251,7 @@ def main(
     # Terminate logging
     logging.info(f"Script '{script_name}' execution terminated successfully.")
 
-    print("   -- Inspecting data files set naming completed.")
+    click.echo("   -- Inspecting data files set naming completed.")
 
 
 if __name__ == "__main__":

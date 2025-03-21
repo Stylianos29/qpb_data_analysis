@@ -81,6 +81,11 @@ def extract_parameters_values_from_filename(filename, logger=None):
         if segment.strip("_")
     ]
 
+    # Specific treatment for "MPI_geometry"
+    if "MPI_geometry" in extracted_values_dictionary:
+        raw_cores = extracted_values_dictionary["MPI_geometry"]
+        extracted_values_dictionary["MPI_geometry"] = f"(1, {', '.join(raw_cores)})"
+
     # Add unmatched text as "Additional_text"
     if non_matched_segments:
         extracted_values_dictionary["Additional_text"] = non_matched_segments
@@ -88,21 +93,40 @@ def extract_parameters_values_from_filename(filename, logger=None):
     return extracted_values_dictionary
 
 
-def extract_parameters_values_from_file_contents(file_contents_list, logger=None):
+def extract_single_valued_parameter_values_from_file_contents(
+    file_contents_list, logger=None
+):
     """
     Extract parameter values from file contents based on patterns defined in
-    FILE_CONTENTS_SINGLE_VALUE_PATTERNS_DICTIONARY.
+    FILE_CONTENTS_SINGLE_VALUE_PATTERNS_DICTIONARY, along with determining
+    the 'Main_program_type' based on specific key phrases.
 
     Parameters:
-        file_contents_list (list): List of lines read from the file. logger
-        (logging.Logger, optional): Logger for logging warnings.
+        - file_contents_list (list): List of lines read from the file.
+        - logger (logging.Logger, optional): Logger for logging warnings.
 
     Returns:
         dict: Dictionary of extracted parameter values.
     """
 
-    # Initialize result dictionary
+    # Initialize output dictionary
     extracted_values = {}
+
+    # SPECIAL EXTRACTION OF THE MAIN PROGRAM TYPE
+
+    # Initialize "Main_program_type" as None (or a default value if needed)
+    main_program_type = None
+    for line in file_contents_list:
+        # Check for the special string matches
+        for key_string, program_type in constants.MAIN_PROGRAM_TYPE_MAPPING.items():
+            if key_string in line:
+                main_program_type = program_type
+                break  # Stop checking further if a match is found
+    # If a match was found, store it in the dictionary
+    if main_program_type:
+        extracted_values["Main_program_type"] = main_program_type
+
+    # EXTRACT THE REST PIECES OF INFORMATION
 
     for (
         parameter_name,
@@ -113,13 +137,13 @@ def extract_parameters_values_from_file_contents(file_contents_list, logger=None
         expected_type = parameter_info["type"]
 
         # Search for the line containing the parameter
-        relevant_line = next(
+        matched_line = next(
             (line for line in file_contents_list if line_identifier in line), None
         )
 
-        if relevant_line:
+        if matched_line:
             # Apply regex to extract the value
-            match = re.search(regex_pattern, relevant_line)
+            match = re.search(regex_pattern, matched_line)
             if match:
                 # Assume the first capture group contains the value
                 raw_value = match.group(1)
@@ -148,6 +172,7 @@ def extract_parameters_values_from_file_contents(file_contents_list, logger=None
 
 
 def extract_multivalued_parameters_from_file_contents(file_contents_list, logger=None):
+    # TODO: Include logging
 
     # Initialize a dictionary to store multivalued parameters
     multivalued_parameters = {}

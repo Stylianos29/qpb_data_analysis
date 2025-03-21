@@ -1,3 +1,18 @@
+# TODO: Write a detailed introductory commentary
+"""
+post_processing_analysis/process_qpb_log_files_extracted_values.py
+
+Summary:
+
+Input:
+
+Output:
+
+Functionality:
+
+Usage:
+"""
+
 import os
 import sys
 
@@ -10,10 +25,12 @@ import logging
 import pandas as pd
 import copy
 from scipy.optimize import curve_fit
+import warnings
+from scipy.optimize import OptimizeWarning
 
 from library import (
     filesystem_utilities,
-    plotting,
+    custom_plotting,
     data_processing,
     fit_functions,
     constants,
@@ -22,29 +39,39 @@ from library import (
 REFERENCE_BARE_MASS = 0.1
 REFERENCE_PCAC_MASS = 0.1
 
+UPPER_BARE_MASS_CUT = 0.15
 
 @click.command()
 @click.option(
+    "-in_PCAC_csv",
     "--input_PCAC_mass_estimates_csv_file_path",
     "input_PCAC_mass_estimates_csv_file_path",
-    "-PCAC_csv",
-    # default="/nvme/h/cy22sg1/qpb_data_analysis/data_files/processed/invert/Chebyshev_several_config_varying_N/PCAC_mass_estimates.csv",
     required=True,
+    callback=filesystem_utilities.validate_input_csv_file,
     help="Path to .csv file containing PCAC mass estimates.",
 )
 @click.option(
+    "-in_jack_hdf5",
+    "--input_correlators_jackknife_analysis_hdf5_file_path",
+    "input_correlators_jackknife_analysis_hdf5_file_path",
+    callback=filesystem_utilities.validate_input_HDF5_file,
+    required=True,
+    help="Path to input HDF5 file containing extracted correlators values.",
+)
+@click.option(
+    "-out_dir",
     "--output_files_directory",
     "output_files_directory",
-    "-out_dir",
     default=None,
+    callback=filesystem_utilities.validate_directory,
     help="Path to directory where all output files will be stored.",
 )
 @click.option(
+    "-plots_dir",
     "--plots_directory",
     "plots_directory",
-    "-plots_dir",
-    default="../../output/plots",
-    # default="/nvme/h/cy22sg1/qpb_data_analysis/output/plots/invert/Chebyshev_several_config_varying_N",
+    default="../../../output/plots",
+    callback=filesystem_utilities.validate_directory,
     help="Path to the output directory for storing plots.",
 )
 @click.option(
@@ -72,114 +99,79 @@ REFERENCE_PCAC_MASS = 0.1
     help="Enable annotating the data points.",
 )
 @click.option(
+    "-out_csv_name",
     "--output_calculation_cost_csv_filename",
     "output_calculation_cost_csv_filename",
-    "-out_csv",
     default="calculation_cost_of_critical_bare_mass_from_PCAC_mass.csv",
     help="Specific name for the output .csv files.",
 )
 @click.option(
+    "-log_on",
+    "--enable_logging",
+    "enable_logging",
+    is_flag=True,
+    default=False,
+    help="Enable logging.",
+)
+@click.option(
+    "-log_file_dir",
     "--log_file_directory",
     "log_file_directory",
-    "-log_file_dir",
     default=None,
+    callback=filesystem_utilities.validate_script_log_file_directory,
     help="Directory where the script's log file will be stored.",
 )
 @click.option(
+    "-log_name",
     "--log_filename",
     "log_filename",
-    "-log",
     default=None,
+    callback=filesystem_utilities.validate_script_log_filename,
     help="Specific name for the script's log file.",
 )
 def main(
     input_PCAC_mass_estimates_csv_file_path,
+    input_correlators_jackknife_analysis_hdf5_file_path,
     output_files_directory,
     plots_directory,
     plot_critical_bare_mass,
     plot_calculation_cost,
     annotate_data_points,
     output_calculation_cost_csv_filename,
+    enable_logging,
     log_file_directory,
     log_filename,
 ):
-    # VALIDATE INPUT ARGUMENTS
-
-    if not filesystem_utilities.is_valid_file(input_PCAC_mass_estimates_csv_file_path):
-        error_message = "Passed correlator values HDF5 file path is invalid."
-        print("ERROR:", error_message)
-        sys.exit(1)
+    # HANDLE EMPTY INPUT ARGUMENTS
 
     # If no output directory is provided, use the directory of the input file
     if output_files_directory is None:
         output_files_directory = os.path.dirname(
             input_PCAC_mass_estimates_csv_file_path
         )
-    # Check validity if the provided
-    elif not filesystem_utilities.is_valid_file(output_files_directory):
-        error_message = (
-            "Passed output files directory path is invalid " "or not a directory."
-        )
-        print("ERROR:", error_message)
-        print("Exiting...")
-        sys.exit(1)
-
-    if not filesystem_utilities.is_valid_directory(plots_directory):
-        error_message = "The specified plots directory path is invalid."
-        print("ERROR:", error_message)
-        sys.exit(1)
-
-    # Specify current script's log file directory
-    if log_file_directory is None:
-        log_file_directory = output_files_directory
-    elif not filesystem_utilities.is_valid_directory(log_file_directory):
-        error_message = (
-            "Passed directory path to store script's log file is "
-            "invalid or not a directory."
-        )
-        print("ERROR:", error_message)
-        print("Exiting...")
-        sys.exit(1)
-
-    # Get the script's filename
-    script_name = os.path.basename(__file__)
-
-    if log_filename is None:
-        log_filename = script_name.replace(".py", "_python_script.log")
-
-    # Check for proper extensions in provided output filenames
-    if not output_calculation_cost_csv_filename.endswith(".csv"):
-        output_calculation_cost_csv_filename = (
-            output_calculation_cost_csv_filename + ".csv"
-        )
-    if not log_filename.endswith(".log"):
-        log_filename = log_filename + ".log"
 
     # INITIATE LOGGING
 
-    filesystem_utilities.setup_logging(log_file_directory, log_filename)
+    # Setup logging
+    logger = filesystem_utilities.LoggingWrapper(
+        log_file_directory, log_filename, enable_logging
+    )
 
-    # # Create a logger instance for the current script using the script's name.
-    # logger = logging.getLogger(__name__)
-
-    # Get the script's filename
-    script_name = os.path.basename(__file__)
-
-    # Initiate logging
-    logging.info(f"Script '{script_name}' execution initiated.")
+    # Log script start
+    logger.initiate_script_logging()
 
     # CREATE PLOTS SUBDIRECTORIES
 
-    if plot_critical_bare_mass or plot_calculation_cost:
+    if any([plot_critical_bare_mass, plot_calculation_cost]):
         # Create main plots directory if it does not exist
         plots_main_subdirectory = filesystem_utilities.create_subdirectory(
             plots_directory,
-            "calculation_cost_of_critical_bare_mass",
+            "Calculation_cost_of_critical_bare_mass",
         )
 
+    # Create deeper-level subdirectories if requested
     if plot_critical_bare_mass:
-        # Create deeper-level subdirectories if requested
-        critical_bare_mass_plots_base_name = "critical_bare_mass"
+        critical_bare_mass_plots_base_name = "Critical_bare_mass"
         critical_bare_mass_plots_subdirectory = (
             filesystem_utilities.create_subdirectory(
                 plots_main_subdirectory,
@@ -187,10 +179,10 @@ def main(
                 clear_contents=True,
             )
         )
+        logger.info("Subdirectory for critical bare mass plots created.")
 
     if plot_calculation_cost:
-        # Create deeper-level subdirectories if requested
-        number_of_MV_multiplications_plots_base_name = "number_MV_multiplications"
+        number_of_MV_multiplications_plots_base_name = "Number_MV_multiplications"
         number_of_MV_multiplications_plots_subdirectory = (
             filesystem_utilities.create_subdirectory(
                 plots_main_subdirectory,
@@ -198,6 +190,17 @@ def main(
                 clear_contents=True,
             )
         )
+        logger.info("Subdirectory for number of MV multiplications plots created.")
+
+        adjusted_core_hours_plots_base_name = "Adjusted_core_hours"
+        adjusted_core_hours_plots_subdirectory = (
+            filesystem_utilities.create_subdirectory(
+                plots_main_subdirectory,
+                adjusted_core_hours_plots_base_name + "_per_PCAC_mass",
+                clear_contents=True,
+            )
+        )
+        logger.info("Subdirectory for number of MV multiplications plots created.")
 
     # IMPORT DATASETS AND METADATA
 
@@ -230,7 +233,8 @@ def main(
 
     critical_bare_mass_values_list = []
     for value, group in PCAC_mass_estimates_dataframe.groupby(
-        tunable_multivalued_parameters_list
+        tunable_multivalued_parameters_list,
+        observed=True,
     ):
         # Check for a minimum amount of data points
         if group["Bare_mass"].nunique() < 3:
@@ -256,8 +260,8 @@ def main(
             "Number_of_gauge_configurations"
         ].to_numpy()
 
-        average_calculation_time_per_spinor_per_configuration_array = group[
-            "Average_calculation_time_per_spinor_per_configuration"
+        adjusted_average_core_hours_per_spinor_per_configuration_array = group[
+            "Adjusted_average_core_hours_per_spinor_per_configuration"
         ].to_numpy()
 
         average_number_of_MV_multiplications_array = group[
@@ -266,8 +270,18 @@ def main(
 
         # FIT ON PCAC MASS VS BARE MASS DATA
 
-        x = bare_mass_values_array
-        y = PCAC_mass_estimates_array
+        bare_mass_values_for_fitting_array = bare_mass_values_array
+        PCAC_mass_estimates_for_fitting_array = PCAC_mass_estimates_array
+        if UPPER_BARE_MASS_CUT is not None:
+            condition = bare_mass_values_array < UPPER_BARE_MASS_CUT
+            bare_mass_values_for_fitting_array = bare_mass_values_array[condition]
+            PCAC_mass_estimates_for_fitting_array = PCAC_mass_estimates_array[condition]
+
+        x = bare_mass_values_for_fitting_array
+        y = PCAC_mass_estimates_for_fitting_array
+
+        if len(x) < 3:
+            continue
 
         # Guess parameters
         min_index = np.argmin(x)
@@ -294,6 +308,7 @@ def main(
         critical_bare_mass_value = linear_fit.p[1]
 
         # Calculate corresponding values to the reference levels set by the user
+        # TODO:
         PCAC_mass_reference_value = fit_functions.linear_function(
             REFERENCE_BARE_MASS, linear_fit.p
         )
@@ -318,10 +333,13 @@ def main(
         d = np.min(x)
         shifted_exponential_fit_p0 = [a, b, c, d]
 
-        # Shifted exponential fit
-        shifted_exponential_coefficients, _ = curve_fit(
+        # Suppress specific warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", OptimizeWarning)
+            # Shifted exponential fit
+            shifted_exponential_coefficients, _ = curve_fit(
             fit_functions.shifted_exponential, x, y, p0=shifted_exponential_fit_p0
-        )
+            )
 
         # Calculate corresponding values to the reference levels set by the user
         number_of_MV_multiplications_reference_value_for_constant_bare_mass = (
@@ -335,21 +353,53 @@ def main(
             )
         )
 
+        # FIT ON CORE-HOURS VS NUMBER OF MV MULTIPLICATIONS DATA
+        x = average_number_of_MV_multiplications_array
+        y = adjusted_average_core_hours_per_spinor_per_configuration_array
+
+        # Perform linear fit using numpy's polyfit
+        linear_fit_coefficients = np.polyfit(x, y, 1)
+        slope, intercept = linear_fit_coefficients
+        core_hours_linear_fit = np.poly1d(linear_fit_coefficients)
+
+        # Calculate corresponding values to the reference levels set by the user
+        core_hours_reference_value_for_constant_PCAC_mass = (
+            slope * number_of_MV_multiplications_reference_value_for_constant_PCAC_mass
+            + intercept
+        )
+        core_hours_reference_value_for_constant_bare_mass = (
+            slope * number_of_MV_multiplications_reference_value_for_constant_bare_mass
+            + intercept
+        )
+
         # PLOT PCAC MASS VS BARE MASS DATA
 
         x = bare_mass_values_array
         y = PCAC_mass_estimates_array
 
         if plot_calculation_cost:
+
+            excluded_title_fields = [
+                "Number_of_vectors",
+                "Delta_Min",
+                "Delta_Max",
+                "Lanczos_epsilon",
+            ]
+            reduced_parameters_value_dictionary = {
+                k: v
+                for k, v in parameters_value_dictionary.items()
+                if k not in excluded_title_fields
+            }
+
             fig, ax = plt.subplots()
             ax.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
 
-            plot_title = plotting.DataPlotter._construct_plot_title(
+            plot_title = custom_plotting.DataPlotter._construct_plot_title(
                 None,
                 leading_substring="",
                 metadata_dictionary=metadata_dictionary,
-                title_width=100,
-                fields_unique_value_dictionary=parameters_value_dictionary,
+                title_width=80,
+                fields_unique_value_dictionary=reduced_parameters_value_dictionary,
             )
             ax.set_title(f"{plot_title}", pad=8)
 
@@ -431,7 +481,7 @@ def main(
                     )
 
             current_plots_base_name = critical_bare_mass_plots_base_name
-            plot_path = plotting.DataPlotter._generate_plot_path(
+            plot_path = custom_plotting.DataPlotter._generate_plot_path(
                 None,
                 critical_bare_mass_plots_subdirectory,
                 current_plots_base_name,
@@ -450,12 +500,18 @@ def main(
             fig, ax = plt.subplots()
             ax.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
 
-            plot_title = plotting.DataPlotter._construct_plot_title(
+            plot_title = custom_plotting.DataPlotter._construct_plot_title(
                 None,
                 leading_substring="",
                 metadata_dictionary=metadata_dictionary,
-                title_width=100,
-                fields_unique_value_dictionary=parameters_value_dictionary,
+                title_width=80,
+                fields_unique_value_dictionary=reduced_parameters_value_dictionary,
+                excluded_title_fields=[
+                    "Number_of_vectors",
+                    "Delta_Min",
+                    "Delta_Max",
+                    "Lanczos_epsilon",
+                ],
             )
             ax.set_title(f"{plot_title}", pad=8)
 
@@ -506,9 +562,99 @@ def main(
             ax.legend(loc="upper right")
 
             current_plots_base_name = number_of_MV_multiplications_plots_base_name
-            plot_path = plotting.DataPlotter._generate_plot_path(
+            plot_path = custom_plotting.DataPlotter._generate_plot_path(
                 None,
                 number_of_MV_multiplications_plots_subdirectory,
+                current_plots_base_name,
+                metadata_dictionary,
+                single_valued_fields_dictionary=single_valued_fields_dictionary,
+            )
+
+            fig.savefig(plot_path)
+            plt.close()
+
+            # PLOT CORE-HOURS VS NUMBER OF MV MULTIPLICATIONS
+
+            x = average_number_of_MV_multiplications_array
+            y = adjusted_average_core_hours_per_spinor_per_configuration_array
+
+            fig, ax = plt.subplots()
+            ax.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
+
+            plot_title = custom_plotting.DataPlotter._construct_plot_title(
+                None,
+                leading_substring="",
+                metadata_dictionary=metadata_dictionary,
+                title_width=80,
+                fields_unique_value_dictionary=reduced_parameters_value_dictionary,
+            )
+            ax.set_title(f"{plot_title}", pad=8)
+
+            ax.set(
+                xlabel=constants.AXES_LABELS_DICTIONARY[
+                    "Average_number_of_MV_multiplications_per_spinor_per_configuration"
+                ],
+                ylabel=constants.AXES_LABELS_DICTIONARY[
+                    "Adjusted_average_core_hours_per_spinor_per_configuration"
+                ],
+            )
+            # fig.subplots_adjust(left=0.14)
+
+            ax.axhline(0, color="brown")  # y = 0
+            ax.axvline(0, color="brown")  # x = 0
+
+            ax.scatter(x, y, marker="x")
+            # s=8,
+
+            # Plot shifted exponential fit
+            x_data = np.linspace(np.min(x), np.max(x), 100)
+            y_data = core_hours_linear_fit(x_data)
+            ax.plot(
+                x_data,
+                y_data,
+                color="red",
+                linestyle="--",
+                # linewidth=2,
+                # label="Fit",
+            )
+
+            # Plot reference levels for constant PCAC mass
+            ax.axvline(
+                number_of_MV_multiplications_reference_value_for_constant_PCAC_mass,
+                color="blue",
+                linestyle="--",
+            )
+            ax.axhline(
+                core_hours_reference_value_for_constant_PCAC_mass,
+                color="green",
+                linestyle="--",
+                label=(
+                    "core-hours for const. PCAC mass = "
+                    f"{core_hours_reference_value_for_constant_PCAC_mass:.2f}"
+                ),
+            )
+            # Plot reference levels for constant bare mass
+            ax.axvline(
+                number_of_MV_multiplications_reference_value_for_constant_bare_mass,
+                color="blue",
+                linestyle="--",
+            )
+            ax.axhline(
+                core_hours_reference_value_for_constant_bare_mass,
+                color="green",
+                linestyle="--",
+                label=(
+                    "core-hours for const. bare mass = "
+                    f"{core_hours_reference_value_for_constant_bare_mass:.2f}"
+                ),
+            )
+
+            ax.legend(loc="upper right")
+
+            current_plots_base_name = adjusted_core_hours_plots_base_name
+            plot_path = custom_plotting.DataPlotter._generate_plot_path(
+                None,
+                adjusted_core_hours_plots_subdirectory,
                 current_plots_base_name,
                 metadata_dictionary,
                 single_valued_fields_dictionary=single_valued_fields_dictionary,
@@ -525,14 +671,30 @@ def main(
             )
 
             parameters_value_dictionary[
-                "number_of_MV_multiplications_for_constant_bare_mass"
+                "Number_of_MV_multiplications_for_constant_bare_mass"
             ] = number_of_MV_multiplications_reference_value_for_constant_bare_mass
 
             parameters_value_dictionary[
-                "number_of_MV_multiplications_for_constant_PCAC_mass"
+                "Number_of_MV_multiplications_for_constant_PCAC_mass"
             ] = number_of_MV_multiplications_reference_value_for_constant_PCAC_mass
 
+            parameters_value_dictionary["Core_hours_for_constant_bare_mass"] = (
+                core_hours_reference_value_for_constant_bare_mass
+            )
+
+            parameters_value_dictionary["Core_hours_for_constant_PCAC_mass"] = (
+                core_hours_reference_value_for_constant_PCAC_mass
+            )
+
         critical_bare_mass_values_list.append(parameters_value_dictionary)
+
+    # Check if list is empty before exporting
+    if not critical_bare_mass_values_list:
+        logger.warning(
+            "Critical bare mass values calculation produced no results.",
+            to_console=True,
+        )
+        sys.exit(1)
 
     # Create a DataFrame from the extracted data
     critical_bare_mass_dataframe = pd.DataFrame(critical_bare_mass_values_list)
@@ -545,10 +707,10 @@ def main(
     # Export the DataFrame to a CSV file
     critical_bare_mass_dataframe.to_csv(csv_file_full_path, index=False)
 
-    # Terminate logging
-    logging.info(f"Script '{script_name}' execution terminated successfully.")
+    click.echo("   -- Calculation cost estimation from PCAC mass estimates completed.")
 
-    print("   -- Calculation cost estimation from PCAC mass estimates completed.")
+    # Terminate logging
+    logger.terminate_script_logging()
 
 
 if __name__ == "__main__":

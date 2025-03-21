@@ -107,7 +107,14 @@ for main_program_directory in "$SOURCE_DIRECTORY"/*; do
 
         echo "- Moving raw data files from '${data_files_set_name}/' directory."
 
+        # Count the number of files to be moved
+        file_count=$(ls -1 "${data_files_set_directory}" | wc -l)
+
+        # Move the files
         mv "${data_files_set_directory}"/* "${destination_subdirectory}/"
+
+        # Log the number of files moved
+        echo "Moved ${file_count} files to '${destination_subdirectory}/'."
 
     done
 done

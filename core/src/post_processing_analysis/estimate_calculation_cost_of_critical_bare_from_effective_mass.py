@@ -1,3 +1,18 @@
+# TODO: Write a detailed introductory commentary
+"""
+post_processing_analysis/process_qpb_log_files_extracted_values.py
+
+Summary:
+
+Input:
+
+Output:
+
+Functionality:
+
+Usage:
+"""
+
 import os
 import sys
 
@@ -13,7 +28,7 @@ from scipy.optimize import curve_fit
 
 from library import (
     filesystem_utilities,
-    plotting,
+    custom_plotting,
     data_processing,
     fit_functions,
     constants,
@@ -43,7 +58,7 @@ REFERENCE_EFFECTIVE_MASS = 0.15
     "--plots_directory",
     "plots_directory",
     "-plots_dir",
-    default="../../output/plots",
+    default="../../../output/plots",
     # default="/nvme/h/cy22sg1/qpb_data_analysis/output/plots/invert/KL_several_config_varying_n",
     help="Path to the output directory for storing plots.",
 )
@@ -232,7 +247,8 @@ def main(
 
     critical_bare_mass_values_list = []
     for value, group in effective_mass_estimates_dataframe.groupby(
-        tunable_multivalued_parameters_list
+        tunable_multivalued_parameters_list,
+        observed=True,
     ):
         # Check for a minimum amount of data points
         if group["Bare_mass"].nunique() < 3:
@@ -348,7 +364,7 @@ def main(
             fig, ax = plt.subplots()
             ax.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
 
-            plot_title = plotting.DataPlotter._construct_plot_title(
+            plot_title = custom_plotting.DataPlotter._construct_plot_title(
                 None,
                 leading_substring="",
                 metadata_dictionary=metadata_dictionary,
@@ -439,7 +455,7 @@ def main(
                     )
 
             current_plots_base_name = critical_bare_mass_plots_base_name
-            plot_path = plotting.DataPlotter._generate_plot_path(
+            plot_path = custom_plotting.DataPlotter._generate_plot_path(
                 None,
                 critical_bare_mass_plots_subdirectory,
                 current_plots_base_name,
@@ -458,7 +474,7 @@ def main(
             fig, ax = plt.subplots()
             ax.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
 
-            plot_title = plotting.DataPlotter._construct_plot_title(
+            plot_title = custom_plotting.DataPlotter._construct_plot_title(
                 None,
                 leading_substring="",
                 metadata_dictionary=metadata_dictionary,
@@ -514,7 +530,7 @@ def main(
             ax.legend(loc="upper right")
 
             current_plots_base_name = number_of_MV_multiplications_plots_base_name
-            plot_path = plotting.DataPlotter._generate_plot_path(
+            plot_path = custom_plotting.DataPlotter._generate_plot_path(
                 None,
                 number_of_MV_multiplications_plots_subdirectory,
                 current_plots_base_name,
@@ -556,7 +572,9 @@ def main(
     # Terminate logging
     logging.info(f"Script '{script_name}' execution terminated successfully.")
 
-    print("   -- Calculation cost estimation from effective mass estimates completed.")
+    click.echo(
+        "   -- Calculation cost estimation from effective mass estimates completed."
+    )
 
 
 if __name__ == "__main__":

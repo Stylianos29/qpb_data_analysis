@@ -6,9 +6,9 @@
 #
 # DESCRIPTION:
 # This script validates raw data files sets organized in a specific directory
-# structure. Each subdirectory of "raw" represents a main program's output,
-# containing subdirectories corresponding to data files sets. The script:
-#
+# structure. Each subdirectory of "raw" directory represents a main program's
+# type, containing subdirectories corresponding to data files sets. The
+# script:
 # 1. Recursively traverses this structure to locate data files sets.
 # 2. Uses timestamp checks to avoid re-validating unmodified sets unless the
 #    "--all" flag is provided.
@@ -17,8 +17,8 @@
 #     b. Updates a timestamp file to track validation.
 #
 # FLAGS:
-# --all       Validate all data files sets, bypassing timestamp checks.
-# -u, --usage Display usage instructions and exit.
+# --all         Validate all data files sets, bypassing timestamp checks.
+# -u, --usage   Display usage instructions and exit.
 #
 # USAGE EXAMPLES:
 #   ./validate_all_raw_data_files_sets.sh         # Validate only modified sets.

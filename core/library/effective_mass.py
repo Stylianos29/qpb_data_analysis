@@ -4,9 +4,6 @@ import lsqfit
 import warnings
 
 
-warnings.filterwarnings("ignore")
-
-
 def merge_contiguous_ranges(indices, maximum_gap=2):
     # Step 1: Split indices into contiguous sublists
     contiguous_ranges = []
@@ -170,7 +167,7 @@ def optimum_range(xrange, effective_mass, fitting_function_name, fit_p0):
     temporal_direction_lattice_size = len(effective_mass)
     number_of_parameters = len(fit_p0)
 
-    chi_square_dict = dict()
+    chi_square_dict = {}
     minimum_value = 1000  # Arbitrary value
     min_key = tuple()
     fit_parameters = []

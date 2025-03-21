@@ -5,6 +5,8 @@ def symmetrization(values_list):
     reverse = values_list[::-1]
 
     return 0.5 * (values_list + np.roll(reverse, shift=+1))
+    # return 0.5 * (values_list + reverse)
+    # return 0.5 * (values_list + np.roll(reverse, shift=-1))
 
 
 def single_state_non_periodic_correlator(t, p):
