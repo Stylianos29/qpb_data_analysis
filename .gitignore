@@ -2,6 +2,8 @@
 
 archive/*
 
+bash_scripts/unit_tests/mock_data/*
+
 core/library/__pycache__/*
 core/qpb_data_analysis.egg-info/*
 core/unit_tests/__pycache__/*
