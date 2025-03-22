@@ -19,8 +19,11 @@
 usage() {
     # Function to display usage information
 
-    echo "Usage: $0 -p <data_files_set_directory>"
-    echo "  -p, --set_dir   Specify the directory containing raw files"
+    echo "Usage: $0 -set_dir <data_files_set_directory> [-log_dir <auxiliary_files_directory>] [-log_name <script_log_filename>] [--disable-cache]"
+    echo "  -set_dir, --data_files_set_directory   Specify the directory containing raw files"
+    echo "  -log_dir, --auxiliary_files_directory  Specify the directory for auxiliary files (default: parent of data files set directory)"
+    echo "  -log_name, --script_log_filename       Specify the log file name (default: script name with .log extension)"
+    echo "  --disable-cache                        Disable caching of validated file paths"
     exit 1
 }
 
@@ -41,6 +44,7 @@ if [ -z "$LIBRARY_SCRIPTS_DIRECTORY_PATH" ]; then
                             && echo "Invalid library scripts path." && exit 1
 fi
 
+FILE_TYPES=("error" "log" "correlators")
 NON_INVERT_LOG_FILES_SUCCESS_FLAG="per stochastic source"
 INVERT_LOG_FILES_SUCCESS_FLAG="CG done"
 ERROR_FILES_FAILURE_FLAG="terminated"
@@ -65,20 +69,29 @@ done
 # PARSE INPUT ARGUMENTS
 
 data_files_set_directory=""
-script_log_file_directory=""
+auxiliary_files_directory=""
+script_log_file_name=""
+enable_cache=true
 while [[ $# -gt 0 ]]; do
     case $1 in
         -set_dir|--data_files_set_directory)
             data_files_set_directory="$2"
             shift 2
             ;;
-        -log_dir|--scripts_log_files_directory)
-            script_log_file_directory="$2"
+        -log_dir|--auxiliary_files_directory)
+            auxiliary_files_directory="$2"
             shift 2
             ;;
         -log_name|--script_log_filename)
             script_log_file_name="$2"
             shift 2
+            ;;
+        --disable-cache)
+            enable_cache=false
+            shift
+            ;;
+        -u|--usage)
+            usage
             ;;
         *)
             echo "Error: Unknown argument '$1'"
@@ -98,19 +111,21 @@ fi
 check_directory_exists "$data_files_set_directory"
 data_files_set_directory_name=$(basename $data_files_set_directory)
 
-# Check if a log directory is provided
-if [ -z "$script_log_file_directory" ]; then
+# Check if an auxiliary files directory is provided
+if [ -z "$auxiliary_files_directory" ]; then
     # if not, then set it to the parent of the data files set directory
-    script_log_file_directory=$(dirname $data_files_set_directory)
+    auxiliary_files_directory=$(dirname $data_files_set_directory)
 else
     # if it was provided, then check if it exists
-    check_directory_exists "$script_log_file_directory"
+    check_directory_exists "$auxiliary_files_directory"
 fi
 
 # Set log filename to default if not provided
 if [ -z "$script_log_file_name" ]; then
     script_log_file_name=$DEFAULT_SCRIPT_LOG_FILE_NAME
 else
+    # Check if the provided script log filename ends with a ".log". If it does
+    # not, append the ".log" extension to it.
     if [[ "$script_log_file_name" != *.log ]]; then
         script_log_file_name="${script_log_file_name}.log"
     fi
@@ -119,7 +134,7 @@ fi
 # INITIATE LOGGING
 
 # Export log file path as a global variable to be used by custom functions
-SCRIPT_LOG_FILE_PATH="${script_log_file_directory}/${script_log_file_name}"
+SCRIPT_LOG_FILE_PATH="${auxiliary_files_directory}/${script_log_file_name}"
 export SCRIPT_LOG_FILE_PATH
 
 # Create or override a log file. Initiate logging
@@ -130,7 +145,7 @@ log_message="Initiate inspecting '${data_files_set_directory_name}' "
 log_message+="data files set directory."
 log "INFO" "$log_message"
 
-# COUNT THE NUMBERS OF DATA FILES BY TYPE
+# LIST THE DATA FILES FOR VALIDATION BY TYPE
 
 # Check if the data files set directory is empty
 if [ -z "$(ls -A "$data_files_set_directory")" ]; then
@@ -140,7 +155,7 @@ if [ -z "$(ls -A "$data_files_set_directory")" ]; then
     exit 1
 fi
 
-# Create lists of filenames per file type
+# Create lists of file paths per file type for all existing files in directory
 list_of_qpb_error_file_paths=($(\
                     find "$data_files_set_directory" -type f -name "*.err"))
 list_of_qpb_log_file_paths=($(\
@@ -158,22 +173,60 @@ if [[ $number_of_qpb_log_files -eq 0 ]]; then
     exit 1
 fi
 
-# Check if any error files exist
+if [[ $enable_cache == true ]]; then
+    # Iterate over each file type defined in the FILE_TYPES array
+    for file_type in "${FILE_TYPES[@]}"; do
+        # Construct the path to the stored file list for the current file type
+        stored_files_list_file_path="${auxiliary_files_directory}/list_of_stored_qpb_${file_type}_files.txt"
+        
+        # Check if the stored file list exists and is not empty
+        check_if_file_exists "$stored_files_list_file_path" -c -s
+
+        # Read the stored file list into an array
+        mapfile -t "list_of_stored_qpb_${file_type}_file_paths" < "$stored_files_list_file_path"
+
+        # Copy the elements of the current file type's list to a new array
+        eval "list_of_present_qpb_file_paths=(\"\${list_of_qpb_${file_type}_file_paths[@]}\")"
+
+        # Copy the elements of the stored file list to a new array
+        eval "list_of_stored_qpb_file_paths=(\"\${list_of_stored_qpb_${file_type}_file_paths[@]}\")"
+
+        # Initialize an array to store new file paths that are not in the stored list
+        list_of_new_qpb_file_paths=()
+        for file in "${list_of_present_qpb_file_paths[@]}"; do
+            # If the file is not in the stored list, add it to the new file paths array
+            if [[ ! " ${list_of_stored_qpb_file_paths[*]} " =~ " $file " ]]; then
+                list_of_new_qpb_file_paths+=("$file")
+            fi
+        done
+
+        # Assign the contents of the new file paths array to the original array
+        declare -n list_of_qpb_file_paths="list_of_qpb_${file_type}_file_paths"
+        list_of_qpb_file_paths=("${list_of_new_qpb_file_paths[@]}")
+    done
+
+    # Update the number of log files after filtering
+    number_of_qpb_log_files=${#list_of_qpb_log_file_paths[@]}
+fi
+
+# Check if any error files are assigned to be validated
 error_files_present=false
 number_of_qpb_error_files=${#list_of_qpb_error_file_paths[@]}
 [[ ${number_of_qpb_error_files} -gt 0 ]] && error_files_present=true
 
-# Check if any correlators files exist
+# Check if any correlators files are assigned to be validated
 correlators_files_present=false
+is_invert=false
 number_of_qpb_correlators_files=${#list_of_qpb_correlators_file_paths[@]}
 if [[ ${number_of_qpb_correlators_files} -gt 0 ]]; then
     correlators_files_present=true
-    # initialize 'is_invert' to true
+    # initialize 'is_invert' to true. This is a preliminary assessment.
     is_invert=true
 fi
 
-# Report the number of data files in the directory
-output_message="Directory contains ${number_of_qpb_log_files} qpb log files"
+# TODO: # Report the number of the remaining data files in the directory
+output_message="Initializing validation for a total of "
+output_message+="${number_of_qpb_log_files} qpb log files"
 if [[ $error_files_present == true ]]; then
     output_message+=", ${number_of_qpb_error_files} qpb error files"
 else
@@ -187,73 +240,6 @@ else
 fi
 log "INFO" "$output_message"
 echo -e "++ $output_message"
-
-
-# stored_qpb_error_files_list_file_path="${script_log_file_directory}"
-# stored_qpb_error_files_list_file_path+="/list_of_stored_qpb_error_files.txt"
-# check_if_file_exists "$stored_qpb_error_files_list_file_path" -c -s
-
-# # Read the stored qpb log files list into an array
-# mapfile -t list_of_stored_qpb_error_files < "$stored_qpb_error_files_list_file_path"
-# # Initialize an array to store new qpb log file paths
-# list_of_new_qpb_error_file_paths=()
-# # Compare the two arrays and find new qpb log file paths
-# for qpb_error_file in "${list_of_qpb_error_file_paths[@]}"; do
-#     if [[ ! " ${list_of_stored_qpb_error_files[*]} " =~ " ${qpb_error_file} " ]]; then
-#         list_of_new_qpb_error_file_paths+=("$qpb_error_file")
-#     fi
-# done
-# # Assign the contents of the "list_of_new_qpb_error_file_paths" array to the
-# # "list_of_qpb_error_file_paths" array, superseding its contents
-# list_of_qpb_error_file_paths=("${list_of_new_qpb_error_file_paths[@]}")
-
-
-# stored_qpb_log_files_list_file_path="${script_log_file_directory}"
-# stored_qpb_log_files_list_file_path+="/list_of_stored_qpb_log_files.txt"
-# check_if_file_exists "$stored_qpb_log_files_list_file_path" -c -s
-
-# # Read the stored qpb log files list into an array
-# mapfile -t list_of_stored_qpb_log_files < "$stored_qpb_log_files_list_file_path"
-# # Initialize an array to store new qpb log file paths
-# list_of_new_qpb_log_file_paths=()
-# # Compare the two arrays and find new qpb log file paths
-# for qpb_log_file in "${list_of_qpb_log_file_paths[@]}"; do
-#     if [[ ! " ${list_of_stored_qpb_log_files[*]} " =~ " ${qpb_log_file} " ]]; then
-#         list_of_new_qpb_log_file_paths+=("$qpb_log_file")
-#     fi
-# done
-# # TODO: Anticipate the case of 0 new qpb log files
-
-# # Assign the contents of the "list_of_new_qpb_log_file_paths" array to the
-# # "list_of_qpb_log_file_paths" array, superseding its contents
-# list_of_qpb_log_file_paths=("${list_of_new_qpb_log_file_paths[@]}")
-
-
-# stored_qpb_correlators_files_list_file_path="${script_log_file_directory}"
-# stored_qpb_correlators_files_list_file_path+="/list_of_stored_qpb_correlators_files.txt"
-# check_if_file_exists "$stored_qpb_correlators_files_list_file_path" -c -s
-
-# # Read the stored qpb log files list into an array
-# mapfile -t list_of_stored_qpb_correlators_files < "$stored_qpb_correlators_files_list_file_path"
-# # Initialize an array to store new qpb log file paths
-# list_of_new_qpb_correlators_file_paths=()
-# # Compare the two arrays and find new qpb log file paths
-# for qpb_correlators_file in "${list_of_qpb_correlators_file_paths[@]}"; do
-#     if [[ ! " ${list_of_stored_qpb_correlators_files[*]} " =~ " ${qpb_correlators_file} " ]]; then
-#         list_of_new_qpb_correlators_file_paths+=("$qpb_correlators_file")
-#     fi
-# done
-# # Assign the contents of the "list_of_new_qpb_correlators_file_paths" array to the
-# # "list_of_qpb_correlators_file_paths" array, superseding its contents
-# list_of_qpb_correlators_file_paths=("${list_of_new_qpb_correlators_file_paths[@]}")
-
-# # Print the sum of the length of all three array variables
-# sum_of_lengths=$(( ${#list_of_new_qpb_error_file_paths[@]} + ${#list_of_new_qpb_log_file_paths[@]} + ${#list_of_new_qpb_correlators_file_paths[@]} ))
-# echo "A total of $sum_of_lengths new qpb files were added to the directory."
-
-# echo "Error: ${#list_of_qpb_error_file_paths[@]}"
-# echo "Log: ${#list_of_qpb_log_file_paths[@]}"
-# echo "Correlators: ${#list_of_qpb_correlators_file_paths[@]}"
 
 # # IDENTIFY QPB MAIN PROGRAM TYPE: INVERT OR NON-INVERT
 
@@ -870,20 +856,23 @@ echo -e "++ $output_message"
 #     fi
 # fi
 
-# # EXPORT LIST OF QPB FILES TO LIST FILES
+# EXPORT LIST OF QPB FILES TO LIST FILES
 
-# # Write the contents of the "list_of_qpb_log_file_paths" array to a file
-# list_of_qpb_error_file_paths=($(\
-#                     find "$data_files_set_directory" -type f -name "*.err"))
-# printf "%s\n" "${list_of_qpb_error_file_paths[@]}" > "$stored_qpb_error_files_list_file_path"
-# # Write the contents of the "list_of_qpb_log_file_paths" array to a file
-# list_of_qpb_log_file_paths=($(\
-#                     find "$data_files_set_directory" -type f -name "*.txt"))
-# printf "%s\n" "${list_of_qpb_log_file_paths[@]}" > "$stored_qpb_log_files_list_file_path"
-# # Write the contents of the "list_of_qpb_log_file_paths" array to a file
-# list_of_qpb_correlators_file_paths=($(\
-#                     find "$data_files_set_directory" -type f -name "*.dat"))
-# printf "%s\n" "${list_of_qpb_correlators_file_paths[@]}" > "$stored_qpb_correlators_files_list_file_path"
+# TODO: This needs to be restored.
+# if [ "$enable_cache" = false ]; then
+#     # Write the contents of the "list_of_qpb_error_file_paths" array to a file
+#     list_of_qpb_error_file_paths=($(\
+#                         find "$data_files_set_directory" -type f -name "*.err"))
+#     printf "%s\n" "${list_of_qpb_error_file_paths[@]}" > "$stored_qpb_error_files_list_file_path"
+#     # Write the contents of the "list_of_qpb_log_file_paths" array to a file
+#     list_of_qpb_log_file_paths=($(\
+#                         find "$data_files_set_directory" -type f -name "*.txt"))
+#     printf "%s\n" "${list_of_qpb_log_file_paths[@]}" > "$stored_qpb_log_files_list_file_path"
+#     # Write the contents of the "list_of_qpb_log_file_paths" array to a file
+#     list_of_qpb_correlators_file_paths=($(\
+#                         find "$data_files_set_directory" -type f -name "*.dat"))
+#     printf "%s\n" "${list_of_qpb_correlators_file_paths[@]}" > "$stored_qpb_correlators_files_list_file_path"
+# fi
 
 # SUCCESSFUL COMPLETION OUTPUT
 
