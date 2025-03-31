@@ -460,6 +460,7 @@ class DataPlotter(DataFrameAnalyzer):
         is_histogram: bool = False,
         include_plot_title: bool = True,
         include_legend: bool = True,
+        include_legend_title: bool = True,
         enable_hashed_enumeration: bool = False,
         varying_marker_style: bool = False,
         custom_marker_style: str = None,
@@ -770,6 +771,9 @@ class DataPlotter(DataFrameAnalyzer):
                 legend_title = legend_title.replace("_", " ") + ":"
 
                 legend_title = legend_title.replace(" operator", "")
+
+                if not include_legend_title:
+                    legend_title = ""
 
                 if include_legend:
                     ax.legend(loc=legend_location, title=legend_title, framealpha=1.0)
