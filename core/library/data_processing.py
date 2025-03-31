@@ -675,6 +675,24 @@ class HDF5Analyzer:
         self.hdf5_file_path = hdf5_file_path
         self.hdf5_file = h5py.File(hdf5_file_path, "r")
 
+    def get_group(self, group_path: str) -> h5py.Group:
+        """
+        Retrieve a group from the HDF5 file.
+
+        Parameters:
+        -----------
+        group_path : str
+            Path to the group to retrieve.
+
+        Returns:
+        --------
+        h5py.Group
+            The group object.
+        """
+        return self.hdf5_file[group_path]
+
+
+
     def list_datasets(self, group_path: str = "/") -> List[str]:
         """
         List all datasets in the specified group.
@@ -731,7 +749,7 @@ class HDF5Analyzer:
         obj = self.hdf5_file[object_path]
         return dict(obj.attrs)
 
-    def list_common_datasets(self, group_path: str) -> List[str]:
+    def list_common_datasets(self, group_path: str = "/") -> List[str]:
         """
         List common dataset names for all subgroups of a specific group.
 
@@ -754,6 +772,33 @@ class HDF5Analyzer:
             common_datasets.intersection_update(subgroup.keys())
 
         return list(common_datasets)
+
+    def get_common_attributes(self, group_path: str) -> Dict[str, any]:
+        """
+        Get common attributes from all subgroups of a specific group.
+
+        Parameters:
+        -----------
+        group_path : str
+            Path to the group to analyze.
+
+        Returns:
+        --------
+        Dict[str, any]
+            A dictionary of common attribute names and their values.
+        """
+        subgroups = [obj for obj in self.hdf5_file[group_path].values() if isinstance(obj, h5py.Group)]
+        if not subgroups:
+            return {}
+
+        # Initialize with attributes of the first subgroup
+        common_attributes = set(dict(subgroups[0].attrs).keys())
+
+        for subgroup in subgroups[1:]:
+            subgroup_attribute_names = set(dict(subgroups[0].attrs).keys())
+            common_attributes.intersection_update(subgroup_attribute_names)
+
+        return list(common_attributes)
 
     def get_common_dataset_values(self, group_path: str, dataset_name: str) -> Dict[str, np.ndarray]:
         """
