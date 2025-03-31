@@ -41,6 +41,7 @@ REFERENCE_PCAC_MASS = 0.1
 
 UPPER_BARE_MASS_CUT = 0.15
 
+
 @click.command()
 @click.option(
     "-in_PCAC_csv",
@@ -338,7 +339,7 @@ def main(
             warnings.simplefilter("ignore", OptimizeWarning)
             # Shifted exponential fit
             shifted_exponential_coefficients, _ = curve_fit(
-            fit_functions.shifted_exponential, x, y, p0=shifted_exponential_fit_p0
+                fit_functions.shifted_exponential, x, y, p0=shifted_exponential_fit_p0
             )
 
         # Calculate corresponding values to the reference levels set by the user
