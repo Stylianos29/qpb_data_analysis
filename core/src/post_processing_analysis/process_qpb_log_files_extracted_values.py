@@ -353,8 +353,7 @@ def main(
         average_number_of_MSCG_iterations_dictionary = {
             filename: float(
                 # TODO: Change it later!
-                np.average(dataset)
-                # / single_valued_parameters_dataframe["Number_of_vectors"].unique()[0]
+                np.sum(dataset)
             )
             for filename, dataset in total_number_of_MSCG_iterations_dictionary.items()
         }
@@ -363,8 +362,11 @@ def main(
         if not "Number_of_spinors" in single_valued_parameters_dataframe.columns:
             single_valued_parameters_dataframe[
                 "Average_number_of_MSCG_iterations_per_vector"
-            ] = single_valued_parameters_dataframe["Filename"].map(
-                average_number_of_MSCG_iterations_dictionary
+            ] = (
+                single_valued_parameters_dataframe["Filename"].map(
+                    average_number_of_MSCG_iterations_dictionary
+                )
+                / single_valued_parameters_dataframe["Number_of_vectors"].unique()[0]
             )
         # Inversions case
         else:
