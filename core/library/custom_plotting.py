@@ -698,7 +698,11 @@ class DataPlotter(DataFrameAnalyzer):
                     if isinstance(label_value, tuple):
                         label_string = f"{label_value[0]} ($\\kappa_{{\\mathbb{{X}}^2}}$={label_value[1]:.2f})"
                     elif isinstance(label_value, float):
-                        label_string = f"{label_value:.2f}"
+                        if "e" in f"{label_value:.2e}":
+                            label_string = f"{label_value:.0e}"  # Exponential format
+                        else:
+                            label_string = f"{label_value:.2f}"  # Decimal format
+                        # label_string = f"{label_value:.2f}"
                     else:
                         label_string = str(label_value)
 
