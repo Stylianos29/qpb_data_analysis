@@ -23,3 +23,5 @@ examples/plots/*
 examples/tables/*
 !examples/tables/table_of_data_files_set_template.ipynb
 !examples/README.md
+
+TEST/*
