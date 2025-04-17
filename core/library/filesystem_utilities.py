@@ -433,7 +433,7 @@ class LoggingWrapper:
             self.logger.info(message)
             if to_console:
                 print(f"INFO: {message}")
-
+# TODO: Create a list option
     def warning(self, message, to_console=False):
         if self.logger:
             self.logger.warning(message)
