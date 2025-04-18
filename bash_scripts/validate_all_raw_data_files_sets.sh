@@ -150,7 +150,7 @@ for main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
 
         $working_script_path \
             --data_files_set_directory "$data_files_set_directory" \
-            --scripts_log_files_directory "$auxiliary_files_directory" \
+            --auxiliary_files_directory "$auxiliary_files_directory" \
             || { echo; continue; }
 
         # Update the timestamp file after successful validation.
