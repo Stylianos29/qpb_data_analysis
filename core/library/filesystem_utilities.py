@@ -297,6 +297,8 @@ def validate_script_log_filename(ctx, param, value):
 
 
 def validate_script_log_file_directory(ctx, param, value):
+    # TODO: I need to rethink this case, there isn't always a
+    # "output_files_directory" directory
     if value is None:
         # Get the value of 'input_correlators_hdf5_file_path' from ctx.params
         output_files_directory = ctx.params.get("output_files_directory")
