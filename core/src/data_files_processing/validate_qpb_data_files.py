@@ -1,3 +1,52 @@
+"""
+validate_qpb_data_files.py
+
+Summary:
+    A validation script for qpb data files that checks file integrity, ensures
+    consistency between file types, and maintains program type compatibility
+    (invert vs non-invert) within a data files set directory.
+
+Input:
+    Required:
+        - raw_data_files_set_directory_path: Path to directory containing
+        qpb data files (.txt log files, .dat correlator files, .err error files)
+    Optional:
+        - enable_logging: Flag to enable detailed logging of validation process
+        - auxiliary_files_directory: Directory for storing metadata and log files
+        - log_filename: Custom name for the log file
+
+Output:
+    1. Validated and cleaned data files set directory
+    2. metadata.md file containing:
+        - Main program type (invert/non-invert)
+        - File counts by type
+        - Validation timestamp
+    3. List files of validated file paths:
+        - list_of_stored_qpb_log_files.txt
+        - list_of_stored_qpb_error_files.txt
+        - list_of_stored_qpb_correlators_files.txt
+
+Functionality:
+    1. Validates file extensions and removes unsupported files
+    2. Removes empty files (.txt and .dat)
+    3. Identifies and handles corrupted log files
+    4. Ensures program type consistency (invert vs non-invert)
+    5. Maintains matching between log and correlator files
+    6. Manages error files based on user preference
+    7. Caches validated file paths for future reference
+
+Usage:
+    python validate_qpb_data_files.py -raw_dir /path/to/data/files/set 
+                                     [-log_on] [-ax_files_dir
+                                     /path/to/auxiliary/files] [-log_name
+                                     custom_log_name]
+
+Note:
+    The script requires user interaction for critical decisions about file
+    deletion and handles error conditions by either exiting or allowing user
+    intervention.
+"""
+
 import os
 import sys
 import glob
@@ -41,7 +90,7 @@ def get_yes_no_response(prompt_text, logger=None):
     "--auxiliary_files_directory",
     "auxiliary_files_directory",
     default=None,
-    callback=filesystem_utilities.validate_script_log_file_directory,
+    callback=filesystem_utilities.validate_directory,
     help="Directory where the script's log file will be stored.",
 )
 @click.option(
@@ -59,7 +108,7 @@ def main(
     log_filename,
 ):
 
-    ### INITIATE SCRIPT AND LOGGING ###
+    # INITIATE SCRIPT AND LOGGING
 
     click.echo("   -- Validating raw qpb data files set initiated.")
 
@@ -71,23 +120,45 @@ def main(
     # Log script start
     logger.initiate_script_logging()
 
-    ### MAIN PART OF THE SCRIPT ###
+    # CHECK IF DATA FILES SET DIRECTORY IS EMPTY
+
+    if not os.listdir(raw_data_files_set_directory_path):
+        logger.error(
+            f"Data files set directory '{raw_data_files_set_directory_path}' "
+            "is empty. Validation cannot proceed without any files to validate.",
+            to_console=True,
+        )
+        sys.exit(1)
+
+    # CHECK PRESENCE OF QPB LOG FILES
+
+    # Check if there are any .txt files present
+    if not any(glob.iglob(os.path.join(raw_data_files_set_directory_path, "*.txt"))):
+        logger.error(
+            f"No qpb log files (*.txt) found in '{raw_data_files_set_directory_path}'. "
+            "Validation cannot proceed without qpb log files.",
+            to_console=True,
+        )
+        sys.exit(1)
 
     # REMOVE ANY UNSUPPORTED FILES FROM THE DIRECTORY
 
     # Find files with extensions other than .txt, .err, or .dat (unsupported)
     all_files = glob.glob(os.path.join(raw_data_files_set_directory_path, "*"))
+    logger.info(
+        f"Total number of files in raw data files set directory: {len(all_files)}"
+    )
+
     invalid_extension_files = [
         file
         for file in all_files
         if not any(file.endswith(ext) for ext in [".txt", ".err", ".dat"])
     ]
-
     # Unsupported files must be deleted before validation can proceed
     if invalid_extension_files:
         # Log a list of unsupported files
         logger.warning(
-            f"Found {len(invalid_extension_files)} files with invalid extensions:",
+            f"Found {len(invalid_extension_files)} file(s) with invalid extensions.",
             to_console=True,
         )
         for file in invalid_extension_files:
@@ -95,7 +166,7 @@ def main(
 
         # Ask user about deleting unsupported files
         response = get_yes_no_response(
-            "Found unsupported file types. Delete them to continue? "
+            "Delete unsupported file types to continue? "
             "Selecting 'n' will exit the program (y[Y]/n[N])"
         )
         if response:
@@ -116,6 +187,8 @@ def main(
                 to_console=True,
             )
             sys.exit(1)
+    else:
+        logger.info("No unsupported file types found in raw data files set directory.")
 
     # REMOVE ANY EMPTY FILES FROM THE DIRECTORY
 
@@ -131,7 +204,7 @@ def main(
     if empty_files:
         # Log a list of empty files
         logger.warning(
-            f"Found {len(empty_files)} empty files with .txt or .dat extensions:",
+            f"Found {len(empty_files)} empty file(s) with .txt or .dat extensions.",
             to_console=True,
         )
         for file in empty_files:
@@ -139,7 +212,8 @@ def main(
 
         # Ask used about deleting empty files
         response = get_yes_no_response(
-            "Do you want to delete all empty .txt and .dat files? (y[Y]/n[N])"
+            "Do you want to delete all empty .txt and .dat files? "
+            "Selecting 'n' will exit the program (y[Y]/n[N])"
         )
         if response:
             for file_path in empty_files:
@@ -152,16 +226,24 @@ def main(
                         to_console=True,
                     )
 
-    # CHECK PRESENCE OF QPB LOG FILES
-
-    # Check if there are any .txt files present
-    if not any(glob.iglob(os.path.join(raw_data_files_set_directory_path, "*.txt"))):
-        logger.error(
-            f"No qpb log files (*.txt) found in '{raw_data_files_set_directory_path}'. "
-            "Validation cannot proceed without log files.",
-            to_console=True,
-        )
-        sys.exit(1)
+            # Check if directory is empty after deleting files
+            if not os.listdir(raw_data_files_set_directory_path):
+                logger.error(
+                    f"Data files set directory '{raw_data_files_set_directory_path}' "
+                    "is now empty after deleting empty files. Validation cannot proceed.",
+                    to_console=True,
+                )
+                sys.exit(1)
+        else:
+            logger.error(
+                "Validation cannot proceed with empty qpb log or correlations "
+                "files present inside the qpb data files set directory. "
+                "Exiting the program.",
+                to_console=True,
+            )
+            sys.exit(1)
+    else:
+        logger.info("No empty files found in raw data files set directory.")
 
     # RETRIEVE STORED FILE PATHS
 
@@ -182,17 +264,17 @@ def main(
         file_path = os.path.join(auxiliary_files_directory, filename)
         try:
             if os.path.exists(file_path):
+                if os.path.getsize(file_path) == 0:
+                    logger.info(f"File: {filename} exists but it is empty.")
+                    continue
                 with open(file_path, "r") as file:
                     # Read non-empty lines and strip whitespace
                     file_list.extend(line.strip() for line in file if line.strip())
+                    logger.info(f"Contents of file: {filename} passed to a list.")
             else:
                 # Create empty file if it doesn't exist
-                with open(file_path, "w") as file:
-                    pass
-                logger.info(
-                    f"Created empty file: {filename}",
-                    to_console=True,
-                )
+                with open(file_path, "w") as _:
+                    logger.info(f"Created empty file: {filename}", to_console=True)
         except Exception as e:
             logger.error(
                 f"Error processing {filename}: {str(e)}",
@@ -232,34 +314,31 @@ def main(
     # Log information about files to validate
     if list_of_qpb_log_files_to_validate:
         logger.info(
-            f"Found {len(list_of_qpb_log_files_to_validate)} log files to validate.",
+            f"Found {len(list_of_qpb_log_files_to_validate)} log files not listed.",
             to_console=True,
         )
     if list_of_qpb_error_files_to_validate:
         logger.info(
             f"Found {len(list_of_qpb_error_files_to_validate)} error "
-            "files to validate.",
+            "files not listed.",
             to_console=True,
         )
     if list_of_qpb_correlators_files_to_validate:
         logger.info(
             f"Found {len(list_of_qpb_correlators_files_to_validate)} "
-            "correlator files to validate.",
+            "correlators files not listed.",
             to_console=True,
         )
 
-    # Check if there are no files to validate
+    # Check if there are no .txt or .dat files to validate
     if not (
-        list_of_qpb_log_files_to_validate
-        or list_of_qpb_error_files_to_validate
-        or list_of_qpb_correlators_files_to_validate
+        list_of_qpb_log_files_to_validate or list_of_qpb_correlators_files_to_validate
     ):
-        logger.warning(f"No new files found to validate.")
+        logger.warning(f"No new files found to validate.", to_console=True)
 
         # Ask user if they want to repeat the validation of already existing files
         response = get_yes_no_response(
-            "No new files found to validate. Would you like to repeat "
-            "validation of already existing qpb data files? "
+            "Would you like to repeat validation of already existing qpb data files? "
             "Selecting 'n' will exit the program (y[Y]/n[N])"
         )
         if not response:
@@ -298,6 +377,8 @@ def main(
                         to_console=True,
                     )
             logger.info(f"A total of {number_of_qpb_error_files} were deleted.")
+        else:
+            logger.info(f"No qpb error files to validate wre deleted.")
 
     # REMOVE CORRUPTED QPB DATA FILES
 
@@ -362,12 +443,12 @@ def main(
                             try:
                                 os.remove(associated_file)
                                 logger.info(
-                                    "Deleted associated file: "
+                                    "Deleted also associated file: "
                                     f"{os.path.basename(associated_file)}"
                                 )
                             except Exception as e:
                                 logger.error(
-                                    "Error deleting file "
+                                    "Error deleting associated file "
                                     f"{associated_file}: {str(e)}.",
                                     to_console=True,
                                 )
@@ -376,6 +457,17 @@ def main(
                         f"Error deleting file {file_path}: {str(e)}.",
                         to_console=True,
                     )
+
+            # After deleting corrupted files, check if directory is empty
+            if not os.listdir(raw_data_files_set_directory_path):
+                logger.error(
+                    f"Data files set directory '{raw_data_files_set_directory_path}' "
+                    "is now empty after deleting corrupted files. Validation cannot "
+                    "proceed.",
+                    to_console=True,
+                )
+                sys.exit(1)
+
         else:
             logger.error(
                 "Validation cannot proceed with corrupted files present "
@@ -384,24 +476,25 @@ def main(
                 to_console=True,
             )
             sys.exit(1)
+    else:
+        logger.info("No corrupted qpb log files found.")
 
     # IDENTIFY MAIN PROGRAM TYPE AND REMOVE INCOMPATIBLE FILES
 
     # Check if metadata file exists and get main program type if present
     metadata_file = os.path.join(auxiliary_files_directory, "metadata.md")
     main_program_type = None
-    if os.path.exists(metadata_file):
+    if os.path.exists(metadata_file) and os.path.getsize(metadata_file) > 0:
         with open(metadata_file, "r") as file:
             for line in file:
-                if line.startswith("Main program type: "):
+                if line.startswith("Main program type:"):
                     program_type = line.strip().split("Main program type: ")[1]
                     if program_type in ["invert", "non-invert"]:
                         main_program_type = program_type
                     break
             if main_program_type:
                 logger.info(
-                    f"Main program type found in metadata file: {main_program_type}.",
-                    to_console=True,
+                    f"Main program type found in metadata file: '{main_program_type}'.",
                 )
 
     incompatible_pairs_dictionary = {
@@ -413,14 +506,20 @@ def main(
     if main_program_type is not None:
         # Check for incompatible files based on main program type
         incompatible_files = incompatible_pairs_dictionary.get(main_program_type, [])
+        incompatible_main_program_type = (
+            "non-invert" if main_program_type == "invert" else "invert"
+        )
         if incompatible_files:
             logger.error(
-                f"Found {len(incompatible_files)} {main_program_type} incompatible"
-                "files. This conflicts with the established main program type."
+                f"Found {len(incompatible_files)} '{incompatible_main_program_type}' "
+                "incompatible file(s). This conflicts with the established main "
+                "program type of the data files set.",
+                to_console=True,
             )
             response = get_yes_no_response(
-                f"Do you want to delete all incompatible {main_program_type} qpb log files? "
-                "Selecting 'n' will exit the program. (y[Y]/n[N])?"
+                "Do you want to delete all incompatible "
+                f"{incompatible_main_program_type} qpb log files?  Selecting 'n'"
+                " will exit the program. (y[Y]/n[N])?"
             )
             if response:
                 # Delete incompatible files
@@ -453,18 +552,19 @@ def main(
                             f"Error deleting file {file_path}: {str(e)}.",
                             to_console=True,
                         )
-                else:
-                    logger.error(
-                        "Validation cannot proceed with incompatible "
-                        f"{main_program_type} file types present inside the "
-                        "qpb data files set directory. Exiting the program.",
-                        to_console=True,
-                    )
-                    sys.exit(1)
+            else:
+                logger.error(
+                    "Validation cannot proceed with incompatible "
+                    f"{incompatible_main_program_type} file types present inside the "
+                    "qpb data files set directory. Exiting the program.",
+                    to_console=True,
+                )
+                sys.exit(1)
+
         # Filter log files to match the main program type
         list_of_qpb_log_files_to_validate = (
             list_of_invert_qpb_log_file_paths
-            if main_program_type == "non-invert"
+            if main_program_type == "invert"
             else list_of_non_invert_qpb_log_file_paths
         )
 
@@ -474,8 +574,7 @@ def main(
             and not list_of_non_invert_qpb_log_file_paths
         ):
             # Case: Only invert files present
-            with open(metadata_file, "w") as file:
-                file.write("Main program type: invert.")
+            main_program_type = "invert"
             list_of_qpb_log_files_to_validate = list_of_invert_qpb_log_file_paths
 
         elif (
@@ -483,8 +582,7 @@ def main(
             and not list_of_invert_qpb_log_file_paths
         ):
             # Case: Only non-invert files present
-            with open(metadata_file, "w") as file:
-                file.write("Main program type: non-invert.")
+            main_program_type = "non-invert"
             list_of_qpb_log_files_to_validate = list_of_non_invert_qpb_log_file_paths
 
         else:
@@ -497,72 +595,80 @@ def main(
             )
             sys.exit(1)
 
-    # REMOVE UNMATCHED FILES
+    # REMOVE UNMATCHED INVERT FILES
 
-    # Check for matching .txt and .dat files
-    log_file_basenames = {
-        os.path.splitext(path)[0] for path in list_of_qpb_log_files_to_validate
-    }
-    correlators_file_basenames = {
-        os.path.splitext(path)[0] for path in list_of_qpb_correlators_files_to_validate
-    }
+    if main_program_type == "invert":
+        # Check for matching .txt and .dat files
+        log_file_basenames = {
+            os.path.splitext(path)[0] for path in list_of_qpb_log_files_to_validate
+        }
+        correlators_file_basenames = {
+            os.path.splitext(path)[0]
+            for path in list_of_qpb_correlators_files_to_validate
+        }
 
-    # Find unmatched files
-    unmatched_log_files_only = log_file_basenames - correlators_file_basenames
-    unmatched_correlators_files_only = correlators_file_basenames - log_file_basenames
-
-    # Handle unmatched .txt files
-    if unmatched_log_files_only:
-        logger.warning(
-            f"Found {len(unmatched_log_files_only)} qpb log files without "
-            "matching correlator files."
+        # Find unmatched files
+        unmatched_log_files_only = log_file_basenames - correlators_file_basenames
+        unmatched_correlators_files_only = (
+            correlators_file_basenames - log_file_basenames
         )
-        unmatched_txt_files = [
-            path
-            for path in list_of_qpb_log_file_paths
-            if os.path.splitext(path)[0] in unmatched_log_files_only
-        ]
 
-        response = get_yes_no_response(
-            "Do you want to delete qpb log files without matching "
-            "correlators files? (y[Y]/n[N])"
-        )
-        if response:
-            for file_path in unmatched_txt_files:
-                try:
-                    os.remove(file_path)
-                    logger.info(
-                        f"Deleted unmatched log file: {os.path.basename(file_path)}"
-                    )
-                except Exception as e:
-                    logger.error(f"Error deleting file {file_path}: {str(e)}")
+        # Handle unmatched .txt files
+        if unmatched_log_files_only:
+            logger.warning(
+                f"Found {len(unmatched_log_files_only)} qpb log files without "
+                "matching correlator files."
+            )
+            unmatched_txt_files = [
+                path
+                for path in list_of_qpb_log_file_paths
+                if os.path.splitext(path)[0] in unmatched_log_files_only
+            ]
 
-    # Handle unmatched .dat files
-    if unmatched_correlators_files_only:
-        logger.warning(
-            f"Found {len(unmatched_correlators_files_only)} qpb correlators "
-            "files without matching log files."
-        )
-        unmatched_dat_files = [
-            path
-            for path in list_of_qpb_correlators_file_paths
-            if os.path.splitext(path)[0] in unmatched_correlators_files_only
-        ]
+            response = get_yes_no_response(
+                "Do you want to delete qpb log files without matching "
+                "correlators files? (y[Y]/n[N])"
+            )
+            if response:
+                for file_path in unmatched_txt_files:
+                    try:
+                        os.remove(file_path)
+                        logger.info(
+                            f"Deleted unmatched log file: {os.path.basename(file_path)}"
+                        )
+                    except Exception as e:
+                        logger.error(f"Error deleting file {file_path}: {str(e)}")
+        else:
+            logger.info("No unmatched qpb log files found.")
 
-        response = get_yes_no_response(
-            "Do you want to delete qpb correlators files without matching "
-            "log files? (y[Y]/n[N])"
-        )
-        if response:
-            for file_path in unmatched_dat_files:
-                try:
-                    os.remove(file_path)
-                    logger.info(
-                        "Deleted unmatched qpb correlators "
-                        f"file: {os.path.basename(file_path)}"
-                    )
-                except Exception as e:
-                    logger.error(f"Error deleting file {file_path}: {str(e)}")
+        # Handle unmatched .dat files
+        if unmatched_correlators_files_only:
+            logger.warning(
+                f"Found {len(unmatched_correlators_files_only)} qpb correlators "
+                "files without matching log files."
+            )
+            unmatched_dat_files = [
+                path
+                for path in list_of_qpb_correlators_file_paths
+                if os.path.splitext(path)[0] in unmatched_correlators_files_only
+            ]
+
+            response = get_yes_no_response(
+                "Do you want to delete qpb correlators files without matching "
+                "log files? (y[Y]/n[N])"
+            )
+            if response:
+                for file_path in unmatched_dat_files:
+                    try:
+                        os.remove(file_path)
+                        logger.info(
+                            "Deleted unmatched qpb correlators "
+                            f"file: {os.path.basename(file_path)}"
+                        )
+                    except Exception as e:
+                        logger.error(f"Error deleting file {file_path}: {str(e)}")
+        else:
+            logger.info("No unmatched qpb correlators files found.")
 
     # STORE REMAINING FILE PATHS IN SEPARATE TEXT FILES
 
@@ -573,41 +679,62 @@ def main(
     list_of_qpb_error_file_paths = glob.glob(
         os.path.join(raw_data_files_set_directory_path, "*.err")
     )
-    list_of_qpb_correlators_file_paths = glob.glob(
-        os.path.join(raw_data_files_set_directory_path, "*.dat")
-    )
+    if main_program_type == "invert":
+        list_of_qpb_correlators_file_paths = glob.glob(
+            os.path.join(raw_data_files_set_directory_path, "*.dat")
+        )
+
+        # Precautionary check if lengths match for invert program type
+        if main_program_type == "invert":
+            if len(list_of_qpb_log_file_paths) != len(
+                list_of_qpb_correlators_file_paths
+            ):
+                logger.warning(
+                    f"Number of log files ({len(list_of_qpb_log_file_paths)}) "
+                    "does not match number of correlator files "
+                    f"({len(list_of_qpb_correlators_file_paths)}). "
+                    "This may indicate missing or extra files.",
+                    to_console=True,
+                )
 
     output_files_dictionary = {
         "list_of_stored_qpb_log_files.txt": list_of_qpb_log_file_paths,
         "list_of_stored_qpb_error_files.txt": list_of_qpb_error_file_paths,
-        "list_of_stored_qpb_correlators_files.txt": list_of_qpb_correlators_file_paths,
     }
+    if main_program_type == "invert":
+        output_files_dictionary["list_of_stored_qpb_correlators_files.txt"] = (
+            list_of_qpb_correlators_file_paths,
+        )
     for filename, file_list in output_files_dictionary.items():
-        output_path = os.path.join(raw_data_files_set_directory_path, filename)
+        output_path = os.path.join(auxiliary_files_directory, filename)
         try:
             file_exists = os.path.exists(output_path)
             with open(output_path, "w") as file:
                 for file_path in file_list:
                     file.write(f"{file_path}\n")
             initial_substring = "Updated" if file_exists else "Created"
-            logger.info(f"{initial_substring} file list: {filename}", to_console=True)
+            logger.info(f"{initial_substring} file list: {filename}")
         except Exception as e:
             logger.error(f"Error writing to {filename}: {str(e)}", to_console=True)
 
     # INCLUDE ADDITIONAL INFORMATION IN THE METADATA FILE
 
-    with open(metadata_file, "a") as file:
+    with open(metadata_file, "w") as file:
+        file.write(f"Main program type: {main_program_type}")
         file.write(f"\nNumber of qpb log files: {len(list_of_qpb_log_file_paths)}")
         file.write(f"\nNumber of qpb error files: {len(list_of_qpb_error_file_paths)}")
-        file.write(
-            f"\nNumber of qpb correlators files: {len(list_of_qpb_correlators_file_paths)}"
-        )
+        if main_program_type == "invert":
+            file.write(
+                "\nNumber of qpb correlators files: "
+                f"{len(list_of_qpb_correlators_file_paths)}"
+            )
         file.write("\n")
         file.write(
-            f"\nValidation completed at: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            "\nValidation completed at: "
+            f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         )
 
-    ### FINALIZE SCRIPT AND LOGGING ###
+    # FINALIZE SCRIPT AND LOGGING
 
     # Terminate logging
     logger.terminate_script_logging()
