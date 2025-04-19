@@ -703,7 +703,7 @@ def main(
     }
     if main_program_type == "invert":
         output_files_dictionary["list_of_stored_qpb_correlators_files.txt"] = (
-            list_of_qpb_correlators_file_paths,
+            list_of_qpb_correlators_file_paths
         )
     for filename, file_list in output_files_dictionary.items():
         output_path = os.path.join(auxiliary_files_directory, filename)
