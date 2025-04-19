@@ -376,9 +376,42 @@ def main(
                         f"Error deleting file {file_path}: {str(e)}",
                         to_console=True,
                     )
-            logger.info(f"A total of {number_of_qpb_error_files} were deleted.")
+            logger.info(
+                f"A total of {number_of_qpb_error_files} qpb error files were deleted.",
+                to_console=True,
+            )
+            list_of_qpb_error_files_to_validate = []
         else:
-            logger.info(f"No qpb error files to validate wre deleted.")
+            logger.info(f"No qpb error files to validate were deleted.")
+
+    # Check for any remaining .err files in directory
+    remaining_error_files = [
+        file
+        for file in glob.glob(os.path.join(raw_data_files_set_directory_path, "*.err"))
+        if file not in list_of_qpb_error_files_to_validate
+    ]
+    if remaining_error_files:
+        # Ask user to delete .err files
+        response = get_yes_no_response(
+            f"There are still remaining a total of {len(remaining_error_files)} "
+            "qpb error file(s) inside the data files set directory. Do you want "
+            "to delete all remaining .err files? (y[Y]/n[N])"
+        )
+        if response:
+            for file_path in remaining_error_files:
+                try:
+                    os.remove(file_path)
+                    logger.info(f"Deleted .err file: {os.path.basename(file_path)}")
+                except Exception as e:
+                    logger.error(
+                        f"Error deleting file {file_path}: {str(e)}",
+                        to_console=True,
+                    )
+    else:
+        logger.info(
+            "No qpb error files remain in the data files set directory.",
+            to_console=True,
+        )
 
     # REMOVE CORRUPTED QPB DATA FILES
 
