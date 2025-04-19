@@ -101,6 +101,10 @@ def main(
 
     click.echo("   -- Validating raw qpb data files set initiated.")
 
+    # Default to input file's parent directory if no auxiliary directory specified
+    if auxiliary_files_directory is None:
+        auxiliary_files_directory = os.path.dirname(raw_data_files_set_directory_path)
+
     # Setup logging
     logger = filesystem_utilities.LoggingWrapper(
         auxiliary_files_directory, log_filename, enable_logging
