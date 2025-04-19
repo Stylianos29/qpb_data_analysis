@@ -185,13 +185,12 @@ def main(
 
     # INTEGER-TYPE PARAMETERS
 
-    if "MPI_geometry" in single_valued_parameters_dataframe.columns:
+    if "MPI_geometry" in single_valued_parameters_dataframe.columns and "Threads_per_process" in single_valued_parameters_dataframe.columns:
         single_valued_parameters_dataframe[
             "Number_of_cores"
-        ] = single_valued_parameters_dataframe["MPI_geometry"].apply(
-            lambda x: np.prod(
-                ast.literal_eval(x)
-            )  # Calculate the product of the tuple elements
+        ] = single_valued_parameters_dataframe.apply(
+            lambda row: np.prod(ast.literal_eval(row["MPI_geometry"])) * row["Threads_per_process"],
+            axis=1
         )
 
     # TODO: Unacceptable!
