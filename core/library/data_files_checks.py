@@ -1,7 +1,9 @@
 import os
-from statistics import correlation
 import sys
 import re
+from statistics import correlation
+
+import click
 
 
 CORRELATOR_IDENTIFIERS_LIST = [
@@ -138,3 +140,14 @@ def extract_optimization_factor(filename):
         return float(match.group(1))
     else:
         return None
+
+
+def get_yes_or_no_user_response(prompt_text, logger=None):
+    """Helper function to handle yes/no prompts with validation"""
+    response = click.prompt(prompt_text, type=str)
+    while response.lower() not in ["y", "yes", "", "n", "no"]:
+        response = click.prompt(
+            "Invalid input. Please enter 'y' for yes or 'n' for no (y[Y]/n[N])",
+            type=str,
+        )
+    return response.lower() in ["y", "yes", ""]

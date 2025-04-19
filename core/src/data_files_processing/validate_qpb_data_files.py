@@ -50,22 +50,11 @@ Note:
 import os
 import sys
 import glob
-
-import click
 import datetime
 
-from library import filesystem_utilities
+import click
 
-
-def get_yes_no_response(prompt_text, logger=None):
-    """Helper function to handle yes/no prompts with validation"""
-    response = click.prompt(prompt_text, type=str)
-    while response.lower() not in ["y", "yes", "", "n", "no"]:
-        response = click.prompt(
-            "Invalid input. Please enter 'y' for yes or 'n' for no (y[Y]/n[N])",
-            type=str,
-        )
-    return response.lower() in ["y", "yes", ""]
+from library import filesystem_utilities, get_yes_or_no_user_response
 
 
 @click.command()
@@ -165,7 +154,7 @@ def main(
             logger.info(f"Invalid file: {os.path.basename(file)}")
 
         # Ask user about deleting unsupported files
-        response = get_yes_no_response(
+        response = get_yes_or_no_user_response(
             "Delete unsupported file types to continue? "
             "Selecting 'n' will exit the program (y[Y]/n[N])"
         )
@@ -211,7 +200,7 @@ def main(
             logger.info(f"Empty file: {os.path.basename(file)}")
 
         # Ask used about deleting empty files
-        response = get_yes_no_response(
+        response = get_yes_or_no_user_response(
             "Do you want to delete all empty .txt and .dat files? "
             "Selecting 'n' will exit the program (y[Y]/n[N])"
         )
@@ -337,7 +326,7 @@ def main(
         logger.warning(f"No new files found to validate.", to_console=True)
 
         # Ask user if they want to repeat the validation of already existing files
-        response = get_yes_no_response(
+        response = get_yes_or_no_user_response(
             "Would you like to repeat validation of already existing qpb data files? "
             "Selecting 'n' will exit the program (y[Y]/n[N])"
         )
@@ -362,7 +351,7 @@ def main(
     # Check for and handle .err files
     if list_of_qpb_error_files_to_validate:
         # Ask user to delete .err files
-        response = get_yes_no_response(
+        response = get_yes_or_no_user_response(
             "Do you want to delete all .err files set for validation? (y[Y]/n[N])"
         )
         if response:
@@ -392,7 +381,7 @@ def main(
     ]
     if remaining_error_files:
         # Ask user to delete .err files
-        response = get_yes_no_response(
+        response = get_yes_or_no_user_response(
             f"There are still remaining a total of {len(remaining_error_files)} "
             "qpb error file(s) inside the data files set directory. Do you want "
             "to delete all remaining .err files? (y[Y]/n[N])"
@@ -450,7 +439,7 @@ def main(
         )
 
         # Ask user about deleting corrupted files. Otherwise, exit the program
-        response = get_yes_no_response(
+        response = get_yes_or_no_user_response(
             "Do you want to delete all corrupted qpb log files? "
             "Selecting 'n' will exit the program (y[Y]/n[N])"
         )
@@ -544,7 +533,7 @@ def main(
                 "program type of the data files set.",
                 to_console=True,
             )
-            response = get_yes_no_response(
+            response = get_yes_or_no_user_response(
                 "Do you want to delete all incompatible "
                 f"{incompatible_main_program_type} qpb log files?  Selecting 'n'"
                 " will exit the program. (y[Y]/n[N])?"
@@ -658,7 +647,7 @@ def main(
                 "files with all zero values.",
                 to_console=True,
             )
-            response = get_yes_no_response(
+            response = get_yes_or_no_user_response(
                 "Delete correlators files containing only zero correlator values? "
                 "This will also remove their associated .txt files. (y[Y]/n[N])"
             )
@@ -722,7 +711,7 @@ def main(
                 if os.path.splitext(path)[0] in unmatched_log_files_only
             ]
 
-            response = get_yes_no_response(
+            response = get_yes_or_no_user_response(
                 "Do you want to delete qpb log files without matching "
                 "correlators files? (y[Y]/n[N])"
             )
@@ -750,7 +739,7 @@ def main(
                 if os.path.splitext(path)[0] in unmatched_correlators_files_only
             ]
 
-            response = get_yes_no_response(
+            response = get_yes_or_no_user_response(
                 "Do you want to delete qpb correlators files without matching "
                 "log files? (y[Y]/n[N])"
             )
