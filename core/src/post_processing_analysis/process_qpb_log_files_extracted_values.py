@@ -185,12 +185,16 @@ def main(
 
     # INTEGER-TYPE PARAMETERS
 
-    if "MPI_geometry" in single_valued_parameters_dataframe.columns and "Threads_per_process" in single_valued_parameters_dataframe.columns:
-        single_valued_parameters_dataframe[
-            "Number_of_cores"
-        ] = single_valued_parameters_dataframe.apply(
-            lambda row: np.prod(ast.literal_eval(row["MPI_geometry"])) * row["Threads_per_process"],
-            axis=1
+    if (
+        "MPI_geometry" in single_valued_parameters_dataframe.columns
+        and "Threads_per_process" in single_valued_parameters_dataframe.columns
+    ):
+        single_valued_parameters_dataframe["Number_of_cores"] = (
+            single_valued_parameters_dataframe.apply(
+                lambda row: np.prod(ast.literal_eval(row["MPI_geometry"]))
+                * row["Threads_per_process"],
+                axis=1,
+            )
         )
 
     # TODO: Unacceptable!
@@ -376,6 +380,40 @@ def main(
                 / single_valued_parameters_dataframe["Number_of_spinors"].unique()[0]
             )
 
+    # Calculate average number of MSCG iterations
+    number_of_kernel_applications_per_MSCG_dictionary = (
+        data_processing.extract_HDF5_datasets_to_dictionary(
+            input_multivalued_hdf5_file_path, "Number_of_kernel_applications_per_MSCG"
+        )
+    )
+    if number_of_kernel_applications_per_MSCG_dictionary:
+        #
+        total_number_of_kernel_applications_dictionary = {
+            filename: int(np.sum(dataset)) + len(dataset)
+            for filename, dataset in number_of_kernel_applications_per_MSCG_dictionary.items()
+        }
+        # Add a new column with the dictionary values
+        # Forward operator applications case
+        if not "Number_of_spinors" in single_valued_parameters_dataframe.columns:
+            single_valued_parameters_dataframe[
+                "Average_number_of_MV_multiplications_per_vector"
+            ] = (
+                single_valued_parameters_dataframe["Filename"].map(
+                    total_number_of_kernel_applications_dictionary
+                )
+                / single_valued_parameters_dataframe["Number_of_vectors"].unique()[0]
+            )
+        # Inversions case
+        else:
+            single_valued_parameters_dataframe[
+                "Average_number_of_MV_multiplications_per_spinor"
+            ] = (
+                single_valued_parameters_dataframe["Filename"].map(
+                    total_number_of_kernel_applications_dictionary
+                )
+                / single_valued_parameters_dataframe["Number_of_spinors"].unique()[0]
+            )
+
     # Extract MS shifts
     MS_expansion_shifts_dictionary = (
         data_processing.extract_HDF5_datasets_to_dictionary(
@@ -454,23 +492,23 @@ def main(
             )
 
         # KL case
-        elif (
-            single_valued_parameters_dataframe["Overlap_operator_method"].unique()[0]
-            == "KL"
-        ):
-            if (
-                "Average_number_of_MSCG_iterations_per_vector"
-                in single_valued_parameters_dataframe.columns
-            ):
-                single_valued_parameters_dataframe[
-                    "Average_number_of_MV_multiplications_per_vector"
-                ] = (
-                    2
-                    * single_valued_parameters_dataframe[
-                        "Average_number_of_MSCG_iterations_per_vector"
-                    ]
-                    + 1
-                )
+        # elif (
+        #     single_valued_parameters_dataframe["Overlap_operator_method"].unique()[0]
+        #     == "KL"
+        # ):
+        #     if (
+        #         "Average_number_of_MSCG_iterations_per_vector"
+        #         in single_valued_parameters_dataframe.columns
+        #     ):
+        #         single_valued_parameters_dataframe[
+        #             "Average_number_of_MV_multiplications_per_vector"
+        #         ] = (
+        #             2
+        #             * single_valued_parameters_dataframe[
+        #                 "Average_number_of_MSCG_iterations_per_vector"
+        #             ]
+        #             + 1
+        #         )
     # Inversions
     else:
         # Chebyshev case
@@ -496,19 +534,19 @@ def main(
                 2 * single_valued_parameters_dataframe["Number_of_Chebyshev_terms"] - 1
             )
 
-        elif (
-            single_valued_parameters_dataframe["Overlap_operator_method"].unique()[0]
-            == "KL"
-        ):
-            single_valued_parameters_dataframe[
-                "Average_number_of_MV_multiplications_per_spinor"
-            ] = (
-                2
-                * single_valued_parameters_dataframe[
-                    "Average_number_of_MSCG_iterations_per_spinor"
-                ]
-                + 1
-            )
+        # elif (
+        #     single_valued_parameters_dataframe["Overlap_operator_method"].unique()[0]
+        #     == "KL"
+        # ):
+        #     single_valued_parameters_dataframe[
+        #         "Average_number_of_MV_multiplications_per_spinor"
+        #     ] = (
+        #         2
+        #         * single_valued_parameters_dataframe[
+        #             "Average_number_of_MSCG_iterations_per_spinor"
+        #         ]
+        #         + 1
+        #     )
 
     # Forward operator applications
     if "Total_calculation_time" in single_valued_parameters_dataframe.columns:
