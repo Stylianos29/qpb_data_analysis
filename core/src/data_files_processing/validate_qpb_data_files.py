@@ -407,11 +407,6 @@ def main(
                         f"Error deleting file {file_path}: {str(e)}",
                         to_console=True,
                     )
-    else:
-        logger.info(
-            "No qpb error files remain in the data files set directory.",
-            to_console=True,
-        )
 
     # REMOVE CORRUPTED QPB DATA FILES
 
@@ -627,6 +622,75 @@ def main(
                 to_console=True,
             )
             sys.exit(1)
+
+    # CHECK IF CORRELATORS FILES CONTAIN ONLY ZERO VALUES
+
+    if main_program_type == "invert":
+        # Initialize list to store files with all zero values in columns 5 and 6
+        zero_value_correlator_files = []
+
+        # Check each correlator file
+        for correlator_file in list_of_qpb_correlators_files_to_validate:
+            try:
+                with open(correlator_file, "r") as file:
+                    # Read all lines and check columns 5 and 6 (indices 4 and 5)
+                    all_zeros = all(
+                        line.strip().split()[4:6] == ["+0.000000e+00", "+0.000000e+00"]
+                        for line in file
+                        if line.strip()  # Skip empty lines
+                    )
+                    if all_zeros:
+                        zero_value_correlator_files.append(correlator_file)
+                        logger.info(
+                            "File contains only zeros in columns 5-6: "
+                            f"{os.path.basename(correlator_file)}"
+                        )
+            except Exception as e:
+                logger.error(
+                    f"Error checking zeros in file {correlator_file}: {str(e)}",
+                    to_console=True,
+                )
+
+        # Handle correlator files with all zero values
+        if zero_value_correlator_files:
+            logger.warning(
+                f"Found {len(zero_value_correlator_files)} correlators "
+                "files with all zero values.",
+                to_console=True,
+            )
+            response = get_yes_no_response(
+                "Delete correlators files containing only zero correlator values? "
+                "This will also remove their associated .txt files. (y[Y]/n[N])"
+            )
+            if response:
+                for file_path in zero_value_correlator_files:
+                    try:
+                        # Remove the correlator file
+                        os.remove(file_path)
+                        logger.info(
+                            "Deleted zero-value correlators file: "
+                            f"{os.path.basename(file_path)}"
+                        )
+
+                        # Remove associated .txt file
+                        txt_file = os.path.splitext(file_path)[0] + ".txt"
+                        if os.path.exists(txt_file):
+                            os.remove(txt_file)
+                            logger.info(
+                                "Deleted associated log file: "
+                                f"{os.path.basename(txt_file)}"
+                            )
+
+                    except Exception as e:
+                        logger.error(
+                            f"Error deleting file {file_path}: {str(e)}",
+                            to_console=True,
+                        )
+            else:
+                logger.info(
+                    "No correlators files with all zero values were deleted.",
+                    to_console=True,
+                )
 
     # REMOVE UNMATCHED INVERT FILES
 
