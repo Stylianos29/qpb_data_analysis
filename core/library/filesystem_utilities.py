@@ -248,7 +248,7 @@ def validate_file(ctx, param, value):
     return path_type.convert(value, param, ctx)
 
 
-def validate_directory(ctx, param, value):
+def validate_input_directory(ctx, param, value):
     if value is None:
         return None  # Skip validation for None
     # Validate the directory path using click.Path

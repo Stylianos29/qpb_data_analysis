@@ -52,7 +52,7 @@ from library import filesystem_utilities, data_processing
     "--output_files_directory",
     "output_files_directory",
     default=None,
-    callback=filesystem_utilities.validate_directory,
+    callback=validate_input_directory,
     help="Path to directory where all output files will be stored.",
 )
 @click.option(

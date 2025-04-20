@@ -54,7 +54,7 @@ import datetime
 
 import click
 
-from library import filesystem_utilities, get_yes_or_no_user_response
+from library import filesystem_utilities, validate_input_directory, get_yes_or_no_user_response
 
 
 @click.command()
@@ -63,7 +63,7 @@ from library import filesystem_utilities, get_yes_or_no_user_response
     "--raw_data_files_set_directory_path",
     "raw_data_files_set_directory_path",
     required=True,
-    callback=filesystem_utilities.validate_directory,
+    callback=validate_input_directory,
     help="Path to the raw data files set directory",
 )
 @click.option(
@@ -79,7 +79,7 @@ from library import filesystem_utilities, get_yes_or_no_user_response
     "--auxiliary_files_directory",
     "auxiliary_files_directory",
     default=None,
-    callback=filesystem_utilities.validate_directory,
+    callback=validate_input_directory,
     help="Directory where the script's log file will be stored.",
 )
 @click.option(

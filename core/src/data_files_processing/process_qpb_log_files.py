@@ -59,7 +59,7 @@ from library import extraction, filesystem_utilities, RAW_DATA_FILES_DIRECTORY
     "--qpb_log_files_directory",
     "qpb_log_files_directory",
     required=True,
-    callback=filesystem_utilities.validate_directory,
+    callback=validate_input_directory,
     help="Directory where the qpb log files to be analyzed are stored.",
 )
 @click.option(
@@ -67,7 +67,7 @@ from library import extraction, filesystem_utilities, RAW_DATA_FILES_DIRECTORY
     "--output_files_directory",
     "output_files_directory",
     default=None,
-    callback=filesystem_utilities.validate_directory,
+    callback=validate_input_directory,
     help="Path to directory where all output files will be stored.",
 )
 @click.option(
