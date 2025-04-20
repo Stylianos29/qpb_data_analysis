@@ -32,6 +32,8 @@ from library import (
     data_processing,
     fit_functions,
     constants,
+    validate_input_directory,
+    validate_input_script_log_filename,
 )
 
 REFERENCE_BARE_MASS = 0.1

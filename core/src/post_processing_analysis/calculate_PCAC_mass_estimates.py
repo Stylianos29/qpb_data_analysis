@@ -35,6 +35,8 @@ from library import (
     jackknife_analysis,
     momentum_correlator,
     PROCESSED_DATA_FILES_DIRECTORY,
+    validate_input_directory,
+    validate_input_script_log_filename,
 )
 
 
@@ -108,7 +110,7 @@ from library import (
     "--log_filename",
     "log_filename",
     default=None,
-    callback=filesystem_utilities.validate_script_log_filename,
+    callback=validate_input_script_log_filename,
     help="Specific name for the script's log file.",
 )
 def main(

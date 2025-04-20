@@ -21,7 +21,12 @@ import click
 import pandas as pd
 import logging
 
-from library import filesystem_utilities, data_processing
+from library import (
+    filesystem_utilities,
+    data_processing,
+    validate_input_directory,
+    validate_input_script_log_filename,
+)
 
 
 @click.command()
@@ -87,7 +92,7 @@ from library import filesystem_utilities, data_processing
     "--log_filename",
     "log_filename",
     default=None,
-    callback=filesystem_utilities.validate_script_log_filename,
+    callback=validate_input_script_log_filename,
     help="Specific name for the script's log file.",
 )
 def main(

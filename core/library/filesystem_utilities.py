@@ -274,7 +274,7 @@ def validate_output_csv_filename(ctx, param, value):
     return value
 
 
-def validate_script_log_filename(ctx, param, value):
+def validate_input_script_log_filename(ctx, param, value):
     # Get the name of the script being executed (entry point)
     script_name = os.path.basename(sys.argv[0])
 

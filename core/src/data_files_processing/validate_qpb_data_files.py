@@ -54,7 +54,12 @@ import datetime
 
 import click
 
-from library import filesystem_utilities, validate_input_directory, get_yes_or_no_user_response
+from library import (
+    filesystem_utilities,
+    validate_input_directory,
+    validate_input_script_log_filename,
+    get_yes_or_no_user_response,
+)
 
 
 @click.command()
@@ -87,7 +92,7 @@ from library import filesystem_utilities, validate_input_directory, get_yes_or_n
     "--log_filename",
     "log_filename",
     default=None,
-    callback=filesystem_utilities.validate_script_log_filename,
+    callback=validate_input_script_log_filename,
     help="Specific name for the script's log file.",
 )
 def main(
