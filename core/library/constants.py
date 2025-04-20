@@ -609,7 +609,6 @@ MARKER_STYLES = [
 DEFAULT_COLORS = [
     "blue",
     "red",
-    "cyan",
     "magenta",
     "darkgoldenrod",  # Dark yellow option
     "green",
@@ -617,14 +616,20 @@ DEFAULT_COLORS = [
     "orange",
     "purple",
     "brown",
-    # "pink",
-    "gray",
-    "lime",
-    "teal",
-    # "olive",
-    "maroon",
-    "gold",
-    "navy",
-    "violet",
+    "darkslategray",
     "indigo",
+    "gray",
+    # "cyan",
+    # "pink",
+    # "lime",
+    # "teal", 
+    # "olive",
+    # "maroon",
+    # "gold",
+    # "navy",
+    # "darkred",        # Added
+    # "darkviolet"      # Added
+    # "darkorange",     # Added
+    "darkgreen",
+    "violet",
 ]
