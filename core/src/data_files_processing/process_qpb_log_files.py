@@ -50,7 +50,13 @@ import pandas as pd
 import h5py
 import click
 
-from library import extraction, filesystem_utilities, RAW_DATA_FILES_DIRECTORY
+from library import (
+    extraction,
+    filesystem_utilities,
+    RAW_DATA_FILES_DIRECTORY,
+    validate_input_directory,
+    validate_input_script_log_filename,
+)
 
 
 @click.command()
@@ -59,7 +65,7 @@ from library import extraction, filesystem_utilities, RAW_DATA_FILES_DIRECTORY
     "--qpb_log_files_directory",
     "qpb_log_files_directory",
     required=True,
-    callback=filesystem_utilities.validate_directory,
+    callback=validate_input_directory,
     help="Directory where the qpb log files to be analyzed are stored.",
 )
 @click.option(
@@ -67,7 +73,7 @@ from library import extraction, filesystem_utilities, RAW_DATA_FILES_DIRECTORY
     "--output_files_directory",
     "output_files_directory",
     default=None,
-    callback=filesystem_utilities.validate_directory,
+    callback=validate_input_directory,
     help="Path to directory where all output files will be stored.",
 )
 @click.option(
@@ -113,7 +119,7 @@ from library import extraction, filesystem_utilities, RAW_DATA_FILES_DIRECTORY
     "--log_filename",
     "log_filename",
     default=None,
-    callback=filesystem_utilities.validate_script_log_filename,
+    callback=validate_input_script_log_filename,
     help="Specific name for the script's log file.",
 )
 def main(

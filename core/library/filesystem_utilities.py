@@ -248,7 +248,7 @@ def validate_file(ctx, param, value):
     return path_type.convert(value, param, ctx)
 
 
-def validate_directory(ctx, param, value):
+def validate_input_directory(ctx, param, value):
     if value is None:
         return None  # Skip validation for None
     # Validate the directory path using click.Path
@@ -274,7 +274,7 @@ def validate_output_csv_filename(ctx, param, value):
     return value
 
 
-def validate_script_log_filename(ctx, param, value):
+def validate_input_script_log_filename(ctx, param, value):
     # Get the name of the script being executed (entry point)
     script_name = os.path.basename(sys.argv[0])
 
@@ -297,6 +297,8 @@ def validate_script_log_filename(ctx, param, value):
 
 
 def validate_script_log_file_directory(ctx, param, value):
+    # TODO: I need to rethink this case, there isn't always a
+    # "output_files_directory" directory
     if value is None:
         # Get the value of 'input_correlators_hdf5_file_path' from ctx.params
         output_files_directory = ctx.params.get("output_files_directory")
@@ -433,7 +435,7 @@ class LoggingWrapper:
             self.logger.info(message)
             if to_console:
                 print(f"INFO: {message}")
-
+# TODO: Create a list option
     def warning(self, message, to_console=False):
         if self.logger:
             self.logger.warning(message)

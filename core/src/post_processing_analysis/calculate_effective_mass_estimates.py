@@ -34,6 +34,8 @@ from library import (
     momentum_correlator,
     jackknife_analysis,
     PROCESSED_DATA_FILES_DIRECTORY,
+    validate_input_directory,
+    validate_input_script_log_filename,
 )
 
 
@@ -51,7 +53,7 @@ from library import (
     "--output_files_directory",
     "output_files_directory",
     default=None,
-    callback=filesystem_utilities.validate_directory,
+    callback=validate_input_directory,
     help="Path to directory where all output files will be stored.",
 )
 @click.option(
@@ -59,7 +61,7 @@ from library import (
     "--plots_directory",
     "plots_directory",
     default="../../../output/plots",
-    callback=filesystem_utilities.validate_directory,
+    callback=validate_input_directory,
     help="Path to the output directory for storing plots.",
 )
 @click.option(
@@ -115,7 +117,7 @@ from library import (
     "--log_filename",
     "log_filename",
     default=None,
-    callback=filesystem_utilities.validate_script_log_filename,
+    callback=validate_input_script_log_filename,
     help="Specific name for the script's log file.",
 )
 def main(

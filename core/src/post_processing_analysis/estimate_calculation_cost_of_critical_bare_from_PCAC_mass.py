@@ -34,6 +34,8 @@ from library import (
     data_processing,
     fit_functions,
     constants,
+    validate_input_directory,
+    validate_input_script_log_filename,
 )
 
 REFERENCE_BARE_MASS = 0.1
@@ -64,7 +66,7 @@ UPPER_BARE_MASS_CUT = 0.15
     "--output_files_directory",
     "output_files_directory",
     default=None,
-    callback=filesystem_utilities.validate_directory,
+    callback=validate_input_directory,
     help="Path to directory where all output files will be stored.",
 )
 @click.option(
@@ -72,7 +74,7 @@ UPPER_BARE_MASS_CUT = 0.15
     "--plots_directory",
     "plots_directory",
     default="../../../output/plots",
-    callback=filesystem_utilities.validate_directory,
+    callback=validate_input_directory,
     help="Path to the output directory for storing plots.",
 )
 @click.option(
@@ -127,7 +129,7 @@ UPPER_BARE_MASS_CUT = 0.15
     "--log_filename",
     "log_filename",
     default=None,
-    callback=filesystem_utilities.validate_script_log_filename,
+    callback=validate_input_script_log_filename,
     help="Specific name for the script's log file.",
 )
 def main(

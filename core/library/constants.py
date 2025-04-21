@@ -285,6 +285,11 @@ FILE_CONTENTS_MULTIVALUED_PATTERNS_DICTIONARY = {
         "regex_pattern": r"After (\d+) iters,",
         "type": int,
     },
+    "Number_of_kernel_applications_per_MSCG": {
+        "line_identifier": " Total number of dslash applications",
+        "regex_pattern": r"dslash applications (\d+)",
+        "type": int,
+    },
     "CG_total_calculation_time_per_spinor": {
         "line_identifier": ", CG converged,",
         "regex_pattern": r", t = (\d+\.\d+) sec",
@@ -604,7 +609,6 @@ MARKER_STYLES = [
 DEFAULT_COLORS = [
     "blue",
     "red",
-    "cyan",
     "magenta",
     "darkgoldenrod",  # Dark yellow option
     "green",
@@ -612,14 +616,20 @@ DEFAULT_COLORS = [
     "orange",
     "purple",
     "brown",
-    # "pink",
-    "gray",
-    "lime",
-    "teal",
-    # "olive",
-    "maroon",
-    "gold",
-    "navy",
-    "violet",
+    "darkslategray",
     "indigo",
+    "gray",
+    # "cyan",
+    # "pink",
+    # "lime",
+    # "teal", 
+    # "olive",
+    # "maroon",
+    # "gold",
+    # "navy",
+    # "darkred",        # Added
+    # "darkviolet"      # Added
+    # "darkorange",     # Added
+    "darkgreen",
+    "violet",
 ]
