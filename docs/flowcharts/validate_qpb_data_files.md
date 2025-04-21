@@ -1,97 +1,125 @@
-# validate_qpb_data_files.py flowchart
+## validate_qpb_data_files.py flowchart
+
+A validation script for qpb data files inside the data files set directory.
 
 ```mermaid
 flowchart TD
     
-    Start([Start]) --> Inputs[/Input paths:
-    -raw data files set directory
-    -auxiliary files directory
-    /]
+    %% INITIATE SCRIPT
+    Start([Start]) --> Inputs[/Input:
+        -raw data files set directory
+        -auxiliary files directory
+        /]
     
-    %% Script checks if data files set directory is empty
-    Inputs --> CheckDirectory[
-        Check if data files set 
-        directory is empty
-        ]
-    CheckDirectory --> EmptyDirectory{
-        Data files set 
-        directory empty?
+    %% CHECK IF DATA FILES SET DIRECTORY IS EMPTY
+    Inputs --> EmptyDirectory{
+        Data files 
+        set directory 
+        empty?
         }
-    EmptyDirectory -- Yes --> Exit([Exit program])
+    EmptyDirectory -- Yes --> Exit([Exit])
+    
+    %% CHECK PRESENCE OF QPB LOG FILES
+    EmptyDirectory -- No --> LogFiles{
+        qpb log files 
+        present?
+        }
+    LogFiles -- No --> Exit([Exit])
 
-    %% Script checks if any qpb log files are present
-    EmptyDirectory -- No --> CheckTxtFiles[
-        Check for any .txt 
-        files present in 
-        the data files set directory?
-        ]
-    CheckTxtFiles --> TxtFilesPresent{
-            .txt files present?
-            }
-    TxtFilesPresent -- No --> Exit([Exit program])
-
-    %% Script checks for unsupported file types
-    TxtFilesPresent -- Yes --> RemoveUnsupported[
-        Check data files set 
-        directory for unsupported 
-        file types
-        ]
-    RemoveUnsupported --> UnsupportedFiles{
-        Unsupported files found?
-        Delete files? Y/N
+    %% REMOVE ANY UNSUPPORTED FILES FROM THE DIRECTORY
+    LogFiles -- Yes --> UnsupportedFiles{
+        Unsupported 
+        files found?
+        Delete files?
+        Y/N
         }
     UnsupportedFiles -- No --> Exit([Exit program])
-    
-    %% Script checks for empty file types
-    UnsupportedFiles -- Yes --> RemoveEmpty[
-        Check data files set 
-        directory for empty 
-        .txt and .dat files
-        ]
-    RemoveEmpty --> EmptyFiles{
-        Empty .txt and .dat 
-        files found?
+
+    %% REMOVE ANY EMPTY FILES FROM THE DIRECTORY
+    UnsupportedFiles -- Yes --> EmptyTxtDatFiles{
+        Empty log 
+        or correlator 
+        files found? 
         Delete files? Y/N
         }
-    EmptyFiles -- No --> Exit([Exit program])
-    EmptyFiles -- Yes --> CheckEmptyDirectory[
-        Check again if data files 
-        set directory empty
-    ]
-    CheckEmptyDirectory --> EmptyDirectory2{
-        Data files set 
-        directory empty?
-        }
-    EmptyDirectory2 -- Yes --> Exit([Exit Program])
+    EmptyTxtDatFiles -- No --> Exit([Exit])
     
-    
-    %% Script checks qpb log files are present indeed
-    EmptyDirectory2 -- No --> CheckQPB[
-        Check data files set 
-        directory if qpb log 
-        files are present
-        ]
-    CheckQPB --> LogFiles{Log files present?}
-    LogFiles -- No --> Exit
-    LogFiles -- Yes --> StorePaths[
-        Store file paths in 
-        text files inside the 
+    %% RETRIEVE STORED FILE PATHS
+    EmptyTxtDatFiles -- Yes --> RetrieveStored[
+        Retrieve stored files
+        paths in separate lists 
+        by file type from 
         auxiliary files directory
-        ]
+    ]
+
+    %% SELECT DATA FILES TO BE VALIDATED
+    RetrieveStored --> NotListedFiles{
+        Are there any 
+        not-listed files 
+        present?
+        }
+    NotListedFiles -- No --> RepeatValidation{
+        Repeat validation 
+        of all files? Y/N
+        }
+    RepeatValidation -- No --> Exit([Exit])
+
+    %% KEEP OR REMOVE QPB ERROR FILES
+    NotListedFiles -- Yes --> ErrorFiles
+    RepeatValidation -- Yes --> ErrorFiles{
+        qpb error files 
+        found? Delete 
+        files? Y/N
+        }
     
-    %% Script checks qpb log files are present indeed
+    %% REMOVE CORRUPTED QPB DATA FILES
+    ErrorFiles -- No --> CorruptedFiles
+    ErrorFiles -- Yes --> CorruptedFiles{
+        Corrupted log 
+        files found? 
+        Delete files? Y/N
+        }
+    CorruptedFiles -- No --> Exit([Exit])
 
-            A[Start] --> B[Initialize empty lists for stored file paths]
-            B --> C[Define file mappings dictionary]
-            C --> D[Loop through each file mapping]
-            D --> E{File exists?}
-            E -- Yes --> F[Read file contents into corresponding list]
-            E -- No --> G[Create empty file]
-            F --> H{More files?}
-            G --> H
-            H -- Yes --> D
-            H -- No --> I[End]
+    %% IDENTIFY MAIN PROGRAM TYPE AND REMOVE INCOMPATIBLE FILES
+    CorruptedFiles -- Yes --> MainProgramType[
+        Read main program 
+        type from metadata.md 
+        file from auxiliary 
+        files directory
+        ]
 
+    %% CHECK IF CORRELATORS FILES CONTAIN ONLY ZERO VALUES
+    MainProgramType --> CheckCorrelators{
+        Correlator files 
+        contain only 
+        zeros? Delete 
+        files? Y/N
+        }
+    CheckCorrelators -- No -->  Exit([Exit])
 
-    StorePaths --> End([End])
+    %% REMOVE UNMATCHED INVERT FILES
+    CheckCorrelators -- Yes --> UnmatchedInvertFiles{
+        Unmatched invert 
+        files found? 
+        Delete files? Y/N
+        }
+    UnmatchedInvertFiles -- No --> Exit([Exit])
+
+    %% STORE REMAINING FILE PATHS IN SEPARATE TEXT FILES
+    UnmatchedInvertFiles -- Yes --> StoreFilePaths[
+        Store remaining 
+        file paths in 
+        separate text files
+        ]
+
+    %% INCLUDE ADDITIONAL INFORMATION IN THE METADATA FILE
+    StoreFilePaths --> Metadata[
+        Include additional 
+        information in 
+        the metadata file
+        ]
+
+    %% TERMINATE SCRIPT
+    Metadata --> End([End])
 ```
