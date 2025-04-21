@@ -67,7 +67,7 @@ flowchart TD
     %% KEEP OR REMOVE QPB ERROR FILES
     NotListedFiles -- Yes --> ErrorFiles
     RepeatValidation -- Yes --> ErrorFiles{
-        qpb error files 
+        qpb error file 
         found? Delete 
         files? Y/N
         }
