@@ -121,6 +121,53 @@ def test_concatenated_parameters_and_quantities():
     assert set(concatenated_list) == set(TEST_ANALYZER.list_of_dataframe_column_names)
 
 
+def test_unique_value_columns_dictionary():
+    """Test if unique_value_columns_dictionary contains the expected values."""
+    expected_dict = {
+        "Main_program_type": "invert",
+        "Kernel_operator_type": "Wilson",
+        "QCD_beta_value": "6.20",
+        "APE_alpha": np.float64(0.72),
+        "APE_iterations": np.int64(1),
+        "Rho_value": np.float64(1.0),
+        "Clover_coefficient": np.int64(0),
+        "Number_of_spinors": np.int64(12),
+        "KL_diagonal_order": np.int64(1),
+        "KL_scaling_factor": np.float64(1.0),
+        "Overlap_operator_method": "KL",
+        "Temporal_lattice_size": np.int64(48),
+        "Spatial_lattice_size": np.int64(24),
+        "Number_of_vectors": np.int64(1),
+        "MS_expansion_shifts": "(0.333333)",
+    }
+    assert TEST_ANALYZER.unique_value_columns_dictionary == expected_dict
+
+
+def test_multivalued_columns_count_dictionary():
+    """Test if multivalued_columns_count_dictionary contains the expected
+    counts."""
+    expected_dict = {
+        "Filename": 48,
+        "MPI_geometry": 3,
+        "Threads_per_process": 2,
+        "Configuration_label": 6,
+        "Bare_mass": 2,
+        "Kappa_value": 2,
+        "Plaquette": 6,
+        "Total_calculation_time": 48,
+        "CG_epsilon": 4,
+        "MSCG_epsilon": 4,
+        "Number_of_cores": 3,
+        "Average_number_of_MSCG_iterations_per_spinor": 9,
+        "Average_number_of_CG_iterations_per_spinor": 24,
+        "Average_number_of_MV_multiplications_per_spinor": 9,
+        "Average_wall_clock_time_per_spinor": 48,
+        "Average_core_hours_per_spinor": 48,
+        "Adjusted_average_core_hours_per_spinor": 48,
+    }
+    assert TEST_ANALYZER.multivalued_columns_count_dictionary == expected_dict
+
+
 def test_list_of_single_valued_column_names():
     """Test if list_of_single_valued_column_names matches the expected list of
     columns with single unique values."""
@@ -173,69 +220,14 @@ def test_list_of_multivalued_column_names():
     )
 
 
-def test_group_by_multivalued_tunable_parameters():
-    """Test if group_by_multivalued_tunable_parameters returns a
-    DataFrameGroupBy object."""
-    filter_params = [
-        "Bare_mass",
-        "Kappa_value",
-        "MPI_geometry",
-        "CG_epsilon",
-        "Filename",
-        "MSCG_epsilon",
-        "Configuration_label",
-    ]
-    grouped = TEST_ANALYZER.group_by_multivalued_tunable_parameters(
-        filter_out_parameters_list=filter_params
+def test_concatenated_single_and_multivalued_columns():
+    """Test if concatenating single and multivalued column lists matches all
+    column names."""
+    concatenated_list = (
+        TEST_ANALYZER.list_of_single_valued_column_names
+        + TEST_ANALYZER.list_of_multivalued_column_names
     )
-    assert isinstance(grouped, pd.core.groupby.generic.DataFrameGroupBy)
-
-
-def test_unique_value_columns_dictionary():
-    """Test if unique_value_columns_dictionary contains the expected values."""
-    expected_dict = {
-        "Main_program_type": "invert",
-        "Kernel_operator_type": "Wilson",
-        "QCD_beta_value": "6.20",
-        "APE_alpha": np.float64(0.72),
-        "APE_iterations": np.int64(1),
-        "Rho_value": np.float64(1.0),
-        "Clover_coefficient": np.int64(0),
-        "Number_of_spinors": np.int64(12),
-        "KL_diagonal_order": np.int64(1),
-        "KL_scaling_factor": np.float64(1.0),
-        "Overlap_operator_method": "KL",
-        "Temporal_lattice_size": np.int64(48),
-        "Spatial_lattice_size": np.int64(24),
-        "Number_of_vectors": np.int64(1),
-        "MS_expansion_shifts": "(0.333333)",
-    }
-    assert TEST_ANALYZER.unique_value_columns_dictionary == expected_dict
-
-
-def test_multivalued_columns_count_dictionary():
-    """Test if multivalued_columns_count_dictionary contains the expected
-    counts."""
-    expected_dict = {
-        "Filename": 48,
-        "MPI_geometry": 3,
-        "Threads_per_process": 2,
-        "Configuration_label": 6,
-        "Bare_mass": 2,
-        "Kappa_value": 2,
-        "Plaquette": 6,
-        "Total_calculation_time": 48,
-        "CG_epsilon": 4,
-        "MSCG_epsilon": 4,
-        "Number_of_cores": 3,
-        "Average_number_of_MSCG_iterations_per_spinor": 9,
-        "Average_number_of_CG_iterations_per_spinor": 24,
-        "Average_number_of_MV_multiplications_per_spinor": 9,
-        "Average_wall_clock_time_per_spinor": 48,
-        "Average_core_hours_per_spinor": 48,
-        "Adjusted_average_core_hours_per_spinor": 48,
-    }
-    assert TEST_ANALYZER.multivalued_columns_count_dictionary == expected_dict
+    assert set(concatenated_list) == set(TEST_ANALYZER.list_of_dataframe_column_names)
 
 
 def test_list_of_single_valued_tunable_parameter_names():
@@ -277,6 +269,18 @@ def test_list_of_multivalued_tunable_parameter_names():
     )
 
 
+def test_concatenated_single_and_multivalued_tunable_parameters():
+    """Test if concatenating single-valued and multi-valued tunable parameter
+    lists matches all tunable parameters."""
+    concatenated_list = (
+        TEST_ANALYZER.list_of_single_valued_tunable_parameter_names
+        + TEST_ANALYZER.list_of_multivalued_tunable_parameter_names
+    )
+    assert set(concatenated_list) == set(
+        TEST_ANALYZER.list_of_tunable_parameter_names_from_dataframe
+    )
+
+
 def test_list_of_single_valued_output_quantity_names():
     """Test if list_of_single_valued_output_quantity_names is empty as
     expected."""
@@ -308,6 +312,36 @@ def test_list_of_multivalued_output_quantity_names():
     assert set(TEST_ANALYZER.list_of_multivalued_output_quantity_names) == set(
         expected_list
     )
+
+
+def test_concatenated_single_and_multivalued_output_quantities():
+    """Test if concatenating single-valued and multi-valued output quantity
+    lists matches all output quantities."""
+    concatenated_list = (
+        TEST_ANALYZER.list_of_single_valued_output_quantity_names
+        + TEST_ANALYZER.list_of_multivalued_output_quantity_names
+    )
+    assert set(concatenated_list) == set(
+        TEST_ANALYZER.list_of_output_quantity_names_from_dataframe
+    )
+
+
+def test_group_by_multivalued_tunable_parameters():
+    """Test if group_by_multivalued_tunable_parameters returns a
+    DataFrameGroupBy object."""
+    filter_params = [
+        "Bare_mass",
+        "Kappa_value",
+        "MPI_geometry",
+        "CG_epsilon",
+        "Filename",
+        "MSCG_epsilon",
+        "Configuration_label",
+    ]
+    grouped = TEST_ANALYZER.group_by_multivalued_tunable_parameters(
+        filter_out_parameters_list=filter_params
+    )
+    assert isinstance(grouped, pd.core.groupby.generic.DataFrameGroupBy)
 
 
 def test_group_by_multivalued_tunable_parameters_no_filter():
