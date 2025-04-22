@@ -516,126 +516,340 @@ def find_multiple_value_columns(df):
 
 
 class DataFrameAnalyzer:
+    """
+    A class for analyzing and manipulating Pandas DataFrames with a focus on
+    distinguishing between tunable parameters and output quantities.
+    
+    This class provides functionality to categorize DataFrame columns, identify
+    columns with single vs. multiple unique values, group data by parameters,
+    and filter the DataFrame based on various conditions.
+    
+    Attributes:
+        - original_dataframe (pd.DataFrame): A copy of the original input
+          DataFrame.
+        - dataframe (pd.DataFrame): The working DataFrame that can be filtered
+          and manipulated.
+        - list_of_dataframe_column_names (list): List of all column names in the
+          DataFrame.
+        - list_of_tunable_parameter_names_from_dataframe (list): Columns
+          identified as tunable parameters.
+        - list_of_output_quantity_names_from_dataframe (list): Columns
+          identified as output quantities.
+        - unique_value_columns_dictionary (dict): Columns with single unique
+          values and their values.
+        - multivalued_columns_count_dictionary (dict): Columns with multiple
+          unique values and counts.
+        - list_of_single_valued_column_names (list): Column names with only one
+          unique value.
+        - list_of_multivalued_column_names (list): Column names with multiple
+          unique values.
+        - list_of_single_valued_tunable_parameter_names (list): Tunable
+          parameters with one unique value.
+        - list_of_multivalued_tunable_parameter_names (list): Tunable parameters
+          with multiple values.
+        - list_of_single_valued_output_quantity_names (list): Output quantities
+          with one unique value.
+        - list_of_multivalued_output_quantity_names (list): Output quantities
+          with multiple values.
+    """
+    
     def __init__(self, dataframe: pd.DataFrame):
+        """
+        Initialize the DataFrameAnalyzer with a DataFrame.
+        
+        We divide parameters into two categories:
+        1. Tunable parameters: These are parameters that can be adjusted by the
+           user.
+        2. Output quantities: These are the results of calculations.
+        
+        The primary purpose of this class is to distinguish between tunable
+        parameters and output quantities, and to construct DataFrame groups
+        based on tunable parameters or subsets of them, according to user needs.
+        
+        Args:
+            dataframe (pd.DataFrame): The input DataFrame to analyze.
+            
+        Raises:
+            TypeError: If the input is not a Pandas DataFrame.
+        """
+        # Verify that the input is a Pandas DataFrame
+        if not isinstance(dataframe, pd.DataFrame):
+            raise TypeError("Input must be a Pandas DataFrame")
 
-        self.dataframe = dataframe
-        self.original_dataframe = self.dataframe.copy()
+        # Store a copy of the original DataFrame
+        self.original_dataframe = dataframe.copy()
 
-        self.list_of_dataframe_fields = self.dataframe.columns.tolist()
+        # Initialize the dataframe attribute
+        self.dataframe = self.original_dataframe.copy()
 
-        # Extract list of tunable parameter names for the provided dataframe
+        # Initialize all lists of dataframe column name categories
+        self.update_column_categories()
+
+    def update_column_categories(self):
+        """
+        Update and categorize column names from the dataframe into various lists
+        and dictionaries.
+        
+        This method processes dataframe columns to identify:
+        - Tunable parameters vs output quantities
+        - Columns with single vs multiple unique values
+        - Intersections of these categories
+        
+        The method updates multiple class attributes that categorize the columns
+        in different ways for later use in analysis and filtering operations.
+        """
+        self.list_of_dataframe_column_names = self.dataframe.columns.tolist()
+
+        # Extract list of tunable parameter names
         self.list_of_tunable_parameter_names_from_dataframe = [
             column_name
-            for column_name in self.list_of_dataframe_fields
+            for column_name in self.list_of_dataframe_column_names
             if column_name in constants.TUNABLE_PARAMETER_NAMES_LIST
         ]
 
-        # Extract list of output quantity names for the provided dataframe
+        # Extract list of output quantity names
         self.list_of_output_quantity_names_from_dataframe = [
             column_name
-            for column_name in self.list_of_dataframe_fields
+            for column_name in self.list_of_dataframe_column_names
             if column_name in constants.OUTPUT_QUANTITY_NAMES_LIST
         ]
 
-        self.set_data_based_attributes()
+        # Get dictionary of columns with single unique values and their values
+        self.unique_value_columns_dictionary = self.get_unique_value_columns()
 
-    # TODO: This must be renamed as the update method
-    def set_data_based_attributes(self):
+        # Get dictionary of multivalued columns with number of unique values
+        self.multivalued_columns_count_dictionary = self.get_multivalued_columns_count()
 
-        self.list_of_dataframe_fields = self.dataframe.columns.tolist()
-
-        # Extract dictionary with single-valued fields and their values
-        self.single_valued_fields_dictionary = self.get_single_valued_fields()
-
-        # Extract dictionary of multivalued fields with number of unique values
-        self.multivalued_fields_dictionary = self.get_multivalued_fields()
-
-        self.list_of_tunable_multivalued_parameter_names = list(
-            set(self.list_of_tunable_parameter_names_from_dataframe)
-            & set(self.multivalued_fields_dictionary.keys())
+        # Extract list of column names with single unique values
+        self.list_of_single_valued_column_names = list(
+            self.unique_value_columns_dictionary.keys()
         )
 
-        self.tunable_single_valued_parameters_dictionary = {
-            parameter: value
-            for parameter, value in self.single_valued_fields_dictionary.items()
-            if parameter in self.list_of_tunable_parameter_names_from_dataframe
-        }
+        # Extract list of column names with multiple unique values
+        self.list_of_multivalued_column_names = list(
+            self.multivalued_columns_count_dictionary.keys()
+        )
 
-    def get_single_valued_fields(self) -> dict:
+        # Create list of tunable parameters with single unique values
+        self.list_of_single_valued_tunable_parameter_names = list(
+            set(self.list_of_tunable_parameter_names_from_dataframe)
+            & set(self.list_of_single_valued_column_names)
+        )
 
-        single_valued_fields_dictionary = {}
+        # Create list of tunable parameters with multiple unique values
+        self.list_of_multivalued_tunable_parameter_names = list(
+            set(self.list_of_tunable_parameter_names_from_dataframe)
+            & set(self.list_of_multivalued_column_names)
+        )
 
+        # Create list of output quantities with single unique values
+        self.list_of_single_valued_output_quantity_names = list(
+            set(self.list_of_output_quantity_names_from_dataframe)
+            & set(self.list_of_single_valued_column_names)
+        )
+
+        # Create list of output quantities with multiple unique values
+        self.list_of_multivalued_output_quantity_names = list(
+            set(self.list_of_output_quantity_names_from_dataframe)
+            & set(self.list_of_multivalued_column_names)
+        )
+
+    def get_unique_value_columns(self) -> dict:
+        """
+        Identify columns that have only a single unique value.
+        
+        Returns:
+            dict: A dictionary where keys are column names with only one unique
+            value, and values are the actual unique values for those columns.
+                  
+        Example:
+            If a column 'temperature' has the same value 298.15 for all rows,
+            the dictionary would contain {'temperature': 298.15}
+        """
+        unique_value_columns_dictionary = {}
         for column in self.dataframe.columns:
             unique_values = self.dataframe[column].unique()
 
             # Only add columns where there is a single unique value
             if len(unique_values) == 1:
                 # Store the unique value directly, not as a list
-                single_valued_fields_dictionary[column] = unique_values[0]
+                unique_value_columns_dictionary[column] = unique_values[0]
 
-        return single_valued_fields_dictionary
+        return unique_value_columns_dictionary
 
-    def get_multivalued_fields(self) -> dict:
-
-        multivalued_fields_dictionary = {}
-
+    def get_multivalued_columns_count(self) -> dict:
+        """
+        Identify columns that have multiple unique values and count them.
+        
+        Returns:
+            dict: A dictionary where keys are column names with multiple unique
+            values, and values are the counts of unique values in those columns.
+                  
+        Example:
+            If a column 'pressure' has values [1.0, 2.0, 3.0] across different
+            rows, the dictionary would contain {'pressure': 3}
+        """
+        multivalued_columns_count_dictionary = {}
         for column in self.dataframe.columns:
             # Get the number of unique values in the column
             unique_values_count = self.dataframe[column].nunique()
             if unique_values_count > 1:
                 # If there's more than one unique value, add it to dictionary
-                multivalued_fields_dictionary[column] = unique_values_count
+                multivalued_columns_count_dictionary[column] = unique_values_count
 
-        return multivalued_fields_dictionary
+        return multivalued_columns_count_dictionary
 
-    def group_by_reduced_tunable_parameters_list(self, filter_out_parameters: list):
+    def group_by_multivalued_tunable_parameters(
+        self, filter_out_parameters_list: list = None
+    ):
+        """
+        Group the DataFrame by multivalued tunable parameters, optionally
+        excluding some parameters.
+        
+        This method allows for flexible grouping of data based on tunable
+        parameters that have multiple unique values. Parameters can be excluded
+        from the grouping if they are not relevant to the current analysis.
+        
+        Args:
+            filter_out_parameters_list (list, optional): List of parameter names
+            to exclude from the grouping operation. Default is None (include all
+            multivalued parameters).
+                
+        Returns:
+            pandas.core.groupby.DataFrameGroupBy: A GroupBy object created by
+            grouping on the specified multivalued tunable parameters.
+                
+        Raises:
+            TypeError: If filter_out_parameters_list is not a list. ValueError:
+            If filter_out_parameters_list contains invalid parameter names.
+            
+        Example:
+            # Group by all multivalued tunable parameters groups =
+            analyzer.group_by_multivalued_tunable_parameters()
+            
+            # Group by all except 'temperature' and 'pressure'
+            
+            groups = analyzer.group_by_multivalued_tunable_parameters(
+                filter_out_parameters_list=['temperature', 'pressure']
+            )
+        """
+        if filter_out_parameters_list is not None:
+            # Check if filter_out_parameters_list is a list
+            if not isinstance(filter_out_parameters_list, list):
+                raise TypeError("'filter_out_parameters_list' must be a list!")
 
-        # self.reduced_tunable_parameters_list = list(
-        #     set(self.list_of_tunable_parameter_names_from_dataframe)
-        #     - set(self.single_valued_fields_dictionary)
-        #     - set(filter_out_parameters)
-        # )
+            # Check if all elements in filter_out_parameters_list are valid
+            # tunable parameters
+            invalid_parameters = [
+                param
+                for param in filter_out_parameters_list
+                if param not in self.list_of_multivalued_tunable_parameter_names
+            ]
+            if invalid_parameters:
+                raise ValueError(
+                    "Invalid parameters in filter_out_parameters_list: "
+                    f"{invalid_parameters}. Must be from: "
+                    f"{self.list_of_multivalued_tunable_parameter_names}."
+                )
 
-        self.reduced_tunable_parameters_list = [
-            item
-            for item in self.list_of_tunable_multivalued_parameter_names
-            if item not in filter_out_parameters
-        ]
+            # Create a reduced list of multivalued tunable parameters by
+            # excluding the specified ones from the filter_out_parameters_list
+            self.reduced_multivalued_tunable_parameter_names_list = [
+                item
+                for item in self.list_of_multivalued_tunable_parameter_names
+                if item not in filter_out_parameters_list
+            ]
 
-        self.list_of_tunable_multivalued_parameter_names
+        else:
+            self.reduced_multivalued_tunable_parameter_names_list = (
+                self.list_of_multivalued_tunable_parameter_names.copy()
+            )
 
-        print(self.reduced_tunable_parameters_list)
-
-        if self.reduced_tunable_parameters_list:
+        # Create a groupby object based on the reduced list of multivalued
+        # tunable parameters. If reduced list is empty, return entire dataframe
+        if self.reduced_multivalued_tunable_parameter_names_list:
             return self.dataframe.groupby(
-                self.reduced_tunable_parameters_list, observed=True
+                self.reduced_multivalued_tunable_parameter_names_list, observed=True
             )
         else:
-            return [(None, self.dataframe)]
+            # Group by a dummy value to return the entire dataframe
+            return self.dataframe.groupby(lambda _: "Dummy", observed=True)
 
-    def restrict_data(self, condition: str):
+    def restrict_dataframe(self, condition=None, filter_func=None):
         """
-        Restricts the DataFrame to rows that satisfy the given condition.
-
+        Restricts the DataFrame to rows that satisfy given conditions.
+        
+        This method provides two ways to filter the DataFrame:
+        1. Using a string condition with Pandas query syntax
+        2. Using a custom filter function for more complex filtering logic
+        
         Args:
-            condition (str): A condition to filter rows, e.g., "parameter >= 1".
+            condition (str, optional): A string condition to filter rows using
+            Pandas query syntax
+                e.g., "MSCG_epsilon >= 1e-06 and Kernel_operator_type ==
+                'Wilson'"
 
+            filter_func (callable, optional): A function that takes a DataFrame
+            and returns a boolean Series for more complex filtering needs
+                
+        Returns:
+            None: Modifies the DataFrameAnalyzer's DataFrame in-place.
+            
+        Raises:
+            ValueError: If neither condition nor filter_func is provided, or if
+            filtering fails.
+            
+        Examples:
+            # Example 1: Using a query string for simpler conditions
+            analyzer.restrict_dataframe(
+                "(MSCG_epsilon >= 1e-06 and Kernel_operator_type == 'Wilson') "
+                "or (MSCG_epsilon >= 1e-05 and Kernel_operator_type ==
+                'Brillouin')"
+            )
+
+            # Example 2: Using a filter function for more complex conditions
+            def complex_filter(df):
+                return (
+                    ((df["MSCG_epsilon"] >= 1e-06) & (df["Kernel_operator_type"]
+                    == "Wilson")) | ((df["MSCG_epsilon"] >= 1e-05) &
+                    (df["Kernel_operator_type"] == "Brillouin"))
+                )
+            analyzer.restrict_dataframe(filter_func=complex_filter)
+        """
+        try:
+            if condition is not None:
+                # Use `query` to filter the DataFrame based on the condition
+                # string
+                self.dataframe = self.dataframe.query(condition)
+            elif filter_func is not None:
+                # Apply the custom filter function for more complex filtering
+                mask = filter_func(self.dataframe)
+                self.dataframe = self.dataframe[mask]
+            else:
+                raise ValueError("Either condition or filter_func must be provided")
+                
+            # Recompute the column categories after filtering
+            self.update_column_categories()
+
+        except Exception as e:
+            raise ValueError(f"Failed to apply filter: {e}")
+
+    def restore_original_dataframe(self):
+        """
+        Reset the working DataFrame to the original, unfiltered state.
+        
+        This method replaces the current working DataFrame with a fresh copy of
+        the original DataFrame that was provided when the object was created. It
+        also updates all the column categories to reflect the original data.
+        
+        This is useful when you want to start a new analysis from scratch after
+        applying various filters or transformations.
+        
         Returns:
             None: Modifies the DataFrameAnalyzer's DataFrame in-place.
         """
-        try:
-            # Use `query` to filter the DataFrame based on the condition
-            self.dataframe = self.dataframe.query(condition)
-            # Recompute data-based dictionaries as the DataFrame has changed
-            self.set_data_based_attributes()
-
-        except Exception as e:
-            raise ValueError(f"Failed to apply condition '{condition}': {e}")
-
-    def restore_entire_dataframe(self):
-
-        self.dataframe = self.original_dataframe
-        self.set_data_based_attributes()
+        self.dataframe = self.original_dataframe.copy()
+        self.update_column_categories()
 
 
 class TableGenerator(DataFrameAnalyzer):
@@ -690,8 +904,6 @@ class HDF5Analyzer:
             The group object.
         """
         return self.hdf5_file[group_path]
-
-
 
     def list_datasets(self, group_path: str = "/") -> List[str]:
         """
@@ -763,7 +975,11 @@ class HDF5Analyzer:
         List[str]
             A list of common dataset names.
         """
-        subgroups = [obj for obj in self.hdf5_file[group_path].values() if isinstance(obj, h5py.Group)]
+        subgroups = [
+            obj
+            for obj in self.hdf5_file[group_path].values()
+            if isinstance(obj, h5py.Group)
+        ]
         if not subgroups:
             return []
 
@@ -787,7 +1003,11 @@ class HDF5Analyzer:
         Dict[str, any]
             A dictionary of common attribute names and their values.
         """
-        subgroups = [obj for obj in self.hdf5_file[group_path].values() if isinstance(obj, h5py.Group)]
+        subgroups = [
+            obj
+            for obj in self.hdf5_file[group_path].values()
+            if isinstance(obj, h5py.Group)
+        ]
         if not subgroups:
             return {}
 
@@ -800,7 +1020,9 @@ class HDF5Analyzer:
 
         return list(common_attributes)
 
-    def get_common_dataset_values(self, group_path: str, dataset_name: str) -> Dict[str, np.ndarray]:
+    def get_common_dataset_values(
+        self, group_path: str, dataset_name: str
+    ) -> Dict[str, np.ndarray]:
         """
         Get values of a common dataset from all subgroups of a specific group.
 
@@ -817,12 +1039,16 @@ class HDF5Analyzer:
             A dictionary with subgroup names as keys and dataset values as NumPy arrays.
         """
         dataset_values = {}
-        subgroups = [obj for obj in self.hdf5_file[group_path].values() if isinstance(obj, h5py.Group)]
-        
+        subgroups = [
+            obj
+            for obj in self.hdf5_file[group_path].values()
+            if isinstance(obj, h5py.Group)
+        ]
+
         for subgroup in subgroups:
             if dataset_name in subgroup:
                 dataset_values[subgroup.name] = subgroup[dataset_name][()]
-        
+
         return dataset_values
 
     def close(self):
