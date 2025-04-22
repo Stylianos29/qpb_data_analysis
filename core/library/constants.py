@@ -488,7 +488,6 @@ PARAMETERS_PRINTED_LABELS_DICTIONARY = {
 
 
 TUNABLE_PARAMETER_NAMES_LIST = [
-    "APE_alpha",
     "APE_iterations",
     "Bare_mass",
     "CG_epsilon",
@@ -496,33 +495,40 @@ TUNABLE_PARAMETER_NAMES_LIST = [
     "Configuration_label",
     "Delta_Max",
     "Delta_Min",
+    "Filename",
     "Kappa_value",
     "Kernel_operator_type",
     "KL_diagonal_order",
     "KL_scaling_factor",
     "Lanczos_epsilon",
+    "Main_program_type",
     "Maximum_Lanczos_iterations",
     "Maximum_solver_iterations",
     "MPI_geometry",
     "MSCG_epsilon",
     "Number_of_Chebyshev_terms",
+    "Number_of_spinors",
     "Number_of_vectors",
     "Overlap_operator_method",
     "QCD_beta_value",
     "Rho_value",
     "Solver_epsilon",
+    "APE_alpha",
 ]
 
 
 OUTPUT_QUANTITY_NAMES_LIST = [
+    "Adjusted_average_core_hours_per_spinor",
     "Average_calculation_result",
+    "Average_calculation_time_per_spinor_per_configuration",
     "Average_CG_calculation_time_per_spinor",
+    "Average_core_hours_per_spinor",
     "Average_number_of_CG_iterations_per_spinor",
-    "Average_number_of_MSCG_iterations_per_vector",
     "Average_number_of_MSCG_iterations_per_spinor",
+    "Average_number_of_MSCG_iterations_per_vector",
     "Average_number_of_MV_multiplications_per_spinor",
     "Average_number_of_MV_multiplications_per_spinor_per_configuration",
-    "Average_calculation_time_per_spinor_per_configuration",
+    "Average_wall_clock_time_per_spinor",
     "Calculation_result_per_vector",
     "Calculation_result_with_no_error",
     "Condition_number",
@@ -534,6 +540,8 @@ OUTPUT_QUANTITY_NAMES_LIST = [
     "Minimum_eigenvalue_squared",
     "MS_expansion_shifts",
     "MSCG_Elapsed_time",
+    "Number_of_cores",
+    "Number_of_gauge_configurations",
     "Number_of_MSCG_iterations",
     "PCAC_mass_estimate",
     "Plaquette",
@@ -545,14 +553,13 @@ OUTPUT_QUANTITY_NAMES_LIST = [
     "Total_calculation_time",
     "Total_number_of_Lanczos_iterations",
     "Total_overhead_time",
-    "Number_of_gauge_configurations",
 ]
 
 PARAMETERS_WITH_EXPONENTIAL_FORMAT = [
-    "Lanczos_epsilon",
-    "Solver_epsilon",
     "CG_epsilon",
+    "Lanczos_epsilon",
     "MSCG_epsilon",
+    "Solver_epsilon",
 ]
 
 
@@ -622,7 +629,7 @@ DEFAULT_COLORS = [
     # "cyan",
     # "pink",
     # "lime",
-    # "teal", 
+    # "teal",
     # "olive",
     # "maroon",
     # "gold",
