@@ -9,6 +9,8 @@ from .constants import ROOT, RAW_DATA_FILES_DIRECTORY, PROCESSED_DATA_FILES_DIRE
 from .data_processing import load_csv, DataFrameAnalyzer, TableGenerator
 from .data_files_checks import get_yes_or_no_user_response
 from .filesystem_utilities import (
+    is_valid_file,
+    is_valid_directory,
     validate_input_directory,
     validate_input_script_log_filename,
 )
@@ -17,6 +19,8 @@ __all__ = [
     'ROOT',
     'RAW_DATA_FILES_DIRECTORY',
     'PROCESSED_DATA_FILES_DIRECTORY',
+    'is_valid_file',
+    'is_valid_directory',
     'load_csv',
     'DataFrameAnalyzer',
     'TableGenerator',
