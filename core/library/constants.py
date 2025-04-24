@@ -640,3 +640,49 @@ DEFAULT_COLORS = [
     "darkgreen",
     "violet",
 ]
+
+FILENAME_LABELS_BY_COLUMN_NAME = {
+    "QCD_beta_value": "beta",
+    "Configuration_label": "config",
+    "APE_iterations": "APEiters",
+    "Rho_value": "rho",
+    "Bare_mass": "m",
+    "Kappa_value": "kappa",
+    "Clover_coefficient": "cSW",
+    "Delta_Min": "dMin",
+    "Delta_Max": "dMax",
+    "Number_of_Chebyshev_terms": "N",
+    "Lanczos_epsilon": "EpsLanczos",
+    "CG_epsilon": "EpsCG",
+    "MSCG_epsilon": "EpsMSCG",
+    "KL_diagonal_order": "n",
+    "KL_scaling_factor": "mu",
+    "MPI_geometry": "MPI",
+    "Threads_per_process": "OMP",
+}
+
+AXES_LABELS_BY_COLUMN_NAME = {
+    "Average_number_of_MV_multiplications_per_spinor_per_configuration": "Average # of MV multiplications [per spinor per config]",
+    "Average_number_of_MV_multiplications_per_vector": "Average # of MV multiplications per vector",
+    "Number_of_MV_multiplications_for_constant_PCAC_mass": "# of MV multiplications [per spinor per config]",
+    "Number_of_MV_multiplications_for_constant_bare_mass": "# of MV multiplications [per spinor per config]",
+    "Average_calculation_time_per_spinor_per_configuration": "Average wall-clock time [per spinor per config] (s)",
+    "Average_core_hours_per_vector": "Average cost of calculation per vector (core-hours)",
+    "Average_core_hours_per_spinor": "Average cost of calculation per spinor (core-hours)",
+    "Average_core_hours_per_spinor_per_configuration": "Average cost [per spinor per config] (core-hours)",
+    "Adjusted_average_core_hours_per_spinor_per_configuration": "Average cost [per spinor per config] (core-hours)",
+    "Core_hours_for_constant_PCAC_mass": "Average cost [per spinor per config] (core-hours)",
+    "Total_overhead_time": "Overhead (s)",
+    "Total_calculation_time": "Total wall-clock time (s)",
+    "Average_wall_clock_time_per_vector": "Average wall-clock time per vector (s)",
+    "Average_wall_clock_time_per_spinor": "Average wall-clock time per spinor (s)",
+    "Total_number_of_Lanczos_iterations": "Total # of Lanczos algorithm iterations",
+    "PCAC_mass_estimate": "a$m_{PCAC}$",
+    "Pion_effective_mass_estimate": "a$m_{eff.}$",
+    "Critical_bare_mass": "a$m^{{critical}}_{{bare}}$",
+    "Number_of_cores": "# of cores",
+}
+
+
+# TITLE_LABELS_BY_COLUMN_NAME =
+# LEGEND_LABELS_BY_COLUMN_NAME =
