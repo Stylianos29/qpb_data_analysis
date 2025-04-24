@@ -1429,6 +1429,7 @@ class TableGenerator(DataFrameAnalyzer):
                 columns=pivot_variable,
                 values=value_variable,
                 aggfunc="mean",  # Can be changed to other strategies if needed
+                observed=True,
             )
 
             # Ensure exactly two pivot values exist per group
