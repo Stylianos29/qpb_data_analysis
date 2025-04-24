@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-from library import load_csv, DataFrameAnalyzer
+from library import load_csv, DataFrameAnalyzer, TableGenerator
 
 
 # CONSTANTS
@@ -10,6 +10,7 @@ TEST_DATAFRAME = load_csv(
     "./mock_data/valid_csv_files/KL_several_m_varying_EpsCG_and_EpsMSCG_processed_parameter_values.csv"
 )
 TEST_ANALYZER = DataFrameAnalyzer(TEST_DATAFRAME)
+TEST_TABLE_GENERATOR = TableGenerator(TEST_DATAFRAME)
 
 # TESTS
 
@@ -34,7 +35,6 @@ def test_list_of_dataframe_column_names():
         "APE_iterations",
         "Rho_value",
         "Bare_mass",
-        "Kappa_value",
         "Clover_coefficient",
         "Plaquette",
         "Number_of_spinors",
@@ -69,8 +69,6 @@ def test_list_of_tunable_parameter_names():
         "CG_epsilon",
         "Clover_coefficient",
         "Configuration_label",
-        "Filename",
-        "Kappa_value",
         "Kernel_operator_type",
         "KL_diagonal_order",
         "KL_scaling_factor",
@@ -98,6 +96,7 @@ def test_list_of_output_quantity_names():
         "Average_number_of_MSCG_iterations_per_spinor",
         "Average_number_of_MV_multiplications_per_spinor",
         "Average_wall_clock_time_per_spinor",
+        "Filename",
         "MS_expansion_shifts",
         "Number_of_cores",
         "Plaquette",
@@ -152,7 +151,6 @@ def test_multivalued_columns_count_dictionary():
         "Threads_per_process": 2,
         "Configuration_label": 6,
         "Bare_mass": 2,
-        "Kappa_value": 2,
         "Plaquette": 6,
         "Total_calculation_time": 48,
         "CG_epsilon": 4,
@@ -202,7 +200,6 @@ def test_list_of_multivalued_column_names():
         "Threads_per_process",
         "Configuration_label",
         "Bare_mass",
-        "Kappa_value",
         "Plaquette",
         "Total_calculation_time",
         "CG_epsilon",
@@ -257,9 +254,7 @@ def test_list_of_multivalued_tunable_parameter_names():
     parameters."""
     expected_list = [
         "MPI_geometry",
-        "Kappa_value",
         "Configuration_label",
-        "Filename",
         "MSCG_epsilon",
         "CG_epsilon",
         "Bare_mass",
@@ -302,6 +297,7 @@ def test_list_of_multivalued_output_quantity_names():
         "Adjusted_average_core_hours_per_spinor",
         "Number_of_cores",
         "Threads_per_process",
+        "Filename",
         "Average_number_of_MV_multiplications_per_spinor",
         "Total_calculation_time",
         "Average_core_hours_per_spinor",
@@ -331,10 +327,8 @@ def test_group_by_multivalued_tunable_parameters():
     DataFrameGroupBy object."""
     filter_params = [
         "Bare_mass",
-        "Kappa_value",
         "MPI_geometry",
         "CG_epsilon",
-        "Filename",
         "MSCG_epsilon",
         "Configuration_label",
     ]
