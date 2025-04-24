@@ -75,58 +75,6 @@ After initialization, the following attributes are available:
 
 ## Methods
 
-### `update_column_categories()`
-
-Updates and categorizes column names from the dataframe into various lists and
-dictionaries.
-
-**Returns:** None
-
-**Example:**
-```python
-# After modifying the dataframe, update the categories
-analyzer.dataframe['new_column'] = [1, 2, 3]
-analyzer.update_column_categories()
-```
-
----
-
-### `get_unique_value_columns()`
-
-Identifies columns that have only a single unique value.
-
-**Returns:**
-- `dict`: A dictionary where keys are column names with only one unique value,
-  and values are the actual unique values for those columns.
-
-**Example:**
-```python
-# Get columns with single values
-unique_columns = analyzer.get_unique_value_columns()
-print(unique_columns)
-# Output might be something like: {'constant_temp': 298.15}
-```
-
----
-
-### `get_multivalued_columns_count()`
-
-Identifies columns that have multiple unique values and count them.
-
-**Returns:**
-- `dict`: A dictionary where keys are column names with multiple unique values,
-  and values are the counts of unique values in those columns.
-
-**Example:**
-```python
-# Get columns with multiple values and their counts
-multivalued_columns = analyzer.get_multivalued_columns_count()
-print(multivalued_columns)
-# Output might be: {'parameter1': 3, 'parameter2': 3}
-```
-
----
-
 ### `group_by_multivalued_tunable_parameters(filter_out_parameters_list=None)`
 
 Groups the DataFrame by multivalued tunable parameters, optionally excluding
@@ -279,5 +227,3 @@ print(analyzer.dataframe)
     considered tunable parameters
   - `constants.OUTPUT_QUANTITY_NAMES_LIST`: List of column names that are
     considered output quantities
-- After any modification to the DataFrame structure or content, call
-  `update_column_categories()` to refresh the attribute lists.
