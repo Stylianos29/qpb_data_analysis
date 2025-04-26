@@ -14,6 +14,7 @@ from .filesystem_utilities import (
     validate_input_directory,
     validate_input_script_log_filename,
 )
+from .plotting import DataPlotter, HDF5Plotter, EnhancedHDF5Analyzer
 
 __all__ = [
     'ROOT',
@@ -27,4 +28,7 @@ __all__ = [
     'get_yes_or_no_user_response',
     'validate_input_directory',
     'validate_input_script_log_filename',
+    'DataPlotter',
+    'HDF5Plotter',
+    'EnhancedHDF5Analyzer',
 ]
