@@ -7,7 +7,7 @@ bash_scripts/unit_tests/mock_data/*
 core/library/__pycache__/*
 core/qpb_data_analysis.egg-info/*
 core/unit_tests/__pycache__/*
-core/unit_tests/output_from_mock_data/test_effective_mass.png
+core/unit_tests/output_from_mock_data/*
 
 data_files/raw/*
 !data_files/raw/README.md
@@ -23,4 +23,3 @@ examples/plots/*
 examples/tables/*
 !examples/tables/table_of_data_files_set_template.ipynb
 !examples/README.md
-bash_scripts/unit_tests/mock_data/validate_raw_data_files_set/*
