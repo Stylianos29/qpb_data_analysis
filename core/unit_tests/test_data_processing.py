@@ -49,8 +49,6 @@ def test_list_of_dataframe_column_names():
         "Number_of_cores",
         "Number_of_vectors",
         "Average_number_of_MSCG_iterations_per_spinor",
-        "MS_expansion_shifts",
-        "Average_number_of_CG_iterations_per_spinor",
         "Average_number_of_MV_multiplications_per_spinor",
         "Average_wall_clock_time_per_spinor",
         "Average_core_hours_per_spinor",
@@ -63,23 +61,23 @@ def test_list_of_tunable_parameter_names():
     """Test if list_of_tunable_parameter_names_from_dataframe matches the
     expected tunable parameters."""
     expected_tunable_parameters = [
+        "Main_program_type",
+        "Kernel_operator_type",
+        "MPI_geometry",
+        "Configuration_label",
+        "QCD_beta_value",
         "APE_alpha",
         "APE_iterations",
+        "Rho_value",
         "Bare_mass",
-        "CG_epsilon",
         "Clover_coefficient",
-        "Configuration_label",
-        "Kernel_operator_type",
+        "Number_of_spinors",
         "KL_diagonal_order",
         "KL_scaling_factor",
-        "Main_program_type",
-        "MPI_geometry",
-        "MSCG_epsilon",
-        "Number_of_spinors",
-        "Number_of_vectors",
         "Overlap_operator_method",
-        "QCD_beta_value",
-        "Rho_value",
+        "CG_epsilon",
+        "MSCG_epsilon",
+        "Number_of_vectors",
     ]
     assert set(TEST_ANALYZER.list_of_tunable_parameter_names_from_dataframe) == set(
         expected_tunable_parameters
@@ -90,20 +88,18 @@ def test_list_of_output_quantity_names():
     """Test if list_of_output_quantity_names_from_dataframe matches the expected
     output quantities."""
     expected_output_quantities = [
-        "Adjusted_average_core_hours_per_spinor",
-        "Average_core_hours_per_spinor",
-        "Average_number_of_CG_iterations_per_spinor",
+        "Filename",
+        "Threads_per_process",
+        "Plaquette",
+        "Total_calculation_time",
+        "Temporal_lattice_size",
+        "Spatial_lattice_size",
+        "Number_of_cores",
         "Average_number_of_MSCG_iterations_per_spinor",
         "Average_number_of_MV_multiplications_per_spinor",
         "Average_wall_clock_time_per_spinor",
-        "Filename",
-        "MS_expansion_shifts",
-        "Number_of_cores",
-        "Plaquette",
-        "Spatial_lattice_size",
-        "Temporal_lattice_size",
-        "Threads_per_process",
-        "Total_calculation_time",
+        "Average_core_hours_per_spinor",
+        "Adjusted_average_core_hours_per_spinor",
     ]
     assert set(TEST_ANALYZER.list_of_output_quantity_names_from_dataframe) == set(
         expected_output_quantities
@@ -137,7 +133,6 @@ def test_unique_value_columns_dictionary():
         "Temporal_lattice_size": np.int64(48),
         "Spatial_lattice_size": np.int64(24),
         "Number_of_vectors": np.int64(1),
-        "MS_expansion_shifts": "(0.333333)",
     }
     assert TEST_ANALYZER.unique_value_columns_dictionary == expected_dict
 
@@ -156,12 +151,11 @@ def test_multivalued_columns_count_dictionary():
         "CG_epsilon": 4,
         "MSCG_epsilon": 4,
         "Number_of_cores": 3,
-        "Average_number_of_MSCG_iterations_per_spinor": 9,
-        "Average_number_of_CG_iterations_per_spinor": 24,
-        "Average_number_of_MV_multiplications_per_spinor": 9,
+        "Average_number_of_MSCG_iterations_per_spinor": 30,
+        "Average_number_of_MV_multiplications_per_spinor": 48,
         "Average_wall_clock_time_per_spinor": 48,
         "Average_core_hours_per_spinor": 48,
-        "Adjusted_average_core_hours_per_spinor": 48,
+        "Adjusted_average_core_hours_per_spinor": 9,
     }
     assert TEST_ANALYZER.multivalued_columns_count_dictionary == expected_dict
 
@@ -184,7 +178,6 @@ def test_list_of_single_valued_column_names():
         "Temporal_lattice_size",
         "Spatial_lattice_size",
         "Number_of_vectors",
-        "MS_expansion_shifts",
     ]
     assert set(TEST_ANALYZER.list_of_single_valued_column_names) == set(
         expected_single_valued_columns
@@ -206,7 +199,6 @@ def test_list_of_multivalued_column_names():
         "MSCG_epsilon",
         "Number_of_cores",
         "Average_number_of_MSCG_iterations_per_spinor",
-        "Average_number_of_CG_iterations_per_spinor",
         "Average_number_of_MV_multiplications_per_spinor",
         "Average_wall_clock_time_per_spinor",
         "Average_core_hours_per_spinor",
@@ -280,7 +272,6 @@ def test_list_of_single_valued_output_quantity_names():
     """Test if list_of_single_valued_output_quantity_names is empty as
     expected."""
     excepted_list = [
-        "MS_expansion_shifts",
         "Temporal_lattice_size",
         "Spatial_lattice_size",
     ]
@@ -293,17 +284,16 @@ def test_list_of_multivalued_output_quantity_names():
     """Test if list_of_multivalued_output_quantity_names contains the expected
     quantities."""
     expected_list = [
-        "Average_number_of_CG_iterations_per_spinor",
-        "Adjusted_average_core_hours_per_spinor",
-        "Number_of_cores",
-        "Threads_per_process",
-        "Filename",
-        "Average_number_of_MV_multiplications_per_spinor",
         "Total_calculation_time",
-        "Average_core_hours_per_spinor",
+        "Filename",
         "Plaquette",
-        "Average_wall_clock_time_per_spinor",
+        "Average_core_hours_per_spinor",
+        "Average_number_of_MV_multiplications_per_spinor",
         "Average_number_of_MSCG_iterations_per_spinor",
+        "Threads_per_process",
+        "Number_of_cores",
+        "Adjusted_average_core_hours_per_spinor",
+        "Average_wall_clock_time_per_spinor",
     ]
     assert set(TEST_ANALYZER.list_of_multivalued_output_quantity_names) == set(
         expected_list
