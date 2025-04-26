@@ -488,6 +488,7 @@ PARAMETERS_PRINTED_LABELS_DICTIONARY = {
 
 
 TUNABLE_PARAMETER_NAMES_LIST = [
+    "APE_alpha",
     "APE_iterations",
     "Bare_mass",
     "CG_epsilon",
@@ -512,7 +513,7 @@ TUNABLE_PARAMETER_NAMES_LIST = [
     "QCD_beta_value",
     "Rho_value",
     "Solver_epsilon",
-    "APE_alpha",
+    "Threads_per_process",
 ]
 
 
@@ -549,7 +550,6 @@ OUTPUT_QUANTITY_NAMES_LIST = [
     "Solver_iterations_running_count",
     "Spatial_lattice_size",
     "Temporal_lattice_size",
-    "Threads_per_process",
     "Total_calculation_time",
     "Total_number_of_Lanczos_iterations",
     "Total_overhead_time",
@@ -662,6 +662,8 @@ FILENAME_LABELS_BY_COLUMN_NAME = {
 }
 
 AXES_LABELS_BY_COLUMN_NAME = {
+    "Average_sign_squared_violation_values": "||(sgn$^2$(X) - I)$\\eta$||$^2$ / ||$\\eta$||$^2$",
+    "KL_diagonal_order": "n",
     "Average_number_of_MV_multiplications_per_spinor_per_configuration": "Average # of MV multiplications [per spinor per config]",
     "Average_number_of_MV_multiplications_per_vector": "Average # of MV multiplications per vector",
     "Number_of_MV_multiplications_for_constant_PCAC_mass": "# of MV multiplications [per spinor per config]",
@@ -683,6 +685,10 @@ AXES_LABELS_BY_COLUMN_NAME = {
     "Number_of_cores": "# of cores",
 }
 
-
+LEGEND_LABELS_BY_COLUMN_NAME = {
+    'Condition_number': "$\kappa = \lambda_{\max}^2 / \lambda_{\min}^2$:",
+    'Configuration_label': 'Config. labels:',
+    'KL_diagonal_order': 'n =',
+    'Kernel_operator_type': 'Kernel:',
+}
 # TITLE_LABELS_BY_COLUMN_NAME =
-# LEGEND_LABELS_BY_COLUMN_NAME =
