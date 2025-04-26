@@ -172,7 +172,9 @@ class DataFrameAnalyzer:
         self.list_of_output_quantity_names_from_dataframe = [
             column_name
             for column_name in self.list_of_dataframe_column_names
-            if column_name in constants.OUTPUT_QUANTITY_NAMES_LIST
+            # TODO: I have to decide which method is better
+            # if column_name in constants.OUTPUT_QUANTITY_NAMES_LIST
+            if column_name not in constants.TUNABLE_PARAMETER_NAMES_LIST
         ]
 
         # Get dictionary of columns with single unique values and their values
@@ -262,6 +264,37 @@ class DataFrameAnalyzer:
 
         return multivalued_columns_count_dictionary
 
+    def print_unique_values(self, column_name):
+        """
+        Print the count and list of unique values for a specified column.
+        
+        This method displays the total number of unique values in the specified column,
+        followed by a list of those unique values sorted in ascending order.
+        
+        Args:
+            column_name (str): The name of the column to analyze.
+
+        Returns:
+            None: Prints information to the console.
+
+        Raises:
+            ValueError: If the specified column doesn't exist in the DataFrame.
+        """
+        # Check if the column exists
+        if column_name not in self.dataframe.columns:
+            raise ValueError(f"Column '{column_name}' does not exist in the DataFrame.")
+        
+        # Get unique values and sort them
+        unique_values = sorted(self.dataframe[column_name].unique())
+        unique_count = len(unique_values)
+        
+        # Convert numpy types to native Python types for cleaner display
+        unique_values_python = [item.item() if hasattr(item, 'item') else item for item in unique_values]
+        
+        # Print the information
+        print(f"Column '{column_name}' has {unique_count} unique values:")
+        print(unique_values_python)
+        
     def group_by_multivalued_tunable_parameters(
         self, filter_out_parameters_list: list = None
     ):
@@ -395,6 +428,73 @@ class DataFrameAnalyzer:
 
         except Exception as e:
             raise ValueError(f"Failed to apply filter: {e}")
+
+    def add_derived_column(
+        self, new_column_name, derivation_function=None, expression=None
+    ):
+        """
+        Add a new column to the DataFrame derived from existing columns using
+        either a function or a string expression.
+
+        This method automatically updates column categories after adding the new
+        column.
+
+        Args:
+            - new_column_name (str): Name for the new column to be added.
+            - derivation_function (callable, optional): A function that takes
+              the dataframe as input and returns a Series with values for the
+              new column.
+            - expression (str, optional): A string expression using column names
+              that will be evaluated to create the new column (e.g., "pressure *
+              10").
+
+        Returns:
+            None: Modifies the DataFrameAnalyzer's DataFrame in-place.
+
+        Raises:
+            ValueError: If neither derivation_function nor expression is
+            provided,
+                or if the specified column name already exists.
+
+        Examples:
+            # Example 1: Using a derivation function
+            analyzer.add_derived_column(
+                "pressure_kPa", derivation_function=lambda df: df["pressure"] *
+                10
+            )
+
+            # Example 2: Using a string expression analyzer.add_derived_column(
+                "total_energy", expression="kinetic_energy + potential_energy"
+            )
+        """
+        # Check if the column name already exists
+        if new_column_name in self.list_of_dataframe_column_names:
+            raise ValueError(
+                f"Column '{new_column_name}' already exists in the DataFrame."
+            )
+
+        # Check that at least one method is provided
+        if derivation_function is None and expression is None:
+            raise ValueError(
+                "Either derivation_function or expression must be provided."
+            )
+
+        try:
+            if derivation_function is not None:
+                # Apply the provided function to derive the new column
+                self.dataframe[new_column_name] = derivation_function(self.dataframe)
+            elif expression is not None:
+                # Evaluate the expression string using pandas eval
+                self.dataframe[new_column_name] = self.dataframe.eval(expression)
+
+            # Update column categories to include the new column
+            self._update_column_categories()
+
+        except Exception as e:
+            # If anything goes wrong, clean up and raise the exception
+            if new_column_name in self.dataframe.columns:
+                self.dataframe.drop(columns=[new_column_name], inplace=True)
+            raise ValueError(f"Failed to create derived column: {e}")
 
     def restore_original_dataframe(self):
         """
@@ -1390,4 +1490,3 @@ def find_multiple_value_columns(df):
             multiple_value_columns[col] = unique_values_count
 
     return multiple_value_columns
-
