@@ -683,12 +683,15 @@ AXES_LABELS_BY_COLUMN_NAME = {
     "Pion_effective_mass_estimate": "a$m_{eff.}$",
     "Critical_bare_mass": "a$m^{{critical}}_{{bare}}$",
     "Number_of_cores": "# of cores",
+    "time_index": "$t/a$",
+    "Jackknife_average_of_PCAC_mass_correlator": "a$m_{PCAC}$(t)",
 }
 
 LEGEND_LABELS_BY_COLUMN_NAME = {
     'Condition_number': "$\kappa = \lambda_{\max}^2 / \lambda_{\min}^2$:",
     'Configuration_label': 'Config. labels:',
-    'KL_diagonal_order': 'n =',
+    'KL_diagonal_order': 'diagonal KL order:',
     'Kernel_operator_type': 'Kernel:',
 }
-# TITLE_LABELS_BY_COLUMN_NAME =
+
+TITLE_LABELS_BY_COLUMN_NAME = TITLE_LABELS_DICTIONARY.copy()
