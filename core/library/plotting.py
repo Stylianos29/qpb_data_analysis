@@ -722,6 +722,7 @@ class DataPlotter(DataFrameAnalyzer):
         marker: str = "o",
         marker_size: int = 6,
         capsize: float = 5,
+        empty_markers: bool = False,
     ):
         """
         Plot a single data group on the provided Matplotlib Axes object.
@@ -754,45 +755,128 @@ class DataPlotter(DataFrameAnalyzer):
 
         # Case 1: both scalar
         if not x_is_tuple and not y_is_tuple:
-            ax.scatter(
-                x_raw, y_raw, color=color, marker=marker, label=label, s=marker_size**2
-            )
+            # ax.scatter(
+            #     x_raw, y_raw, color=color, marker=marker, label=label, s=marker_size**2
+            # )
+            if empty_markers:
+                ax.scatter(
+                    x_raw, y_raw,
+                    marker=marker,
+                    s=marker_size**2,
+                    markerfacecolor='none',
+                    markeredgecolor=color,
+                    label=label,
+                )
+            else:
+                ax.scatter(
+                    x_raw, y_raw,
+                    marker=marker,
+                    s=marker_size**2,
+                    color=color,
+                    label=label,
+                )
 
         # Case 2: scalar x, tuple y
         elif not x_is_tuple and y_is_tuple:
             y_val = np.array([val for val, _ in y_raw])
             y_err = np.array([err for _, err in y_raw])
-            ax.errorbar(
-                x_raw,
-                y_val,
-                yerr=y_err,
-                fmt=marker,
-                capsize=capsize,
-                color=color,
-                label=label,
-                markersize=marker_size,
-            )
+            # ax.errorbar(
+            #     x_raw,
+            #     y_val,
+            #     yerr=y_err,
+            #     fmt=marker,
+            #     capsize=capsize,
+            #     color=color,
+            #     label=label,
+            #     markersize=marker_size,
+            # )
+            if empty_markers:
+                ax.errorbar(
+                    x_raw,
+                    y_val,
+                    yerr=y_err,
+                    fmt=marker,
+                    markersize=marker_size,
+                    capsize=capsize,
+                    markerfacecolor='none',
+                    markeredgecolor=color,
+                    color=color,
+                    label=label,
+                )
+            else:
+                ax.errorbar(
+                    x_raw,
+                    y_val,
+                    yerr=y_err,
+                    fmt=marker,
+                    markersize=marker_size,
+                    capsize=capsize,
+                    color=color,
+                    label=label,
+                )
 
         # Case 3: tuple x, scalar y
         elif x_is_tuple and not y_is_tuple:
             x_val = np.array([val for val, _ in x_raw])
-            ax.scatter(x_val, y_raw, color=color, marker=marker, label=label)
+            # ax.scatter(x_val, y_raw, color=color, marker=marker, label=label)
+            if empty_markers:
+                ax.scatter(
+                    x_raw, y_raw,
+                    marker=marker,
+                    s=marker_size**2,
+                    markerfacecolor='none',
+                    markeredgecolor=color,
+                    label=label,
+                )
+            else:
+                ax.scatter(
+                    x_raw, y_raw,
+                    marker=marker,
+                    s=marker_size**2,
+                    color=color,
+                    label=label,
+                )
 
         # Case 4: tuple x and tuple y
         elif x_is_tuple and y_is_tuple:
             x_val = np.array([val for val, _ in x_raw])
             y_val = np.array([val for val, _ in y_raw])
             y_err = np.array([err for _, err in y_raw])
-            ax.errorbar(
-                x_val,
-                y_val,
-                yerr=y_err,
-                fmt=marker,
-                capsize=capsize,
-                color=color,
-                label=label,
-                markersize=marker_size,
-            )
+            # ax.errorbar(
+            #     x_val,
+            #     y_val,
+            #     yerr=y_err,
+            #     fmt=marker,
+            #     capsize=capsize,
+            #     color=color,
+            #     label=label,
+            #     markersize=marker_size,
+            # )
+            if empty_markers:
+                ax.errorbar(
+                    x_val,
+                    y_val,
+                    yerr=y_err,
+                    fmt=marker,
+                    markersize=marker_size,
+                    capsize=capsize,
+                    markerfacecolor='none',
+                    markeredgecolor=color,
+                    color=color,
+                    label=label,
+                )
+            else:
+                ax.errorbar(
+                    x_val,
+                    y_val,
+                    yerr=y_err,
+                    fmt=marker,
+                    markersize=marker_size,
+                    capsize=capsize,
+                    color=color,
+                    label=label,
+                )
+
 
     def _generate_marker_color_map(
         self, grouping_values: list, custom_map: dict = None
@@ -827,6 +911,120 @@ class DataPlotter(DataFrameAnalyzer):
                 style_map[value] = (marker, color)
 
         return style_map
+
+    def _construct_plot_title(
+        self,
+        metadata_dict: dict,
+        grouping_variable: str = None,
+        labeling_variable: str = None,
+        leading_plot_substring: str = None,
+        excluded_from_title_list: list = None,
+        title_number_format: str = ".2f", # ".4g" for scientific/float hybrid format
+        title_wrapping_length: int = 90,
+    ) -> str:
+        """
+        Construct an informative plot title based on metadata and user
+        preferences.
+
+        Parameters:
+        -----------
+        metadata_dict : dict
+            Dictionary containing key-value pairs for this plot group.
+        grouping_variable : str, optional
+            If provided, exclude this variable from appearing in the title.
+        labeling_variable : str, optional
+            If provided, exclude this variable from appearing in the title.
+        leading_plot_substring : str, optional
+            Optional leading string to prepend to the title.
+        excluded_from_title_list : list, optional
+            List of additional variable names to exclude from the title.
+
+        Returns:
+        --------
+        str
+            The constructed plot title.
+        """
+        title_parts = []
+
+        # 1. Include leading substring if given
+        if leading_plot_substring:
+            title_parts.append(leading_plot_substring)
+
+        # 2. Handle Overlap/Kernel/KL_or_Chebyshev_Order special logic
+        excluded = set(excluded_from_title_list or [])
+        if grouping_variable:
+            excluded.add(grouping_variable)
+        if labeling_variable:
+            excluded.add(labeling_variable)
+
+        overlap_method = metadata_dict.get("Overlap_operator_method")
+        kernel_type = metadata_dict.get("Kernel_operator_type")
+        chebyshev_terms = metadata_dict.get("Number_of_Chebyshev_terms")
+        kl_order = metadata_dict.get("KL_diagonal_order")
+
+        if overlap_method and "Overlap_operator_method" not in excluded:
+            if overlap_method == "Bare":
+                # Only Overlap_operator_method + Kernel_operator_type
+                temp = []
+                temp.append(str(overlap_method))
+                if kernel_type and "Kernel_operator_type" not in excluded:
+                    temp.append(str(kernel_type))
+                title_parts.append(" ".join(temp) + ",")
+            else:
+                # Chebyshev or KL
+                temp = []
+                temp.append(str(overlap_method))
+                if kernel_type and "Kernel_operator_type" not in excluded:
+                    temp.append(str(kernel_type))
+                if (
+                    overlap_method == "Chebyshev"
+                    and "Number_of_Chebyshev_terms" not in excluded
+                    and chebyshev_terms is not None
+                ):
+                    temp.append(str(chebyshev_terms))
+                if (
+                    overlap_method == "KL"
+                    and "KL_diagonal_order" not in excluded
+                    and kl_order is not None
+                ):
+                    temp.append(str(kl_order))
+                title_parts.append(" ".join(temp) + ",")
+
+        # 3. Handle all remaining tunable parameters
+        for param_name in self.list_of_tunable_parameter_names_from_dataframe:
+            if param_name in excluded:
+                continue
+            if param_name not in metadata_dict:
+                continue
+
+            value = metadata_dict[param_name]
+            label = constants.TITLE_LABELS_BY_COLUMN_NAME.get(param_name, param_name)
+
+            # Format number values cleanly
+            if isinstance(value, (int, float)):
+                formatted_value = format(value, title_number_format)
+            else:
+                formatted_value = str(value)
+
+            title_parts.append(f"{label} {formatted_value},")
+
+        # 4. Merge and clean up final title
+        full_title = " ".join(title_parts).strip()
+
+        # Remove trailing comma if any
+        if full_title.endswith(","):
+            full_title = full_title[:-1]
+
+        if title_wrapping_length and len(full_title) > title_wrapping_length:
+            # Find a good place (comma) to insert newline
+            comma_positions = [pos for pos, char in enumerate(full_title) if char == ","]
+
+            if comma_positions:
+                # Find best comma to split around the middle
+                split_pos = min(comma_positions, key=lambda x: abs(x - len(full_title) // 2))
+                full_title = full_title[:split_pos+1] + "\n" + full_title[split_pos+1:]
+
+        return full_title
 
     def _construct_plot_filename(
         self,
@@ -950,6 +1148,7 @@ class DataPlotter(DataFrameAnalyzer):
         excluded_from_grouping_list: list = None,
         labeling_variable: str = None,
         legend_number_format: str = ".2f",
+        include_legend_title: bool = True,
         sorting_variable: str = None,
         sort_ascending: bool = None,
         figure_size=(7, 5),
@@ -962,9 +1161,18 @@ class DataPlotter(DataFrameAnalyzer):
         bottom_margin_adjustment: float = 0.12,
         top_margin_adjustment: float = 0.88,
         legend_location: str = "upper left",
+        styling_variable: str = None,
         marker_color_map: dict = None,
         marker_size: int = 6,
+        empty_markers: bool = False,
+        alternate_filled_markers: bool = False,
         capsize: float = 5,
+        include_plot_title: bool = False,
+        custom_plot_title: str = None,
+        leading_plot_substring: str = None,
+        excluded_from_title_list: list = None,
+        title_number_format: str = ".2f",
+        title_wrapping_length: int = 90,
         customization_function: callable = None,
     ):
         """
@@ -990,6 +1198,9 @@ class DataPlotter(DataFrameAnalyzer):
         if self.xaxis_variable_name is None or self.yaxis_variable_name is None:
             raise ValueError("Call 'set_plot_variables()' before plotting.")
 
+        if alternate_filled_markers:
+            empty_markers = False  # ignore user's empty_markers setting when alternating
+
         # Determine which tunable parameters to exclude from grouping
         excluded = set(excluded_from_grouping_list or [])
         for axis_variable in [self.xaxis_variable_name, self.yaxis_variable_name]:
@@ -1009,6 +1220,12 @@ class DataPlotter(DataFrameAnalyzer):
         grouped = self.group_by_multivalued_tunable_parameters(
             filter_out_parameters_list=list(excluded)
         )
+
+        # styling_unique_group_values = grouped[styling_variable].unique().tolist()
+        # print(styling_unique_group_values)
+
+        print("List of reduced multivalued tunable parameter names:")
+        print(self.reduced_multivalued_tunable_parameter_names_list)
 
         for group_keys, group_df in grouped:
             fig, ax = plt.subplots(figsize=figure_size)
@@ -1089,11 +1306,13 @@ class DataPlotter(DataFrameAnalyzer):
                     unique_group_values, custom_map=marker_color_map
                 )
 
+                # print(style_map)
+
                 # Combine subgroups in one plot
                 # for value, subgroup in group_df.groupby(
                 #     grouping_variable, observed=True, sort=False
                 # ):
-                for value in unique_group_values:
+                for curve_index, value in enumerate(unique_group_values):
                     if labeling_variable:
                         # Fetch unique value of labeling_variable for the current group
                         label_value = group_df.loc[
@@ -1114,7 +1333,13 @@ class DataPlotter(DataFrameAnalyzer):
                         label = str(value)
 
                     subgroup = group_df[group_df[grouping_variable] == value]
+
                     marker, color = style_map[value]
+                    # Alternate filling
+                    if alternate_filled_markers:
+                        empty_marker = (curve_index % 2 == 1)  # odd indices → empty
+                    else:
+                        empty_marker = empty_markers  # regular user setting (could be False)
                     self._plot_group(
                         ax,
                         subgroup,
@@ -1123,16 +1348,20 @@ class DataPlotter(DataFrameAnalyzer):
                         marker=marker,
                         marker_size=marker_size,
                         capsize=capsize,
+                        empty_markers=empty_marker,
                     )
-                legend_title = constants.LEGEND_LABELS_BY_COLUMN_NAME.get(
-                    labeling_variable if labeling_variable else grouping_variable,
-                    labeling_variable if labeling_variable else grouping_variable,
-                )
-                # If the title is not a LaTeX string (no $ symbols), replace
-                # underscores with spaces
-                if '$' not in legend_title:
-                    legend_title = legend_title.replace("_", " ")
-                ax.legend(title=legend_title, loc=legend_location)
+                legend = ax.legend(loc=legend_location)
+                if include_legend_title:
+                    legend_title = constants.LEGEND_LABELS_BY_COLUMN_NAME.get(
+                        labeling_variable if labeling_variable else grouping_variable,
+                        labeling_variable if labeling_variable else grouping_variable,
+                    )
+                    # If the title is not a LaTeX string (no $ symbols), replace
+                    # underscores with spaces
+                    if "$" not in legend_title:
+                        legend_title = legend_title.replace("_", " ")
+                    legend.set_title(legend_title)
+                # ax.legend(title=legend_title, loc=legend_location)
 
             else:
                 # Individual plot
@@ -1141,6 +1370,7 @@ class DataPlotter(DataFrameAnalyzer):
                     group_df,
                     marker_size=marker_size,
                     capsize=capsize,
+                    empty_markers=empty_markers,
                 )
 
             fig.subplots_adjust(
@@ -1149,6 +1379,21 @@ class DataPlotter(DataFrameAnalyzer):
                 bottom=bottom_margin_adjustment,
                 top=top_margin_adjustment,
             )
+
+            if include_plot_title:
+                if custom_plot_title:
+                    ax.set_title(custom_plot_title)
+                else:
+                    title = self._construct_plot_title(
+                        metadata_dict=metadata,
+                        grouping_variable=grouping_variable,
+                        labeling_variable=labeling_variable,
+                        leading_plot_substring=leading_plot_substring,
+                        excluded_from_title_list=excluded_from_title_list,
+                        title_number_format=title_number_format,
+                        title_wrapping_length=title_wrapping_length,
+                    )
+                    ax.set_title(title)
 
             # Construct filename and save
             filename = self._construct_plot_filename(
@@ -1738,17 +1983,24 @@ class HDF5Plotter(EnhancedHDF5Analyzer):
         """
         Plot datasets directly from the HDF5 file using DataPlotter.
 
-        This is a convenience method that combines dataframe creation and plotting.
+        This is a convenience method that combines dataframe creation and
+        plotting.
 
         Args:
-            dataset_names (str or list): Name(s) of dataset(s) to plot
-            output_directory (str, optional): Directory where plots will be saved
-            x_axis (str, optional): Column to use as x-axis. Defaults to 'time_index'.
-            filter_func (callable, optional): Function to filter groups
-            plot_kwargs (dict, optional): Additional keyword arguments for DataPlotter.plot()
-            group_by (str, optional): Column to use for grouping in combined plots
-            exclude_from_grouping (list, optional): Parameters to exclude from grouping
-            merge_value_error (bool, optional): If True, try to merge value/error datasets. Default is False.
+            - dataset_names (str or list): Name(s) of dataset(s) to plot
+            - output_directory (str, optional): Directory where plots will be
+              saved
+            - x_axis (str, optional): Column to use as x-axis. Defaults to
+              'time_index'.
+            - filter_func (callable, optional): Function to filter groups
+            - plot_kwargs (dict, optional): Additional keyword arguments for
+              DataPlotter.plot()
+            - group_by (str, optional): Column to use for grouping in combined
+              plots
+            - exclude_from_grouping (list, optional): Parameters to exclude from
+              grouping
+            - merge_value_error (bool, optional): If True, try to merge
+              value/error datasets. Default is False.
 
         Returns:
             DataPlotter: The configured DataPlotter instance
