@@ -181,7 +181,7 @@ def main(
 
     # Open the input HDF5 file for reading
     with h5py.File(
-        input_correlators_jackknife_analysis_hdf5_file_path, "r"
+        input_correlators_jackknife_analysis_hdf5_file_path, "r+"
     ) as hdf5_file:
 
         # Construct the path to the processed data files set directory
@@ -348,6 +348,36 @@ def main(
             logger.info(
                 "Jackknife average of the pion effective mass correlators was "
                 "calculated."
+            )
+
+            # STORE PION EFFECTIVE MASS CORRELATOR VALUES
+
+            # Store dataset and attach brief description
+            correlators_jackknife_analysis_group.create_dataset(
+                "Jackknife_samples_of_pion_effective_mass_correlator_values_2D_array",
+                data=effective_mass_correlator_replicas_2D_array,
+            ).attrs["Description"] = (
+                "A 2D Numpy array containing the jackknife replicas of the "
+                "pion effective mass correlator values grouped by gauge links "
+                "configuration for specific tunable parameter values. The pion "
+                "effective mass correlator is calculated by using the "
+                "g5-g5 correlator values."
+            )
+            # Store the jackknife average of the pion effective mass correlator samples as
+            # two separate datasets: one for the mean and one for the error
+            correlators_jackknife_analysis_group.create_dataset(
+                "Jackknife_average_of_pion_effective_mass_correlator_mean_values",
+                data=gv.mean(jackknife_average_effective_mass_correlator),
+            ).attrs["Description"] = (
+                "A Numpy array containing the mean values of the the jackknife"
+                "average of the pion effective mass correlator jackknife samples."
+            )
+            correlators_jackknife_analysis_group.create_dataset(
+                "Jackknife_average_of_pion_effective_mass_correlator_error_values",
+                data=gv.sdev(jackknife_average_effective_mass_correlator),
+            ).attrs["Description"] = (
+                "A Numpy array containing the error values of the the jackknife"
+                "average of the pion effective mass correlator jackknife samples."
             )
 
             # VALIDATE VALUES OF IMPORTANT PARAMETERS
