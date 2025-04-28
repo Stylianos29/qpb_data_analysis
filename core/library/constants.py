@@ -669,8 +669,8 @@ AXES_LABELS_BY_COLUMN_NAME = {
     "Number_of_MV_multiplications_for_constant_PCAC_mass": "# of MV multiplications [per spinor per config]",
     "Number_of_MV_multiplications_for_constant_bare_mass": "# of MV multiplications [per spinor per config]",
     "Average_calculation_time_per_spinor_per_configuration": "Average wall-clock time [per spinor per config] (s)",
-    "Average_core_hours_per_vector": "Average cost of calculation per vector (core-hours)",
-    "Average_core_hours_per_spinor": "Average cost of calculation per spinor (core-hours)",
+    "Average_core_hours_per_vector": "Computational cost (core-hours/vector)",
+    "Average_core_hours_per_spinor": "Computational cost (core-hours/spinor)",
     "Average_core_hours_per_spinor_per_configuration": "Average cost [per spinor per config] (core-hours)",
     "Adjusted_average_core_hours_per_spinor_per_configuration": "Average cost [per spinor per config] (core-hours)",
     "Core_hours_for_constant_PCAC_mass": "Average cost [per spinor per config] (core-hours)",
@@ -680,18 +680,23 @@ AXES_LABELS_BY_COLUMN_NAME = {
     "Average_wall_clock_time_per_spinor": "Average wall-clock time per spinor (s)",
     "Total_number_of_Lanczos_iterations": "Total # of Lanczos algorithm iterations",
     "PCAC_mass_estimate": "a$m_{PCAC}$",
-    "Pion_effective_mass_estimate": "a$m_{eff.}$",
-    "Critical_bare_mass": "a$m^{{critical}}_{{bare}}$",
+    "Pion_effective_mass_estimate": "$m_{\\text{eff.}}(t)$",
+    "Pion_effective_mass_estimate_squared": "$m^2_{\\text{eff.}}(t)$",
+    "Critical_bare_mass": "a$m^{\\text{critical}}_{\\text{bare}}$",
+    "Absolute_critical_bare_mass": "|a$m^{\\text{critical}}_{\\text{bare}}$|",
     "Number_of_cores": "# of cores",
     "time_index": "$t/a$",
-    "Jackknife_average_of_PCAC_mass_correlator": "a$m_{PCAC}$(t)",
+    "Jackknife_average_of_PCAC_mass_correlator": "a$m_{\\text{PCAC}}$(t)",
+    "Jackknife_average_of_pion_effective_mass_correlator": "$m_{\\text{eff.}}(t)$",
+    "Bare_mass": "a$m_{bare}$",
 }
 
 LEGEND_LABELS_BY_COLUMN_NAME = {
-    'Condition_number': "$\kappa = \lambda_{\max}^2 / \lambda_{\min}^2$:",
+    'Condition_number': "$\kappa_{\mathbb{X}^2} = \lambda_{\max}^2 / \lambda_{\min}^2$:",
     'Configuration_label': 'Config. labels:',
-    'KL_diagonal_order': 'diagonal KL order:',
+    'KL_diagonal_order': 'Diagonal KL order:',
     'Kernel_operator_type': 'Kernel:',
+    "Bare_mass": "a$m_{bare}=$",
 }
 
 TITLE_LABELS_BY_COLUMN_NAME = TITLE_LABELS_DICTIONARY.copy()
