@@ -1974,6 +1974,7 @@ class HDF5Plotter(EnhancedHDF5Analyzer):
         dataset_names,
         output_directory=None,
         x_axis="time_index",
+        time_offset=0,
         filter_func=None,
         plot_kwargs=None,
         group_by=None,
@@ -2019,6 +2020,7 @@ class HDF5Plotter(EnhancedHDF5Analyzer):
                 df = self.create_merged_value_error_dataframe(
                     dataset_names,
                     add_time_column=(x_axis == "time_index"),
+                    time_offset=time_offset,
                     filter_func=filter_func,
                 )
                 # Update dataset_names to be the cleaned base name
