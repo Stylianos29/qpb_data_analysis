@@ -743,6 +743,9 @@ class DataPlotter(DataFrameAnalyzer):
         x_raw = group_df[self.xaxis_variable_name].to_numpy()
         y_raw = group_df[self.yaxis_variable_name].to_numpy()
 
+        # print(x_raw)
+        # print(y_raw)
+
         # is_tuple_array = lambda arr: (isinstance(arr[0], tuple) and len(arr[0]) == 2)
 
         def is_tuple_array(arr):
@@ -1406,9 +1409,6 @@ class DataPlotter(DataFrameAnalyzer):
                         .tolist()
                     )
 
-                print("unique_group_values:")
-                print(unique_group_values)
-
                 if sort_ascending is True and not sorting_variable:
                     unique_group_values = sorted(unique_group_values)
                 elif sort_ascending is False and not sorting_variable:
@@ -1433,8 +1433,11 @@ class DataPlotter(DataFrameAnalyzer):
                         #     group_df[grouping_variable] == value, labeling_variable
                         # ].unique()
 
+                        # if isinstance(grouping_variable, str):
+                        #     label_rows = group_df[group_df[grouping_variable] == value]
                         if isinstance(grouping_variable, str):
-                            label_rows = group_df[group_df[grouping_variable] == value]
+                            actual_value = value[0] if isinstance(value, tuple) and len(value) == 1 else value
+                            label_rows = group_df[group_df[grouping_variable] == actual_value]
                         else:
                             mask = (group_df[grouping_variable]
                                     .apply(tuple, axis=1) == value)
@@ -1462,8 +1465,14 @@ class DataPlotter(DataFrameAnalyzer):
 
                     # subgroup = group_df[group_df[grouping_variable] == value]
 
+                    # print(grouping_variable, value)
+
+                    # if isinstance(grouping_variable, str):
+                    #     subgroup = group_df[group_df[grouping_variable] == value]
                     if isinstance(grouping_variable, str):
-                        subgroup = group_df[group_df[grouping_variable] == value]
+                        # Value is a 1-tuple like ('0004200',), extract the scalar
+                        actual_value = value[0] if isinstance(value, tuple) and len(value) == 1 else value
+                        subgroup = group_df[group_df[grouping_variable] == actual_value]
                     else:
                         # grouping_variable is a list of column names
                         mask = group_df[grouping_variable].apply(tuple, axis=1) == value
