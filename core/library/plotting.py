@@ -743,15 +743,65 @@ class DataPlotter(DataFrameAnalyzer):
         x_raw = group_df[self.xaxis_variable_name].to_numpy()
         y_raw = group_df[self.yaxis_variable_name].to_numpy()
 
-        is_tuple_array = lambda arr: (isinstance(arr[0], tuple) and len(arr[0]) == 2)
+        # is_tuple_array = lambda arr: (isinstance(arr[0], tuple) and len(arr[0]) == 2)
+
+        def is_tuple_array(arr):
+            # Filter out any NaNs or Nones
+            for element in arr:
+                if isinstance(element, tuple) and len(element) == 2:
+                    return True
+            return False
 
         x_is_tuple = is_tuple_array(x_raw)
         y_is_tuple = is_tuple_array(y_raw)
 
-        if not (np.issubdtype(x_raw.dtype, np.number) or x_is_tuple):
-            raise TypeError(f"x-axis data has unsupported type: {x_raw.dtype}")
-        if not (np.issubdtype(y_raw.dtype, np.number) or y_is_tuple):
-            raise TypeError(f"y-axis data has unsupported type: {y_raw.dtype}")
+        # if not (np.issubdtype(x_raw.dtype, np.number) or x_is_tuple):
+        #     raise TypeError(f"x-axis data has unsupported type: {x_raw.dtype}")
+        # if not (np.issubdtype(y_raw.dtype, np.number) or y_is_tuple):
+        #     raise TypeError(f"y-axis data has unsupported type: {y_raw.dtype}")
+
+        # if not (np.issubdtype(x_raw.dtype, np.number) or x_is_tuple):
+        #     example = x_raw[0]
+        #     raise TypeError(
+        #         f"x-axis data has unsupported type: {x_raw.dtype}. "
+        #         f"Example value: {example} (type: {type(example).__name__})"
+        #     )
+
+        def is_numeric_array(arr):
+            return all(
+                isinstance(x, (int, float, np.integer, np.floating))
+                or (np.isscalar(x) and np.isnan(x))
+                for x in arr
+            )
+
+        # # Then use:
+        # if not (is_numeric_array(y_raw) or y_is_tuple):
+        #     example = y_raw[0]
+        #     raise TypeError(
+        #         f"y-axis data has unsupported type: {y_raw.dtype}. "
+        #         f"Example value: {example} (type: {type(example).__name__})"
+        #     )
+
+        if not (is_numeric_array(x_raw) or x_is_tuple):
+            example = x_raw[0]
+            raise TypeError(
+                f"x-axis data has unsupported type: {x_raw.dtype}. "
+                f"Example value: {example} (type: {type(example).__name__})"
+            )
+
+        if not (is_numeric_array(y_raw) or y_is_tuple):
+            example = y_raw[0]
+            raise TypeError(
+                f"y-axis data has unsupported type: {y_raw.dtype}. "
+                f"Example value: {example} (type: {type(example).__name__})"
+            )
+
+        # if not (np.issubdtype(y_raw.dtype, np.number) or y_is_tuple):
+        #     example = y_raw[0]
+        #     raise TypeError(
+        #         f"y-axis data has unsupported type: {y_raw.dtype}. "
+        #         f"Example value: {example} (type: {type(example).__name__})"
+        #     )
 
         # Case 1: both scalar
         if not x_is_tuple and not y_is_tuple:
@@ -759,17 +809,28 @@ class DataPlotter(DataFrameAnalyzer):
             #     x_raw, y_raw, color=color, marker=marker, label=label, s=marker_size**2
             # )
             if empty_markers:
+                # ax.scatter(
+                #     x_raw,
+                #     y_raw,
+                #     marker=marker,
+                #     s=marker_size**2,
+                #     markerfacecolor="none",
+                #     markeredgecolor=color,
+                #     label=label,
+                # )
                 ax.scatter(
-                    x_raw, y_raw,
+                    x_raw,
+                    y_raw,
                     marker=marker,
                     s=marker_size**2,
-                    markerfacecolor='none',
-                    markeredgecolor=color,
+                    facecolors="none",  # hollow marker
+                    edgecolors=color,  # border color
                     label=label,
                 )
             else:
                 ax.scatter(
-                    x_raw, y_raw,
+                    x_raw,
+                    y_raw,
                     marker=marker,
                     s=marker_size**2,
                     color=color,
@@ -798,7 +859,7 @@ class DataPlotter(DataFrameAnalyzer):
                     fmt=marker,
                     markersize=marker_size,
                     capsize=capsize,
-                    markerfacecolor='none',
+                    markerfacecolor="none",
                     markeredgecolor=color,
                     color=color,
                     label=label,
@@ -820,17 +881,28 @@ class DataPlotter(DataFrameAnalyzer):
             x_val = np.array([val for val, _ in x_raw])
             # ax.scatter(x_val, y_raw, color=color, marker=marker, label=label)
             if empty_markers:
+                # ax.scatter(
+                #     x_raw,
+                #     y_raw,
+                #     marker=marker,
+                #     s=marker_size**2,
+                #     markerfacecolor="none",
+                #     markeredgecolor=color,
+                #     label=label,
+                # )
                 ax.scatter(
-                    x_raw, y_raw,
+                    x_raw,
+                    y_raw,
                     marker=marker,
                     s=marker_size**2,
-                    markerfacecolor='none',
-                    markeredgecolor=color,
+                    facecolors="none",  # hollow marker
+                    edgecolors=color,  # border color
                     label=label,
                 )
             else:
                 ax.scatter(
-                    x_raw, y_raw,
+                    x_raw,
+                    y_raw,
                     marker=marker,
                     s=marker_size**2,
                     color=color,
@@ -860,7 +932,7 @@ class DataPlotter(DataFrameAnalyzer):
                     fmt=marker,
                     markersize=marker_size,
                     capsize=capsize,
-                    markerfacecolor='none',
+                    markerfacecolor="none",
                     markeredgecolor=color,
                     color=color,
                     label=label,
@@ -876,7 +948,6 @@ class DataPlotter(DataFrameAnalyzer):
                     color=color,
                     label=label,
                 )
-
 
     def _generate_marker_color_map(
         self, grouping_values: list, custom_map: dict = None
@@ -919,7 +990,7 @@ class DataPlotter(DataFrameAnalyzer):
         labeling_variable: str = None,
         leading_plot_substring: str = None,
         excluded_from_title_list: list = None,
-        title_number_format: str = ".2f", # ".4g" for scientific/float hybrid format
+        title_number_format: str = ".2f",  # ".4g" for scientific/float hybrid format
         title_wrapping_length: int = 90,
     ) -> str:
         """
@@ -1017,12 +1088,18 @@ class DataPlotter(DataFrameAnalyzer):
 
         if title_wrapping_length and len(full_title) > title_wrapping_length:
             # Find a good place (comma) to insert newline
-            comma_positions = [pos for pos, char in enumerate(full_title) if char == ","]
+            comma_positions = [
+                pos for pos, char in enumerate(full_title) if char == ","
+            ]
 
             if comma_positions:
                 # Find best comma to split around the middle
-                split_pos = min(comma_positions, key=lambda x: abs(x - len(full_title) // 2))
-                full_title = full_title[:split_pos+1] + "\n" + full_title[split_pos+1:]
+                split_pos = min(
+                    comma_positions, key=lambda x: abs(x - len(full_title) // 2)
+                )
+                full_title = (
+                    full_title[: split_pos + 1] + "\n" + full_title[split_pos + 1 :]
+                )
 
         return full_title
 
@@ -1100,7 +1177,11 @@ class DataPlotter(DataFrameAnalyzer):
 
         # 6. Optional grouping variable suffix
         if grouping_variable:
-            suffix = f"_grouped_by_{grouping_variable}"
+            if isinstance(grouping_variable, str):
+                suffix = f"_grouped_by_{grouping_variable}"
+            else:
+                suffix = "_grouped_by_" + "_and_".join(grouping_variable)
+            # suffix = f"_grouped_by_{grouping_variable}"
         else:
             suffix = ""
 
@@ -1199,22 +1280,31 @@ class DataPlotter(DataFrameAnalyzer):
             raise ValueError("Call 'set_plot_variables()' before plotting.")
 
         if alternate_filled_markers:
-            empty_markers = False  # ignore user's empty_markers setting when alternating
+            empty_markers = (
+                False  # ignore user's empty_markers setting when alternating
+            )
 
         # Determine which tunable parameters to exclude from grouping
         excluded = set(excluded_from_grouping_list or [])
         for axis_variable in [self.xaxis_variable_name, self.yaxis_variable_name]:
             if axis_variable in self.list_of_multivalued_tunable_parameter_names:
                 excluded.add(axis_variable)
+
         if grouping_variable:
-            if (
-                grouping_variable
-                not in self.list_of_multivalued_tunable_parameter_names
-            ):
-                raise ValueError(
-                    f"'{grouping_variable}' is not a multivalued tunable parameter."
-                )
-            excluded.add(grouping_variable)
+            grouping_columns = (
+                [grouping_variable]
+                if isinstance(grouping_variable, str)
+                else grouping_variable
+            )
+            for grouping_column in grouping_columns:
+                if (
+                    grouping_column
+                    not in self.list_of_multivalued_tunable_parameter_names
+                ):
+                    raise ValueError(
+                        f"'{grouping_column}' is not a multivalued tunable parameter."
+                    )
+                excluded.add(grouping_column)
 
         # Get the grouped DataFrame
         grouped = self.group_by_multivalued_tunable_parameters(
@@ -1233,7 +1323,8 @@ class DataPlotter(DataFrameAnalyzer):
 
             # Reconstruct metadata dict
             if not isinstance(group_keys, tuple):
-                group_keys = [group_keys]
+                # group_keys = [group_keys]
+                group_keys = (group_keys,)
             metadata = dict(
                 zip(self.reduced_multivalued_tunable_parameter_names_list, group_keys)
             )
@@ -1283,17 +1374,40 @@ class DataPlotter(DataFrameAnalyzer):
                 customization_function(ax)
 
             if grouping_variable:
-                # Determine order of unique grouping values
+                # # Determine order of unique grouping values
+                # if sorting_variable:
+                #     unique_group_values = (
+                #         group_df.sort_values(
+                #             by=sorting_variable, ascending=(sort_ascending is not False)
+                #         )[grouping_columns]
+                #         .unique()
+                #         .tolist()
+                #     )
+                # else:
+                #     unique_group_values = (
+                #         group_df[grouping_columns[0]].unique().tolist()
+                #     )
+
                 if sorting_variable:
                     unique_group_values = (
                         group_df.sort_values(
-                            by=sorting_variable, ascending=(sort_ascending is not False)
-                        )[grouping_variable]
-                        .unique()
+                            by=sorting_variable,
+                            ascending=(sort_ascending is not False)
+                        )[grouping_columns]
+                        .drop_duplicates()
+                        .apply(tuple, axis=1)
                         .tolist()
                     )
                 else:
-                    unique_group_values = group_df[grouping_variable].unique().tolist()
+                    unique_group_values = (
+                        group_df[grouping_columns]
+                        .drop_duplicates()
+                        .apply(tuple, axis=1)
+                        .tolist()
+                    )
+
+                print("unique_group_values:")
+                print(unique_group_values)
 
                 if sort_ascending is True and not sorting_variable:
                     unique_group_values = sorted(unique_group_values)
@@ -1315,31 +1429,54 @@ class DataPlotter(DataFrameAnalyzer):
                 for curve_index, value in enumerate(unique_group_values):
                     if labeling_variable:
                         # Fetch unique value of labeling_variable for the current group
-                        label_value = group_df.loc[
-                            group_df[grouping_variable] == value, labeling_variable
-                        ].unique()
-                        if len(label_value) == 1:
-                            label_value = label_value[0]
+                        # label_value = group_df.loc[
+                        #     group_df[grouping_variable] == value, labeling_variable
+                        # ].unique()
+
+                        if isinstance(grouping_variable, str):
+                            label_rows = group_df[group_df[grouping_variable] == value]
                         else:
-                            raise ValueError(
-                                f"Multiple values found for '{labeling_variable}' within group '{value}'."
-                            )
+                            mask = (group_df[grouping_variable]
+                                    .apply(tuple, axis=1) == value)
+                            label_rows = group_df[mask]
+
+                        label_value = label_rows[labeling_variable].unique()
+
+                        # if len(label_value) == 1:
+                        #     label_value = label_value[0]
+                        # else:
+                        #     raise ValueError(
+                        #         f"Multiple values found for '{labeling_variable}' within group '{value}'."
+                        #     )
 
                         # Format numerical labels nicely
                         if isinstance(label_value, (int, float)):
                             label_value = format(label_value, legend_number_format)
                         label = str(label_value)
                     else:
-                        label = str(value)
+                        # label = str(value)
+                        if isinstance(value, tuple):
+                            label = " ".join(str(v) for v in value)
+                        else:
+                            label = str(value)
 
-                    subgroup = group_df[group_df[grouping_variable] == value]
+                    # subgroup = group_df[group_df[grouping_variable] == value]
+
+                    if isinstance(grouping_variable, str):
+                        subgroup = group_df[group_df[grouping_variable] == value]
+                    else:
+                        # grouping_variable is a list of column names
+                        mask = group_df[grouping_variable].apply(tuple, axis=1) == value
+                        subgroup = group_df[mask]
 
                     marker, color = style_map[value]
                     # Alternate filling
                     if alternate_filled_markers:
-                        empty_marker = (curve_index % 2 == 1)  # odd indices → empty
+                        empty_marker = curve_index % 2 == 1  # odd indices → empty
                     else:
-                        empty_marker = empty_markers  # regular user setting (could be False)
+                        empty_marker = (
+                            empty_markers  # regular user setting (could be False)
+                        )
                     self._plot_group(
                         ax,
                         subgroup,
@@ -1402,7 +1539,13 @@ class DataPlotter(DataFrameAnalyzer):
                 grouping_variable=grouping_variable,
             )
             if grouping_variable:
-                nested_dirname = f"Grouped_by_{grouping_variable}"
+                # nested_dirname = f"Grouped_by_{grouping_variable}"
+                if isinstance(grouping_variable, str):
+                    nested_dirname = f"Grouped_by_{grouping_variable}"
+                else:
+                    nested_dirname = (
+                        "Grouped_by_" + "_and_".join(grouping_variable)
+                    )
                 self.combined_plots_subdirectory = self._prepare_plot_subdirectory(
                     os.path.join(self.plots_base_name, nested_dirname)
                 )
