@@ -132,7 +132,7 @@ for main_program_directory in "$RAW_DATA_FILES_DIRECTORY"/*; do
         data_files_set_name=$(basename "$raw_data_files_set_directory")
 
         # if [[ ! $data_files_set_name == 'Chebyshev_several_config_varying_N' ]]; then
-        if [[ ! $data_files_set_name == 'KL_several_config_varying_n' ]]; then
+        if [[ ! $data_files_set_name == 'KL_several_config_varying_n_NEW' ]]; then
             continue
         fi
 

@@ -266,17 +266,17 @@ python_script_path="${PYTHON_SCRIPTS_DIRECTORY}/post_processing_analysis"
 python_script_path+="/calculate_effective_mass_estimates.py"
 check_if_file_exists "$python_script_path" || exit 1
 
-# python $python_script_path \
-#     --input_correlators_jackknife_analysis_hdf5_file_path \
-#                             "$correlators_jackknife_analysis_hdf5_file_path" \
-#     --plots_directory "$data_files_set_plots_directory" \
-#     --plot_g5g5_correlators --plot_effective_mass_correlators \
-#     --output_pion_effective_mass_estimates_csv_filename \
-#                                 "$PION_EFFECTIVE_MASS_ESTIMATE_CSV_FILENAME" \
-#     --enable_logging \
-#     --log_file_directory "$auxiliary_files_directory" \
-#     || failed_python_script $python_script_path
-#     # --zoom_in_effective_mass_correlators_plots \
+python $python_script_path \
+    --input_correlators_jackknife_analysis_hdf5_file_path \
+                            "$correlators_jackknife_analysis_hdf5_file_path" \
+    --plots_directory "$data_files_set_plots_directory" \
+    --plot_g5g5_correlators --plot_effective_mass_correlators \
+    --output_pion_effective_mass_estimates_csv_filename \
+                                "$PION_EFFECTIVE_MASS_ESTIMATE_CSV_FILENAME" \
+    --enable_logging \
+    --log_file_directory "$auxiliary_files_directory" \
+    || failed_python_script $python_script_path
+    # --zoom_in_effective_mass_correlators_plots \
 
 # Log successful calculation
 log_message="Pion effective mass estimate analysis for "
@@ -349,15 +349,15 @@ python_script_path="${PYTHON_SCRIPTS_DIRECTORY}/post_processing_analysis"
 python_script_path+="/calculate_critical_bare_mass_from_effective_mass.py"
 check_if_file_exists "$python_script_path" || exit 1
 
-# python $python_script_path \
-#     --input_effective_mass_csv_file_path \
-#                                 "$pion_effective_mass_estimate_csv_file_path" \
-#     --plots_directory "$data_files_set_plots_directory" \
-#     --plot_critical_bare_mass --fit_for_critical_bare_mass \
-#     --output_critical_bare_mass_csv_filename \
-#                             "$CRITICAL_BARE_FROM_EFFECTIVE_MASS_CSV_FILENAME" \
-#     --log_file_directory "$auxiliary_files_directory" \
-#     || failed_python_script $python_script_path
+python $python_script_path \
+    --input_effective_mass_csv_file_path \
+                                "$pion_effective_mass_estimate_csv_file_path" \
+    --plots_directory "$data_files_set_plots_directory" \
+    --plot_critical_bare_mass --fit_for_critical_bare_mass \
+    --output_critical_bare_mass_csv_filename \
+                            "$CRITICAL_BARE_FROM_EFFECTIVE_MASS_CSV_FILENAME" \
+    --log_file_directory "$auxiliary_files_directory" \
+    || failed_python_script $python_script_path
 
 # Log successful calculation
 log_message="Critical bare mass values calculation from Pion effective mass for"
