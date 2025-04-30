@@ -24,3 +24,5 @@ examples/tables/*
 !examples/tables/table_of_data_files_set_template.ipynb
 !examples/README.md
 bash_scripts/unit_tests/mock_data/validate_raw_data_files_set/*
+
+core/unit_tests/output_from_mock_data/*
