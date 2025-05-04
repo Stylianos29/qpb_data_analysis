@@ -8,6 +8,7 @@ core/library/__pycache__/*
 core/qpb_data_analysis.egg-info/*
 core/unit_tests/__pycache__/*
 core/unit_tests/output_from_mock_data/*
+core/integration_tests/*/*
 
 data_files/raw/*
 !data_files/raw/README.md
