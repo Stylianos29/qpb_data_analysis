@@ -11,7 +11,9 @@ from .data_files_checks import get_yes_or_no_user_response
 from .filesystem_utilities import (
     is_valid_file,
     is_valid_directory,
+    validate_file,
     validate_input_directory,
+    validate_output_directory,
     validate_input_script_log_filename,
 )
 from .plotting import DataPlotter, HDF5Plotter, EnhancedHDF5Analyzer
@@ -26,7 +28,9 @@ __all__ = [
     'DataFrameAnalyzer',
     'TableGenerator',
     'get_yes_or_no_user_response',
+    'validate_file',
     'validate_input_directory',
+    'validate_output_directory',
     'validate_input_script_log_filename',
     'DataPlotter',
     'HDF5Plotter',
