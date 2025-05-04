@@ -202,10 +202,12 @@ def main(
             base_filename = output_filename
         else:
             # Generate base filename without extension from input CSV
-            base_filename = os.path.splitext(os.path.basename(csv_file_path))[0]
+            base_filename = (
+                os.path.splitext(os.path.basename(csv_file_path))[0] + "_summary"
+            )
 
         output_file_path = os.path.join(
-            output_directory, f"{base_filename}_summary.{output_format}"
+            output_directory, f"{base_filename}.{output_format}"
         )
         output_file = open(output_file_path, "w", encoding="utf-8")
 
