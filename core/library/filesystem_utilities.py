@@ -256,6 +256,13 @@ def validate_input_directory(ctx, param, value):
     return path_type.convert(value, param, ctx)
 
 
+def validate_output_directory(ctx, param, value):
+    if value is None:
+        return None  # Skip validation for None
+    # Validate the directory path using click.Path
+    path_type = click.Path(exists=True, file_okay=True, dir_okay=True, readable=True)
+    return path_type.convert(value, param, ctx)
+
 def validate_output_HDF5_filename(ctx, param, value):
     if not value.endswith(".h5"):
         raise click.BadParameter(
