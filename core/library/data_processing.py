@@ -72,6 +72,40 @@ def load_csv(input_csv_file_path, dtype_mapping=None, converters_mapping=None):
     return dataframe
 
 
+def extract_HDF5_datasets_to_dictionary(file_path, dataset_name):
+    """
+    Open an HDF5 file and extract datasets named 'Calculation_result_per_vector'
+    stored in level-3 groups.
+
+    Parameters:
+        file_path (str): The physical path of the HDF5 file provided by the
+        user.
+
+    Returns:
+        dict: A dictionary with group basenames as keys and the corresponding
+        datasets (NumPy arrays) as values.
+    """
+    datasets_dictionary = {}
+
+    # Open the HDF5 file in read mode
+    with h5py.File(file_path, "r") as hdf_file:
+
+        def traverse_groups(name, obj):
+            # Only process if the object is a dataset with the target name
+            if isinstance(obj, h5py.Dataset) and name.endswith(dataset_name):
+                # Get the group name (parent group name) and extract its
+                # basename
+                group_name = name.rsplit("/", maxsplit=1)[0]
+                basename = os.path.basename(group_name)
+                # Store the dataset as a NumPy array
+                datasets_dictionary[basename] = obj[:]
+
+        # Recursively visit all objects in the file
+        hdf_file.visititems(traverse_groups)
+
+    return datasets_dictionary
+
+
 class DataFrameAnalyzer:
     """
     A class for analyzing and manipulating Pandas DataFrames with a focus on
@@ -1323,170 +1357,3 @@ class HDF5Analyzer:
     def close(self):
         """Close the HDF5 file."""
         self.hdf5_file.close()
-
-
-def print_dictionaries_side_by_side(
-    left_dictionary,
-    right_dictionary,
-    line_width=80,
-    left_column_title=None,
-    right_column_title=None,
-):
-    """
-    Print two dictionaries side by side, with the second dictionary starting at
-    the middle of the line width.
-
-    Parameters: - left_dictionary (dict): The first dictionary to print. -
-    right_dictionary (dict): The second dictionary to print. - line_width (int,
-    optional): The total width of the line. Default is 80.
-    """
-    # Calculate the middle position of the line
-    middle_position = line_width // 2
-
-    # Prepare keys and values as formatted strings
-    left_dictionary_items = [f"{k}: {v}" for k, v in left_dictionary.items()]
-    right_dictionary_items = [f"{k}: {v}" for k, v in right_dictionary.items()]
-
-    # Determine the maximum number of lines to print
-    max_lines = max(len(left_dictionary_items), len(right_dictionary_items))
-
-    # Print titles if provided, aligned with the key-value pairs
-    if left_column_title and right_column_title:
-        # Format and align the two column titles Format the first title and add
-        # the separator
-        title_output = (
-            f"{left_column_title:<{middle_position-3}} | {right_column_title}"
-        )
-        print(title_output)
-        # print(f"{left_column_title:<{middle_position}}{right_column_title}")
-        print("-" * (line_width))
-
-    # Print dictionaries side by side
-    for i in range(max_lines):
-        # Get the current item from each dictionary, if it exists
-        left = left_dictionary_items[i] if i < len(left_dictionary_items) else ""
-        right = right_dictionary_items[i] if i < len(right_dictionary_items) else ""
-
-        # Format and align the two outputs
-        output = f"{left:<{middle_position}}{right}"
-        print(output)
-
-
-def get_fields_with_multiple_values(df, excluded_fields=None) -> list:
-    """
-    Retrieves a list of column names from the given Pandas DataFrame that
-    contain more than one unique value, excluding any columns specified in the
-    'excluded_fields' set.
-
-    Parameters:
-
-    - df (pd.DataFrame): The Pandas DataFrame to analyze.
-    - excluded_fields (set, optional): A set of column names to exclude from the
-    results. If not provided or is empty, no columns will be excluded. Default
-    is None.
-
-    Returns:
-
-    - List of column names that have more than one unique value,
-    excluding any specified in 'excluded_fields'.
-
-    Usage:
-
-    - get_fields_with_multiple_values(df, {"Filename", "Plaquette"}) -
-    get_fields_with_multiple_values(df)
-    """
-
-    if excluded_fields is None:
-        excluded_fields = set()  # Default to an empty set if not provided
-
-    # Filter columns with more than one unique value and exclude specified
-    # fields
-    varying_fields = [
-        col
-        for col in df.columns
-        if df[col].nunique() > 1 and col not in excluded_fields
-    ]
-
-    return varying_fields
-
-
-def extract_HDF5_datasets_to_dictionary(file_path, dataset_name):
-    """
-    Open an HDF5 file and extract datasets named 'Calculation_result_per_vector'
-    stored in level-3 groups.
-
-    Parameters:
-        file_path (str): The physical path of the HDF5 file provided by the
-        user.
-
-    Returns:
-        dict: A dictionary with group basenames as keys and the corresponding
-        datasets (NumPy arrays) as values.
-    """
-    datasets_dictionary = {}
-
-    # Open the HDF5 file in read mode
-    with h5py.File(file_path, "r") as hdf_file:
-
-        def traverse_groups(name, obj):
-            # Only process if the object is a dataset with the target name
-            if isinstance(obj, h5py.Dataset) and name.endswith(dataset_name):
-                # Get the group name (parent group name) and extract its
-                # basename
-                group_name = name.rsplit("/", maxsplit=1)[0]
-                basename = os.path.basename(group_name)
-                # Store the dataset as a NumPy array
-                datasets_dictionary[basename] = obj[:]
-
-        # Recursively visit all objects in the file
-        hdf_file.visititems(traverse_groups)
-
-    return datasets_dictionary
-
-
-def find_single_value_columns(df):
-    """
-    Finds columns in the DataFrame with a single unique value and returns a
-    dictionary with column names as keys and their unique values as dictionary
-    values.
-
-    Parameters: df (pd.DataFrame): The input Pandas DataFrame.
-
-    Returns: dict: A dictionary with column names as keys and their unique
-    values as dictionary values.
-    """
-    single_value_columns = {}
-
-    for col in df.columns:
-        unique_values = df[
-            col
-        ].nunique()  # Get the number of unique values in the column
-        if unique_values == 1:
-            # If there's only one unique value, add it to the dictionary
-            single_value_columns[col] = df[col].iloc[0]
-
-    return single_value_columns
-
-
-def find_multiple_value_columns(df):
-    """
-    Finds columns in the DataFrame with multiple unique values and returns a
-    dictionary with column names as keys and the count of unique values as
-    dictionary values.
-
-    Parameters: df (pd.DataFrame): The input Pandas DataFrame.
-
-    Returns: dict: A dictionary with column names as keys and the count of
-    unique values as dictionary values.
-    """
-    multiple_value_columns = {}
-
-    for col in df.columns:
-        unique_values_count = df[
-            col
-        ].nunique()  # Get the number of unique values in the column
-        if unique_values_count > 1:
-            # If there's more than one unique value, add it to the dictionary
-            multiple_value_columns[col] = unique_values_count
-
-    return multiple_value_columns
