@@ -251,7 +251,6 @@ check_if_file_exists "$inspect_csv_file_python_script_path" || exit 1
 # Generate a summary for output .csv file
 python $inspect_csv_file_python_script_path \
     --csv_file_path "$PCAC_mass_estimate_csv_file_path" \
-    --generate_output_file \
     || failed_python_script $inspect_csv_file_python_script_path
 
 # Log generation of output .csv file summary
@@ -291,7 +290,6 @@ check_if_file_exists "$pion_effective_mass_estimate_csv_file_path" || exit 1
 # Generate a summary for output .csv file
 python $inspect_csv_file_python_script_path \
     --csv_file_path "$pion_effective_mass_estimate_csv_file_path" \
-    --generate_output_file \
     || failed_python_script $python_script_path
 
 # Log generation of output .csv file summary
@@ -334,7 +332,6 @@ check_if_file_exists "$critical_bare_mass_csv_file_path" || exit 1
 # Generate a summary for output .csv file
 python $inspect_csv_file_python_script_path \
     --csv_file_path "$critical_bare_mass_csv_file_path" \
-    --generate_output_file \
     || failed_python_script $python_script_path
 
 # Log generation of output .csv file summary
@@ -372,7 +369,6 @@ check_if_file_exists "$critical_bare_mass_csv_file_path" || exit 1
 # Generate a summary for output .csv file
 python $inspect_csv_file_python_script_path \
     --csv_file_path "$critical_bare_mass_csv_file_path" \
-    --generate_output_file \
     || failed_python_script $python_script_path
 
 # Log generation of output .csv file summary
@@ -413,7 +409,6 @@ check_if_file_exists "$calculation_cost_csv_file_path" || exit 1
 # Generate a summary for output .csv file
 python $inspect_csv_file_python_script_path \
     --csv_file_path "$calculation_cost_csv_file_path" \
-    --generate_output_file \
     || failed_python_script $python_script_path
 
 # Log generation of output .csv file summary
@@ -451,7 +446,6 @@ check_if_file_exists "$calculation_cost_csv_file_path" || exit 1
 # Generate a summary for output .csv file
 python $inspect_csv_file_python_script_path \
     --csv_file_path "$calculation_cost_csv_file_path" \
-    --generate_output_file \
     || failed_python_script $python_script_path
 
 # Log generation of output .csv file summary
