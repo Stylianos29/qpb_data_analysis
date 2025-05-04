@@ -226,6 +226,8 @@ check_if_file_exists "$python_script_path" || exit 1
 
 python $python_script_path \
     --csv_file_path "$preprocessed_csv_file_path" \
+    --output_directory "$output_directory_path" \
+    --uniqueness_report \
     || failed_python_script $python_script_path
 
 log_message="A summary of the ${PREPROCESSED_CSV_FILENAME} .csv file "
@@ -274,6 +276,8 @@ check_if_file_exists "$python_script_path" || exit 1
 
 python $python_script_path \
     --csv_file_path "$processed_csv_file_path" \
+    --output_directory "$output_directory_path" \
+    --uniqueness_report \
     || failed_python_script $python_script_path
 
 log_message="A summary of the ${PROCESSED_VALUES_CSV_FILENAME} .csv file "
