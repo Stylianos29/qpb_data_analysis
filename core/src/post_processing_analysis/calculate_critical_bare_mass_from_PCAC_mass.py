@@ -219,7 +219,7 @@ def main(
 
         # Store names and values of tunable parameters with unique values
         single_valued_fields_dictionary = copy.deepcopy(
-            analyzer.single_valued_fields_dictionary
+            analyzer.unique_value_columns_dictionary
         )
 
         # CONSTRUCT LIST OF RELEVANT MULTIVALUED TUNABLE PARAMETERS FOR GROUPING
@@ -227,7 +227,7 @@ def main(
         # Groupings will be based on tunable parameters with more than one
         # unique values (multivalued)
         tunable_multivalued_parameter_names_list = copy.deepcopy(
-            analyzer.list_of_tunable_multivalued_parameter_names
+            analyzer.list_of_multivalued_tunable_parameter_names
         )
 
         # Exclude "MPI_geometry" from tunable multivalued parameters list

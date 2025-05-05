@@ -258,15 +258,16 @@ def main(
             input_parameter_values_csv_file_path
         )
         analyzer = data_processing.DataFrameAnalyzer(parameter_values_dataframe)
-
+        
+        # TODO: Change obsolete class attributes
         # Store names and values of tunable parameters with unique values
         single_valued_fields_dictionary = copy.deepcopy(
-            analyzer.single_valued_fields_dictionary
+            analyzer.unique_value_columns_dictionary
         )
 
         # Initialize a list of parameter names with multiple unique values
         rest_of_the_multivalued_field_names_list = list(
-            analyzer.multivalued_fields_dictionary.keys()
+            analyzer.multivalued_columns_count_dictionary.keys()
         )
 
         # CONSTRUCT LIST OF RELEVANT MULTIVALUED TUNABLE PARAMETERS FOR GROUPING
@@ -274,7 +275,7 @@ def main(
         # Groupings will be based on tunable parameters with more than one
         # unique values (multivalued)
         tunable_multivalued_parameter_names_list = copy.deepcopy(
-            analyzer.list_of_tunable_multivalued_parameter_names
+            analyzer.list_of_multivalued_tunable_parameter_names
         )
 
         # Exclude "MPI_geometry" from tunable multivalued parameters list
