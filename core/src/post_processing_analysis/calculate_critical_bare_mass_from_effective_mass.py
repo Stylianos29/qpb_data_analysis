@@ -195,12 +195,12 @@ def main(
 
     analyzer = data_processing.DataFrameAnalyzer(effective_mass_estimates_dataframe)
 
-    single_valued_fields_dictionary = analyzer.single_valued_fields_dictionary
+    single_valued_fields_dictionary = analyzer.unique_value_columns_dictionary
 
     tunable_multivalued_parameters_list = (
-        analyzer.list_of_tunable_multivalued_parameter_names
+        analyzer.list_of_multivalued_tunable_parameter_names
     )
-
+        
     # TODO: Rethink this strategy of excluding "MPI_geometry" manually
     tunable_multivalued_parameters_list = [
         item for item in tunable_multivalued_parameters_list if item != "MPI_geometry"
