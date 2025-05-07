@@ -4,14 +4,31 @@
 # analyze_invert_processed_data_files_set.sh
 #
 # Description: 
+#   Script for analyzing processed inversion data files sets. Performs various
+#   analyses including correlator jackknife analysis, PCAC mass estimation, pion
+#   effective mass calculations, and critical bare mass determinations.
 #
 # Purpose:
+#   - Execute jackknife analysis on correlator data
+#   - Calculate PCAC mass estimates and generate related plots
+#   - Determine pion effective mass estimates
+#   - Calculate critical bare mass values using both PCAC and effective mass
+#   - Estimate calculation costs for different methods
+#   - Generate comprehensive plots and data summaries
 #
-# Usage:
+# Usage: ./analyze_invert_processed_data_files_set.sh [options]
 #
 # Flags:
+#   - set_dir, --data_files_set_directory  Directory containing processed data
+#   files
+#   - out_dir, --output_files_directory    Directory for output files (optional)
+#   - log_dir, --scripts_log_files_directory  Directory for log files (optional)
 #
 # Note:
+#   - Requires associated Python scripts in the core/src directory
+#   - Generates multiple CSV and HDF5 output files
+#   - Creates plots in the specified output directory
+#   - Maintains detailed logging of all operations
 ################################################################################
 
 # CUSTOM FUNCTIONS DEFINITIONS
@@ -433,15 +450,15 @@ python_script_path="${PYTHON_SCRIPTS_DIRECTORY}/post_processing_analysis"
 python_script_path+="/estimate_calculation_cost_of_critical_bare_from_effective_mass.py"
 check_if_file_exists "$python_script_path" || exit 1
 
-# python $python_script_path \
-#     --input_pion_effective_mass_estimates_csv_file_path \
-#                                 "$pion_effective_mass_estimate_csv_file_path" \
-#     --plots_directory "$data_files_set_plots_directory" \
-#     --plot_critical_bare_mass --plot_calculation_cost \
-#     --output_calculation_cost_csv_filename \
-#                         "$CALCULATION_COST_FROM_EFFECTIVE_MASS_CSV_FILENAME" \
-#     --log_file_directory "$auxiliary_files_directory" \
-#     || failed_python_script $python_script_path
+python $python_script_path \
+    --input_pion_effective_mass_estimates_csv_file_path \
+                                "$pion_effective_mass_estimate_csv_file_path" \
+    --plots_directory "$data_files_set_plots_directory" \
+    --plot_critical_bare_mass --plot_calculation_cost \
+    --output_calculation_cost_csv_filename \
+                        "$CALCULATION_COST_FROM_EFFECTIVE_MASS_CSV_FILENAME" \
+    --log_file_directory "$auxiliary_files_directory" \
+    || failed_python_script $python_script_path
 
 # Log successful calculation
 log_message="Estimation of calculation cost from effective mass estimates for"
