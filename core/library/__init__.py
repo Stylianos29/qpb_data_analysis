@@ -17,6 +17,7 @@ from .filesystem_utilities import (
     validate_input_script_log_filename,
 )
 from .plotting import DataPlotter, HDF5Plotter, EnhancedHDF5Analyzer
+from .specialized import generate_config_labels
 
 __all__ = [
     'ROOT',
@@ -25,6 +26,7 @@ __all__ = [
     'is_valid_file',
     'is_valid_directory',
     'load_csv',
+    'generate_config_labels',
     'DataFrameAnalyzer',
     'TableGenerator',
     'get_yes_or_no_user_response',
