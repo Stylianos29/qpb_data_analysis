@@ -301,10 +301,10 @@ class DataFrameAnalyzer:
     def print_unique_values(self, column_name):
         """
         Print the count and list of unique values for a specified column.
-        
+
         This method displays the total number of unique values in the specified column,
         followed by a list of those unique values sorted in ascending order.
-        
+
         Args:
             column_name (str): The name of the column to analyze.
 
@@ -317,18 +317,20 @@ class DataFrameAnalyzer:
         # Check if the column exists
         if column_name not in self.dataframe.columns:
             raise ValueError(f"Column '{column_name}' does not exist in the DataFrame.")
-        
+
         # Get unique values and sort them
         unique_values = sorted(self.dataframe[column_name].unique())
         unique_count = len(unique_values)
-        
+
         # Convert numpy types to native Python types for cleaner display
-        unique_values_python = [item.item() if hasattr(item, 'item') else item for item in unique_values]
-        
+        unique_values_python = [
+            item.item() if hasattr(item, "item") else item for item in unique_values
+        ]
+
         # Print the information
         print(f"Column '{column_name}' has {unique_count} unique values:")
         print(unique_values_python)
-        
+
     def group_by_multivalued_tunable_parameters(
         self, filter_out_parameters_list: list = None
     ):
@@ -973,9 +975,9 @@ class TableGenerator(DataFrameAnalyzer):
 
             # 1D case
             elif row_variable is not None and column_variable is None:
-                group = group_df.groupby(row_variable)[value_variable]
+                group = group_df.groupby(row_variable, observed=True)[value_variable]
             elif column_variable is not None and row_variable is None:
-                group = group_df.groupby(column_variable)[value_variable]
+                group = group_df.groupby(column_variable, observed=True)[value_variable]
 
             if (row_variable is not None) ^ (column_variable is not None):
                 result_dict = {}
@@ -1002,9 +1004,9 @@ class TableGenerator(DataFrameAnalyzer):
 
             # 2D case
             elif row_variable is not None and column_variable is not None:
-                pivot_df = group_df.groupby([row_variable, column_variable])[
-                    value_variable
-                ]
+                pivot_df = group_df.groupby(
+                    [row_variable, column_variable], observed=True
+                )[value_variable]
 
                 if aggregation == "count":
                     table_df = pivot_df.nunique().unstack(fill_value=0)
@@ -1027,7 +1029,7 @@ class TableGenerator(DataFrameAnalyzer):
                 ]
                 table_lines.append(" | ".join(headers))
                 table_lines.append(
-                    # 
+                    #
                     " | ".join([":" + "-" * len(h) for h in headers])
                 )
 
