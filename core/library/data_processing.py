@@ -1027,7 +1027,8 @@ class TableGenerator(DataFrameAnalyzer):
                 ]
                 table_lines.append(" | ".join(headers))
                 table_lines.append(
-                    " | ".join([":" + "-" * (len(h) - 1) for h in headers])
+                    # 
+                    " | ".join([":" + "-" * len(h) for h in headers])
                 )
 
                 for row_index, row in table_df.iterrows():
