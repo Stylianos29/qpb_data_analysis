@@ -44,8 +44,16 @@ flowchart TD
         }
     EmptyTxtDatFiles -- No --> Exit([Exit])
     
+    %% REMOVE ANY NULL QPB CORRELATORS FILES FROM THE DIRECTORY
+    EmptyTxtDatFiles -- Yes --> NullDatFiles{
+        Null correlator 
+        files found? 
+        Delete files? Y/N
+        }
+    NullDatFiles -- No --> Exit([Exit])
+
     %% RETRIEVE STORED FILE PATHS
-    EmptyTxtDatFiles -- Yes --> RetrieveStored[
+    NullDatFiles -- Yes --> RetrieveStored[
         Retrieve stored files
         paths in separate lists 
         by file type from 

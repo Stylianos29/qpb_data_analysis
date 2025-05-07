@@ -188,6 +188,83 @@ def main(
     else:
         logger.info("No unsupported file types found in raw data files set directory.")
 
+    # REMOVE ANY NULL CORRELATORS FILES
+
+    # Find correlator files (.dat) with null values in the 5th column
+    null_correlator_files = []
+    correlator_files = glob.glob(
+        os.path.join(raw_data_files_set_directory_path, "*.dat")
+    )
+
+    for correlator_file_path in correlator_files:
+        try:
+            with open(correlator_file_path, "r") as file:
+                # Check if any line has a null value in the 5th column
+                has_null_value = any(
+                    line.strip().split()[4] == "+0.000000e+00"
+                    for line in file
+                    if line.strip() and len(line.strip().split()) >= 5
+                )
+                if has_null_value:
+                    null_correlator_files.append(correlator_file_path)
+                    logger.info(
+                        "Null correlator file found: "
+                        f"{os.path.basename(correlator_file_path)}"
+                    )
+        except Exception as e:
+            logger.error(
+                f"Error reading correlator file {correlator_file_path}: {str(e)}",
+                to_console=True,
+            )
+
+    # Handle found null correlator files
+    if null_correlator_files:
+        # Log the number of null correlator files found
+        logger.warning(
+            f"Found {len(null_correlator_files)} correlator files with null values "
+            "in the 5th column.",
+            to_console=True,
+        )
+
+        # Ask user about deleting null correlator files
+        response = get_yes_or_no_user_response(
+            "Do you want to delete all correlator files with null values? "
+            "This will also remove their associated .txt files. (y[Y]/n[N])"
+        )
+        if response:
+            for file_path in null_correlator_files:
+                try:
+                    # Remove the correlator file
+                    os.remove(file_path)
+                    logger.info(
+                        "Deleted null correlator file: "
+                        f"{os.path.basename(file_path)}"
+                    )
+
+                    # Remove associated .txt file if it exists
+                    txt_file = os.path.splitext(file_path)[0] + ".txt"
+                    if os.path.exists(txt_file):
+                        os.remove(txt_file)
+                        logger.info(
+                            "Deleted associated log file: "
+                            f"{os.path.basename(txt_file)}"
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"Error deleting file {file_path}: {str(e)}",
+                        to_console=True,
+                    )
+        else:
+            logger.error(
+                "Validation cannot proceed with null correlators files "
+                "present inside the qpb data files set directory. "
+                "Exiting the program.",
+                to_console=True,
+            )
+            sys.exit(1)
+    else:
+        logger.info("No correlator files with null values found.")
+
     # REMOVE ANY EMPTY FILES FROM THE DIRECTORY
 
     # Find empty .txt and .dat files, ignore .err files for later
