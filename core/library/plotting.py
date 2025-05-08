@@ -1462,16 +1462,17 @@ class DataPlotter(DataFrameAnalyzer):
 
                         label_value = label_rows[labeling_variable].unique()
 
-                        # if len(label_value) == 1:
-                        #     label_value = label_value[0]
+
+                        if len(label_value) == 1:
+                            label_value = label_value[0]
                         # else:
                         #     raise ValueError(
                         #         f"Multiple values found for '{labeling_variable}' within group '{value}'."
                         #     )
 
-                        # Format numerical labels nicely
-                        if isinstance(label_value, (int, float)):
-                            label_value = format(label_value, legend_number_format)
+                            # Format numerical labels nicely
+                            if isinstance(label_value, (int, float)):
+                                label_value = format(label_value, legend_number_format)
                         label = str(label_value)
                     else:
                         # label = str(value)
