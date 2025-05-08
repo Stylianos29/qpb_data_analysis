@@ -332,7 +332,9 @@ class DataFrameAnalyzer:
         print(unique_values_python)
 
     def group_by_multivalued_tunable_parameters(
-        self, filter_out_parameters_list: list = None
+        self,
+        filter_out_parameters_list: list = None,
+        verbose: bool = False,
     ):
         """
         Group the DataFrame by multivalued tunable parameters, optionally
@@ -396,6 +398,10 @@ class DataFrameAnalyzer:
             self.reduced_multivalued_tunable_parameter_names_list = (
                 self.list_of_multivalued_tunable_parameter_names.copy()
             )
+
+        if verbose:
+            print("List of reduced multivalued tunable parameter names:")
+            print(self.reduced_multivalued_tunable_parameter_names_list)
 
         # Create a groupby object based on the reduced list of multivalued
         # tunable parameters. If reduced list is empty, return entire dataframe
@@ -563,7 +569,7 @@ class TableGenerator(DataFrameAnalyzer):
     combinations.
     """
 
-    def __init__(self, dataframe: pd.DataFrame, output_directory: str = "."):
+    def __init__(self, dataframe: pd.DataFrame, output_directory: str = None):
         """
         Initialize the TableGenerator with a DataFrame and optional output
         directory.
@@ -608,6 +614,11 @@ class TableGenerator(DataFrameAnalyzer):
         """
         # Use class's default output directory if none is provided
         if output_directory is None:
+            if self.output_directory is None:
+                raise ValueError(
+                    "No output directory was specified. "
+                    "Table cannot be exported to file."
+                )
             output_directory = self.output_directory
 
         # Normalize and create output directory if it doesn't exist
@@ -954,7 +965,14 @@ class TableGenerator(DataFrameAnalyzer):
                 zip(self.reduced_multivalued_tunable_parameter_names_list, group_keys)
             )
 
-            table_lines = [f"#### Group {idx+1}:\n{group_dict}", ""]
+            # Convert NumPy scalar types (e.g., np.float64, np.int64) to native
+            # Python types to avoid verbose representations like
+            # "np.float64(0.1)" when printing or formatting
+            clean_group_dict = {
+                k: v.item() if isinstance(v, np.generic) else v
+                for k, v in group_dict.items()
+            }
+            table_lines = [f"#### Group {idx+1}:\n{clean_group_dict}", ""]
 
             # 0D case
             if row_variable is None and column_variable is None:
