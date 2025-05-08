@@ -1236,6 +1236,8 @@ class DataPlotter(DataFrameAnalyzer):
         sorting_variable: str = None,
         sort_ascending: bool = None,
         figure_size=(7, 5),
+        xaxis_label: str = None,
+        yaxis_label: str = None,
         xaxis_log_scale: bool = False,
         yaxis_log_scale: bool = False,
         invert_xaxis: bool = False,
@@ -1340,14 +1342,23 @@ class DataPlotter(DataFrameAnalyzer):
                         metadata[special] = unique_vals[0]
 
             # Determine axes labels
-            x_label = constants.AXES_LABELS_BY_COLUMN_NAME.get(
-                self.xaxis_variable_name, ""
-            )
-            ax.set_xlabel(x_label)
-            y_label = constants.AXES_LABELS_BY_COLUMN_NAME.get(
-                self.yaxis_variable_name, ""
-            )
-            ax.set_ylabel(y_label)
+            if xaxis_label is not None:
+                ax.set_xlabel(xaxis_label)
+            else:
+                ax.set_xlabel(
+                    constants.AXES_LABELS_BY_COLUMN_NAME.get(
+                        self.xaxis_variable_name, ""
+                    )
+                )
+
+            if yaxis_label is not None:
+                ax.set_ylabel(yaxis_label)
+            else:
+                ax.set_ylabel(
+                    constants.AXES_LABELS_BY_COLUMN_NAME.get(
+                        self.yaxis_variable_name, ""
+                    )
+                )
 
             # Axes scaling
             if (
@@ -1394,8 +1405,7 @@ class DataPlotter(DataFrameAnalyzer):
                 if sorting_variable:
                     unique_group_values = (
                         group_df.sort_values(
-                            by=sorting_variable,
-                            ascending=(sort_ascending is not False)
+                            by=sorting_variable, ascending=(sort_ascending is not False)
                         )[grouping_columns]
                         .drop_duplicates()
                         .apply(tuple, axis=1)
@@ -1436,11 +1446,19 @@ class DataPlotter(DataFrameAnalyzer):
                         # if isinstance(grouping_variable, str):
                         #     label_rows = group_df[group_df[grouping_variable] == value]
                         if isinstance(grouping_variable, str):
-                            actual_value = value[0] if isinstance(value, tuple) and len(value) == 1 else value
-                            label_rows = group_df[group_df[grouping_variable] == actual_value]
+                            actual_value = (
+                                value[0]
+                                if isinstance(value, tuple) and len(value) == 1
+                                else value
+                            )
+                            label_rows = group_df[
+                                group_df[grouping_variable] == actual_value
+                            ]
                         else:
-                            mask = (group_df[grouping_variable]
-                                    .apply(tuple, axis=1) == value)
+                            mask = (
+                                group_df[grouping_variable].apply(tuple, axis=1)
+                                == value
+                            )
                             label_rows = group_df[mask]
 
                         label_value = label_rows[labeling_variable].unique()
@@ -1471,7 +1489,11 @@ class DataPlotter(DataFrameAnalyzer):
                     #     subgroup = group_df[group_df[grouping_variable] == value]
                     if isinstance(grouping_variable, str):
                         # Value is a 1-tuple like ('0004200',), extract the scalar
-                        actual_value = value[0] if isinstance(value, tuple) and len(value) == 1 else value
+                        actual_value = (
+                            value[0]
+                            if isinstance(value, tuple) and len(value) == 1
+                            else value
+                        )
                         subgroup = group_df[group_df[grouping_variable] == actual_value]
                     else:
                         # grouping_variable is a list of column names
@@ -1552,9 +1574,7 @@ class DataPlotter(DataFrameAnalyzer):
                 if isinstance(grouping_variable, str):
                     nested_dirname = f"Grouped_by_{grouping_variable}"
                 else:
-                    nested_dirname = (
-                        "Grouped_by_" + "_and_".join(grouping_variable)
-                    )
+                    nested_dirname = "Grouped_by_" + "_and_".join(grouping_variable)
                 self.combined_plots_subdirectory = self._prepare_plot_subdirectory(
                     os.path.join(self.plots_base_name, nested_dirname)
                 )
