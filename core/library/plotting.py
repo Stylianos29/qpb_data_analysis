@@ -1260,6 +1260,7 @@ class DataPlotter(DataFrameAnalyzer):
         title_number_format: str = ".2f",
         title_wrapping_length: int = 90,
         customization_function: callable = None,
+        verbose: bool = True,
     ):
         """
         Plot data from the DataFrame, optionally grouped by a specific
@@ -1313,14 +1314,12 @@ class DataPlotter(DataFrameAnalyzer):
 
         # Get the grouped DataFrame
         grouped = self.group_by_multivalued_tunable_parameters(
-            filter_out_parameters_list=list(excluded)
+            filter_out_parameters_list=list(excluded),
+            verbose=verbose,
         )
 
         # styling_unique_group_values = grouped[styling_variable].unique().tolist()
         # print(styling_unique_group_values)
-
-        print("List of reduced multivalued tunable parameter names:")
-        print(self.reduced_multivalued_tunable_parameter_names_list)
 
         for group_keys, group_df in grouped:
             fig, ax = plt.subplots(figsize=figure_size)
