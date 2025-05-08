@@ -1236,6 +1236,7 @@ class DataPlotter(DataFrameAnalyzer):
         sorting_variable: str = None,
         sort_ascending: bool = None,
         figure_size=(7, 5),
+        font_size: int = 10,
         xaxis_label: str = None,
         yaxis_label: str = None,
         xaxis_log_scale: bool = False,
@@ -1254,6 +1255,7 @@ class DataPlotter(DataFrameAnalyzer):
         alternate_filled_markers: bool = False,
         capsize: float = 5,
         include_plot_title: bool = False,
+        title_size: int = 12,
         custom_plot_title: str = None,
         leading_plot_substring: str = None,
         excluded_from_title_list: list = None,
@@ -1341,23 +1343,19 @@ class DataPlotter(DataFrameAnalyzer):
                         metadata[special] = unique_vals[0]
 
             # Determine axes labels
-            if xaxis_label is not None:
-                ax.set_xlabel(xaxis_label)
-            else:
-                ax.set_xlabel(
-                    constants.AXES_LABELS_BY_COLUMN_NAME.get(
-                        self.xaxis_variable_name, ""
-                    )
+            if xaxis_label is None:
+                xaxis_label = constants.AXES_LABELS_BY_COLUMN_NAME.get(
+                    self.xaxis_variable_name, ""
                 )
+            ax.set_xlabel(xaxis_label, fontsize=font_size + 2)
 
-            if yaxis_label is not None:
-                ax.set_ylabel(yaxis_label)
-            else:
-                ax.set_ylabel(
-                    constants.AXES_LABELS_BY_COLUMN_NAME.get(
-                        self.yaxis_variable_name, ""
-                    )
+            if yaxis_label is None:
+                yaxis_label = constants.AXES_LABELS_BY_COLUMN_NAME.get(
+                    self.yaxis_variable_name, ""
                 )
+            ax.set_ylabel(yaxis_label, fontsize=font_size + 2)
+
+            ax.tick_params(axis="both", labelsize=font_size)
 
             # Axes scaling
             if (
@@ -1462,13 +1460,12 @@ class DataPlotter(DataFrameAnalyzer):
 
                         label_value = label_rows[labeling_variable].unique()
 
-
                         if len(label_value) == 1:
                             label_value = label_value[0]
-                        # else:
-                        #     raise ValueError(
-                        #         f"Multiple values found for '{labeling_variable}' within group '{value}'."
-                        #     )
+                            # else:
+                            #     raise ValueError(
+                            #         f"Multiple values found for '{labeling_variable}' within group '{value}'."
+                            #     )
 
                             # Format numerical labels nicely
                             if isinstance(label_value, (int, float)):
@@ -1518,7 +1515,7 @@ class DataPlotter(DataFrameAnalyzer):
                         capsize=capsize,
                         empty_markers=empty_marker,
                     )
-                legend = ax.legend(loc=legend_location)
+                legend = ax.legend(loc=legend_location, fontsize=font_size)
                 if include_legend_title:
                     legend_title = constants.LEGEND_LABELS_BY_COLUMN_NAME.get(
                         labeling_variable if labeling_variable else grouping_variable,
@@ -1528,7 +1525,7 @@ class DataPlotter(DataFrameAnalyzer):
                     # underscores with spaces
                     if "$" not in legend_title:
                         legend_title = legend_title.replace("_", " ")
-                    legend.set_title(legend_title)
+                    legend.set_title(legend_title, prop={"size": font_size + 1})
                 # ax.legend(title=legend_title, loc=legend_location)
 
             else:
@@ -1550,7 +1547,7 @@ class DataPlotter(DataFrameAnalyzer):
 
             if include_plot_title:
                 if custom_plot_title:
-                    ax.set_title(custom_plot_title)
+                    ax.set_title(custom_plot_title, fontsize=title_size)
                 else:
                     title = self._construct_plot_title(
                         metadata_dict=metadata,
