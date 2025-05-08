@@ -899,6 +899,7 @@ class TableGenerator(DataFrameAnalyzer):
         output_directory: str = None,
         filename: str = "summary_tables",
         file_format: str = "md",
+        verbose: bool = False,
     ) -> str:
         """
         Generate grouped summary tables with optional row/column pivots and
@@ -953,7 +954,8 @@ class TableGenerator(DataFrameAnalyzer):
                 filter_out_vars.add(var)
 
         groupby_obj = self.group_by_multivalued_tunable_parameters(
-            filter_out_parameters_list=list(filter_out_vars)
+            filter_out_parameters_list=list(filter_out_vars),
+            verbose=verbose,
         )
 
         all_tables = []
@@ -1085,6 +1087,7 @@ class TableGenerator(DataFrameAnalyzer):
         output_directory: str = None,
         filename: str = "comparison_table",
         file_format: str = "md",
+        verbose: bool = False,
     ) -> str:
         """
         Generate comparison tables (e.g., ratio or difference) of a value
@@ -1129,7 +1132,8 @@ class TableGenerator(DataFrameAnalyzer):
         filter_out_vars = list(filter_out_vars)
 
         groupby_obj = self.group_by_multivalued_tunable_parameters(
-            filter_out_parameters_list=filter_out_vars
+            filter_out_parameters_list=filter_out_vars,
+            verbose=verbose,
         )
 
         all_tables = []
