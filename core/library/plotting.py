@@ -1255,8 +1255,9 @@ class DataPlotter(DataFrameAnalyzer):
         alternate_filled_markers: bool = False,
         capsize: float = 5,
         include_plot_title: bool = False,
-        title_size: int = 12,
         custom_plot_title: str = None,
+        title_size: int = 12,
+        bold_title: bool = False,
         leading_plot_substring: str = None,
         excluded_from_title_list: list = None,
         title_number_format: str = ".2f",
@@ -1547,7 +1548,11 @@ class DataPlotter(DataFrameAnalyzer):
 
             if include_plot_title:
                 if custom_plot_title:
-                    ax.set_title(custom_plot_title, fontsize=title_size)
+                    ax.set_title(
+                        custom_plot_title,
+                        fontsize=title_size,
+                        weight="bold" if bold_title else "normal",
+                    )
                 else:
                     title = self._construct_plot_title(
                         metadata_dict=metadata,
@@ -1558,7 +1563,11 @@ class DataPlotter(DataFrameAnalyzer):
                         title_number_format=title_number_format,
                         title_wrapping_length=title_wrapping_length,
                     )
-                    ax.set_title(title)
+                    ax.set_title(
+                        title,
+                        fontsize=title_size,
+                        weight="bold" if bold_title else "normal",
+                    )
 
             # Construct filename and save
             filename = self._construct_plot_filename(
