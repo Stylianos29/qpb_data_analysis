@@ -1243,6 +1243,10 @@ class DataPlotter(DataFrameAnalyzer):
         yaxis_log_scale: bool = False,
         invert_xaxis: bool = False,
         invert_yaxis: bool = False,
+        xlim: tuple = None,
+        ylim: tuple = None,
+        xaxis_start_at_zero: bool = False,
+        yaxis_start_at_zero: bool = False,
         left_margin_adjustment: float = 0.14,
         right_margin_adjustment: float = 0.9,
         bottom_margin_adjustment: float = 0.12,
@@ -1256,6 +1260,7 @@ class DataPlotter(DataFrameAnalyzer):
         capsize: float = 5,
         include_plot_title: bool = False,
         custom_plot_title: str = None,
+        custom_plot_titles_dict: dict = None,
         title_size: int = 12,
         bold_title: bool = False,
         leading_plot_substring: str = None,
@@ -1548,13 +1553,14 @@ class DataPlotter(DataFrameAnalyzer):
 
             if include_plot_title:
                 if custom_plot_title:
-                    ax.set_title(
-                        custom_plot_title,
-                        fontsize=title_size,
-                        weight="bold" if bold_title else "normal",
+                    plot_title = custom_plot_title
+                elif custom_plot_titles_dict is not None:
+                    title_key = (
+                        group_keys if len(group_keys) > 1 else group_keys[0]
                     )
+                    plot_title = custom_plot_titles_dict.get(title_key, None)
                 else:
-                    title = self._construct_plot_title(
+                    plot_title = self._construct_plot_title(
                         metadata_dict=metadata,
                         grouping_variable=grouping_variable,
                         labeling_variable=labeling_variable,
@@ -1563,11 +1569,24 @@ class DataPlotter(DataFrameAnalyzer):
                         title_number_format=title_number_format,
                         title_wrapping_length=title_wrapping_length,
                     )
-                    ax.set_title(
-                        title,
-                        fontsize=title_size,
-                        weight="bold" if bold_title else "normal",
-                    )
+                ax.set_title(
+                    plot_title,
+                    fontsize=title_size,
+                    weight="bold" if bold_title else "normal",
+                )
+
+            # Set axis limits if specified
+            if xlim is not None:
+                ax.set_xlim(xlim)
+            elif xaxis_start_at_zero:
+                current_xlim = ax.get_xlim()
+                ax.set_xlim(left=0, right=current_xlim[1])
+
+            if ylim is not None:
+                ax.set_ylim(ylim)
+            elif yaxis_start_at_zero:
+                current_ylim = ax.get_ylim()
+                ax.set_ylim(bottom=0, top=current_ylim[1])
 
             # Construct filename and save
             filename = self._construct_plot_filename(
