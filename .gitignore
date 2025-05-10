@@ -6,9 +6,9 @@ bash_scripts/unit_tests/mock_data/*
 
 core/library/__pycache__/*
 core/qpb_data_analysis.egg-info/*
-core/unit_tests/__pycache__/*
-core/unit_tests/output_from_mock_data/*
-core/integration_tests/*/*
+core/tests/unit_tests/__pycache__/*
+core/tests/unit_tests/output_from_mock_data/*
+core/tests/integration_tests/*/*
 
 data_files/raw/*
 !data_files/raw/README.md
