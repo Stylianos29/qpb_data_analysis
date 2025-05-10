@@ -1256,6 +1256,7 @@ class DataPlotter(DataFrameAnalyzer):
         bottom_margin_adjustment: float = 0.12,
         top_margin_adjustment: float = 0.88,
         legend_location: str = "upper left",
+        legend_columns: int = 1,
         styling_variable: str = None,
         marker_color_map: dict = None,
         marker_size: int = 6,
@@ -1304,7 +1305,10 @@ class DataPlotter(DataFrameAnalyzer):
 
         # Use grouping values unless styling_variable is provided
         if styling_variable:
-            if styling_variable not in self.list_of_tunable_parameter_names_from_dataframe:
+            if (
+                styling_variable
+                not in self.list_of_tunable_parameter_names_from_dataframe
+            ):
                 raise ValueError("'styling_variable' must be tunable parameter.")
 
             styling_variable_unique_values = self.get_unique_values(styling_variable)
@@ -1509,7 +1513,9 @@ class DataPlotter(DataFrameAnalyzer):
                         capsize=capsize,
                         empty_markers=empty_marker,
                     )
-                legend = ax.legend(loc=legend_location, fontsize=font_size)
+                legend = ax.legend(
+                    loc=legend_location, fontsize=font_size, ncol=legend_columns
+                )
                 if include_legend_title:
                     legend_title = constants.LEGEND_LABELS_BY_COLUMN_NAME.get(
                         labeling_variable if labeling_variable else grouping_variable,
@@ -1520,7 +1526,6 @@ class DataPlotter(DataFrameAnalyzer):
                     if "$" not in legend_title:
                         legend_title = legend_title.replace("_", " ")
                     legend.set_title(legend_title, prop={"size": font_size + 1})
-                # ax.legend(title=legend_title, loc=legend_location)
 
             else:
                 # Individual plot
