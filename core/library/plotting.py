@@ -6,8 +6,20 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 import h5py
 from collections import defaultdict
+from scipy.optimize import curve_fit
+import gvar
+import lsqfit
 
 from library import DataFrameAnalyzer, TableGenerator, constants
+
+
+FIT_LABEL_POSITIONS = {
+    "top left": ((0.05, 0.95), ("left", "top")),
+    "top right": ((0.95, 0.95), ("right", "top")),
+    "bottom left": ((0.05, 0.05), ("left", "bottom")),
+    "bottom right": ((0.95, 0.05), ("right", "bottom")),
+    "center": ((0.5, 0.5), ("center", "center")),
+}
 
 
 class EnhancedHDF5Analyzer:
@@ -1194,6 +1206,151 @@ class DataPlotter(DataFrameAnalyzer):
 
         return prefix + "_".join(filename_parts) + suffix
 
+    def _apply_curve_fit(
+        self,
+        ax,
+        x_raw,
+        y_raw,
+        fit_function: str,
+        show_fit_parameters_on_plot: bool = True,
+        fit_curve_style: dict = None,
+        fit_label_format: str = ".2e",
+        fit_label_location: str = "top left",
+        fit_index_range: slice = slice(None),
+    ):
+        try:
+
+            if fit_index_range:
+                # Apply the fit only to a specific range of indices
+                x_raw = x_raw[fit_index_range]
+                y_raw = y_raw[fit_index_range]
+
+            position, alignment = FIT_LABEL_POSITIONS.get(
+                fit_label_location, ((0.05, 0.95), ("left", "top"))
+            )
+            if isinstance(y_raw[0], tuple) and len(y_raw[0]) == 2:
+
+                # gvar-based fit (with uncertainty)
+                y_gv = gvar.gvar([t[0] for t in y_raw], [t[1] for t in y_raw])
+                x_raw = np.asarray(x_raw, dtype=float)
+
+                def linear(x, p):
+                    return p[0] * x + p[1]
+
+                def exponential(x, p):
+                    return p[0] * np.exp(-p[1] * x)
+
+                def power_law(x, p):
+                    return p[0] * x ** p[1]
+
+                fit_func_map = {
+                    "linear": linear,
+                    "exponential": exponential,
+                    "power_law": power_law,
+                }
+
+                fcn = fit_func_map.get(fit_function)
+                if fcn is None:
+                    raise ValueError(f"Unsupported fit function: '{fit_function}'")
+
+                fit = lsqfit.nonlinear_fit(
+                    data=(x_raw, y_gv),
+                    fcn=fcn,
+                    p0=[1, 1],
+                    debug=False,
+                )
+
+                fit_params = gvar.mean(fit.p)
+                x_smooth = np.linspace(min(x_raw), max(x_raw), 200)
+                y_smooth = fcn(x_smooth, fit_params)
+
+                style = (
+                    {"color": "red", "linestyle": "--"}
+                    if fit_curve_style is None
+                    else fit_curve_style
+                )
+                ax.plot(x_smooth, gvar.mean(y_smooth), **style)
+
+                if show_fit_parameters_on_plot:
+                    a_fmt = format(fit_params[0], fit_label_format)
+                    b_fmt = format(fit_params[1], fit_label_format)
+                    param_text = f"a = {a_fmt}, b = {b_fmt}"
+                    ax.text(
+                        *position,
+                        param_text,
+                        transform=ax.transAxes,
+                        fontsize=10,
+                        verticalalignment=alignment[1],
+                        horizontalalignment=alignment[0],
+                        bbox=dict(boxstyle="round", facecolor="white", alpha=0.7),
+                    )
+                else:
+                    return fit_params
+
+            else:
+                # Regular fit with scipy
+                def linear(x, a, b):
+                    return a * x + b
+
+                def exponential(x, a, b):
+                    return a * np.exp(b * x)
+
+                def power_law(x, a, b):
+                    return a * x**b
+
+                fit_func_map = {
+                    "linear": linear,
+                    "exponential": exponential,
+                    "power_law": power_law,
+                }
+
+                fit_func = fit_func_map.get(fit_function)
+                if fit_func is None:
+                    raise ValueError(f"Unsupported fit function: '{fit_function}'")
+
+                # Remove NaNs
+                valid = ~np.isnan(x_raw) & ~np.isnan(y_raw)
+                x_fit = x_raw[valid]
+                y_fit = y_raw[valid]
+
+                if fit_function == "power_law" and np.any(x_fit <= 0):
+                    raise ValueError(
+                        "Power-law fit requires strictly positive x values."
+                    )
+
+                fit_params, _ = curve_fit(fit_func, x_fit, y_fit)
+
+                x_smooth = np.linspace(min(x_fit), max(x_fit), 200)
+                y_smooth = fit_func(x_smooth, *fit_params)
+
+                style = (
+                    {"color": "red", "linestyle": "--"}
+                    if fit_curve_style is None
+                    else fit_curve_style
+                )
+                ax.plot(x_smooth, y_smooth, **style)
+
+                if show_fit_parameters_on_plot:
+                    param_names = ["a", "b"]
+                    param_text = ", ".join(
+                        f"{name} = {val:{fit_label_format}}"
+                        for name, val in zip(param_names, fit_params)
+                    )
+                    ax.text(
+                        *position,
+                        param_text,
+                        transform=ax.transAxes,
+                        fontsize=10,
+                        verticalalignment=alignment[1],
+                        horizontalalignment=alignment[0],
+                        bbox=dict(boxstyle="round", facecolor="white", alpha=0.7),
+                    )
+                else:
+                    return fit_params
+
+        except Exception as e:
+            print(f"Fit failed: {e}")
+
     def set_plot_variables(
         self, x_variable: str, y_variable: str, clear_existing: bool = False
     ) -> None:
@@ -1274,6 +1431,14 @@ class DataPlotter(DataFrameAnalyzer):
         title_wrapping_length: int = 90,
         customization_function: callable = None,
         verbose: bool = True,
+        fit_function: str = None,  # e.g. "linear"
+        fit_label_format: str = ".2f",
+        show_fit_parameters_on_plot: bool = True,
+        fit_curve_style: dict = None,  # optional override
+        fit_label_location: str = "top left",
+        fit_index_range: tuple = None,  # default: include all
+        fit_on_values: list = None,
+        fit_label_in_legend: bool = False,
     ):
         """
         Plot data from the DataFrame, optionally grouped by a specific
@@ -1294,6 +1459,12 @@ class DataPlotter(DataFrameAnalyzer):
         yaxis_log_scale : bool, optional
             Use log scale for y-axis. Defaults to True if parameter is in
             EXPONENTIAL_FORMAT.
+
+            TODO: Refer to this example of slicing for fit_index_range parameter:
+            plot(..., fit_index_range=slice(3, None))      # From index 3 onward
+            plot(..., fit_index_range=slice(None, 10))     # Up to index 10
+            plot(..., fit_index_range=slice(3, 10))        # From 3 to 10 (exclusive)
+
         """
         if self.xaxis_variable_name is None or self.yaxis_variable_name is None:
             raise ValueError("Call 'set_plot_variables()' before plotting.")
@@ -1302,6 +1473,11 @@ class DataPlotter(DataFrameAnalyzer):
             empty_markers = (
                 False  # ignore user's empty_markers setting when alternating
             )
+
+        if fit_index_range:
+            if not isinstance(fit_index_range, tuple) or len(fit_index_range) != 2:
+                raise ValueError("fit_index_range must be a tuple like (start, stop)")
+            fit_index_range = slice(*fit_index_range)
 
         # Use grouping values unless styling_variable is provided
         if styling_variable:
@@ -1348,6 +1524,7 @@ class DataPlotter(DataFrameAnalyzer):
         marker, color = (".", "blue")
 
         for group_keys, group_df in grouped:
+
             fig, ax = plt.subplots(figsize=figure_size)
             ax.grid(True, linestyle="--", alpha=0.5)
 
@@ -1503,16 +1680,53 @@ class DataPlotter(DataFrameAnalyzer):
                         empty_marker = (
                             empty_markers  # regular user setting (could be False)
                         )
+
+                    fit_label_suffix = ""
+                    if fit_function is not None:
+                        # print(value)
+                        if fit_on_values is not None and not isinstance(
+                            fit_on_values, tuple
+                        ):
+                            fit_on_values = (fit_on_values,)
+
+                        if fit_on_values is None or value == fit_on_values:
+
+                            x_raw = subgroup[self.xaxis_variable_name].to_numpy()
+                            y_raw = subgroup[self.yaxis_variable_name].to_numpy()
+                            try:
+                                if fit_label_in_legend:
+                                    show_fit_parameters_on_plot = False
+
+                                params = self._apply_curve_fit(
+                                    ax,
+                                    x_raw,
+                                    y_raw,
+                                    fit_function=fit_function,
+                                    show_fit_parameters_on_plot=show_fit_parameters_on_plot,
+                                    fit_curve_style=fit_curve_style,
+                                    fit_label_format=fit_label_format,
+                                    fit_label_location=fit_label_location,
+                                    fit_index_range=fit_index_range,
+                                )
+
+                                if fit_label_in_legend:
+                                    a_fmt = format(params[0], fit_label_format)
+                                    b_fmt = format(params[1], fit_label_format)
+                                    fit_label_suffix = f" (a={a_fmt}, b={b_fmt})"
+                            except Exception as e:
+                                print(f"Fit failed for {value}: {e}")
+
                     self._plot_group(
                         ax,
                         subgroup,
-                        label=label,
+                        label=label + fit_label_suffix,
                         color=color,
                         marker=marker,
                         marker_size=marker_size,
                         capsize=capsize,
                         empty_markers=empty_marker,
                     )
+
                 legend = ax.legend(
                     loc=legend_location, fontsize=font_size, ncol=legend_columns
                 )
@@ -1538,6 +1752,21 @@ class DataPlotter(DataFrameAnalyzer):
                     capsize=capsize,
                     empty_markers=empty_markers,
                 )
+
+                if fit_function is not None:
+                    x_raw = group_df[self.xaxis_variable_name].to_numpy()
+                    y_raw = group_df[self.yaxis_variable_name].to_numpy()
+                    self._apply_curve_fit(
+                        ax,
+                        x_raw,
+                        y_raw,
+                        fit_function=fit_function,
+                        show_fit_parameters_on_plot=show_fit_parameters_on_plot,
+                        fit_curve_style=fit_curve_style,
+                        fit_label_format=fit_label_format,
+                        fit_label_location=fit_label_location,
+                        fit_index_range=fit_index_range,
+                    )
 
             fig.subplots_adjust(
                 left=left_margin_adjustment,
