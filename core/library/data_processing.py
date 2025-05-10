@@ -298,7 +298,7 @@ class DataFrameAnalyzer:
 
         return multivalued_columns_count_dictionary
 
-    def print_unique_values(self, column_name):
+    def get_unique_values(self, column_name, print_output: bool = False):
         """
         Print the count and list of unique values for a specified column.
 
@@ -327,9 +327,12 @@ class DataFrameAnalyzer:
             item.item() if hasattr(item, "item") else item for item in unique_values
         ]
 
-        # Print the information
-        print(f"Column '{column_name}' has {unique_count} unique values:")
-        print(unique_values_python)
+        if print_output:
+            # Print the information
+            print(f"Column '{column_name}' has {unique_count} unique values:")
+            print(unique_values_python)
+
+        return unique_values_python
 
     def group_by_multivalued_tunable_parameters(
         self,

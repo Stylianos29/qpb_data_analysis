@@ -180,7 +180,7 @@ class EnhancedHDF5Analyzer:
                 # Consider them as multi-valued in this case
                 self.output_quantities["multi_valued"][dataset_name] = len(paths)
 
-    def print_unique_values(self, parameter_name):
+    def get_unique_values(self, parameter_name, print_output: bool = False):
         """
         Print the count and list of unique values for a specified parameter.
 
@@ -199,8 +199,12 @@ class EnhancedHDF5Analyzer:
                 raise ValueError(f"Parameter '{parameter_name}' not found.")
 
         values = sorted(self.tunable_parameters["multi_valued"][parameter_name])
-        print(f"Parameter '{parameter_name}' has {len(values)} unique values:")
-        print(values)
+
+        if print_output:
+            print(f"Parameter '{parameter_name}' has {len(values)} unique values:")
+            print(values)
+
+        return values
 
     def get_dataset_values_by_parameters(self, dataset_name, parameters_dict):
         """
@@ -1298,6 +1302,16 @@ class DataPlotter(DataFrameAnalyzer):
                 False  # ignore user's empty_markers setting when alternating
             )
 
+        # Use grouping values unless styling_variable is provided
+        if styling_variable:
+            if styling_variable not in self.list_of_tunable_parameter_names_from_dataframe:
+                raise ValueError("'styling_variable' must be tunable parameter.")
+
+            styling_variable_unique_values = self.get_unique_values(styling_variable)
+            style_lookup = self._generate_marker_color_map(
+                styling_variable_unique_values, custom_map=marker_color_map
+            )
+
         # Determine which tunable parameters to exclude from grouping
         excluded = set(excluded_from_grouping_list or [])
         for axis_variable in [self.xaxis_variable_name, self.yaxis_variable_name]:
@@ -1326,8 +1340,8 @@ class DataPlotter(DataFrameAnalyzer):
             verbose=verbose,
         )
 
-        # styling_unique_group_values = grouped[styling_variable].unique().tolist()
-        # print(styling_unique_group_values)
+        # Initialize marker and color
+        marker, color = (".", "blue")
 
         for group_keys, group_df in grouped:
             fig, ax = plt.subplots(figsize=figure_size)
@@ -1347,6 +1361,11 @@ class DataPlotter(DataFrameAnalyzer):
                     unique_vals = group_df[special].unique()
                     if len(unique_vals) == 1:
                         metadata[special] = unique_vals[0]
+
+            if not grouping_variable and styling_variable:
+                # Get the style key from the whole group_df
+                style_key = group_df[styling_variable].iloc[0]
+                marker, color = style_lookup.get(style_key, ("o", "blue"))
 
             # Determine axes labels
             if xaxis_label is None:
@@ -1391,20 +1410,6 @@ class DataPlotter(DataFrameAnalyzer):
                 customization_function(ax)
 
             if grouping_variable:
-                # # Determine order of unique grouping values
-                # if sorting_variable:
-                #     unique_group_values = (
-                #         group_df.sort_values(
-                #             by=sorting_variable, ascending=(sort_ascending is not False)
-                #         )[grouping_columns]
-                #         .unique()
-                #         .tolist()
-                #     )
-                # else:
-                #     unique_group_values = (
-                #         group_df[grouping_columns[0]].unique().tolist()
-                #     )
-
                 if sorting_variable:
                     unique_group_values = (
                         group_df.sort_values(
@@ -1433,21 +1438,8 @@ class DataPlotter(DataFrameAnalyzer):
                     unique_group_values, custom_map=marker_color_map
                 )
 
-                # print(style_map)
-
-                # Combine subgroups in one plot
-                # for value, subgroup in group_df.groupby(
-                #     grouping_variable, observed=True, sort=False
-                # ):
                 for curve_index, value in enumerate(unique_group_values):
                     if labeling_variable:
-                        # Fetch unique value of labeling_variable for the current group
-                        # label_value = group_df.loc[
-                        #     group_df[grouping_variable] == value, labeling_variable
-                        # ].unique()
-
-                        # if isinstance(grouping_variable, str):
-                        #     label_rows = group_df[group_df[grouping_variable] == value]
                         if isinstance(grouping_variable, str):
                             actual_value = (
                                 value[0]
@@ -1468,10 +1460,6 @@ class DataPlotter(DataFrameAnalyzer):
 
                         if len(label_value) == 1:
                             label_value = label_value[0]
-                            # else:
-                            #     raise ValueError(
-                            #         f"Multiple values found for '{labeling_variable}' within group '{value}'."
-                            #     )
 
                             # Format numerical labels nicely
                             if isinstance(label_value, (int, float)):
@@ -1484,14 +1472,8 @@ class DataPlotter(DataFrameAnalyzer):
                         else:
                             label = str(value)
 
-                    # subgroup = group_df[group_df[grouping_variable] == value]
-
-                    # print(grouping_variable, value)
-
-                    # if isinstance(grouping_variable, str):
-                    #     subgroup = group_df[group_df[grouping_variable] == value]
                     if isinstance(grouping_variable, str):
-                        # Value is a 1-tuple like ('0004200',), extract the scalar
+                        # Value is a 1-tuple, extract the scalar
                         actual_value = (
                             value[0]
                             if isinstance(value, tuple) and len(value) == 1
@@ -1503,7 +1485,13 @@ class DataPlotter(DataFrameAnalyzer):
                         mask = group_df[grouping_variable].apply(tuple, axis=1) == value
                         subgroup = group_df[mask]
 
-                    marker, color = style_map[value]
+                    if grouping_variable and not styling_variable:
+                        marker, color = style_map[value]
+
+                    if grouping_variable and styling_variable:
+                        style_key = group_df[styling_variable].iloc[0]
+                        marker, color = style_lookup.get(style_key, ("o", "blue"))
+
                     # Alternate filling
                     if alternate_filled_markers:
                         empty_marker = curve_index % 2 == 1  # odd indices → empty
@@ -1539,6 +1527,8 @@ class DataPlotter(DataFrameAnalyzer):
                 self._plot_group(
                     ax,
                     group_df,
+                    color=color,
+                    marker=marker,
                     marker_size=marker_size,
                     capsize=capsize,
                     empty_markers=empty_markers,
@@ -1555,10 +1545,8 @@ class DataPlotter(DataFrameAnalyzer):
                 if custom_plot_title:
                     plot_title = custom_plot_title
                 elif custom_plot_titles_dict is not None:
-                    title_key = (
-                        group_keys if len(group_keys) > 1 else group_keys[0]
-                    )
-                    plot_title = custom_plot_titles_dict.get(title_key, None)
+                    title_key = group_keys if len(group_keys) > 1 else group_keys[0]
+                    plot_title = custom_plot_titles_dict.get(title_key, "")
                 else:
                     plot_title = self._construct_plot_title(
                         metadata_dict=metadata,

@@ -436,7 +436,9 @@ def main(
 
                 output = io.StringIO()
                 with redirect_stdout(output):
-                    analyzer.print_unique_values(show_unique_values_for)
+                    analyzer.get_unique_values(
+                        show_unique_values_for, print_output=True
+                    )
 
                 write_content(output.getvalue())
             except Exception as e:
