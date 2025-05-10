@@ -3,7 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 import h5py
-from typing import List, Set, Dict
+from typing import List, Dict, Callable, Union
 
 from library import constants
 
@@ -896,7 +896,7 @@ class TableGenerator(DataFrameAnalyzer):
         value_variable: str,
         row_variable: str = None,
         column_variable: str = None,
-        aggregation: str = "count",
+        aggregation: Union[str, Callable] = "count",
         exclude_from_grouping: list = None,
         export_to_file: bool = False,
         output_directory: str = None,
@@ -912,8 +912,10 @@ class TableGenerator(DataFrameAnalyzer):
             - value_variable (str): The variable to summarize.
             - row_variable (str, optional): Row variable in table.
             - column_variable (str, optional): Column variable in table.
-            - aggregation (str, optional): One of 'count', 'list', 'len', 'min',
-              'max', 'mean'.
+            - aggregation (Union[str, Callable], optional): Either one of the built-in
+              aggregation methods ('count', 'list', 'len', 'min', 'max', 'mean'), or
+              a custom callable function that takes a pandas Series as input and
+              returns a value.
             - exclude_from_grouping (list, optional): Additional tunable
               parameters to exclude from grouping.
             - export_to_file (bool, optional): Whether to export the table to a
@@ -928,11 +930,19 @@ class TableGenerator(DataFrameAnalyzer):
         Returns:
             str: A single formatted string containing all tables.
         """
-        supported_aggregations = {"count", "list", "len", "min", "max", "mean"}
-        if aggregation not in supported_aggregations:
+        # If aggregation is a string, check if it's a supported built-in
+        built_in_aggregations = {"count", "list", "len", "min", "max", "mean"}
+        if isinstance(aggregation, str) and aggregation not in built_in_aggregations:
             raise ValueError(
                 f"Unsupported aggregation: '{aggregation}'. "
-                f"Must be one of {supported_aggregations}."
+                f"Must be one of {built_in_aggregations} or a custom callable."
+            )
+
+        # If aggregation is not a string, it should be callable
+        if not isinstance(aggregation, str) and not callable(aggregation):
+            raise ValueError(
+                f"aggregation must be either a string from {built_in_aggregations} "
+                f"or a custom callable function."
             )
 
         for var in [value_variable, row_variable, column_variable]:
@@ -963,6 +973,24 @@ class TableGenerator(DataFrameAnalyzer):
 
         all_tables = []
 
+        # Define custom aggregation wrapper
+        def apply_aggregation(series, agg):
+            """Apply either built-in or custom aggregation to a series."""
+            if callable(agg):
+                return agg(series)
+            elif agg == "count":
+                return series.nunique()
+            elif agg == "list":
+                return ", ".join(str(v) for v in sorted(series.unique()))
+            elif agg == "len":
+                return len(series)
+            elif agg == "min":
+                return series.min()
+            elif agg == "max":
+                return series.max()
+            elif agg == "mean":
+                return series.mean()
+
         for idx, (group_keys, group_df) in enumerate(groupby_obj):
             if not isinstance(group_keys, tuple):
                 group_keys = (group_keys,)
@@ -970,95 +998,62 @@ class TableGenerator(DataFrameAnalyzer):
                 zip(self.reduced_multivalued_tunable_parameter_names_list, group_keys)
             )
 
-            # Convert NumPy scalar types (e.g., np.float64, np.int64) to native
-            # Python types to avoid verbose representations like
-            # "np.float64(0.1)" when printing or formatting
+            # Convert NumPy scalar types to native Python types
             clean_group_dict = {
                 k: v.item() if isinstance(v, np.generic) else v
                 for k, v in group_dict.items()
             }
+
+            # Determine aggregation label for the table
+            agg_label = aggregation.__name__ if callable(aggregation) else aggregation
+
             table_lines = [f"#### Group {idx+1}:\n{clean_group_dict}", ""]
 
-            # 0D case
+            # 0D case (no row or column variables)
             if row_variable is None and column_variable is None:
                 values = group_df[value_variable]
-                if aggregation == "count":
-                    result = values.nunique()
-                elif aggregation == "list":
-                    result = ", ".join(str(v) for v in sorted(values.unique()))
-                elif aggregation == "len":
-                    result = len(values)
-                elif aggregation == "min":
-                    result = values.min()
-                elif aggregation == "max":
-                    result = values.max()
-                elif aggregation == "mean":
-                    result = values.mean()
-                table_lines.append(f"{value_variable} ({aggregation}): {result}")
+                result = apply_aggregation(values, aggregation)
+                table_lines.append(f"{value_variable} ({agg_label}): {result}")
 
-            # 1D case
-            elif row_variable is not None and column_variable is None:
-                group = group_df.groupby(row_variable, observed=True)[value_variable]
-            elif column_variable is not None and row_variable is None:
-                group = group_df.groupby(column_variable, observed=True)[value_variable]
+            # 1D case (only row or column variable)
+            elif (row_variable is not None) ^ (column_variable is not None):
+                grouping_var = (
+                    row_variable if row_variable is not None else column_variable
+                )
+                group = group_df.groupby(grouping_var, observed=True)[value_variable]
 
-            if (row_variable is not None) ^ (column_variable is not None):
                 result_dict = {}
                 for key, subset in group:
-                    if aggregation == "count":
-                        result = subset.nunique()
-                    elif aggregation == "list":
-                        result = ", ".join(str(v) for v in sorted(subset.unique()))
-                    elif aggregation == "len":
-                        result = len(subset)
-                    elif aggregation == "min":
-                        result = subset.min()
-                    elif aggregation == "max":
-                        result = subset.max()
-                    elif aggregation == "mean":
-                        result = subset.mean()
+                    result = apply_aggregation(subset, aggregation)
                     result_dict[key] = result
 
-                label = row_variable or column_variable
-                table_lines.append(f"{label} | {aggregation} of {value_variable}")
+                table_lines.append(f"{grouping_var} | {agg_label} of {value_variable}")
                 table_lines.append("-- | --")
                 for k in sorted(result_dict):
                     table_lines.append(f"{k} | {result_dict[k]}")
 
-            # 2D case
+            # 2D case (both row and column variables)
             elif row_variable is not None and column_variable is not None:
                 pivot_df = group_df.groupby(
                     [row_variable, column_variable], observed=True
                 )[value_variable]
 
-                if aggregation == "count":
-                    table_df = pivot_df.nunique().unstack(fill_value=0)
-                elif aggregation == "list":
-                    table_df = pivot_df.apply(
-                        lambda x: ", ".join(str(v) for v in sorted(x.unique()))
-                    ).unstack(fill_value="")
-                elif aggregation == "len":
-                    table_df = pivot_df.size().unstack(fill_value=0)
-                elif aggregation == "min":
-                    table_df = pivot_df.min().unstack()
-                elif aggregation == "max":
-                    table_df = pivot_df.max().unstack()
-                elif aggregation == "mean":
-                    table_df = pivot_df.mean().unstack()
+                # Apply the aggregation to create the pivot table
+                table_df = pivot_df.apply(
+                    lambda x: apply_aggregation(x, aggregation)
+                ).unstack(fill_value="" if isinstance(aggregation, str) else None)
 
-                # Format
+                # Format the table
                 headers = [f"{row_variable} \\ {column_variable}"] + [
                     str(col) for col in table_df.columns
                 ]
                 table_lines.append(" | ".join(headers))
-                table_lines.append(
-                    #
-                    " | ".join([":" + "-" * len(h) for h in headers])
-                )
+                table_lines.append(" | ".join([":" + "-" * len(h) for h in headers]))
 
                 for row_index, row in table_df.iterrows():
                     row_str = f"{row_index} | " + " | ".join(
-                        str(row[col]) for col in table_df.columns
+                        str(row[col]) if pd.notnull(row[col]) else ""
+                        for col in table_df.columns
                     )
                     table_lines.append(row_str)
 
