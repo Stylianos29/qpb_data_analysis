@@ -195,6 +195,16 @@ class DataFrameAnalyzer:
 
         return multivalued_columns_count_dictionary
 
+    def __enter__(self):
+        """Enter context manager - store current dataframe state."""
+        self._context_dataframe = self.dataframe.copy()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit context manager - restore original dataframe."""
+        self.dataframe = self._context_dataframe
+        self._update_column_categories()
+
     def get_unique_values(self, column_name, print_output: bool = False) -> list:
         """
         Print the count and list of unique values for a specified column.
@@ -359,6 +369,15 @@ class DataFrameAnalyzer:
                 )
             analyzer.restrict_dataframe(filter_func=complex_filter)
         """
+        if condition is None and filter_func is None:
+            raise ValueError("Either condition or filter_func must be provided")
+
+        if condition is not None and not isinstance(condition, str):
+            raise TypeError("condition must be a string")
+
+        if filter_func is not None and not callable(filter_func):
+            raise TypeError("filter_func must be callable")
+
         try:
             if condition is not None:
                 # Use `query` to filter the DataFrame based on the condition
@@ -376,6 +395,8 @@ class DataFrameAnalyzer:
 
         except Exception as e:
             raise ValueError(f"Failed to apply filter: {e}")
+
+        return self  # Return self for method chaining
 
     def add_derived_column(
         self, new_column_name, derivation_function=None, expression=None
@@ -415,34 +436,45 @@ class DataFrameAnalyzer:
                 "total_energy", expression="kinetic_energy + potential_energy"
             )
         """
-        # Check if the column name already exists
-        if new_column_name in self.list_of_dataframe_column_names:
-            raise ValueError(
-                f"Column '{new_column_name}' already exists in the DataFrame."
-            )
-
-        # Check that at least one method is provided
-        if derivation_function is None and expression is None:
-            raise ValueError(
-                "Either derivation_function or expression must be provided."
-            )
-
         try:
-            if derivation_function is not None:
-                # Apply the provided function to derive the new column
-                self.dataframe[new_column_name] = derivation_function(self.dataframe)
-            elif expression is not None:
-                # Evaluate the expression string using pandas eval
-                self.dataframe[new_column_name] = self.dataframe.eval(expression)
+            # Check if the column name already exists
+            if new_column_name in self.list_of_dataframe_column_names:
+                raise ValueError(
+                    f"Column '{new_column_name}' already exists in the DataFrame."
+                )
 
-            # Update column categories to include the new column
-            self._update_column_categories()
+            # Check that at least one method is provided
+            if derivation_function is None and expression is None:
+                raise ValueError(
+                    "Either derivation_function or expression must be provided."
+                )
+
+            try:
+                if derivation_function is not None:
+                    # Apply the provided function to derive the new column
+                    self.dataframe[new_column_name] = derivation_function(
+                        self.dataframe
+                    )
+                elif expression is not None:
+                    # Evaluate the expression string using pandas eval
+                    self.dataframe[new_column_name] = self.dataframe.eval(expression)
+
+                # Update column categories to include the new column
+                self._update_column_categories()
+
+            except Exception as e:
+                # If anything goes wrong, clean up and raise the exception
+                if new_column_name in self.dataframe.columns:
+                    self.dataframe.drop(columns=[new_column_name], inplace=True)
+                raise ValueError(f"Failed to create derived column: {e}")
 
         except Exception as e:
-            # If anything goes wrong, clean up and raise the exception
+            # Clean up and provide more context in the error
             if new_column_name in self.dataframe.columns:
                 self.dataframe.drop(columns=[new_column_name], inplace=True)
-            raise ValueError(f"Failed to create derived column: {e}")
+
+            error_type = type(e).__name__
+            raise ValueError(f"Failed to create derived column: {error_type}: {e}")
 
     def restore_original_dataframe(self):
         """
