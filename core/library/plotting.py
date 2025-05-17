@@ -9,6 +9,7 @@ from collections import defaultdict
 from scipy.optimize import curve_fit
 import gvar
 import lsqfit
+from matplotlib.colors import to_rgba
 
 from library import DataFrameAnalyzer, TableGenerator, constants
 
@@ -759,9 +760,6 @@ class DataPlotter(DataFrameAnalyzer):
         x_raw = group_df[self.xaxis_variable_name].to_numpy()
         y_raw = group_df[self.yaxis_variable_name].to_numpy()
 
-        # print(x_raw)
-        # print(y_raw)
-
         # is_tuple_array = lambda arr: (isinstance(arr[0], tuple) and len(arr[0]) == 2)
 
         def is_tuple_array(arr):
@@ -969,7 +967,7 @@ class DataPlotter(DataFrameAnalyzer):
                 )
 
     def _generate_marker_color_map(
-        self, grouping_values: list, custom_map: dict = None
+        self, grouping_values: list, custom_map: dict = None, index_shift: int = 0,
     ) -> dict:
         """
         Generate a stable mapping from grouping values to (marker, color) pairs.
@@ -996,8 +994,8 @@ class DataPlotter(DataFrameAnalyzer):
             if custom_map and value in custom_map:
                 style_map[value] = custom_map[value]
             else:
-                marker = constants.MARKER_STYLES[idx % num_markers]
-                color = constants.DEFAULT_COLORS[idx % num_colors]
+                marker = constants.MARKER_STYLES[(idx + index_shift) % num_markers]
+                color = constants.DEFAULT_COLORS[(idx + index_shift) % num_colors]
                 style_map[value] = (marker, color)
 
         return style_map
@@ -1011,6 +1009,7 @@ class DataPlotter(DataFrameAnalyzer):
         excluded_from_title_list: list = None,
         title_number_format: str = ".2f",  # ".4g" for scientific/float hybrid format
         title_wrapping_length: int = 90,
+        title_from_columns: list = None,
     ) -> str:
         """
         Construct an informative plot title based on metadata and user
@@ -1039,6 +1038,26 @@ class DataPlotter(DataFrameAnalyzer):
         # 1. Include leading substring if given
         if leading_plot_substring:
             title_parts.append(leading_plot_substring)
+
+        # 1.5. Shortcut override: simple title from selected columns
+        if title_from_columns:
+            simple_parts = []
+            for col in title_from_columns:
+                value = metadata_dict.get(col)
+                if value is None:
+                    continue
+                label = constants.TITLE_LABELS_BY_COLUMN_NAME.get(col, col)
+                if isinstance(value, (int, float)):
+                    formatted_value = format(value, title_number_format)
+                else:
+                    formatted_value = str(value)
+
+                if "Kernel_operator_type" in col:
+                    simple_parts.append(f"{formatted_value} Kernel")
+                else:
+                    simple_parts.append(f"{label}={formatted_value}")
+            return ", ".join(simple_parts)
+
 
         # 2. Handle Overlap/Kernel/KL_or_Chebyshev_Order special logic
         excluded = set(excluded_from_title_list or [])
@@ -1217,6 +1236,7 @@ class DataPlotter(DataFrameAnalyzer):
         fit_label_format: str = ".2e",
         fit_label_location: str = "top left",
         fit_index_range: slice = slice(None),
+        fit_curve_range: tuple = None,
     ):
         try:
 
@@ -1238,7 +1258,7 @@ class DataPlotter(DataFrameAnalyzer):
                     return p[0] * x + p[1]
 
                 def exponential(x, p):
-                    return p[0] * np.exp(-p[1] * x)
+                    return p[0] * np.exp(-p[1] * x) + p[2]
 
                 def power_law(x, p):
                     return p[0] * x ** p[1]
@@ -1249,6 +1269,12 @@ class DataPlotter(DataFrameAnalyzer):
                     "power_law": power_law,
                 }
 
+                p0_map = {
+                    "linear": [1, 1],
+                    "exponential": [1, 1, 1],
+                    "power_law": [1, 1],
+                }
+
                 fcn = fit_func_map.get(fit_function)
                 if fcn is None:
                     raise ValueError(f"Unsupported fit function: '{fit_function}'")
@@ -1256,19 +1282,29 @@ class DataPlotter(DataFrameAnalyzer):
                 fit = lsqfit.nonlinear_fit(
                     data=(x_raw, y_gv),
                     fcn=fcn,
-                    p0=[1, 1],
+                    p0=p0_map.get(fit_function),
                     debug=False,
                 )
 
+                if fit_curve_range is not None:
+                    x_min, x_max = fit_curve_range
+                else:
+                    x_min, x_max = min(x_raw), max(x_raw)
+
                 fit_params = gvar.mean(fit.p)
-                x_smooth = np.linspace(min(x_raw), max(x_raw), 200)
+                x_smooth = np.linspace(x_min, x_max, 200)
+                # x_smooth = np.linspace(min(x_raw), max(x_raw), 200)
                 y_smooth = fcn(x_smooth, fit_params)
 
-                style = (
-                    {"color": "red", "linestyle": "--"}
-                    if fit_curve_style is None
-                    else fit_curve_style
-                )
+                if fit_curve_style is None:
+                    rgba = to_rgba(self.color)  # Use the marker color
+                    lighter_rgba = (
+                        *rgba[:3],
+                        0.5,
+                    )  # Keep RGB, reduce alpha to 0.5 for transparency
+                    style = {"color": lighter_rgba, "linestyle": "--"}
+                else:
+                    style = fit_curve_style
                 ax.plot(x_smooth, gvar.mean(y_smooth), **style)
 
                 if show_fit_parameters_on_plot:
@@ -1323,11 +1359,15 @@ class DataPlotter(DataFrameAnalyzer):
                 x_smooth = np.linspace(min(x_fit), max(x_fit), 200)
                 y_smooth = fit_func(x_smooth, *fit_params)
 
-                style = (
-                    {"color": "red", "linestyle": "--"}
-                    if fit_curve_style is None
-                    else fit_curve_style
-                )
+                if fit_curve_style is None:
+                    rgba = to_rgba(self.color)  # Use the marker color
+                    lighter_rgba = (
+                        *rgba[:3],
+                        0.5,
+                    )  # Keep RGB, reduce alpha to 0.5 for transparency
+                    style = {"color": lighter_rgba, "linestyle": "--"}
+                else:
+                    style = fit_curve_style
                 ax.plot(x_smooth, y_smooth, **style)
 
                 if show_fit_parameters_on_plot:
@@ -1394,10 +1434,13 @@ class DataPlotter(DataFrameAnalyzer):
         labeling_variable: str = None,
         legend_number_format: str = ".2f",
         include_legend_title: bool = True,
+        include_legend: bool = True,
+        legend_location: str = "upper left",
+        legend_columns: int = 1,
         sorting_variable: str = None,
         sort_ascending: bool = None,
         figure_size=(7, 5),
-        font_size: int = 10,
+        font_size: int = 13,
         xaxis_label: str = None,
         yaxis_label: str = None,
         xaxis_log_scale: bool = False,
@@ -1408,22 +1451,23 @@ class DataPlotter(DataFrameAnalyzer):
         ylim: tuple = None,
         xaxis_start_at_zero: bool = False,
         yaxis_start_at_zero: bool = False,
-        left_margin_adjustment: float = 0.14,
-        right_margin_adjustment: float = 0.9,
+        left_margin_adjustment: float = 0.15,
+        right_margin_adjustment: float = 0.94,
         bottom_margin_adjustment: float = 0.12,
-        top_margin_adjustment: float = 0.88,
-        legend_location: str = "upper left",
-        legend_columns: int = 1,
+        top_margin_adjustment: float = 0.92,
         styling_variable: str = None,
         marker_color_map: dict = None,
-        marker_size: int = 6,
+        color_index_shift: int = 0,
+        marker_size: int = 8,
         empty_markers: bool = False,
         alternate_filled_markers: bool = False,
+        alternate_filled_markers_reversed: bool = False,
         capsize: float = 5,
         include_plot_title: bool = False,
         custom_plot_title: str = None,
+        title_from_columns: list = None,
         custom_plot_titles_dict: dict = None,
-        title_size: int = 12,
+        title_size: int = 15,
         bold_title: bool = False,
         leading_plot_substring: str = None,
         excluded_from_title_list: list = None,
@@ -1439,6 +1483,7 @@ class DataPlotter(DataFrameAnalyzer):
         fit_index_range: tuple = None,  # default: include all
         fit_on_values: list = None,
         fit_label_in_legend: bool = False,
+        fit_curve_range: tuple = None,
     ):
         """
         Plot data from the DataFrame, optionally grouped by a specific
@@ -1489,7 +1534,7 @@ class DataPlotter(DataFrameAnalyzer):
 
             styling_variable_unique_values = self.get_unique_values(styling_variable)
             style_lookup = self._generate_marker_color_map(
-                styling_variable_unique_values, custom_map=marker_color_map
+                styling_variable_unique_values, custom_map=marker_color_map, index_shift=color_index_shift,
             )
 
         # Determine which tunable parameters to exclude from grouping
@@ -1616,36 +1661,74 @@ class DataPlotter(DataFrameAnalyzer):
 
                 # Build color/marker map once per plot
                 style_map = self._generate_marker_color_map(
-                    unique_group_values, custom_map=marker_color_map
+                    unique_group_values, custom_map=marker_color_map, index_shift=color_index_shift,
                 )
 
                 for curve_index, value in enumerate(unique_group_values):
                     if labeling_variable:
-                        if isinstance(grouping_variable, str):
-                            actual_value = (
-                                value[0]
-                                if isinstance(value, tuple) and len(value) == 1
-                                else value
-                            )
-                            label_rows = group_df[
-                                group_df[grouping_variable] == actual_value
-                            ]
+                        if (
+                            isinstance(labeling_variable, list)
+                            and len(labeling_variable) == 2
+                        ):
+                            var1, var2 = labeling_variable
+
+                            if isinstance(grouping_variable, str):
+                                actual_value = (
+                                    value[0]
+                                    if isinstance(value, tuple) and len(value) == 1
+                                    else value
+                                )
+                                label_rows = group_df[
+                                    group_df[grouping_variable] == actual_value
+                                ]
+                            else:
+                                mask = (
+                                    group_df[grouping_variable].apply(tuple, axis=1)
+                                    == value
+                                )
+                                label_rows = group_df[mask]
+
+                            val1 = label_rows[var1].unique()
+                            val2 = label_rows[var2].unique()
+
+                            if len(val1) == 1:
+                                val1 = val1[0]
+                            if len(val2) == 1:
+                                val2 = val2[0]
+
+                            if isinstance(val2, (int, float)):
+                                val2 = format(val2, legend_number_format)
+
+                            label = f"{val1} ({constants.LEGEND_LABELS_BY_COLUMN_NAME.get(var2, var2)}{val2})"
+
                         else:
-                            mask = (
-                                group_df[grouping_variable].apply(tuple, axis=1)
-                                == value
-                            )
-                            label_rows = group_df[mask]
+                            # Old logic for string-valued labeling_variable
+                            if isinstance(grouping_variable, str):
+                                actual_value = (
+                                    value[0]
+                                    if isinstance(value, tuple) and len(value) == 1
+                                    else value
+                                )
+                                label_rows = group_df[
+                                    group_df[grouping_variable] == actual_value
+                                ]
+                            else:
+                                mask = (
+                                    group_df[grouping_variable].apply(tuple, axis=1)
+                                    == value
+                                )
+                                label_rows = group_df[mask]
 
-                        label_value = label_rows[labeling_variable].unique()
+                            label_value = label_rows[labeling_variable].unique()
 
-                        if len(label_value) == 1:
-                            label_value = label_value[0]
+                            if len(label_value) == 1:
+                                label_value = label_value[0]
+                                if isinstance(label_value, (int, float)):
+                                    label_value = format(
+                                        label_value, legend_number_format
+                                    )
+                            label = str(label_value)
 
-                            # Format numerical labels nicely
-                            if isinstance(label_value, (int, float)):
-                                label_value = format(label_value, legend_number_format)
-                        label = str(label_value)
                     else:
                         # label = str(value)
                         if isinstance(value, tuple):
@@ -1676,6 +1759,8 @@ class DataPlotter(DataFrameAnalyzer):
                     # Alternate filling
                     if alternate_filled_markers:
                         empty_marker = curve_index % 2 == 1  # odd indices → empty
+                        if alternate_filled_markers_reversed:
+                            empty_marker = not empty_marker
                     else:
                         empty_marker = (
                             empty_markers  # regular user setting (could be False)
@@ -1683,7 +1768,9 @@ class DataPlotter(DataFrameAnalyzer):
 
                     fit_label_suffix = ""
                     if fit_function is not None:
-                        # print(value)
+
+                        self.color = color
+
                         if fit_on_values is not None and not isinstance(
                             fit_on_values, tuple
                         ):
@@ -1707,12 +1794,17 @@ class DataPlotter(DataFrameAnalyzer):
                                     fit_label_format=fit_label_format,
                                     fit_label_location=fit_label_location,
                                     fit_index_range=fit_index_range,
+                                    fit_curve_range=fit_curve_range,
                                 )
 
                                 if fit_label_in_legend:
-                                    a_fmt = format(params[0], fit_label_format)
-                                    b_fmt = format(params[1], fit_label_format)
-                                    fit_label_suffix = f" (a={a_fmt}, b={b_fmt})"
+                                    if fit_function == "exponential":
+                                        c_fmt = format(params[2], fit_label_format)
+                                        fit_label_suffix = f" (a$m^{{n\\to\\infty}}_{{\\text{{PCAC}}}}$={c_fmt})"
+                                    else:
+                                        a_fmt = format(params[0], fit_label_format)
+                                        b_fmt = format(params[1], fit_label_format)
+                                        fit_label_suffix = f" (a={a_fmt}, b={b_fmt})"
                             except Exception as e:
                                 print(f"Fit failed for {value}: {e}")
 
@@ -1726,20 +1818,28 @@ class DataPlotter(DataFrameAnalyzer):
                         capsize=capsize,
                         empty_markers=empty_marker,
                     )
-
-                legend = ax.legend(
-                    loc=legend_location, fontsize=font_size, ncol=legend_columns
-                )
-                if include_legend_title:
-                    legend_title = constants.LEGEND_LABELS_BY_COLUMN_NAME.get(
-                        labeling_variable if labeling_variable else grouping_variable,
-                        labeling_variable if labeling_variable else grouping_variable,
+                if include_legend:
+                    legend = ax.legend(
+                        loc=legend_location, fontsize=font_size, ncol=legend_columns
                     )
-                    # If the title is not a LaTeX string (no $ symbols), replace
-                    # underscores with spaces
-                    if "$" not in legend_title:
-                        legend_title = legend_title.replace("_", " ")
-                    legend.set_title(legend_title, prop={"size": font_size + 1})
+                    if include_legend_title:
+                        legend_title = constants.LEGEND_LABELS_BY_COLUMN_NAME.get(
+                            (
+                                labeling_variable
+                                if labeling_variable
+                                else grouping_variable
+                            ),
+                            (
+                                labeling_variable
+                                if labeling_variable
+                                else grouping_variable
+                            ),
+                        )
+                        # If the title is not a LaTeX string (no $ symbols), replace
+                        # underscores with spaces
+                        if "$" not in legend_title:
+                            legend_title = legend_title.replace("_", " ")
+                        legend.set_title(legend_title, prop={"size": font_size + 1})
 
             else:
                 # Individual plot
@@ -1766,6 +1866,7 @@ class DataPlotter(DataFrameAnalyzer):
                         fit_label_format=fit_label_format,
                         fit_label_location=fit_label_location,
                         fit_index_range=fit_index_range,
+                        fit_curve_range=fit_curve_range,
                     )
 
             fig.subplots_adjust(
@@ -1790,6 +1891,7 @@ class DataPlotter(DataFrameAnalyzer):
                         excluded_from_title_list=excluded_from_title_list,
                         title_number_format=title_number_format,
                         title_wrapping_length=title_wrapping_length,
+                        title_from_columns=title_from_columns,
                     )
                 ax.set_title(
                     plot_title,
@@ -1813,7 +1915,10 @@ class DataPlotter(DataFrameAnalyzer):
             # Construct filename and save
             filename = self._construct_plot_filename(
                 metadata_dict=metadata,
-                include_combined_prefix=(grouping_variable is not None),
+                include_combined_prefix=(
+                    grouping_variable is not None and leading_plot_substring is None
+                ),
+                custom_leading_substring=leading_plot_substring,
                 grouping_variable=grouping_variable,
             )
             if grouping_variable:
@@ -2506,3 +2611,4 @@ class HDF5Plotter(EnhancedHDF5Analyzer):
                 plotter.plot(**plot_args)
 
         return plotter
+
