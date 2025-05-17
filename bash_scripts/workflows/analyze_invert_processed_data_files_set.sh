@@ -443,44 +443,44 @@ log_message="A summary of the ${CALCULATION_COST_FROM_PCAC_MASS_CSV_FILENAME} .c
 log_message+=" file was generated."
 log "INFO" "$log_message"
 
-# CALCULATION COST OF CRITICAL BARE FROM EFFECTIVE MASS ESTIMATES
+# # CALCULATION COST OF CRITICAL BARE FROM EFFECTIVE MASS ESTIMATES
 
-# Validate python script
-python_script_path="${PYTHON_SCRIPTS_DIRECTORY}/post_processing_analysis"
-python_script_path+="/estimate_calculation_cost_of_critical_bare_from_effective_mass.py"
-check_if_file_exists "$python_script_path" || exit 1
+# # Validate python script
+# python_script_path="${PYTHON_SCRIPTS_DIRECTORY}/post_processing_analysis"
+# python_script_path+="/estimate_calculation_cost_of_critical_bare_from_effective_mass.py"
+# check_if_file_exists "$python_script_path" || exit 1
 
-python $python_script_path \
-    --input_pion_effective_mass_estimates_csv_file_path \
-                                "$pion_effective_mass_estimate_csv_file_path" \
-    --plots_directory "$data_files_set_plots_directory" \
-    --plot_critical_bare_mass --plot_calculation_cost \
-    --output_calculation_cost_csv_filename \
-                        "$CALCULATION_COST_FROM_EFFECTIVE_MASS_CSV_FILENAME" \
-    --log_file_directory "$auxiliary_files_directory" \
-    || failed_python_script $python_script_path
+# python $python_script_path \
+#     --input_pion_effective_mass_estimates_csv_file_path \
+#                                 "$pion_effective_mass_estimate_csv_file_path" \
+#     --plots_directory "$data_files_set_plots_directory" \
+#     --plot_critical_bare_mass --plot_calculation_cost \
+#     --output_calculation_cost_csv_filename \
+#                         "$CALCULATION_COST_FROM_EFFECTIVE_MASS_CSV_FILENAME" \
+#     --log_file_directory "$auxiliary_files_directory" \
+#     || failed_python_script $python_script_path
 
-# Log successful calculation
-log_message="Estimation of calculation cost from effective mass estimates for"
-log_message+=" ${processed_data_files_set_directory} data files set completed."
-log "INFO" "$log_message"
+# # Log successful calculation
+# log_message="Estimation of calculation cost from effective mass estimates for"
+# log_message+=" ${processed_data_files_set_directory} data files set completed."
+# log "INFO" "$log_message"
 
-# Validate output .csv file
-calculation_cost_csv_file_path="${processed_data_files_set_directory}/"
-calculation_cost_csv_file_path+="$CALCULATION_COST_FROM_EFFECTIVE_MASS_CSV_FILENAME"
-check_if_file_exists "$calculation_cost_csv_file_path" || exit 1
+# # Validate output .csv file
+# calculation_cost_csv_file_path="${processed_data_files_set_directory}/"
+# calculation_cost_csv_file_path+="$CALCULATION_COST_FROM_EFFECTIVE_MASS_CSV_FILENAME"
+# check_if_file_exists "$calculation_cost_csv_file_path" || exit 1
 
-# Generate a summary for output .csv file
-python $inspect_csv_file_python_script_path \
-    --csv_file_path "$calculation_cost_csv_file_path" \
-    --output_directory "$processed_data_files_set_directory" \
-    --uniqueness_report \
-    || failed_python_script $python_script_path
+# # Generate a summary for output .csv file
+# python $inspect_csv_file_python_script_path \
+#     --csv_file_path "$calculation_cost_csv_file_path" \
+#     --output_directory "$processed_data_files_set_directory" \
+#     --uniqueness_report \
+#     || failed_python_script $python_script_path
 
-# Log generation of output .csv file summary
-log_message="A summary of the ${CALCULATION_COST_FROM_EFFECTIVE_MASS_CSV_FILENAME} .csv"
-log_message+=" file was generated."
-log "INFO" "$log_message"
+# # Log generation of output .csv file summary
+# log_message="A summary of the ${CALCULATION_COST_FROM_EFFECTIVE_MASS_CSV_FILENAME} .csv"
+# log_message+=" file was generated."
+# log "INFO" "$log_message"
 
 # SUCCESSFUL COMPLETION OUTPUT
 
