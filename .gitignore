@@ -7,6 +7,10 @@ bash_scripts/unit_tests/mock_data/*
 core/library/__pycache__/*
 core/library/data/__pycache__/*
 core/tests/unit_tests/data/__pycache__/*
+core/tests/mock_data/valid/KL_several_m_varying_EpsCG_and_EpsMSCG_processed_parameter_values.csv
+core/tests/mock_data/golden_masters/*
+core/tests/test_outputs/*
+core/library/visualization/__pycache__/*
 core/qpb_data_analysis.egg-info/*
 core/tests/unit_tests/__pycache__/*
 core/tests/unit_tests/output_from_mock_data/*
@@ -26,5 +30,3 @@ examples/plots/*
 examples/tables/*
 !examples/tables/table_of_data_files_set_template.ipynb
 !examples/README.md
-core/tests/mock_data/valid/KL_several_m_varying_EpsCG_and_EpsMSCG_processed_parameter_values.csv
-core/tests/mock_data/golden_masters/*
