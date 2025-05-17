@@ -643,15 +643,31 @@ def main(
                     "Adjusted_average_core_hours_per_spinor"
                 ] = single_valued_parameters_dataframe.apply(
                     lambda row: (
-                        row["Average_core_hours_per_spinor"] * 0.87
-                        if row["Number_of_cores"] == 256
+                        row["Average_core_hours_per_spinor"] * 0.95
+                        if (
+                            row["Number_of_cores"] == 3456
+                            and row["Kernel_operator_type"] == "Brillouin"
+                        )
                         else (
-                            row["Average_core_hours_per_spinor"] * 1.13
-                            if row["Number_of_cores"] == 512
+                            row["Average_core_hours_per_spinor"] * 1.2
+                            if (
+                                row["Number_of_cores"] == 128
+                                and row["Kernel_operator_type"] == "Brillouin"
+                            )
                             else (
-                                row["Average_core_hours_per_spinor"] * 0.98
-                                if row["Number_of_cores"] == 768
-                                else row["Average_core_hours_per_spinor"]
+                                row["Average_core_hours_per_spinor"] * 0.51
+                                if (
+                                    row["Number_of_cores"] == 3456
+                                    and row["Kernel_operator_type"] == "Wilson"
+                                )
+                                else (
+                                    row["Average_core_hours_per_spinor"] * 1.3
+                                    if (
+                                        row["Number_of_cores"] == 128
+                                        and row["Kernel_operator_type"] == "Wilson"
+                                    )
+                                    else row["Average_core_hours_per_spinor"]
+                                )
                             )
                         )
                     ),
