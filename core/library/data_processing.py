@@ -370,7 +370,7 @@ class DataFrameAnalyzer:
                 filter_out_parameters_list=['temperature', 'pressure']
             )
         """
-        if filter_out_parameters_list is not None:
+        if filter_out_parameters_list is not None or len(filter_out_parameters_list) > 0:
             # Check if filter_out_parameters_list is a list
             if not isinstance(filter_out_parameters_list, list):
                 raise TypeError("'filter_out_parameters_list' must be a list!")
@@ -401,6 +401,12 @@ class DataFrameAnalyzer:
             self.reduced_multivalued_tunable_parameter_names_list = (
                 self.list_of_multivalued_tunable_parameter_names.copy()
             )
+
+        # self.reduced_multivalued_tunable_parameter_names_list.append('Overlap_operator_method')
+        
+        self.reduced_multivalued_tunable_parameter_names_list = sorted(
+            self.reduced_multivalued_tunable_parameter_names_list
+        )
 
         if verbose:
             print("List of reduced multivalued tunable parameter names:")
