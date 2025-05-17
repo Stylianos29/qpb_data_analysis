@@ -701,3 +701,11 @@ LEGEND_LABELS_BY_COLUMN_NAME = {
 }
 
 TITLE_LABELS_BY_COLUMN_NAME = TITLE_LABELS_DICTIONARY.copy()
+
+FIT_LABEL_POSITIONS = {
+    "top left": ((0.05, 0.95), ("left", "top")),
+    "top right": ((0.95, 0.95), ("right", "top")),
+    "bottom left": ((0.05, 0.05), ("left", "bottom")),
+    "bottom right": ((0.95, 0.05), ("right", "bottom")),
+    "center": ((0.5, 0.5), ("center", "center")),
+}
