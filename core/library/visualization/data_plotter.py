@@ -9,14 +9,19 @@ import gvar
 import lsqfit
 from matplotlib.colors import to_rgba
 
-
-FIT_LABEL_POSITIONS = {
-    "top left": ((0.05, 0.95), ("left", "top")),
-    "top right": ((0.95, 0.95), ("right", "top")),
-    "bottom left": ((0.05, 0.05), ("left", "bottom")),
-    "bottom right": ((0.95, 0.05), ("right", "bottom")),
-    "center": ((0.5, 0.5), ("center", "center")),
-}
+from library.data.analyzer import DataFrameAnalyzer
+from library.data.table_generator import TableGenerator
+from ..constants import (
+    MARKER_STYLES,
+    DEFAULT_COLORS,
+    TITLE_LABELS_BY_COLUMN_NAME,
+    FILENAME_LABELS_BY_COLUMN_NAME,
+    AXES_LABELS_BY_COLUMN_NAME,
+    PARAMETERS_WITH_EXPONENTIAL_FORMAT,
+    PARAMETERS_OF_INTEGER_VALUE,
+    LEGEND_LABELS_BY_COLUMN_NAME,
+    FIT_LABEL_POSITIONS,
+)
 
 
 class DataPlotter(DataFrameAnalyzer):
@@ -363,7 +368,10 @@ class DataPlotter(DataFrameAnalyzer):
                 )
 
     def _generate_marker_color_map(
-        self, grouping_values: list, custom_map: dict = None, index_shift: int = 0,
+        self,
+        grouping_values: list,
+        custom_map: dict = None,
+        index_shift: int = 0,
     ) -> dict:
         """
         Generate a stable mapping from grouping values to (marker, color) pairs.
@@ -381,8 +389,8 @@ class DataPlotter(DataFrameAnalyzer):
             Complete mapping from value → (marker, color)
         """
         sorted_values = sorted(grouping_values, key=lambda x: str(x))
-        num_markers = len(constants.MARKER_STYLES)
-        num_colors = len(constants.DEFAULT_COLORS)
+        num_markers = len(MARKER_STYLES)
+        num_colors = len(DEFAULT_COLORS)
 
         style_map = {}
 
@@ -390,8 +398,8 @@ class DataPlotter(DataFrameAnalyzer):
             if custom_map and value in custom_map:
                 style_map[value] = custom_map[value]
             else:
-                marker = constants.MARKER_STYLES[(idx + index_shift) % num_markers]
-                color = constants.DEFAULT_COLORS[(idx + index_shift) % num_colors]
+                marker = MARKER_STYLES[(idx + index_shift) % num_markers]
+                color = DEFAULT_COLORS[(idx + index_shift) % num_colors]
                 style_map[value] = (marker, color)
 
         return style_map
@@ -442,7 +450,7 @@ class DataPlotter(DataFrameAnalyzer):
                 value = metadata_dict.get(col)
                 if value is None:
                     continue
-                label = constants.TITLE_LABELS_BY_COLUMN_NAME.get(col, col)
+                label = TITLE_LABELS_BY_COLUMN_NAME.get(col, col)
                 if isinstance(value, (int, float)):
                     formatted_value = format(value, title_number_format)
                 else:
@@ -453,7 +461,6 @@ class DataPlotter(DataFrameAnalyzer):
                 else:
                     simple_parts.append(f"{label}={formatted_value}")
             return ", ".join(simple_parts)
-
 
         # 2. Handle Overlap/Kernel/KL_or_Chebyshev_Order special logic
         excluded = set(excluded_from_title_list or [])
@@ -503,7 +510,7 @@ class DataPlotter(DataFrameAnalyzer):
                 continue
 
             value = metadata_dict[param_name]
-            label = constants.TITLE_LABELS_BY_COLUMN_NAME.get(param_name, param_name)
+            label = TITLE_LABELS_BY_COLUMN_NAME.get(param_name, param_name)
 
             # Format number values cleanly
             if isinstance(value, (int, float)):
@@ -597,7 +604,7 @@ class DataPlotter(DataFrameAnalyzer):
         # 4. Parameters from reduced tunable parameter list
         for param in self.reduced_multivalued_tunable_parameter_names_list:
             if param in metadata_dict:
-                label = constants.FILENAME_LABELS_BY_COLUMN_NAME.get(param, param)
+                label = FILENAME_LABELS_BY_COLUMN_NAME.get(param, param)
                 value = sanitize(metadata_dict[param])
                 filename_parts.append(f"{label}{value}")
 
@@ -930,7 +937,9 @@ class DataPlotter(DataFrameAnalyzer):
 
             styling_variable_unique_values = self.get_unique_values(styling_variable)
             style_lookup = self._generate_marker_color_map(
-                styling_variable_unique_values, custom_map=marker_color_map, index_shift=color_index_shift,
+                styling_variable_unique_values,
+                custom_map=marker_color_map,
+                index_shift=color_index_shift,
             )
 
         # Determine which tunable parameters to exclude from grouping
@@ -991,13 +1000,13 @@ class DataPlotter(DataFrameAnalyzer):
 
             # Determine axes labels
             if xaxis_label is None:
-                xaxis_label = constants.AXES_LABELS_BY_COLUMN_NAME.get(
+                xaxis_label = AXES_LABELS_BY_COLUMN_NAME.get(
                     self.xaxis_variable_name, ""
                 )
             ax.set_xlabel(xaxis_label, fontsize=font_size + 2)
 
             if yaxis_label is None:
-                yaxis_label = constants.AXES_LABELS_BY_COLUMN_NAME.get(
+                yaxis_label = AXES_LABELS_BY_COLUMN_NAME.get(
                     self.yaxis_variable_name, ""
                 )
             ax.set_ylabel(yaxis_label, fontsize=font_size + 2)
@@ -1006,20 +1015,20 @@ class DataPlotter(DataFrameAnalyzer):
 
             # Axes scaling
             if (
-                self.xaxis_variable_name in constants.PARAMETERS_WITH_EXPONENTIAL_FORMAT
+                self.xaxis_variable_name in PARAMETERS_WITH_EXPONENTIAL_FORMAT
                 or xaxis_log_scale
             ):
                 ax.set_xscale("log")
             if (
-                self.yaxis_variable_name in constants.PARAMETERS_WITH_EXPONENTIAL_FORMAT
+                self.yaxis_variable_name in PARAMETERS_WITH_EXPONENTIAL_FORMAT
                 or yaxis_log_scale
             ):
                 ax.set_yscale("log")
 
             # Integer ticks
-            if self.xaxis_variable_name in constants.PARAMETERS_OF_INTEGER_VALUE:
+            if self.xaxis_variable_name in PARAMETERS_OF_INTEGER_VALUE:
                 ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-            if self.yaxis_variable_name in constants.PARAMETERS_OF_INTEGER_VALUE:
+            if self.yaxis_variable_name in PARAMETERS_OF_INTEGER_VALUE:
                 ax.yaxis.set_major_locator(MaxNLocator(integer=True))
 
             if invert_xaxis:
@@ -1057,7 +1066,9 @@ class DataPlotter(DataFrameAnalyzer):
 
                 # Build color/marker map once per plot
                 style_map = self._generate_marker_color_map(
-                    unique_group_values, custom_map=marker_color_map, index_shift=color_index_shift,
+                    unique_group_values,
+                    custom_map=marker_color_map,
+                    index_shift=color_index_shift,
                 )
 
                 for curve_index, value in enumerate(unique_group_values):
@@ -1095,7 +1106,7 @@ class DataPlotter(DataFrameAnalyzer):
                             if isinstance(val2, (int, float)):
                                 val2 = format(val2, legend_number_format)
 
-                            label = f"{val1} ({constants.LEGEND_LABELS_BY_COLUMN_NAME.get(var2, var2)}{val2})"
+                            label = f"{val1} ({LEGEND_LABELS_BY_COLUMN_NAME.get(var2, var2)}{val2})"
 
                         else:
                             # Old logic for string-valued labeling_variable
@@ -1219,7 +1230,7 @@ class DataPlotter(DataFrameAnalyzer):
                         loc=legend_location, fontsize=font_size, ncol=legend_columns
                     )
                     if include_legend_title:
-                        legend_title = constants.LEGEND_LABELS_BY_COLUMN_NAME.get(
+                        legend_title = LEGEND_LABELS_BY_COLUMN_NAME.get(
                             (
                                 labeling_variable
                                 if labeling_variable
