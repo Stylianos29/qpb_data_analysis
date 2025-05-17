@@ -392,7 +392,7 @@ TITLE_LABELS_DICTIONARY = {
     "QCD_beta_value": "$\\beta$",
     "Configuration_label": "config label",
     "Rho_value": "$\\rho$",
-    "Bare_mass": "a$m_{bare}$",
+    "Bare_mass": "a$\mathbf{m_{\\text{bare}}}$",
     "Clover_coefficient": "$c_{SW}$",
     "Delta_Min": "$\\delta\\lambda_{min}^2$",
     "Delta_Max": "$\\delta\\lambda_{max}^2$",
@@ -663,10 +663,10 @@ FILENAME_LABELS_BY_COLUMN_NAME = {
 
 AXES_LABELS_BY_COLUMN_NAME = {
     "Absolute_critical_bare_mass": "|a$m^{\\text{critical}}_{\\text{bare}}$|",
-    "Adjusted_average_core_hours_per_spinor_per_configuration": "Average cost (per spinor per config) (core-hours)",
+    "Adjusted_average_core_hours_per_spinor_per_configuration": "Computational cost (core-hours/spinor)",
     "Average_calculation_time_per_spinor_per_configuration": "Average wall-clock time (per spinor per config) (s)",
     "Average_core_hours_per_spinor": "Computational cost (core-hours/spinor)",
-    "Average_core_hours_per_spinor_per_configuration": "Average cost (per spinor per config) (core-hours)",
+    "Average_core_hours_per_spinor_per_configuration": "Computational cost (core-hours/spinor/config)",
     "Average_core_hours_per_vector": "Computational cost (core-hours/vector)",
     "Average_number_of_MV_multiplications_per_spinor_per_configuration": "Average number of MV multiplications (per spinor per config)",
     "Average_number_of_MV_multiplications_per_vector": "Average number of MV muls per vector",
@@ -674,7 +674,7 @@ AXES_LABELS_BY_COLUMN_NAME = {
     "Average_wall_clock_time_per_spinor": "Average wall-clock time per spinor (s)",
     "Average_wall_clock_time_per_vector": "Average wall-clock time per vector (s)",
     "Bare_mass": "a$m_{bare}$",
-    "Core_hours_for_constant_PCAC_mass": "Average cost (per spinor per config) (core-hours)",
+    "Core_hours_for_constant_PCAC_mass": "Computational cost (core-hours/spinor/config)",
     "Critical_bare_mass": "a$m^{\\text{critical}}_{\\text{bare}}$",
     "Jackknife_average_of_PCAC_mass_correlator": "a$m_{\\text{PCAC}}$(t)",
     "Jackknife_average_of_pion_effective_mass_correlator": "a$m_{\\text{eff.}}(t)$",
@@ -684,8 +684,8 @@ AXES_LABELS_BY_COLUMN_NAME = {
     "Number_of_MV_multiplications_for_constant_bare_mass": "Number of MV muls (per spinor per config)",
     "Number_of_MV_multiplications_for_constant_PCAC_mass": "Number of MV muls (per spinor per config)",
     "PCAC_mass_estimate": "a$m_{PCAC}$",
-    "Pion_effective_mass_estimate": "a$m_{\\text{eff.}}(t)$",
-    "Pion_effective_mass_estimate_squared": "$a^2 m^2_{\\text{eff.}}(t)$",
+    "Pion_effective_mass_estimate": "a$m_{\\pi}$",
+    "Pion_effective_mass_estimate_squared": "$a^2 m^2_{\\pi}$",
     "time_index": "$t/a$",
     "Total_calculation_time": "Total wall-clock time (s)",
     "Total_number_of_Lanczos_iterations": "Total Lanczos iterations",
@@ -693,11 +693,11 @@ AXES_LABELS_BY_COLUMN_NAME = {
 }
 
 LEGEND_LABELS_BY_COLUMN_NAME = {
-    "Condition_number": "$\kappa_{\mathbb{X}^2} = \lambda_{\max}^2 / \lambda_{\min}^2$:",
+    "Condition_number": "$\kappa_{\mathbb{X}^2}=$",
     "Configuration_label": "Config. labels:",
-    "KL_diagonal_order": "Diagonal KL order:",
+    "KL_diagonal_order": "n=",
     "Kernel_operator_type": "Kernel:",
-    "Bare_mass": "a$m_{bare}=$",
+    "Bare_mass": "a$m_{\\text{bare}}=$",
 }
 
 TITLE_LABELS_BY_COLUMN_NAME = TITLE_LABELS_DICTIONARY.copy()
