@@ -675,6 +675,3 @@ class HDF5Plotter(EnhancedHDF5Analyzer):
                 plot_args.update(plot_kwargs)
 
                 plotter.plot(**plot_args)
-
-        return plotter
-
