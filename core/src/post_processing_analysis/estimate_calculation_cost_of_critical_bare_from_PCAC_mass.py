@@ -38,8 +38,8 @@ from library import (
     validate_input_script_log_filename,
 )
 
-REFERENCE_BARE_MASS = 0.1
-REFERENCE_PCAC_MASS = 0.1
+REFERENCE_BARE_MASS = 0.02
+REFERENCE_PCAC_MASS = 0.02
 
 UPPER_BARE_MASS_CUT = 0.15
 
@@ -354,6 +354,35 @@ def main(
             fit_functions.shifted_exponential(
                 bare_mass_reference_value, *shifted_exponential_coefficients
             )
+        )
+
+        # FIT ON # OF MV MULTIPLICATIONS VS BARE MASS DATA
+
+        def power_law(x, a, b):
+            return a * x**b
+
+        x = bare_mass_values_array
+        y = adjusted_average_core_hours_per_spinor_per_configuration_array
+
+        # Check for a minimum amount of data points
+        if len(y) < 4:
+            # TODO: Log warning
+            continue
+
+        
+
+        # Suppress specific warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", OptimizeWarning)
+            # Power law fit
+            fit_params, _ = curve_fit(power_law, x, y)
+
+        # Calculate corresponding values to the reference levels set by the user
+        adjusted_average_core_hours_reference_value_for_constant_bare_mass = (
+            power_law(REFERENCE_BARE_MASS, *fit_params)
+        )
+        adjusted_average_core_hours_reference_value_for_constant_PCAC_mass = (
+            power_law(bare_mass_reference_value, *fit_params)
         )
 
         # FIT ON CORE-HOURS VS NUMBER OF MV MULTIPLICATIONS DATA
@@ -682,11 +711,13 @@ def main(
             ] = number_of_MV_multiplications_reference_value_for_constant_PCAC_mass
 
             parameters_value_dictionary["Core_hours_for_constant_bare_mass"] = (
-                core_hours_reference_value_for_constant_bare_mass
+                adjusted_average_core_hours_reference_value_for_constant_bare_mass
+                # core_hours_reference_value_for_constant_bare_mass
             )
 
             parameters_value_dictionary["Core_hours_for_constant_PCAC_mass"] = (
-                core_hours_reference_value_for_constant_PCAC_mass
+                adjusted_average_core_hours_reference_value_for_constant_PCAC_mass
+                # core_hours_reference_value_for_constant_PCAC_mass
             )
 
         critical_bare_mass_values_list.append(parameters_value_dictionary)
