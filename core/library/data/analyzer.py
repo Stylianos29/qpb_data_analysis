@@ -3,6 +3,178 @@ import pandas as pd
 from ..constants import TUNABLE_PARAMETER_NAMES_LIST
 
 
+class _DataFrameInspector:
+    """
+    Private base class for read-only DataFrame inspection and analysis.
+
+    This class provides methods to analyze DataFrame structure and content
+    without modifying the data. It categorizes columns into tunable parameters
+    and output quantities, and identifies single-valued vs multi-valued columns.
+
+    This class should not be instantiated directly. Use DataFrameAnalyzer
+    instead.
+
+    Attributes:
+        - dataframe (pd.DataFrame): The DataFrame to inspect (not copied).
+        - list_of_dataframe_column_names (list): All column names.
+        - list_of_tunable_parameter_names_from_dataframe (list): Columns
+          identified as tunable parameters.
+        - list_of_output_quantity_names_from_dataframe (list): Columns
+          identified as output quantities.
+        - unique_value_columns_dictionary (dict): Single-valued columns and
+          their values.
+        - multivalued_columns_count_dictionary (dict): Multi-valued columns and
+          their counts.
+        - list_of_single_valued_column_names (list): Names of single-valued
+          columns.
+        - list_of_multivalued_column_names (list): Names of multi-valued
+          columns.
+        - list_of_single_valued_tunable_parameter_names (list): Single-valued
+          tunable parameters.
+        - list_of_multivalued_tunable_parameter_names (list): Multi-valued
+          tunable parameters.
+        - list_of_single_valued_output_quantity_names (list): Single-valued
+          output quantities.
+        - list_of_multivalued_output_quantity_names (list): Multi-valued output
+          quantities.
+    """
+
+    def __init__(self, dataframe: pd.DataFrame):
+        """
+        Initialize the inspector with a DataFrame.
+
+        Args:
+            dataframe (pd.DataFrame): The DataFrame to inspect.
+
+        Raises:
+            TypeError: If the input is not a pandas DataFrame.
+        """
+        if not isinstance(dataframe, pd.DataFrame):
+            raise TypeError("Input must be a pandas DataFrame")
+
+        # Store reference to the dataframe (no copy)
+        self.dataframe = dataframe
+
+        # Initialize column categories
+        self._update_column_categories()
+
+    def _update_column_categories(self):
+        """
+        Update and categorize column names into various lists and dictionaries.
+
+        This internal method identifies:
+        - Tunable parameters vs output quantities
+        - Columns with single vs multiple unique values
+        - Intersections of these categories
+        """
+        self.list_of_dataframe_column_names = self.dataframe.columns.tolist()
+
+        # Extract tunable parameter names
+        self.list_of_tunable_parameter_names_from_dataframe = [
+            column_name
+            for column_name in self.list_of_dataframe_column_names
+            if column_name in TUNABLE_PARAMETER_NAMES_LIST
+        ]
+
+        # Extract output quantity names
+        self.list_of_output_quantity_names_from_dataframe = [
+            column_name
+            for column_name in self.list_of_dataframe_column_names
+            if column_name not in TUNABLE_PARAMETER_NAMES_LIST
+        ]
+
+        # Get single and multi-valued columns
+        self.unique_value_columns_dictionary = self._get_unique_value_columns()
+        self.multivalued_columns_count_dictionary = (
+            self._get_multivalued_columns_count()
+        )
+
+        # Extract column name lists
+        self.list_of_single_valued_column_names = list(
+            self.unique_value_columns_dictionary.keys()
+        )
+        self.list_of_multivalued_column_names = list(
+            self.multivalued_columns_count_dictionary.keys()
+        )
+
+        # Create intersection lists
+        self.list_of_single_valued_tunable_parameter_names = list(
+            set(self.list_of_tunable_parameter_names_from_dataframe)
+            & set(self.list_of_single_valued_column_names)
+        )
+
+        self.list_of_multivalued_tunable_parameter_names = list(
+            set(self.list_of_tunable_parameter_names_from_dataframe)
+            & set(self.list_of_multivalued_column_names)
+        )
+
+        self.list_of_single_valued_output_quantity_names = list(
+            set(self.list_of_output_quantity_names_from_dataframe)
+            & set(self.list_of_single_valued_column_names)
+        )
+
+        self.list_of_multivalued_output_quantity_names = list(
+            set(self.list_of_output_quantity_names_from_dataframe)
+            & set(self.list_of_multivalued_column_names)
+        )
+
+    def _get_unique_value_columns(self) -> dict:
+        """
+        Identify columns that have only a single unique value.
+
+        Returns:
+            dict: Column names as keys, their unique values as values.
+        """
+        unique_value_columns_dictionary = {}
+        for column in self.dataframe.columns:
+            unique_values = self.dataframe[column].unique()
+            if len(unique_values) == 1:
+                unique_value_columns_dictionary[column] = unique_values[0]
+
+        return unique_value_columns_dictionary
+
+    def _get_multivalued_columns_count(self) -> dict:
+        """
+        Identify columns with multiple unique values and count them.
+
+        Returns:
+            dict: Column names as keys, counts of unique values as values.
+        """
+        multivalued_columns_count_dictionary = {}
+        for column in self.dataframe.columns:
+            unique_values_count = self.dataframe[column].nunique()
+            if unique_values_count > 1:
+                multivalued_columns_count_dictionary[column] = unique_values_count
+
+        return multivalued_columns_count_dictionary
+
+    def column_unique_values(self, column_name: str) -> list:
+        """
+        Return sorted list of unique values for the specified column.
+
+        Args:
+            column_name (str): The name of the column to analyze.
+
+        Returns:
+            list: Sorted list of unique values in the column.
+
+        Raises:
+            ValueError: If the column doesn't exist in the DataFrame.
+        """
+        if column_name not in self.dataframe.columns:
+            raise ValueError(f"Column '{column_name}' does not exist in the DataFrame.")
+
+        # Get unique values and sort them
+        unique_values = sorted(self.dataframe[column_name].unique())
+
+        # Convert numpy types to native Python types for cleaner usage
+        unique_values_python = [
+            item.item() if hasattr(item, "item") else item for item in unique_values
+        ]
+
+        return unique_values_python
+
+
 class DataFrameAnalyzer:
     """
     A class for analyzing and manipulating Pandas DataFrames with a focus on
