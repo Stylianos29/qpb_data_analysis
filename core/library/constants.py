@@ -382,6 +382,7 @@ CONVERTERS_MAPPING = {
     # "Kernel_operator_type": lambda x: pd.Categorical(
     #         x, categories=["Wilson", "Brillouin"], ordered=True
     #     )
+    "Linear_fit_slope": lambda x: ast.literal_eval(x),
 }
 
 
@@ -673,7 +674,7 @@ AXES_LABELS_BY_COLUMN_NAME = {
     "Average_sign_squared_violation_values": "||(sgn$^2$(X) - I)$\\eta$||$^2$ / ||$\\eta$||$^2$",
     "Average_wall_clock_time_per_spinor": "Average wall-clock time per spinor (s)",
     "Average_wall_clock_time_per_vector": "Average wall-clock time per vector (s)",
-    "Bare_mass": "a$m_{bare}$",
+    "Bare_mass": "a$m_{\\mathrm{bare}}$",
     "Core_hours_for_constant_PCAC_mass": "Computational cost (core-hours/spinor/config)",
     "Critical_bare_mass": "a$m^{\\text{critical}}_{\\text{bare}}$",
     "Jackknife_average_of_PCAC_mass_correlator": "a$m_{\\text{PCAC}}$(t)",
