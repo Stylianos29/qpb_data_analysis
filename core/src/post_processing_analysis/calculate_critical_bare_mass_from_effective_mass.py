@@ -481,6 +481,11 @@ def main(
                 critical_bare_mass_value.sdev,
             )
 
+            parameters_value_dictionary["Linear_fit_slope"] = (
+                linear_fit.p[0].mean,
+                linear_fit.p[0].sdev,
+            )
+
         critical_bare_mass_values_list.append(parameters_value_dictionary)
 
     # Create a DataFrame from the extracted data
