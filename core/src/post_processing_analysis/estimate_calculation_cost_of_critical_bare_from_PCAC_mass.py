@@ -205,6 +205,16 @@ def main(
         )
         logger.info("Subdirectory for number of MV multiplications plots created.")
 
+        core_hours_Vs_bare_mass_plots_base_name = "Adjusted_core_hours_Vs_bare_mass"
+        core_hours_Vs_bare_mass_plots_subdirectory = (
+            filesystem_utilities.create_subdirectory(
+                plots_main_subdirectory,
+                core_hours_Vs_bare_mass_plots_base_name + "_per_PCAC_mass",
+                clear_contents=True,
+            )
+        )
+        logger.info("Subdirectory for core-hours Vs bare mass plots plots created.")
+
     # IMPORT DATASETS AND METADATA
 
     PCAC_mass_estimates_dataframe = data_processing.load_csv(
@@ -368,8 +378,6 @@ def main(
         if len(y) < 4:
             # TODO: Log warning
             continue
-
-        
 
         # Suppress specific warnings
         with warnings.catch_warnings():
@@ -687,6 +695,95 @@ def main(
             plot_path = custom_plotting.DataPlotter._generate_plot_path(
                 None,
                 adjusted_core_hours_plots_subdirectory,
+                current_plots_base_name,
+                metadata_dictionary,
+                single_valued_fields_dictionary=single_valued_fields_dictionary,
+            )
+
+            fig.savefig(plot_path)
+            plt.close()
+
+##########################################################################################
+            # PLOT CORE-HOURS VS BARE MASS
+
+            x = bare_mass_values_array
+            y = adjusted_average_core_hours_per_spinor_per_configuration_array
+
+            fig, ax = plt.subplots()
+            ax.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
+
+            plot_title = custom_plotting.DataPlotter._construct_plot_title(
+                None,
+                leading_substring="",
+                metadata_dictionary=metadata_dictionary,
+                title_width=80,
+                fields_unique_value_dictionary=reduced_parameters_value_dictionary,
+            )
+            ax.set_title(f"{plot_title}", pad=8)
+
+            ax.set(
+                xlabel=constants.AXES_LABELS_DICTIONARY["Bare_mass"],
+                ylabel=constants.AXES_LABELS_DICTIONARY[
+                    "Adjusted_average_core_hours_per_spinor_per_configuration"
+                    ],
+            )
+            # fig.subplots_adjust(left=0.14)
+
+            ax.axhline(0, color="brown")  # y = 0
+            ax.axvline(0, color="brown")  # x = 0
+
+            ax.scatter(x, y, marker="x")
+            # s=8,
+
+            # Plot power law fit
+            x_data = np.linspace(np.min(x), np.max(x), 100)
+            y_data = power_law(x_data, *fit_params)
+            ax.plot(
+                x_data,
+                y_data,
+                color="red",
+                linestyle="--",
+                # linewidth=2,
+                # label="Fit",
+            )
+
+            # Plot reference levels for constant PCAC mass
+            ax.axvline(
+                bare_mass_reference_value,
+                color="blue",
+                linestyle="--",
+            )
+            ax.axhline(
+                adjusted_average_core_hours_reference_value_for_constant_PCAC_mass,
+                color="green",
+                linestyle="--",
+                label=(
+                    "core-hours for const. PCAC mass = "
+                    f"{adjusted_average_core_hours_reference_value_for_constant_PCAC_mass:.2f}"
+                ),
+            )
+            # Plot reference levels for constant bare mass
+            ax.axvline(
+                REFERENCE_BARE_MASS,
+                color="blue",
+                linestyle="--",
+            )
+            ax.axhline(
+                adjusted_average_core_hours_reference_value_for_constant_bare_mass,
+                color="green",
+                linestyle="--",
+                label=(
+                    "core-hours for const. bare mass = "
+                    f"{adjusted_average_core_hours_reference_value_for_constant_bare_mass:.2f}"
+                ),
+            )
+
+            ax.legend(loc="upper right")
+
+            current_plots_base_name = core_hours_Vs_bare_mass_plots_base_name
+            plot_path = custom_plotting.DataPlotter._generate_plot_path(
+                None,
+                core_hours_Vs_bare_mass_plots_subdirectory,
                 current_plots_base_name,
                 metadata_dictionary,
                 single_valued_fields_dictionary=single_valued_fields_dictionary,
