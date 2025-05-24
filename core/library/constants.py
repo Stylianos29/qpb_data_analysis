@@ -670,6 +670,7 @@ AXES_LABELS_BY_COLUMN_NAME = {
     "Average_core_hours_per_spinor_per_configuration": "Computational cost (core-hours/spinor/config)",
     "Average_core_hours_per_vector": "Computational cost (core-hours/vector)",
     "Average_number_of_MV_multiplications_per_spinor_per_configuration": "Average number of MV multiplications (per spinor per config)",
+    "Average_number_of_MV_multiplications_per_spinor": "Average number of MV multiplications (per spinor)",
     "Average_number_of_MV_multiplications_per_vector": "Average number of MV muls per vector",
     "Average_sign_squared_violation_values": "||(sgn$^2$(X) - I)$\\eta$||$^2$ / ||$\\eta$||$^2$",
     "Average_wall_clock_time_per_spinor": "Average wall-clock time per spinor (s)",
@@ -702,3 +703,11 @@ LEGEND_LABELS_BY_COLUMN_NAME = {
 }
 
 TITLE_LABELS_BY_COLUMN_NAME = TITLE_LABELS_DICTIONARY.copy()
+
+FIT_LABEL_POSITIONS = {
+    "top left": ((0.05, 0.95), ("left", "top")),
+    "top right": ((0.95, 0.95), ("right", "top")),
+    "bottom left": ((0.05, 0.05), ("left", "bottom")),
+    "bottom right": ((0.95, 0.05), ("right", "bottom")),
+    "center": ((0.5, 0.5), ("center", "center")),
+}

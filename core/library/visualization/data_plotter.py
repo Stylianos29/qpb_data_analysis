@@ -1,0 +1,1348 @@
+import os, shutil
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
+from scipy.optimize import curve_fit
+import gvar
+import lsqfit
+from matplotlib.colors import to_rgba
+
+from library.data.analyzer import DataFrameAnalyzer
+from library.data.table_generator import TableGenerator
+from ..constants import (
+    MARKER_STYLES,
+    DEFAULT_COLORS,
+    TITLE_LABELS_BY_COLUMN_NAME,
+    FILENAME_LABELS_BY_COLUMN_NAME,
+    AXES_LABELS_BY_COLUMN_NAME,
+    PARAMETERS_WITH_EXPONENTIAL_FORMAT,
+    PARAMETERS_OF_INTEGER_VALUE,
+    LEGEND_LABELS_BY_COLUMN_NAME,
+    FIT_LABEL_POSITIONS,
+)
+
+
+class DataPlotter(DataFrameAnalyzer):
+    """
+    A plotting interface for visualizing grouped data from a DataFrame using
+    matplotlib.
+
+    This class extends `DataFrameAnalyzer` to provide plotting functionality
+    tailored to data that varies across subsets of tunable parameters. It
+    supports generating visual summaries of results for each combination of
+    multivalued tunable parameters, and is designed to produce
+    publication-quality figures in a structured directory hierarchy.
+
+    Attributes:
+    -----------
+    dataframe : pd.DataFrame
+        The main DataFrame containing raw or processed data to be visualized.
+    plots_directory : str
+        The base output directory where all plots will be saved.
+    individual_plots_subdirectory : str
+        Subdirectory within `plots_directory` used for individual plots.
+    combined_plots_subdirectory : str
+        Subdirectory within `plots_directory` used for combined plots.
+    xaxis_variable_name : Optional[str]
+        Name of the variable to be used as x-axis in plots.
+    yaxis_variable_name : Optional[str]
+        Name of the variable to be used as y-axis in plots.
+    plots_base_name : Optional[str]
+        Base string used in naming plot files and directories.
+    """
+
+    def __init__(self, dataframe: pd.DataFrame, plots_directory: str):
+        """
+        Initialize the DataPlotter with a DataFrame and an output directory for
+        plots.
+
+        Parameters:
+        -----------
+        dataframe : pd.DataFrame
+            The input data for plotting. This is expected to include tunable
+            parameters and output quantities as defined in the analysis logic.
+        plots_directory : str
+            The base path where plots will be saved. Subdirectories will be
+            created inside this path for individual and grouped plots.
+
+        Raises:
+        -------
+        TypeError:
+            If the input is not a Pandas DataFrame.
+        ValueError:
+            If the provided `plots_directory` does not point to a valid
+            directory.
+        """
+        super().__init__(dataframe)
+
+        if not os.path.isdir(plots_directory):
+            raise ValueError(f"Invalid plots directory: '{plots_directory}'")
+
+        self.plots_directory = plots_directory
+        self.individual_plots_subdirectory = plots_directory
+        self.combined_plots_subdirectory = plots_directory
+
+        self.xaxis_variable_name = None
+        self.yaxis_variable_name = None
+        self.plots_base_name = None
+
+    def generate_column_uniqueness_report(
+        self, max_width=80, separate_by_type=True
+    ) -> str:
+        table_generator = TableGenerator(self.dataframe)
+        return table_generator.generate_column_uniqueness_report(
+            max_width=max_width,
+            separate_by_type=separate_by_type,
+            export_to_file=False,
+        )
+
+    def _prepare_plot_subdirectory(
+        self, subdir_name: str, clear_existing: bool = False
+    ) -> str:
+        """
+        Create or clean a subdirectory for storing plots.
+
+        Parameters:
+        -----------
+        subdir_name : str
+            The name of the subdirectory to create inside the main plots
+            directory.
+        clear_existing : bool, optional
+            If True, delete all contents of the subdirectory if it already
+            exists.
+
+        Returns:
+        --------
+        str:
+            The full path to the prepared subdirectory.
+        """
+        full_path = os.path.join(self.plots_directory, subdir_name)
+        os.makedirs(full_path, exist_ok=True)
+
+        if clear_existing:
+            for item in os.listdir(full_path):
+                item_path = os.path.join(full_path, item)
+                if os.path.isfile(item_path):
+                    os.remove(item_path)
+                elif os.path.isdir(item_path):
+                    shutil.rmtree(item_path)
+
+        return full_path
+
+    def _plot_group(
+        self,
+        ax,
+        group_df: pd.DataFrame,
+        label: str = None,
+        color: str = "blue",
+        marker: str = "o",
+        marker_size: int = 6,
+        capsize: float = 5,
+        empty_markers: bool = False,
+    ):
+        """
+        Plot a single data group on the provided Matplotlib Axes object.
+
+        Parameters:
+        -----------
+        ax : matplotlib.axes.Axes
+            The axes on which to plot.
+        group_df : pd.DataFrame
+            The DataFrame containing the data for one group.
+        label : str, optional
+            Label to use in the legend.
+        color : str, optional
+            Color of the plotted line or points.
+        marker : str, optional
+            Marker style for scatter/errorbar.
+        """
+        x_raw = group_df[self.xaxis_variable_name].to_numpy()
+        y_raw = group_df[self.yaxis_variable_name].to_numpy()
+
+        # is_tuple_array = lambda arr: (isinstance(arr[0], tuple) and len(arr[0]) == 2)
+
+        def is_tuple_array(arr):
+            # Filter out any NaNs or Nones
+            for element in arr:
+                if isinstance(element, tuple) and len(element) == 2:
+                    return True
+            return False
+
+        x_is_tuple = is_tuple_array(x_raw)
+        y_is_tuple = is_tuple_array(y_raw)
+
+        # if not (np.issubdtype(x_raw.dtype, np.number) or x_is_tuple):
+        #     raise TypeError(f"x-axis data has unsupported type: {x_raw.dtype}")
+        # if not (np.issubdtype(y_raw.dtype, np.number) or y_is_tuple):
+        #     raise TypeError(f"y-axis data has unsupported type: {y_raw.dtype}")
+
+        # if not (np.issubdtype(x_raw.dtype, np.number) or x_is_tuple):
+        #     example = x_raw[0]
+        #     raise TypeError(
+        #         f"x-axis data has unsupported type: {x_raw.dtype}. "
+        #         f"Example value: {example} (type: {type(example).__name__})"
+        #     )
+
+        def is_numeric_array(arr):
+            return all(
+                isinstance(x, (int, float, np.integer, np.floating))
+                or (np.isscalar(x) and np.isnan(x))
+                for x in arr
+            )
+
+        # # Then use:
+        # if not (is_numeric_array(y_raw) or y_is_tuple):
+        #     example = y_raw[0]
+        #     raise TypeError(
+        #         f"y-axis data has unsupported type: {y_raw.dtype}. "
+        #         f"Example value: {example} (type: {type(example).__name__})"
+        #     )
+
+        if not (is_numeric_array(x_raw) or x_is_tuple):
+            example = x_raw[0]
+            raise TypeError(
+                f"x-axis data has unsupported type: {x_raw.dtype}. "
+                f"Example value: {example} (type: {type(example).__name__})"
+            )
+
+        if not (is_numeric_array(y_raw) or y_is_tuple):
+            example = y_raw[0]
+            raise TypeError(
+                f"y-axis data has unsupported type: {y_raw.dtype}. "
+                f"Example value: {example} (type: {type(example).__name__})"
+            )
+
+        # if not (np.issubdtype(y_raw.dtype, np.number) or y_is_tuple):
+        #     example = y_raw[0]
+        #     raise TypeError(
+        #         f"y-axis data has unsupported type: {y_raw.dtype}. "
+        #         f"Example value: {example} (type: {type(example).__name__})"
+        #     )
+
+        # Case 1: both scalar
+        if not x_is_tuple and not y_is_tuple:
+            # ax.scatter(
+            #     x_raw, y_raw, color=color, marker=marker, label=label, s=marker_size**2
+            # )
+            if empty_markers:
+                # ax.scatter(
+                #     x_raw,
+                #     y_raw,
+                #     marker=marker,
+                #     s=marker_size**2,
+                #     markerfacecolor="none",
+                #     markeredgecolor=color,
+                #     label=label,
+                # )
+                ax.scatter(
+                    x_raw,
+                    y_raw,
+                    marker=marker,
+                    s=marker_size**2,
+                    facecolors="none",  # hollow marker
+                    edgecolors=color,  # border color
+                    label=label,
+                )
+            else:
+                ax.scatter(
+                    x_raw,
+                    y_raw,
+                    marker=marker,
+                    s=marker_size**2,
+                    color=color,
+                    label=label,
+                )
+
+        # Case 2: scalar x, tuple y
+        elif not x_is_tuple and y_is_tuple:
+            y_val = np.array([val for val, _ in y_raw])
+            y_err = np.array([err for _, err in y_raw])
+            # ax.errorbar(
+            #     x_raw,
+            #     y_val,
+            #     yerr=y_err,
+            #     fmt=marker,
+            #     capsize=capsize,
+            #     color=color,
+            #     label=label,
+            #     markersize=marker_size,
+            # )
+            if empty_markers:
+                ax.errorbar(
+                    x_raw,
+                    y_val,
+                    yerr=y_err,
+                    fmt=marker,
+                    markersize=marker_size,
+                    capsize=capsize,
+                    markerfacecolor="none",
+                    markeredgecolor=color,
+                    color=color,
+                    label=label,
+                )
+            else:
+                ax.errorbar(
+                    x_raw,
+                    y_val,
+                    yerr=y_err,
+                    fmt=marker,
+                    markersize=marker_size,
+                    capsize=capsize,
+                    color=color,
+                    label=label,
+                )
+
+        # Case 3: tuple x, scalar y
+        elif x_is_tuple and not y_is_tuple:
+            x_val = np.array([val for val, _ in x_raw])
+            # ax.scatter(x_val, y_raw, color=color, marker=marker, label=label)
+            if empty_markers:
+                # ax.scatter(
+                #     x_raw,
+                #     y_raw,
+                #     marker=marker,
+                #     s=marker_size**2,
+                #     markerfacecolor="none",
+                #     markeredgecolor=color,
+                #     label=label,
+                # )
+                ax.scatter(
+                    x_raw,
+                    y_raw,
+                    marker=marker,
+                    s=marker_size**2,
+                    facecolors="none",  # hollow marker
+                    edgecolors=color,  # border color
+                    label=label,
+                )
+            else:
+                ax.scatter(
+                    x_raw,
+                    y_raw,
+                    marker=marker,
+                    s=marker_size**2,
+                    color=color,
+                    label=label,
+                )
+
+        # Case 4: tuple x and tuple y
+        elif x_is_tuple and y_is_tuple:
+            x_val = np.array([val for val, _ in x_raw])
+            y_val = np.array([val for val, _ in y_raw])
+            y_err = np.array([err for _, err in y_raw])
+            # ax.errorbar(
+            #     x_val,
+            #     y_val,
+            #     yerr=y_err,
+            #     fmt=marker,
+            #     capsize=capsize,
+            #     color=color,
+            #     label=label,
+            #     markersize=marker_size,
+            # )
+            if empty_markers:
+                ax.errorbar(
+                    x_val,
+                    y_val,
+                    yerr=y_err,
+                    fmt=marker,
+                    markersize=marker_size,
+                    capsize=capsize,
+                    markerfacecolor="none",
+                    markeredgecolor=color,
+                    color=color,
+                    label=label,
+                )
+            else:
+                ax.errorbar(
+                    x_val,
+                    y_val,
+                    yerr=y_err,
+                    fmt=marker,
+                    markersize=marker_size,
+                    capsize=capsize,
+                    color=color,
+                    label=label,
+                )
+
+    def _generate_marker_color_map(
+        self,
+        grouping_values: list,
+        custom_map: dict = None,
+        index_shift: int = 0,
+    ) -> dict:
+        """
+        Generate a stable mapping from grouping values to (marker, color) pairs.
+
+        Parameters:
+        -----------
+        grouping_values : list
+            List of unique values of the grouping variable.
+        custom_map : dict, optional
+            Custom mapping from value to (marker, color). Values not included will be auto-assigned.
+
+        Returns:
+        --------
+        dict:
+            Complete mapping from value → (marker, color)
+        """
+        sorted_values = sorted(grouping_values, key=lambda x: str(x))
+        num_markers = len(MARKER_STYLES)
+        num_colors = len(DEFAULT_COLORS)
+
+        style_map = {}
+
+        for idx, value in enumerate(sorted_values):
+            if custom_map and value in custom_map:
+                style_map[value] = custom_map[value]
+            else:
+                marker = MARKER_STYLES[(idx + index_shift) % num_markers]
+                color = DEFAULT_COLORS[(idx + index_shift) % num_colors]
+                style_map[value] = (marker, color)
+
+        return style_map
+
+    def _construct_plot_title(
+        self,
+        metadata_dict: dict,
+        grouping_variable: str = None,
+        labeling_variable: str = None,
+        leading_plot_substring: str = None,
+        excluded_from_title_list: list = None,
+        title_number_format: str = ".2f",  # ".4g" for scientific/float hybrid format
+        title_wrapping_length: int = 90,
+        title_from_columns: list = None,
+    ) -> str:
+        """
+        Construct an informative plot title based on metadata and user
+        preferences.
+
+        Parameters:
+        -----------
+        metadata_dict : dict
+            Dictionary containing key-value pairs for this plot group.
+        grouping_variable : str, optional
+            If provided, exclude this variable from appearing in the title.
+        labeling_variable : str, optional
+            If provided, exclude this variable from appearing in the title.
+        leading_plot_substring : str, optional
+            Optional leading string to prepend to the title.
+        excluded_from_title_list : list, optional
+            List of additional variable names to exclude from the title.
+
+        Returns:
+        --------
+        str
+            The constructed plot title.
+        """
+        title_parts = []
+
+        # 1. Include leading substring if given
+        if leading_plot_substring:
+            title_parts.append(leading_plot_substring)
+
+        # 1.5. Shortcut override: simple title from selected columns
+        if title_from_columns:
+            simple_parts = []
+            for col in title_from_columns:
+                value = metadata_dict.get(col)
+                if value is None:
+                    continue
+                label = TITLE_LABELS_BY_COLUMN_NAME.get(col, col)
+                if isinstance(value, (int, float)):
+                    formatted_value = format(value, title_number_format)
+                else:
+                    formatted_value = str(value)
+
+                if "Kernel_operator_type" in col:
+                    simple_parts.append(f"{formatted_value} Kernel")
+                else:
+                    simple_parts.append(f"{label}={formatted_value}")
+            return ", ".join(simple_parts)
+
+        # 2. Handle Overlap/Kernel/KL_or_Chebyshev_Order special logic
+        excluded = set(excluded_from_title_list or [])
+        if grouping_variable:
+            excluded.add(grouping_variable)
+        if labeling_variable:
+            excluded.add(labeling_variable)
+
+        overlap_method = metadata_dict.get("Overlap_operator_method")
+        kernel_type = metadata_dict.get("Kernel_operator_type")
+        chebyshev_terms = metadata_dict.get("Number_of_Chebyshev_terms")
+        kl_order = metadata_dict.get("KL_diagonal_order")
+
+        if overlap_method and "Overlap_operator_method" not in excluded:
+            if overlap_method == "Bare":
+                # Only Overlap_operator_method + Kernel_operator_type
+                temp = []
+                temp.append(str(overlap_method))
+                if kernel_type and "Kernel_operator_type" not in excluded:
+                    temp.append(str(kernel_type))
+                title_parts.append(" ".join(temp) + ",")
+            else:
+                # Chebyshev or KL
+                temp = []
+                temp.append(str(overlap_method))
+                if kernel_type and "Kernel_operator_type" not in excluded:
+                    temp.append(str(kernel_type))
+                if (
+                    overlap_method == "Chebyshev"
+                    and "Number_of_Chebyshev_terms" not in excluded
+                    and chebyshev_terms is not None
+                ):
+                    temp.append(str(chebyshev_terms))
+                if (
+                    overlap_method == "KL"
+                    and "KL_diagonal_order" not in excluded
+                    and kl_order is not None
+                ):
+                    temp.append(str(kl_order))
+                title_parts.append(" ".join(temp) + ",")
+
+        # 3. Handle all remaining tunable parameters
+        for param_name in self.list_of_tunable_parameter_names_from_dataframe:
+            if param_name in excluded:
+                continue
+            if param_name not in metadata_dict:
+                continue
+
+            value = metadata_dict[param_name]
+            label = TITLE_LABELS_BY_COLUMN_NAME.get(param_name, param_name)
+
+            # Format number values cleanly
+            if isinstance(value, (int, float)):
+                formatted_value = format(value, title_number_format)
+            else:
+                formatted_value = str(value)
+
+            title_parts.append(f"{label} {formatted_value},")
+
+        # 4. Merge and clean up final title
+        full_title = " ".join(title_parts).strip()
+
+        # Remove trailing comma if any
+        if full_title.endswith(","):
+            full_title = full_title[:-1]
+
+        if title_wrapping_length and len(full_title) > title_wrapping_length:
+            # Find a good place (comma) to insert newline
+            comma_positions = [
+                pos for pos, char in enumerate(full_title) if char == ","
+            ]
+
+            if comma_positions:
+                # Find best comma to split around the middle
+                split_pos = min(
+                    comma_positions, key=lambda x: abs(x - len(full_title) // 2)
+                )
+                full_title = (
+                    full_title[: split_pos + 1] + "\n" + full_title[split_pos + 1 :]
+                )
+
+        return full_title
+
+    def _construct_plot_filename(
+        self,
+        metadata_dict: dict,
+        include_combined_prefix: bool = False,
+        custom_leading_substring: str = None,
+        grouping_variable: str = None,
+    ) -> str:
+        """
+        Construct a plot filename based on metadata and class configuration.
+
+        Parameters:
+        -----------
+        metadata_dict : dict
+            Dictionary containing values of tunable parameters for this plot
+            group.
+        include_combined_prefix : bool, optional
+            Whether to prepend "Combined_" to the filename (used when
+            grouping_variable is defined).
+        custom_leading_substring : str, optional
+            An optional custom prefix that overrides "Combined_".
+        grouping_variable : str, optional
+            If provided, appends "_grouped_by_{grouping_variable}" to the
+            filename.
+
+        Returns:
+        --------
+        str:
+            A string to use as the plot filename (without extension).
+        """
+
+        def sanitize(value):
+            return (
+                str(value)
+                .replace(".", "p")
+                .replace(",", "")
+                .replace("(", "")
+                .replace(")", "")
+            )
+
+        # -- Build filename in parts
+        filename_parts = []
+
+        # 1. Overlap_operator_method
+        overlap_method = metadata_dict.get("Overlap_operator_method")
+        if overlap_method in {"KL", "Chebyshev", "Bare"}:
+            filename_parts.append(overlap_method)
+            metadata_dict.pop("Overlap_operator_method", None)
+
+        # 2. plots_base_name (y_Vs_x)
+        filename_parts.append(self.plots_base_name)
+
+        # 3. Kernel_operator_type
+        kernel_type = metadata_dict.get("Kernel_operator_type")
+        if kernel_type in {"Brillouin", "Wilson"}:
+            filename_parts.append(kernel_type)
+            metadata_dict.pop("Kernel_operator_type", None)
+
+        # 4. Parameters from reduced tunable parameter list
+        for param in self.reduced_multivalued_tunable_parameter_names_list:
+            if param in metadata_dict:
+                label = FILENAME_LABELS_BY_COLUMN_NAME.get(param, param)
+                value = sanitize(metadata_dict[param])
+                filename_parts.append(f"{label}{value}")
+
+        # 5. Optional prefix override
+        if custom_leading_substring is not None:
+            prefix = custom_leading_substring
+        elif include_combined_prefix:
+            prefix = "Combined_"
+        else:
+            prefix = ""
+
+        # 6. Optional grouping variable suffix
+        if grouping_variable:
+            if isinstance(grouping_variable, str):
+                suffix = f"_grouped_by_{grouping_variable}"
+            else:
+                suffix = "_grouped_by_" + "_and_".join(grouping_variable)
+            # suffix = f"_grouped_by_{grouping_variable}"
+        else:
+            suffix = ""
+
+        return prefix + "_".join(filename_parts) + suffix
+
+    def _apply_curve_fit(
+        self,
+        ax,
+        x_raw,
+        y_raw,
+        fit_function: str,
+        show_fit_parameters_on_plot: bool = True,
+        fit_curve_style: dict = None,
+        fit_label_format: str = ".2e",
+        fit_label_location: str = "top left",
+        fit_index_range: slice = slice(None),
+        fit_curve_range: tuple = None,
+    ):
+        try:
+
+            if fit_index_range:
+                # Apply the fit only to a specific range of indices
+                x_raw = x_raw[fit_index_range]
+                y_raw = y_raw[fit_index_range]
+
+            position, alignment = FIT_LABEL_POSITIONS.get(
+                fit_label_location, ((0.05, 0.95), ("left", "top"))
+            )
+            if isinstance(y_raw[0], tuple) and len(y_raw[0]) == 2:
+
+                # gvar-based fit (with uncertainty)
+                y_gv = gvar.gvar([t[0] for t in y_raw], [t[1] for t in y_raw])
+                x_raw = np.asarray(x_raw, dtype=float)
+
+                def linear(x, p):
+                    return p[0] * x + p[1]
+
+                def exponential(x, p):
+                    return p[0] * np.exp(-p[1] * x) + p[2]
+
+                def power_law(x, p):
+                    return p[0] * x ** p[1]
+
+                fit_func_map = {
+                    "linear": linear,
+                    "exponential": exponential,
+                    "power_law": power_law,
+                }
+
+                p0_map = {
+                    "linear": [1, 1],
+                    "exponential": [1, 1, 1],
+                    "power_law": [1, 1],
+                }
+
+                fcn = fit_func_map.get(fit_function)
+                if fcn is None:
+                    raise ValueError(f"Unsupported fit function: '{fit_function}'")
+
+                fit = lsqfit.nonlinear_fit(
+                    data=(x_raw, y_gv),
+                    fcn=fcn,
+                    p0=p0_map.get(fit_function),
+                    debug=False,
+                )
+
+                if fit_curve_range is not None:
+                    x_min, x_max = fit_curve_range
+                else:
+                    x_min, x_max = min(x_raw), max(x_raw)
+
+                fit_params = gvar.mean(fit.p)
+                x_smooth = np.linspace(x_min, x_max, 200)
+                # x_smooth = np.linspace(min(x_raw), max(x_raw), 200)
+                y_smooth = fcn(x_smooth, fit_params)
+
+                if fit_curve_style is None:
+                    rgba = to_rgba(self.color)  # Use the marker color
+                    lighter_rgba = (
+                        *rgba[:3],
+                        0.5,
+                    )  # Keep RGB, reduce alpha to 0.5 for transparency
+                    style = {"color": lighter_rgba, "linestyle": "--"}
+                else:
+                    style = fit_curve_style
+                ax.plot(x_smooth, gvar.mean(y_smooth), **style)
+
+                if show_fit_parameters_on_plot:
+                    a_fmt = format(fit_params[0], fit_label_format)
+                    b_fmt = format(fit_params[1], fit_label_format)
+                    param_text = f"a = {a_fmt}, b = {b_fmt}"
+                    ax.text(
+                        *position,
+                        param_text,
+                        transform=ax.transAxes,
+                        fontsize=10,
+                        verticalalignment=alignment[1],
+                        horizontalalignment=alignment[0],
+                        bbox=dict(boxstyle="round", facecolor="white", alpha=0.7),
+                    )
+                else:
+                    return fit_params
+
+            else:
+                # Regular fit with scipy
+                def linear(x, a, b):
+                    return a * x + b
+
+                def exponential(x, a, b):
+                    return a * np.exp(b * x)
+
+                def power_law(x, a, b):
+                    return a * x**b
+
+                fit_func_map = {
+                    "linear": linear,
+                    "exponential": exponential,
+                    "power_law": power_law,
+                }
+
+                fit_func = fit_func_map.get(fit_function)
+                if fit_func is None:
+                    raise ValueError(f"Unsupported fit function: '{fit_function}'")
+
+                # Remove NaNs
+                valid = ~np.isnan(x_raw) & ~np.isnan(y_raw)
+                x_fit = x_raw[valid]
+                y_fit = y_raw[valid]
+
+                if fit_function == "power_law" and np.any(x_fit <= 0):
+                    raise ValueError(
+                        "Power-law fit requires strictly positive x values."
+                    )
+
+                fit_params, _ = curve_fit(fit_func, x_fit, y_fit)
+
+                x_smooth = np.linspace(min(x_fit), max(x_fit), 200)
+                y_smooth = fit_func(x_smooth, *fit_params)
+
+                if fit_curve_style is None:
+                    rgba = to_rgba(self.color)  # Use the marker color
+                    lighter_rgba = (
+                        *rgba[:3],
+                        0.5,
+                    )  # Keep RGB, reduce alpha to 0.5 for transparency
+                    style = {"color": lighter_rgba, "linestyle": "--"}
+                else:
+                    style = fit_curve_style
+                ax.plot(x_smooth, y_smooth, **style)
+
+                if show_fit_parameters_on_plot:
+                    param_names = ["a", "b"]
+                    param_text = ", ".join(
+                        f"{name} = {val:{fit_label_format}}"
+                        for name, val in zip(param_names, fit_params)
+                    )
+                    ax.text(
+                        *position,
+                        param_text,
+                        transform=ax.transAxes,
+                        fontsize=10,
+                        verticalalignment=alignment[1],
+                        horizontalalignment=alignment[0],
+                        bbox=dict(boxstyle="round", facecolor="white", alpha=0.7),
+                    )
+                else:
+                    return fit_params
+
+        except Exception as e:
+            print(f"Fit failed: {e}")
+
+    def set_plot_variables(
+        self, x_variable: str, y_variable: str, clear_existing: bool = False
+    ) -> None:
+        """
+        Set the x- and y-axis variables for plotting and prepare the
+        corresponding subdirectory.
+
+        Parameters:
+        -----------
+        x_variable : str
+            The name of the DataFrame column to use as the x-axis variable.
+        y_variable : str
+            The name of the DataFrame column to use as the y-axis variable.
+        clear_existing : bool, optional
+            If True and the plot subdirectory already exists, clear its
+            contents. Default is False.
+
+        Raises:
+        -------
+        ValueError:
+            If either `x_variable` or `y_variable` is not a column in the
+            DataFrame.
+        """
+        if x_variable not in self.dataframe.columns:
+            raise ValueError(f"'{x_variable}' is not a column in the DataFrame.")
+        if y_variable not in self.dataframe.columns:
+            raise ValueError(f"'{y_variable}' is not a column in the DataFrame.")
+
+        self.xaxis_variable_name = x_variable
+        self.yaxis_variable_name = y_variable
+        self.plots_base_name = f"{y_variable}_Vs_{x_variable}"
+
+        self.individual_plots_subdirectory = self._prepare_plot_subdirectory(
+            self.plots_base_name, clear_existing=clear_existing
+        )
+
+    def plot(
+        self,
+        grouping_variable: str = None,
+        excluded_from_grouping_list: list = None,
+        labeling_variable: str = None,
+        legend_number_format: str = ".2f",
+        include_legend_title: bool = True,
+        include_legend: bool = True,
+        legend_location: str = "upper left",
+        legend_columns: int = 1,
+        sorting_variable: str = None,
+        sort_ascending: bool = None,
+        figure_size=(7, 5),
+        font_size: int = 13,
+        xaxis_label: str = None,
+        yaxis_label: str = None,
+        xaxis_log_scale: bool = False,
+        yaxis_log_scale: bool = False,
+        invert_xaxis: bool = False,
+        invert_yaxis: bool = False,
+        xlim: tuple = None,
+        ylim: tuple = None,
+        xaxis_start_at_zero: bool = False,
+        yaxis_start_at_zero: bool = False,
+        left_margin_adjustment: float = 0.15,
+        right_margin_adjustment: float = 0.94,
+        bottom_margin_adjustment: float = 0.12,
+        top_margin_adjustment: float = 0.92,
+        styling_variable: str = None,
+        marker_color_map: dict = None,
+        color_index_shift: int = 0,
+        marker_size: int = 8,
+        empty_markers: bool = False,
+        alternate_filled_markers: bool = False,
+        alternate_filled_markers_reversed: bool = False,
+        capsize: float = 5,
+        include_plot_title: bool = False,
+        custom_plot_title: str = None,
+        title_from_columns: list = None,
+        custom_plot_titles_dict: dict = None,
+        title_size: int = 15,
+        bold_title: bool = False,
+        leading_plot_substring: str = None,
+        excluded_from_title_list: list = None,
+        title_number_format: str = ".2f",
+        title_wrapping_length: int = 90,
+        customization_function: callable = None,
+        verbose: bool = True,
+        fit_function: str = None,  # e.g. "linear"
+        fit_label_format: str = ".2f",
+        show_fit_parameters_on_plot: bool = True,
+        fit_curve_style: dict = None,  # optional override
+        fit_label_location: str = "top left",
+        fit_index_range: tuple = None,  # default: include all
+        fit_on_values: list = None,
+        fit_label_in_legend: bool = False,
+        fit_curve_range: tuple = None,
+    ):
+        """
+        Plot data from the DataFrame, optionally grouped by a specific
+        multivalued parameter.
+
+        Parameters:
+        -----------
+        grouping_variable : str, optional
+            If provided, combine plots grouped by this variable into single
+            plots.
+        excluded_from_grouping_list : list, optional
+            Additional multivalued parameters to exclude from grouping.
+        figure_size : tuple, optional
+            Size of each plot figure.
+        xaxis_log_scale : bool, optional
+            Use log scale for x-axis. Defaults to True if parameter is in
+            EXPONENTIAL_FORMAT.
+        yaxis_log_scale : bool, optional
+            Use log scale for y-axis. Defaults to True if parameter is in
+            EXPONENTIAL_FORMAT.
+
+            TODO: Refer to this example of slicing for fit_index_range parameter:
+            plot(..., fit_index_range=slice(3, None))      # From index 3 onward
+            plot(..., fit_index_range=slice(None, 10))     # Up to index 10
+            plot(..., fit_index_range=slice(3, 10))        # From 3 to 10 (exclusive)
+
+        """
+        if self.xaxis_variable_name is None or self.yaxis_variable_name is None:
+            raise ValueError("Call 'set_plot_variables()' before plotting.")
+
+        if alternate_filled_markers:
+            empty_markers = (
+                False  # ignore user's empty_markers setting when alternating
+            )
+
+        if fit_index_range:
+            if not isinstance(fit_index_range, tuple) or len(fit_index_range) != 2:
+                raise ValueError("fit_index_range must be a tuple like (start, stop)")
+            fit_index_range = slice(*fit_index_range)
+
+        # Use grouping values unless styling_variable is provided
+        if styling_variable:
+            if (
+                styling_variable
+                not in self.list_of_tunable_parameter_names_from_dataframe
+            ):
+                raise ValueError("'styling_variable' must be tunable parameter.")
+
+            styling_variable_unique_values = self.get_unique_values(styling_variable)
+            style_lookup = self._generate_marker_color_map(
+                styling_variable_unique_values,
+                custom_map=marker_color_map,
+                index_shift=color_index_shift,
+            )
+
+        # Determine which tunable parameters to exclude from grouping
+        excluded = set(excluded_from_grouping_list or [])
+        for axis_variable in [self.xaxis_variable_name, self.yaxis_variable_name]:
+            if axis_variable in self.list_of_multivalued_tunable_parameter_names:
+                excluded.add(axis_variable)
+
+        if grouping_variable:
+            grouping_columns = (
+                [grouping_variable]
+                if isinstance(grouping_variable, str)
+                else grouping_variable
+            )
+            for grouping_column in grouping_columns:
+                if (
+                    grouping_column
+                    not in self.list_of_multivalued_tunable_parameter_names
+                ):
+                    raise ValueError(
+                        f"'{grouping_column}' is not a multivalued tunable parameter."
+                    )
+                excluded.add(grouping_column)
+
+        # Get the grouped DataFrame
+        grouped = self.group_by_multivalued_tunable_parameters(
+            filter_out_parameters_list=list(excluded),
+            verbose=verbose,
+        )
+
+        # Initialize marker and color
+        marker, color = (".", "blue")
+
+        for group_keys, group_df in grouped:
+
+            fig, ax = plt.subplots(figsize=figure_size)
+            ax.grid(True, linestyle="--", alpha=0.5)
+
+            # Reconstruct metadata dict
+            if not isinstance(group_keys, tuple):
+                # group_keys = [group_keys]
+                group_keys = (group_keys,)
+            metadata = dict(
+                zip(self.reduced_multivalued_tunable_parameter_names_list, group_keys)
+            )
+
+            # Add method and kernel type if constant
+            for special in ["Overlap_operator_method", "Kernel_operator_type"]:
+                if special in group_df.columns:
+                    unique_vals = group_df[special].unique()
+                    if len(unique_vals) == 1:
+                        metadata[special] = unique_vals[0]
+
+            if not grouping_variable and styling_variable:
+                # Get the style key from the whole group_df
+                style_key = group_df[styling_variable].iloc[0]
+                marker, color = style_lookup.get(style_key, ("o", "blue"))
+
+            # Determine axes labels
+            if xaxis_label is None:
+                xaxis_label = AXES_LABELS_BY_COLUMN_NAME.get(
+                    self.xaxis_variable_name, ""
+                )
+            ax.set_xlabel(xaxis_label, fontsize=font_size + 2)
+
+            if yaxis_label is None:
+                yaxis_label = AXES_LABELS_BY_COLUMN_NAME.get(
+                    self.yaxis_variable_name, ""
+                )
+            ax.set_ylabel(yaxis_label, fontsize=font_size + 2)
+
+            ax.tick_params(axis="both", labelsize=font_size)
+
+            # Axes scaling
+            if (
+                self.xaxis_variable_name in PARAMETERS_WITH_EXPONENTIAL_FORMAT
+                or xaxis_log_scale
+            ):
+                ax.set_xscale("log")
+            if (
+                self.yaxis_variable_name in PARAMETERS_WITH_EXPONENTIAL_FORMAT
+                or yaxis_log_scale
+            ):
+                ax.set_yscale("log")
+
+            # Integer ticks
+            if self.xaxis_variable_name in PARAMETERS_OF_INTEGER_VALUE:
+                ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+            if self.yaxis_variable_name in PARAMETERS_OF_INTEGER_VALUE:
+                ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+
+            if invert_xaxis:
+                ax.invert_xaxis()
+            if invert_yaxis:
+                ax.invert_yaxis()
+
+            # Apply any custom user modifications
+            if customization_function is not None:
+                customization_function(ax)
+
+            if grouping_variable:
+                if sorting_variable:
+                    unique_group_values = (
+                        group_df.sort_values(
+                            by=sorting_variable, ascending=(sort_ascending is not False)
+                        )[grouping_columns]
+                        .drop_duplicates()
+                        .apply(tuple, axis=1)
+                        .tolist()
+                    )
+                else:
+                    unique_group_values = (
+                        group_df[grouping_columns]
+                        .drop_duplicates()
+                        .apply(tuple, axis=1)
+                        .tolist()
+                    )
+
+                if sort_ascending is True and not sorting_variable:
+                    unique_group_values = sorted(unique_group_values)
+                elif sort_ascending is False and not sorting_variable:
+                    unique_group_values = sorted(unique_group_values, reverse=True)
+                # else sort_ascending=None => preserve order
+
+                # Build color/marker map once per plot
+                style_map = self._generate_marker_color_map(
+                    unique_group_values,
+                    custom_map=marker_color_map,
+                    index_shift=color_index_shift,
+                )
+
+                for curve_index, value in enumerate(unique_group_values):
+                    if labeling_variable:
+                        if (
+                            isinstance(labeling_variable, list)
+                            and len(labeling_variable) == 2
+                        ):
+                            var1, var2 = labeling_variable
+
+                            if isinstance(grouping_variable, str):
+                                actual_value = (
+                                    value[0]
+                                    if isinstance(value, tuple) and len(value) == 1
+                                    else value
+                                )
+                                label_rows = group_df[
+                                    group_df[grouping_variable] == actual_value
+                                ]
+                            else:
+                                mask = (
+                                    group_df[grouping_variable].apply(tuple, axis=1)
+                                    == value
+                                )
+                                label_rows = group_df[mask]
+
+                            val1 = label_rows[var1].unique()
+                            val2 = label_rows[var2].unique()
+
+                            if len(val1) == 1:
+                                val1 = val1[0]
+                            if len(val2) == 1:
+                                val2 = val2[0]
+
+                            if isinstance(val2, (int, float)):
+                                val2 = format(val2, legend_number_format)
+
+                            label = f"{val1} ({LEGEND_LABELS_BY_COLUMN_NAME.get(var2, var2)}{val2})"
+
+                        else:
+                            # Old logic for string-valued labeling_variable
+                            if isinstance(grouping_variable, str):
+                                actual_value = (
+                                    value[0]
+                                    if isinstance(value, tuple) and len(value) == 1
+                                    else value
+                                )
+                                label_rows = group_df[
+                                    group_df[grouping_variable] == actual_value
+                                ]
+                            else:
+                                mask = (
+                                    group_df[grouping_variable].apply(tuple, axis=1)
+                                    == value
+                                )
+                                label_rows = group_df[mask]
+
+                            label_value = label_rows[labeling_variable].unique()
+
+                            if len(label_value) == 1:
+                                label_value = label_value[0]
+                                if isinstance(label_value, (int, float)):
+                                    label_value = format(
+                                        label_value, legend_number_format
+                                    )
+                            label = str(label_value)
+
+                    else:
+                        # label = str(value)
+                        if isinstance(value, tuple):
+                            label = " ".join(str(v) for v in value)
+                        else:
+                            label = str(value)
+
+                    if isinstance(grouping_variable, str):
+                        # Value is a 1-tuple, extract the scalar
+                        actual_value = (
+                            value[0]
+                            if isinstance(value, tuple) and len(value) == 1
+                            else value
+                        )
+                        subgroup = group_df[group_df[grouping_variable] == actual_value]
+                    else:
+                        # grouping_variable is a list of column names
+                        mask = group_df[grouping_variable].apply(tuple, axis=1) == value
+                        subgroup = group_df[mask]
+
+                    if grouping_variable and not styling_variable:
+                        marker, color = style_map[value]
+
+                    if grouping_variable and styling_variable:
+                        style_key = group_df[styling_variable].iloc[0]
+                        marker, color = style_lookup.get(style_key, ("o", "blue"))
+
+                    # Alternate filling
+                    if alternate_filled_markers:
+                        empty_marker = curve_index % 2 == 1  # odd indices → empty
+                        if alternate_filled_markers_reversed:
+                            empty_marker = not empty_marker
+                    else:
+                        empty_marker = (
+                            empty_markers  # regular user setting (could be False)
+                        )
+
+                    fit_label_suffix = ""
+                    if fit_function is not None:
+
+                        self.color = color
+
+                        if fit_on_values is not None and not isinstance(
+                            fit_on_values, tuple
+                        ):
+                            fit_on_values = (fit_on_values,)
+
+                        if fit_on_values is None or value == fit_on_values:
+
+                            x_raw = subgroup[self.xaxis_variable_name].to_numpy()
+                            y_raw = subgroup[self.yaxis_variable_name].to_numpy()
+                            try:
+                                if fit_label_in_legend:
+                                    show_fit_parameters_on_plot = False
+
+                                params = self._apply_curve_fit(
+                                    ax,
+                                    x_raw,
+                                    y_raw,
+                                    fit_function=fit_function,
+                                    show_fit_parameters_on_plot=show_fit_parameters_on_plot,
+                                    fit_curve_style=fit_curve_style,
+                                    fit_label_format=fit_label_format,
+                                    fit_label_location=fit_label_location,
+                                    fit_index_range=fit_index_range,
+                                    fit_curve_range=fit_curve_range,
+                                )
+
+                                if fit_label_in_legend:
+                                    if fit_function == "exponential":
+                                        c_fmt = format(params[2], fit_label_format)
+                                        fit_label_suffix = f" (a$m^{{n\\to\\infty}}_{{\\text{{PCAC}}}}$={c_fmt})"
+                                    else:
+                                        a_fmt = format(params[0], fit_label_format)
+                                        b_fmt = format(params[1], fit_label_format)
+                                        fit_label_suffix = f" (a={a_fmt}, b={b_fmt})"
+                            except Exception as e:
+                                print(f"Fit failed for {value}: {e}")
+
+                    self._plot_group(
+                        ax,
+                        subgroup,
+                        label=label + fit_label_suffix,
+                        color=color,
+                        marker=marker,
+                        marker_size=marker_size,
+                        capsize=capsize,
+                        empty_markers=empty_marker,
+                    )
+                if include_legend:
+                    legend = ax.legend(
+                        loc=legend_location, fontsize=font_size, ncol=legend_columns
+                    )
+                    if include_legend_title:
+                        legend_title = LEGEND_LABELS_BY_COLUMN_NAME.get(
+                            (
+                                labeling_variable
+                                if labeling_variable
+                                else grouping_variable
+                            ),
+                            (
+                                labeling_variable
+                                if labeling_variable
+                                else grouping_variable
+                            ),
+                        )
+                        # If the title is not a LaTeX string (no $ symbols), replace
+                        # underscores with spaces
+                        if "$" not in legend_title:
+                            legend_title = legend_title.replace("_", " ")
+                        legend.set_title(legend_title, prop={"size": font_size + 1})
+
+            else:
+                # Individual plot
+                self._plot_group(
+                    ax,
+                    group_df,
+                    color=color,
+                    marker=marker,
+                    marker_size=marker_size,
+                    capsize=capsize,
+                    empty_markers=empty_markers,
+                )
+
+                if fit_function is not None:
+                    x_raw = group_df[self.xaxis_variable_name].to_numpy()
+                    y_raw = group_df[self.yaxis_variable_name].to_numpy()
+                    self._apply_curve_fit(
+                        ax,
+                        x_raw,
+                        y_raw,
+                        fit_function=fit_function,
+                        show_fit_parameters_on_plot=show_fit_parameters_on_plot,
+                        fit_curve_style=fit_curve_style,
+                        fit_label_format=fit_label_format,
+                        fit_label_location=fit_label_location,
+                        fit_index_range=fit_index_range,
+                        fit_curve_range=fit_curve_range,
+                    )
+
+            fig.subplots_adjust(
+                left=left_margin_adjustment,
+                right=right_margin_adjustment,
+                bottom=bottom_margin_adjustment,
+                top=top_margin_adjustment,
+            )
+
+            if include_plot_title:
+                if custom_plot_title:
+                    plot_title = custom_plot_title
+                elif custom_plot_titles_dict is not None:
+                    title_key = group_keys if len(group_keys) > 1 else group_keys[0]
+                    plot_title = custom_plot_titles_dict.get(title_key, "")
+                else:
+                    plot_title = self._construct_plot_title(
+                        metadata_dict=metadata,
+                        grouping_variable=grouping_variable,
+                        labeling_variable=labeling_variable,
+                        leading_plot_substring=leading_plot_substring,
+                        excluded_from_title_list=excluded_from_title_list,
+                        title_number_format=title_number_format,
+                        title_wrapping_length=title_wrapping_length,
+                        title_from_columns=title_from_columns,
+                    )
+                ax.set_title(
+                    plot_title,
+                    fontsize=title_size,
+                    weight="bold" if bold_title else "normal",
+                )
+
+            # Set axis limits if specified
+            if xlim is not None:
+                ax.set_xlim(xlim)
+            elif xaxis_start_at_zero:
+                current_xlim = ax.get_xlim()
+                ax.set_xlim(left=0, right=current_xlim[1])
+
+            if ylim is not None:
+                ax.set_ylim(ylim)
+            elif yaxis_start_at_zero:
+                current_ylim = ax.get_ylim()
+                ax.set_ylim(bottom=0, top=current_ylim[1])
+
+            # Construct filename and save
+            filename = self._construct_plot_filename(
+                metadata_dict=metadata,
+                include_combined_prefix=(
+                    grouping_variable is not None and leading_plot_substring is None
+                ),
+                custom_leading_substring=leading_plot_substring,
+                grouping_variable=grouping_variable,
+            )
+            if grouping_variable:
+                # nested_dirname = f"Grouped_by_{grouping_variable}"
+                if isinstance(grouping_variable, str):
+                    nested_dirname = f"Grouped_by_{grouping_variable}"
+                else:
+                    nested_dirname = "Grouped_by_" + "_and_".join(grouping_variable)
+                self.combined_plots_subdirectory = self._prepare_plot_subdirectory(
+                    os.path.join(self.plots_base_name, nested_dirname)
+                )
+                full_path = os.path.join(
+                    self.combined_plots_subdirectory, f"{filename}.png"
+                )
+            else:
+                full_path = os.path.join(
+                    self.individual_plots_subdirectory, f"{filename}.png"
+                )
+            fig.savefig(full_path)
+            plt.close(fig)
