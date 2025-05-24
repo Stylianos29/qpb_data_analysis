@@ -393,7 +393,7 @@ TITLE_LABELS_DICTIONARY = {
     "QCD_beta_value": "$\\beta$",
     "Configuration_label": "config label",
     "Rho_value": "$\\rho$",
-    "Bare_mass": "a$\mathbf{m_{\\text{bare}}}$",
+    "Bare_mass": "a$\\mathbf{m_{\\text{bare}}}$",
     "Clover_coefficient": "$c_{SW}$",
     "Delta_Min": "$\\delta\\lambda_{min}^2$",
     "Delta_Max": "$\\delta\\lambda_{max}^2$",
@@ -695,7 +695,7 @@ AXES_LABELS_BY_COLUMN_NAME = {
 }
 
 LEGEND_LABELS_BY_COLUMN_NAME = {
-    "Condition_number": "$\kappa_{\mathbb{X}^2}=$",
+    "Condition_number": "$\\kappa_{\\mathbb{X}^2}=$",
     "Configuration_label": "Config. labels:",
     "KL_diagonal_order": "n=",
     "Kernel_operator_type": "Kernel:",
