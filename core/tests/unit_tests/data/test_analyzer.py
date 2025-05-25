@@ -1,360 +1,242 @@
-import os
-
+import pytest
 import pandas as pd
 import numpy as np
 
-from library.data.processing import load_csv
-from library.data.analyzer import DataFrameAnalyzer
-from library.constants import ROOT
+from library.data.analyzer import _DataFrameInspector
+from library.constants import TUNABLE_PARAMETER_NAMES_LIST
 
 
-# CONSTANTS
+class TestDataFrameInspector:
+    """Test suite for the _DataFrameInspector class using synthetic data."""
 
-TEST_CSV_FILE_PATH = os.path.join(
-    ROOT,
-    "core/tests/mock_data/valid/"
-    "KL_several_m_varying_EpsCG_and_EpsMSCG_processed_parameter_values.csv",
-)
-TEST_DATAFRAME = load_csv(TEST_CSV_FILE_PATH)
-TEST_ANALYZER = DataFrameAnalyzer(TEST_DATAFRAME)
+    @pytest.fixture
+    def simple_dataframe(self):
+        """Create a simple DataFrame with mixed parameter types."""
+        return pd.DataFrame(
+            {
+                "Kernel_operator_type": ["Wilson", "Wilson", "Brillouin"],
+                "MSCG_epsilon": [1e-6, 1e-5, 1e-6],
+                "APE_alpha": [0.72, 0.72, 0.72],  # Single value
+                "Total_calculation_time": [10.5, 12.3, 11.8],
+                "Spatial_lattice_size": [24, 24, 24],  # Single value
+            }
+        )
 
+    @pytest.fixture
+    def empty_dataframe(self):
+        """Create an empty DataFrame for edge case testing."""
+        return pd.DataFrame()
 
-# TESTS
+    @pytest.fixture
+    def single_row_dataframe(self):
+        """Create a DataFrame with only one row."""
+        return pd.DataFrame(
+            {
+                "Kernel_operator_type": ["Wilson"],
+                "MSCG_epsilon": [1e-6],
+                "Total_calculation_time": [10.5],
+            }
+        )
 
+    @pytest.fixture
+    def all_single_valued_dataframe(self):
+        """Create a DataFrame where all columns have single unique values."""
+        return pd.DataFrame(
+            {
+                "Kernel_operator_type": ["Wilson", "Wilson", "Wilson"],
+                "APE_alpha": [0.72, 0.72, 0.72],
+                "Spatial_lattice_size": [24, 24, 24],
+            }
+        )
 
-def test_original_dataframe_preservation():
-    """Test if the original_dataframe attribute matches the input dataframe."""
-    pd.testing.assert_frame_equal(TEST_ANALYZER.original_dataframe, TEST_DATAFRAME)
+    def test_initialization_with_valid_dataframe(self, simple_dataframe):
+        """Test that inspector initializes correctly with valid DataFrame."""
+        inspector = _DataFrameInspector(simple_dataframe)
+        assert inspector.dataframe is simple_dataframe  # Should be same reference
+        assert hasattr(inspector, "list_of_dataframe_column_names")
 
+    def test_initialization_with_invalid_input(self):
+        """Test that inspector raises TypeError for non-DataFrame input."""
+        with pytest.raises(TypeError, match="Input must be a pandas DataFrame"):
+            _DataFrameInspector([1, 2, 3])
 
-def test_list_of_dataframe_column_names():
-    """Test if list_of_dataframe_column_names matches the expected list of
-    column names."""
-    expected_columns = [
-        "Filename",
-        "Main_program_type",
-        "Kernel_operator_type",
-        "MPI_geometry",
-        "Threads_per_process",
-        "Configuration_label",
-        "QCD_beta_value",
-        "APE_alpha",
-        "APE_iterations",
-        "Rho_value",
-        "Bare_mass",
-        "Clover_coefficient",
-        "Plaquette",
-        "Number_of_spinors",
-        "KL_diagonal_order",
-        "KL_scaling_factor",
-        "Total_calculation_time",
-        "Overlap_operator_method",
-        "CG_epsilon",
-        "MSCG_epsilon",
-        "Temporal_lattice_size",
-        "Spatial_lattice_size",
-        "Number_of_cores",
-        "Number_of_vectors",
-        "Average_number_of_MSCG_iterations_per_spinor",
-        "Average_number_of_MV_multiplications_per_spinor",
-        "Average_wall_clock_time_per_spinor",
-        "Average_core_hours_per_spinor",
-        "Adjusted_average_core_hours_per_spinor",
-    ]
-    assert TEST_ANALYZER.list_of_dataframe_column_names == expected_columns
+        with pytest.raises(TypeError, match="Input must be a pandas DataFrame"):
+            _DataFrameInspector("not a dataframe")
 
+        with pytest.raises(TypeError, match="Input must be a pandas DataFrame"):
+            _DataFrameInspector(None)
 
-def test_list_of_tunable_parameter_names():
-    """Test if list_of_tunable_parameter_names_from_dataframe matches the
-    expected tunable parameters."""
-    expected_tunable_parameters = [
-        "Main_program_type",
-        "KL_diagonal_order",
-        "MPI_geometry",
-        "Rho_value",
-        "APE_alpha",
-        "Number_of_spinors",
-        "Bare_mass",
-        "Overlap_operator_method",
-        "Clover_coefficient",
-        "Kernel_operator_type",
-        "APE_iterations",
-        "MSCG_epsilon",
-        "Number_of_vectors",
-        "Threads_per_process",
-        "KL_scaling_factor",
-        "Configuration_label",
-        "CG_epsilon",
-        "QCD_beta_value",
-    ]
-    assert set(TEST_ANALYZER.list_of_tunable_parameter_names_from_dataframe) == set(
-        expected_tunable_parameters
-    )
+    def test_column_categorization(self, simple_dataframe):
+        """Test that columns are correctly categorized."""
+        inspector = _DataFrameInspector(simple_dataframe)
 
+        # Check column names list
+        expected_columns = [
+            "Kernel_operator_type",
+            "MSCG_epsilon",
+            "APE_alpha",
+            "Total_calculation_time",
+            "Spatial_lattice_size",
+        ]
+        assert inspector.list_of_dataframe_column_names == expected_columns
 
-def test_list_of_output_quantity_names():
-    """Test if list_of_output_quantity_names_from_dataframe matches the expected
-    output quantities."""
-    expected_output_quantities = [
-        "Temporal_lattice_size",
-        "Spatial_lattice_size",
-        "Average_wall_clock_time_per_spinor",
-        "Plaquette",
-        "Total_calculation_time",
-        "Number_of_cores",
-        "Average_number_of_MSCG_iterations_per_spinor",
-        "Average_number_of_MV_multiplications_per_spinor",
-        "Average_core_hours_per_spinor",
-        "Adjusted_average_core_hours_per_spinor",
-        "Filename",
-    ]
-    assert set(TEST_ANALYZER.list_of_output_quantity_names_from_dataframe) == set(
-        expected_output_quantities
-    )
+        # Check tunable parameters
+        tunable_params = inspector.list_of_tunable_parameter_names_from_dataframe
+        assert set(tunable_params) == {
+            "Kernel_operator_type",
+            "MSCG_epsilon",
+            "APE_alpha",
+        }
 
+        # Check output quantities
+        output_quantities = inspector.list_of_output_quantity_names_from_dataframe
+        assert set(output_quantities) == {
+            "Total_calculation_time",
+            "Spatial_lattice_size",
+        }
 
-def test_concatenated_parameters_and_quantities():
-    """Test if concatenating tunable parameters and output quantities matches
-    all column names."""
-    concatenated_list = (
-        TEST_ANALYZER.list_of_tunable_parameter_names_from_dataframe
-        + TEST_ANALYZER.list_of_output_quantity_names_from_dataframe
-    )
-    assert set(concatenated_list) == set(TEST_ANALYZER.list_of_dataframe_column_names)
+    def test_single_valued_columns_identification(self, simple_dataframe):
+        """Test identification of columns with single unique values."""
+        inspector = _DataFrameInspector(simple_dataframe)
 
+        # Check single-valued columns dictionary
+        assert inspector.unique_value_columns_dictionary == {
+            "APE_alpha": 0.72,
+            "Spatial_lattice_size": 24,
+        }
 
-def test_unique_value_columns_dictionary():
-    """Test if unique_value_columns_dictionary contains the expected values."""
-    expected_dict = {
-        "Main_program_type": "invert",
-        "Kernel_operator_type": "Wilson",
-        "QCD_beta_value": "6.20",
-        "APE_alpha": np.float64(0.72),
-        "APE_iterations": np.int64(1),
-        "Rho_value": np.float64(1.0),
-        "Clover_coefficient": np.int64(0),
-        "Number_of_spinors": np.int64(12),
-        "KL_diagonal_order": np.int64(1),
-        "KL_scaling_factor": np.float64(1.0),
-        "Overlap_operator_method": "KL",
-        "Temporal_lattice_size": np.int64(48),
-        "Spatial_lattice_size": np.int64(24),
-        "Number_of_vectors": np.int64(1),
-    }
-    assert TEST_ANALYZER.unique_value_columns_dictionary == expected_dict
+        # Check single-valued column names list
+        assert set(inspector.list_of_single_valued_column_names) == {
+            "APE_alpha",
+            "Spatial_lattice_size",
+        }
 
+    def test_multivalued_columns_identification(self, simple_dataframe):
+        """Test identification of columns with multiple unique values."""
+        inspector = _DataFrameInspector(simple_dataframe)
 
-def test_multivalued_columns_count_dictionary():
-    """Test if multivalued_columns_count_dictionary contains the expected
-    counts."""
-    expected_dict = {
-        "Filename": 48,
-        "MPI_geometry": 3,
-        "Threads_per_process": 2,
-        "Configuration_label": 6,
-        "Bare_mass": 2,
-        "Plaquette": 6,
-        "Total_calculation_time": 48,
-        "CG_epsilon": 4,
-        "MSCG_epsilon": 4,
-        "Number_of_cores": 3,
-        "Average_number_of_MSCG_iterations_per_spinor": 30,
-        "Average_number_of_MV_multiplications_per_spinor": 48,
-        "Average_wall_clock_time_per_spinor": 48,
-        "Average_core_hours_per_spinor": 48,
-        "Adjusted_average_core_hours_per_spinor": 9,
-    }
-    assert TEST_ANALYZER.multivalued_columns_count_dictionary == expected_dict
+        # Check multi-valued columns dictionary
+        assert inspector.multivalued_columns_count_dictionary == {
+            "Kernel_operator_type": 2,  # Wilson, Brillouin
+            "MSCG_epsilon": 2,  # 1e-6, 1e-5
+            "Total_calculation_time": 3,  # 10.5, 12.3, 11.8
+        }
 
+        # Check multi-valued column names list
+        assert set(inspector.list_of_multivalued_column_names) == {
+            "Kernel_operator_type",
+            "MSCG_epsilon",
+            "Total_calculation_time",
+        }
 
-def test_list_of_single_valued_column_names():
-    """Test if list_of_single_valued_column_names matches the expected list of
-    columns with single unique values."""
-    expected_single_valued_columns = [
-        "Main_program_type",
-        "Kernel_operator_type",
-        "QCD_beta_value",
-        "APE_alpha",
-        "APE_iterations",
-        "Rho_value",
-        "Clover_coefficient",
-        "Number_of_spinors",
-        "KL_diagonal_order",
-        "KL_scaling_factor",
-        "Overlap_operator_method",
-        "Temporal_lattice_size",
-        "Spatial_lattice_size",
-        "Number_of_vectors",
-    ]
-    assert set(TEST_ANALYZER.list_of_single_valued_column_names) == set(
-        expected_single_valued_columns
-    )
+    def test_parameter_value_categorization(self, simple_dataframe):
+        """Test categorization of parameters by single/multi values."""
+        inspector = _DataFrameInspector(simple_dataframe)
 
+        # Single-valued tunable parameters
+        assert inspector.list_of_single_valued_tunable_parameter_names == ["APE_alpha"]
 
-def test_list_of_multivalued_column_names():
-    """Test if list_of_multivalued_column_names matches the expected list of
-    columns with multiple unique values."""
-    expected_multivalued_columns = [
-        "Filename",
-        "MPI_geometry",
-        "Threads_per_process",
-        "Configuration_label",
-        "Bare_mass",
-        "Plaquette",
-        "Total_calculation_time",
-        "CG_epsilon",
-        "MSCG_epsilon",
-        "Number_of_cores",
-        "Average_number_of_MSCG_iterations_per_spinor",
-        "Average_number_of_MV_multiplications_per_spinor",
-        "Average_wall_clock_time_per_spinor",
-        "Average_core_hours_per_spinor",
-        "Adjusted_average_core_hours_per_spinor",
-    ]
-    assert set(TEST_ANALYZER.list_of_multivalued_column_names) == set(
-        expected_multivalued_columns
-    )
+        # Multi-valued tunable parameters
+        assert set(inspector.list_of_multivalued_tunable_parameter_names) == {
+            "Kernel_operator_type",
+            "MSCG_epsilon",
+        }
 
+        # Single-valued output quantities
+        assert inspector.list_of_single_valued_output_quantity_names == [
+            "Spatial_lattice_size"
+        ]
 
-def test_concatenated_single_and_multivalued_columns():
-    """Test if concatenating single and multivalued column lists matches all
-    column names."""
-    concatenated_list = (
-        TEST_ANALYZER.list_of_single_valued_column_names
-        + TEST_ANALYZER.list_of_multivalued_column_names
-    )
-    assert set(concatenated_list) == set(TEST_ANALYZER.list_of_dataframe_column_names)
+        # Multi-valued output quantities
+        assert inspector.list_of_multivalued_output_quantity_names == [
+            "Total_calculation_time"
+        ]
 
+    def test_column_unique_values_method(self, simple_dataframe):
+        """Test the column_unique_values method."""
+        inspector = _DataFrameInspector(simple_dataframe)
 
-def test_list_of_single_valued_tunable_parameter_names():
-    """Test if list_of_single_valued_tunable_parameter_names contains the
-    expected parameters."""
-    expected_list = [
-        "Rho_value",
-        "Kernel_operator_type",
-        "QCD_beta_value",
-        "APE_iterations",
-        "Overlap_operator_method",
-        "Clover_coefficient",
-        "Main_program_type",
-        "KL_diagonal_order",
-        "Number_of_vectors",
-        "APE_alpha",
-        "KL_scaling_factor",
-        "Number_of_spinors",
-    ]
-    assert set(TEST_ANALYZER.list_of_single_valued_tunable_parameter_names) == set(
-        expected_list
-    )
+        # Test with multi-valued column
+        kernel_values = inspector.column_unique_values("Kernel_operator_type")
+        assert kernel_values == ["Brillouin", "Wilson"]  # Sorted
+
+        # Test with single-valued column
+        ape_values = inspector.column_unique_values("APE_alpha")
+        assert ape_values == [0.72]
+
+        # Test with column containing numpy types
+        epsilon_values = inspector.column_unique_values("MSCG_epsilon")
+        assert epsilon_values == [1e-6, 1e-5]  # Should be Python floats, not numpy
+        assert all(isinstance(v, (int, float, str)) for v in epsilon_values)
+
+    def test_column_unique_values_invalid_column(self, simple_dataframe):
+        """Test column_unique_values raises error for invalid column."""
+        inspector = _DataFrameInspector(simple_dataframe)
+
+        with pytest.raises(ValueError, match="Column 'nonexistent' does not exist"):
+            inspector.column_unique_values("nonexistent")
+
+    def test_empty_dataframe_handling(self, empty_dataframe):
+        """Test inspector handles empty DataFrame correctly."""
+        inspector = _DataFrameInspector(empty_dataframe)
+
+        assert inspector.list_of_dataframe_column_names == []
+        assert inspector.list_of_tunable_parameter_names_from_dataframe == []
+        assert inspector.list_of_output_quantity_names_from_dataframe == []
+        assert inspector.unique_value_columns_dictionary == {}
+        assert inspector.multivalued_columns_count_dictionary == {}
+
+    def test_single_row_dataframe_handling(self, single_row_dataframe):
+        """Test inspector handles single-row DataFrame correctly."""
+        inspector = _DataFrameInspector(single_row_dataframe)
+
+        # All columns should be single-valued
+        assert len(inspector.list_of_single_valued_column_names) == 3
+        assert len(inspector.list_of_multivalued_column_names) == 0
+
+        # Check values
+        assert inspector.unique_value_columns_dictionary == {
+            "Kernel_operator_type": "Wilson",
+            "MSCG_epsilon": 1e-6,
+            "Total_calculation_time": 10.5,
+        }
+
+    def test_all_single_valued_dataframe(self, all_single_valued_dataframe):
+        """Test inspector with DataFrame where all columns have single
+        values."""
+        inspector = _DataFrameInspector(all_single_valued_dataframe)
+
+        # All columns should be single-valued
+        assert len(inspector.list_of_multivalued_column_names) == 0
+        assert len(inspector.list_of_single_valued_column_names) == 3
+
+        # No multi-valued parameters
+        assert inspector.list_of_multivalued_tunable_parameter_names == []
+        assert inspector.list_of_multivalued_output_quantity_names == []
+
+    def test_dataframe_not_copied(self, simple_dataframe):
+        """Test that inspector doesn't create a copy of the DataFrame."""
+        inspector = _DataFrameInspector(simple_dataframe)
+
+        # Modify the original DataFrame
+        simple_dataframe.loc[0, "MSCG_epsilon"] = 1e-4
+
+        # Change should be reflected in inspector's dataframe
+        assert inspector.dataframe.loc[0, "MSCG_epsilon"] == 1e-4
+
+    def test_update_column_categories_called_on_init(self, simple_dataframe):
+        """Test that _update_column_categories is called during
+        initialization."""
+        inspector = _DataFrameInspector(simple_dataframe)
+
+        # All category attributes should be populated
+        assert hasattr(inspector, "list_of_dataframe_column_names")
+        assert hasattr(inspector, "list_of_tunable_parameter_names_from_dataframe")
+        assert hasattr(inspector, "unique_value_columns_dictionary")
+        assert hasattr(inspector, "multivalued_columns_count_dictionary")
+        # ... etc
 
 
-def test_list_of_multivalued_tunable_parameter_names():
-    """Test if list_of_multivalued_tunable_parameter_names contains the expected
-    parameters."""
-    expected_list = [
-        "Bare_mass",
-        "MSCG_epsilon",
-        "CG_epsilon",
-        "MPI_geometry",
-        "Configuration_label",
-        "Threads_per_process",
-    ]
-    assert set(TEST_ANALYZER.list_of_multivalued_tunable_parameter_names) == set(
-        expected_list
-    )
-
-
-def test_concatenated_single_and_multivalued_tunable_parameters():
-    """Test if concatenating single-valued and multi-valued tunable parameter
-    lists matches all tunable parameters."""
-    concatenated_list = (
-        TEST_ANALYZER.list_of_single_valued_tunable_parameter_names
-        + TEST_ANALYZER.list_of_multivalued_tunable_parameter_names
-    )
-    assert set(concatenated_list) == set(
-        TEST_ANALYZER.list_of_tunable_parameter_names_from_dataframe
-    )
-
-
-def test_list_of_single_valued_output_quantity_names():
-    """Test if list_of_single_valued_output_quantity_names is empty as
-    expected."""
-    excepted_list = [
-        "Temporal_lattice_size",
-        "Spatial_lattice_size",
-    ]
-    assert set(TEST_ANALYZER.list_of_single_valued_output_quantity_names) == set(
-        excepted_list
-    )
-
-
-def test_list_of_multivalued_output_quantity_names():
-    """Test if list_of_multivalued_output_quantity_names contains the expected
-    quantities."""
-    expected_list = [
-        "Total_calculation_time",
-        "Plaquette",
-        "Filename",
-        "Number_of_cores",
-        "Average_wall_clock_time_per_spinor",
-        "Average_core_hours_per_spinor",
-        "Adjusted_average_core_hours_per_spinor",
-        "Average_number_of_MV_multiplications_per_spinor",
-        "Average_number_of_MSCG_iterations_per_spinor",
-    ]
-    assert set(TEST_ANALYZER.list_of_multivalued_output_quantity_names) == set(
-        expected_list
-    )
-
-
-def test_concatenated_single_and_multivalued_output_quantities():
-    """Test if concatenating single-valued and multi-valued output quantity
-    lists matches all output quantities."""
-    concatenated_list = (
-        TEST_ANALYZER.list_of_single_valued_output_quantity_names
-        + TEST_ANALYZER.list_of_multivalued_output_quantity_names
-    )
-    assert set(concatenated_list) == set(
-        TEST_ANALYZER.list_of_output_quantity_names_from_dataframe
-    )
-
-
-def test_group_by_multivalued_tunable_parameters():
-    """Test if group_by_multivalued_tunable_parameters returns a
-    DataFrameGroupBy object."""
-    filter_params = [
-        "CG_epsilon",
-        "Bare_mass",
-        "MPI_geometry",
-        "Threads_per_process",
-        "MSCG_epsilon",
-        "Configuration_label",
-    ]
-    grouped = TEST_ANALYZER.group_by_multivalued_tunable_parameters(
-        filter_out_parameters_list=filter_params
-    )
-    assert isinstance(grouped, pd.core.groupby.generic.DataFrameGroupBy)
-
-
-def test_group_by_multivalued_tunable_parameters_no_filter():
-    """Test if group_by_multivalued_tunable_parameters returns a
-    DataFrameGroupBy object when no filter is provided."""
-    grouped = TEST_ANALYZER.group_by_multivalued_tunable_parameters()
-    assert isinstance(grouped, pd.core.groupby.generic.DataFrameGroupBy)
-
-
-def test_restore_original_dataframe():
-    """Test if restore_original_dataframe restores the dataframe to its original
-    state after modification."""
-    # Modify the dataframe
-    TEST_ANALYZER.dataframe.drop("Filename", axis=1, inplace=True)
-
-    # Restore the original dataframe
-    TEST_ANALYZER.restore_original_dataframe()
-
-    # Verify that the dataframe matches the original
-    pd.testing.assert_frame_equal(TEST_ANALYZER.dataframe, TEST_DATAFRAME)
-
-
+# Run tests with pytest
 if __name__ == "__main__":
-    pass
+    pytest.main([__file__, "-v"])
