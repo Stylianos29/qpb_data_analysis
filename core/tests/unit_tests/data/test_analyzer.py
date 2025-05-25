@@ -384,6 +384,7 @@ class TestDataFrameAnalyzer:
             analyzer.dataframe["Total_calculation_time"]
             / analyzer.dataframe["MSCG_epsilon"]
         )
+        expected.name = "time_per_epsilon"
         pd.testing.assert_series_equal(analyzer.dataframe["time_per_epsilon"], expected)
 
     def test_add_derived_column_with_expression(self, analyzer):
@@ -394,6 +395,7 @@ class TestDataFrameAnalyzer:
 
         assert "double_time" in analyzer.dataframe.columns
         expected = analyzer.dataframe["Total_calculation_time"] * 2
+        expected.name = "double_time"
         pd.testing.assert_series_equal(analyzer.dataframe["double_time"], expected)
 
     def test_add_derived_column_method_chaining(self, analyzer):
