@@ -2,24 +2,27 @@
 
 ## Overview
 
-The `DataFrameAnalyzer` class provides tools for analyzing and manipulating
-Pandas DataFrames with a focus on distinguishing between tunable parameters and
-output quantities. It helps with categorizing DataFrame columns, identifying
-columns with single vs. multiple unique values, grouping data by parameters, and
-filtering the DataFrame based on various conditions.
+The `DataFrameAnalyzer` class provides comprehensive tools for analyzing and
+manipulating Pandas DataFrames with a focus on distinguishing between tunable
+parameters and output quantities. It offers both read-only inspection
+capabilities and data manipulation features, including filtering, grouping,
+column derivation, and state management through context managers.
 
 ## Class Definition
 
 ```python
-class DataFrameAnalyzer:
-    def __init__(dataframe: pd.DataFrame)
+from library.data import DataFrameAnalyzer
+
+analyzer = DataFrameAnalyzer(dataframe: pd.DataFrame)
 ```
 
 ## Constructor
 
 ### `DataFrameAnalyzer(dataframe)`
 
-Creates a new DataFrameAnalyzer instance with the provided DataFrame.
+Creates a new DataFrameAnalyzer instance with the provided DataFrame. The
+analyzer maintains both an original copy (for restoration) and a working copy
+(for modifications) of the input DataFrame.
 
 **Parameters:**
 - `dataframe` (pd.DataFrame): The input DataFrame to analyze.
@@ -30,13 +33,13 @@ Creates a new DataFrameAnalyzer instance with the provided DataFrame.
 **Example:**
 ```python
 import pandas as pd
-from your_library import DataFrameAnalyzer
+from library.data import DataFrameAnalyzer
 
 # Create a sample DataFrame
 df = pd.DataFrame({
-    'parameter1': [1, 2, 3],
-    'parameter2': ['A', 'B', 'C'],
-    'output1': [10.1, 10.2, 10.3]
+    'Kernel_operator_type': ['Wilson', 'Brillouin'],
+    'MSCG_epsilon': [1e-6, 1e-5],
+    'Total_calculation_time': [10.5, 12.3]
 })
 
 # Initialize the analyzer
@@ -45,185 +48,272 @@ analyzer = DataFrameAnalyzer(df)
 
 ## Key Attributes
 
-After initialization, the following attributes are available:
+After initialization, the analyzer automatically categorizes columns and
+provides the following attributes:
 
-- `original_dataframe` (pd.DataFrame): A copy of the original input DataFrame.
-- `dataframe` (pd.DataFrame): The working DataFrame that can be filtered and
-  manipulated.
-- `list_of_dataframe_column_names` (list): List of all column names in the
-  DataFrame.
+### DataFrame References
+- `original_dataframe` (pd.DataFrame): Immutable copy of the original input
+  DataFrame
+- `dataframe` (pd.DataFrame): Working DataFrame that can be filtered and
+  manipulated
+
+### Column Lists
+- `list_of_dataframe_column_names` (list): All column names
 - `list_of_tunable_parameter_names_from_dataframe` (list): Columns identified as
-  tunable parameters.
+  tunable parameters
 - `list_of_output_quantity_names_from_dataframe` (list): Columns identified as
-  output quantities.
-- `unique_value_columns_dictionary` (dict): Columns with single unique values
-  and their values.
-- `multivalued_columns_count_dictionary` (dict): Columns with multiple unique
-  values and counts.
-- `list_of_single_valued_column_names` (list): Column names with only one unique
-  value.
-- `list_of_multivalued_column_names` (list): Column names with multiple unique
-  values.
+  output quantities
+
+### Value Analysis Dictionaries
+- `unique_value_columns_dictionary` (dict): Maps single-valued columns to their
+  unique values
+- `multivalued_columns_count_dictionary` (dict): Maps multi-valued columns to
+  their unique value counts
+
+### Categorized Column Lists
+- `list_of_single_valued_column_names` (list): Columns with only one unique
+  value
+- `list_of_multivalued_column_names` (list): Columns with multiple unique values
 - `list_of_single_valued_tunable_parameter_names` (list): Tunable parameters
-  with one unique value.
+  with one unique value
 - `list_of_multivalued_tunable_parameter_names` (list): Tunable parameters with
-  multiple values.
+  multiple values
 - `list_of_single_valued_output_quantity_names` (list): Output quantities with
-  one unique value.
+  one unique value
 - `list_of_multivalued_output_quantity_names` (list): Output quantities with
-  multiple values.
+  multiple values
+
+### Computed Properties
+- `reduced_multivalued_tunable_parameter_names_list` (list): Multivalued
+  parameters after filtering (computed property)
 
 ## Methods
 
-### `group_by_multivalued_tunable_parameters(filter_out_parameters_list=None)`
+### Data Inspection Methods
 
-Groups the DataFrame by multivalued tunable parameters, optionally excluding
-some parameters.
+#### `column_unique_values(column_name)`
+
+Returns a sorted list of unique values for the specified column.
 
 **Parameters:**
-- `filter_out_parameters_list` (list, optional): List of parameter names to
-  exclude from the grouping operation. Default is None (include all multivalued
-  parameters).
+- `column_name` (str): The name of the column to analyze
 
 **Returns:**
-- `pandas.core.groupby.DataFrameGroupBy`: A GroupBy object created by grouping
-  on the specified multivalued tunable parameters.
+- `list`: Sorted list of unique values (converted to Python native types)
 
 **Raises:**
-- `TypeError`: If filter_out_parameters_list is not a list.
-- `ValueError`: If filter_out_parameters_list contains invalid parameter names.
+- `ValueError`: If the column doesn't exist in the DataFrame
 
 **Example:**
 ```python
-# Group by all multivalued tunable parameters
-groups = analyzer.group_by_multivalued_tunable_parameters()
-
-# Process each group
-for name, group in groups:
-    print(f"Group: {name}")
-    print(group)
-    
-# Group by all except 'parameter1'
-groups = analyzer.group_by_multivalued_tunable_parameters(
-    filter_out_parameters_list=['parameter1']
-)
+# Get unique values for a column
+values = analyzer.column_unique_values('Kernel_operator_type')
+print(values)  # ['Brillouin', 'Wilson']
 ```
 
 ---
 
-### `restrict_dataframe(condition=None, filter_func=None)`
+### Data Manipulation Methods
 
-Restricts the DataFrame to rows that satisfy given conditions.
+#### `restrict_dataframe(condition=None, filter_func=None)`
+
+Restricts the DataFrame to rows that satisfy given conditions. Supports method
+chaining.
 
 **Parameters:**
-- `condition` (str, optional): A string condition to filter rows using Pandas
-  query syntax.
-- `filter_func` (callable, optional): A function that takes a DataFrame and
-  returns a boolean Series for more complex filtering needs.
+- `condition` (str, optional): String condition using Pandas query syntax
+- `filter_func` (callable, optional): Function that takes a DataFrame and
+  returns a boolean Series
 
-**Returns:** None (modifies the DataFrameAnalyzer's DataFrame in-place)
+**Returns:**
+- `self`: The analyzer instance (for method chaining)
 
 **Raises:**
-- `ValueError`: If neither condition nor filter_func is provided, or if filtering fails.
+- `ValueError`: If neither condition nor filter_func is provided
+- `TypeError`: If types are incorrect
 
 **Example:**
 ```python
-# Example 1: Using a query string for simpler conditions
-analyzer.restrict_dataframe("parameter1 > 1 and parameter2 == 'B'")
+# Using query syntax
+analyzer.restrict_dataframe(
+  "MSCG_epsilon >= 1e-6 and Kernel_operator_type == 'Wilson'"
+  )
 
-# Example 2: Using a filter function for more complex conditions
-def complex_filter(df):
-    return (
-        ((df["parameter1"] >= 2) & (df["parameter2"] == "B")) |
-        ((df["parameter1"] == 1) & (df["parameter2"] == "A"))
-    )
-analyzer.restrict_dataframe(filter_func=complex_filter)
+# Using a filter function
+def custom_filter(df):
+    return df['Total_calculation_time'] > 11.0
+analyzer.restrict_dataframe(filter_func=custom_filter)
+
+# Method chaining
+analyzer.restrict_dataframe("param > 5").add_derived_column(
+  "new_col", expression="param * 2"
+  )
 ```
 
 ---
 
-### `restore_original_dataframe()`
+#### `add_derived_column(new_column_name, derivation_function=None, expression=None)`
 
-Resets the working DataFrame to the original, unfiltered state.
+Adds a new column derived from existing columns. Supports method chaining.
 
-**Returns:** None (modifies the DataFrameAnalyzer's DataFrame in-place)
+**Parameters:**
+- `new_column_name` (str): Name for the new column
+- `derivation_function` (callable, optional): Function that takes the DataFrame
+  and returns a Series
+- `expression` (str, optional): String expression to evaluate
+
+**Returns:**
+- `self`: The analyzer instance (for method chaining)
+
+**Raises:**
+- `ValueError`: If column exists, no derivation method provided, or operation
+  fails
 
 **Example:**
 ```python
-# After applying filters, reset to original
-analyzer.restrict_dataframe("parameter1 > 1")
-# Now we have a filtered dataframe
-print(len(analyzer.dataframe))  # Shows reduced number of rows
+# Using a function
+analyzer.add_derived_column(
+    'efficiency',
+    derivation_function=lambda df: 100 / df['Total_calculation_time']
+)
 
-# Reset to original
-analyzer.restore_original_dataframe()
-print(len(analyzer.dataframe))  # Shows original number of rows
+# Using an expression
+analyzer.add_derived_column(
+  'double_time', expression='Total_calculation_time * 2'
+  )
 ```
 
-## Usage Examples
+---
 
-### Basic Analysis Workflow
+#### `restore_original_dataframe()`
+
+Resets the working DataFrame to the original state. Supports method chaining.
+
+**Returns:**
+- `self`: The analyzer instance (for method chaining)
+
+**Example:**
+```python
+# Make changes and then restore
+analyzer.restrict_dataframe("param > 5")
+analyzer.add_derived_column("new_col", expression="param * 2")
+analyzer.restore_original_dataframe()  # Back to original
+```
+
+---
+
+### Grouping Methods
+
+#### `group_by_multivalued_tunable_parameters(filter_out_parameters_list=None, verbose=False)`
+
+Groups the DataFrame by multivalued tunable parameters, optionally excluding
+some.
+
+**Parameters:**
+- `filter_out_parameters_list` (list, optional): Parameters to exclude from
+  grouping
+- `verbose` (bool, optional): If True, prints the grouping columns
+
+**Returns:**
+- `pandas.core.groupby.DataFrameGroupBy`: GroupBy object
+
+**Raises:**
+- `TypeError`: If filter_out_parameters_list is not a list
+- `ValueError`: If invalid parameters are specified
+
+**Example:**
+```python
+# Group by all multivalued parameters
+groups = analyzer.group_by_multivalued_tunable_parameters()
+
+# Exclude specific parameters
+groups = analyzer.group_by_multivalued_tunable_parameters(
+    filter_out_parameters_list=['MSCG_epsilon']
+)
+
+# Process groups
+for name, group in groups:
+    print(f"Group {name}: {len(group)} rows")
+```
+
+---
+
+### Context Manager Support
+
+The analyzer can be used as a context manager for temporary modifications:
+
+```python
+# Single context
+with analyzer:
+    analyzer.restrict_dataframe("column > 5")
+    # DataFrame is modified here
+# DataFrame is automatically restored here
+
+# Nested contexts
+with analyzer:
+    analyzer.restrict_dataframe("param1 > 5")
+    with analyzer:
+        analyzer.restrict_dataframe("param2 == 'A'")
+        # Both filters applied
+    # Only first filter applied
+# Original state restored
+```
+
+## Complete Example
 
 ```python
 import pandas as pd
-from your_library import DataFrameAnalyzer
+from library.data import DataFrameAnalyzer
 
-# Create a DataFrame with experiment data
+# Create experimental data
 df = pd.DataFrame({
-    'temperature': [298, 310, 323, 298, 310, 323],
-    'pressure': [1.0, 1.0, 1.0, 2.0, 2.0, 2.0],
-    'catalyst': ['A', 'A', 'A', 'A', 'A', 'A'],
-    'yield': [0.45, 0.52, 0.61, 0.47, 0.55, 0.63],
-    'selectivity': [0.78, 0.75, 0.72, 0.79, 0.76, 0.73]
+    'Kernel_operator_type': ['Wilson', 'Wilson', 'Brillouin', 'Brillouin'],
+    'MSCG_epsilon': [1e-6, 1e-5, 1e-6, 1e-5],
+    'Configuration_label': ['001', '001', '002', '002'],
+    'Total_calculation_time': [10.5, 12.3, 11.8, 13.2],
+    'Efficiency': [0.85, 0.82, 0.87, 0.83]
 })
 
 # Initialize analyzer
 analyzer = DataFrameAnalyzer(df)
 
-# Print summary of parameter types
-print(f"Tunable parameters with multiple values: {analyzer.list_of_multivalued_tunable_parameter_names}")
-print(f"Tunable parameters with single value: {analyzer.list_of_single_valued_tunable_parameter_names}")
-print(f"Output quantities: {analyzer.list_of_output_quantity_names_from_dataframe}")
+# Inspect the data structure
+print("Multivalued parameters:", analyzer.list_of_multivalued_tunable_parameter_names)
+print("Output quantities:", analyzer.list_of_output_quantity_names_from_dataframe)
 
-# Group by temperature only (filtering out pressure)
-temp_groups = analyzer.group_by_multivalued_tunable_parameters(
-    filter_out_parameters_list=['pressure']
+# Check unique values
+kernel_types = analyzer.column_unique_values('Kernel_operator_type')
+print(f"Kernel types: {kernel_types}")
+
+# Add derived column
+analyzer.add_derived_column(
+    'time_per_epsilon',
+    derivation_function=lambda df: df['Total_calculation_time'] / df['MSCG_epsilon']
 )
 
-# Calculate average yield for each temperature
-for name, group in temp_groups:
-    avg_yield = group['yield'].mean()
-    print(f"Temperature {name}: Average yield = {avg_yield:.2f}")
+# Group and analyze
+groups = analyzer.group_by_multivalued_tunable_parameters(
+    filter_out_parameters_list=['Configuration_label']
+)
 
-# Filter to high-performance conditions
-analyzer.restrict_dataframe("yield > 0.5 and selectivity > 0.7")
-print("High performing conditions:")
-print(analyzer.dataframe)
+for (kernel, epsilon), group in groups:
+    avg_time = group['Total_calculation_time'].mean()
+    print(f"Kernel={kernel}, Epsilon={epsilon}: Avg time = {avg_time:.2f}")
 
-# Reset for further analysis
-analyzer.restore_original_dataframe()
-```
+# Use context manager for temporary analysis
+with analyzer:
+    analyzer.restrict_dataframe("Efficiency > 0.84")
+    high_efficiency_count = len(analyzer.dataframe)
+    print(f"High efficiency runs: {high_efficiency_count}")
 
-### Complex Filtering Example
-
-```python
-# Filter for optimal conditions based on multiple criteria
-def optimal_conditions(df):
-    high_yield = df['yield'] > 0.55
-    good_selectivity = df['selectivity'] > 0.72
-    energy_efficient = df['temperature'] <= 310
-    
-    return high_yield & good_selectivity & energy_efficient
-
-analyzer.restrict_dataframe(filter_func=optimal_conditions)
-print("Optimal processing conditions:")
-print(analyzer.dataframe)
+# DataFrame is automatically restored after the context
+print(f"Total runs: {len(analyzer.dataframe)}")
 ```
 
 ## Notes
 
-- The class expects two predefined constants from a `constants` module:
-  - `constants.TUNABLE_PARAMETER_NAMES_LIST`: List of column names that are
-    considered tunable parameters
-  - `constants.OUTPUT_QUANTITY_NAMES_LIST`: List of column names that are
-    considered output quantities
+- Column categorization as tunable parameters or output quantities is determined
+  by the `TUNABLE_PARAMETER_NAMES_LIST` constant in the library
+- All manipulation methods support method chaining by returning `self`
+- The analyzer maintains the original DataFrame for restoration at any time
+- Context manager support allows for safe temporary modifications
