@@ -530,13 +530,14 @@ class TestDataFrameAnalyzer:
         # Perform multiple operations
         analyzer.restrict_dataframe("Kernel_operator_type == 'Wilson'")
         analyzer.add_derived_column("test_col", expression="1")
-        analyzer.group_by_multivalued_tunable_parameters(["Configuration_label"])
+        analyzer.group_by_multivalued_tunable_parameters(["MSCG_epsilon"])
 
         # Check that categorizations are updated correctly
         assert "test_col" in analyzer.list_of_output_quantity_names_from_dataframe
         assert (
-            len(analyzer.list_of_multivalued_tunable_parameter_names) == 2
-        )  # One filtered
+            len(analyzer.list_of_multivalued_tunable_parameter_names)
+            == 1  # Only MSCG_epsilon
+        )
 
         # Restore and check
         analyzer.restore_original_dataframe()
