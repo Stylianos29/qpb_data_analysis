@@ -5,21 +5,24 @@ import pandas as pd
 from library.data.analyzer import _DataFrameInspector, DataFrameAnalyzer
 
 
+# MODULE-LEVEL FIXTURE
+@pytest.fixture
+def simple_dataframe():
+    """Create an extended DataFrame for analyzer testing."""
+    return pd.DataFrame(
+        {
+            "Kernel_operator_type": ["Wilson", "Wilson", "Brillouin", "Brillouin"],
+            "MSCG_epsilon": [1e-6, 1e-5, 1e-6, 1e-5],
+            "Configuration_label": ["0000100", "0000100", "0000200", "0000200"],
+            "APE_alpha": [0.72, 0.72, 0.72, 0.72],  # Single unique value
+            "Total_calculation_time": [10.5, 12.3, 11.8, 13.2],
+            "Spatial_lattice_size": [24, 24, 24, 24],  # Single unique value
+        }
+    )
+
+
 class TestDataFrameInspector:
     """Test suite for the _DataFrameInspector class using synthetic data."""
-
-    @pytest.fixture
-    def simple_dataframe(self):
-        """Create a simple DataFrame with mixed parameter types."""
-        return pd.DataFrame(
-            {
-                "Kernel_operator_type": ["Wilson", "Wilson", "Brillouin"],
-                "MSCG_epsilon": [1e-6, 1e-5, 1e-6],
-                "APE_alpha": [0.72, 0.72, 0.72],  # Single value
-                "Total_calculation_time": [10.5, 12.3, 11.8],
-                "Spatial_lattice_size": [24, 24, 24],  # Single value
-            }
-        )
 
     @pytest.fixture
     def empty_dataframe(self):
@@ -73,6 +76,7 @@ class TestDataFrameInspector:
         expected_columns = [
             "Kernel_operator_type",
             "MSCG_epsilon",
+            "Configuration_label",
             "APE_alpha",
             "Total_calculation_time",
             "Spatial_lattice_size",
@@ -84,6 +88,7 @@ class TestDataFrameInspector:
         assert set(tunable_params) == {
             "Kernel_operator_type",
             "MSCG_epsilon",
+            "Configuration_label",
             "APE_alpha",
         }
 
@@ -118,13 +123,15 @@ class TestDataFrameInspector:
         assert inspector.multivalued_columns_count_dictionary == {
             "Kernel_operator_type": 2,  # Wilson, Brillouin
             "MSCG_epsilon": 2,  # 1e-6, 1e-5
-            "Total_calculation_time": 3,  # 10.5, 12.3, 11.8
+            "Configuration_label": 2,  # "0000100", "0000200"
+            "Total_calculation_time": 4,  # 10.5, 12.3, 11.8, 13.2
         }
 
         # Check multi-valued column names list
         assert set(inspector.list_of_multivalued_column_names) == {
             "Kernel_operator_type",
             "MSCG_epsilon",
+            "Configuration_label",
             "Total_calculation_time",
         }
 
@@ -139,6 +146,7 @@ class TestDataFrameInspector:
         assert set(inspector.list_of_multivalued_tunable_parameter_names) == {
             "Kernel_operator_type",
             "MSCG_epsilon",
+            "Configuration_label",
         }
 
         # Single-valued output quantities
@@ -238,20 +246,6 @@ class TestDataFrameInspector:
 
 class TestDataFrameAnalyzer:
     """Test suite for the DataFrameAnalyzer class using synthetic data."""
-
-    @pytest.fixture
-    def simple_dataframe(self):
-        """Create a simple DataFrame for testing."""
-        return pd.DataFrame(
-            {
-                "Kernel_operator_type": ["Wilson", "Wilson", "Brillouin", "Brillouin"],
-                "MSCG_epsilon": [1e-6, 1e-5, 1e-6, 1e-5],
-                "Configuration_label": ["001", "001", "002", "002"],
-                "APE_alpha": [0.72, 0.72, 0.72, 0.72],
-                "Total_calculation_time": [10.5, 12.3, 11.8, 13.2],
-                "Spatial_lattice_size": [24, 24, 24, 24],
-            }
-        )
 
     @pytest.fixture
     def analyzer(self, simple_dataframe):
