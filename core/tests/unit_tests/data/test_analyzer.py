@@ -466,7 +466,7 @@ class TestDataFrameAnalyzer:
             "Kernel_operator_type",
             "MSCG_epsilon",
         ]
-        assert grouped.keys.tolist() == expected_grouping_cols
+        assert grouped.keys == expected_grouping_cols
 
     def test_group_by_with_filter_out_parameters(self, analyzer):
         """Test groupby with filtered parameters."""
@@ -476,7 +476,7 @@ class TestDataFrameAnalyzer:
 
         # Should exclude MSCG_epsilon from grouping
         expected_cols = ["Configuration_label", "Kernel_operator_type"]
-        assert grouped.keys.tolist() == expected_cols
+        assert grouped.keys == expected_cols
 
     def test_group_by_filter_all_parameters(self, analyzer):
         """Test groupby when all parameters are filtered out."""
