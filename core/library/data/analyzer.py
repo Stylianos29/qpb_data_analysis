@@ -245,20 +245,69 @@ class DataFrameAnalyzer(_DataFrameInspector):
 
     def __enter__(self):
         """
-        Enter context manager - store current dataframe state.
+        Enter context manager - store current DataFrame state on a stack.
+
+        This method implements the context manager protocol, allowing temporary
+        modifications to the DataFrame that are automatically reverted when the
+        context ends. It maintains a stack of DataFrame states to support nested
+        context managers.
+
+        The state is preserved by creating a deep copy of the current DataFrame
+        and pushing it onto a stack. When exiting the context, the most recent
+        state is restored by popping from the stack.
 
         Usage:
+            # Single context
             with analyzer:
                 analyzer.restrict_dataframe("column > 5")
                 # DataFrame is modified here
             # DataFrame is automatically restored here
+
+            # Nested contexts
+            with analyzer:
+                analyzer.restrict_dataframe("column > 5")
+                with analyzer:
+                    analyzer.restrict_dataframe("other_column == 'value'")
+                    # Inner context modifications
+                # Restored to outer context state
+            # Restored to original state
+
+        Returns:
+            DataFrameAnalyzer: Returns self for use in the context manager.
         """
-        self._context_dataframe = self.dataframe.copy()
+        if not hasattr(self, "_context_stack"):
+            self._context_stack = []
+        self._context_stack.append(self.dataframe.copy())
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Exit context manager - restore dataframe state."""
-        self.dataframe = self._context_dataframe
+        """
+        Exit context manager - restore DataFrame state from the stack.
+
+        This method implements the context manager protocol's exit handling. It:
+        1. Restores the DataFrame to its state before the context was entered
+        2. Updates all column categories to reflect the restored state
+        3. Maintains proper exception handling
+
+        The restoration process pops the most recent DataFrame state from the
+        stack and restores it, ensuring nested contexts work correctly. Column
+        categories are then recomputed to maintain consistency.
+
+        Args:
+            - exc_type: The type of any exception that occurred (or None)
+            - exc_val: The instance of any exception that occurred (or None)
+            - exc_tb: The traceback of any exception that occurred (or None)
+
+        Returns:
+            bool: Always returns False, allowing exceptions to propagate
+                 normally rather than being suppressed.
+
+        Note:
+            The method handles the case where no context stack exists yet,
+            making it safe to use even if __enter__ was never called.
+        """
+        if hasattr(self, "_context_stack") and self._context_stack:
+            self.dataframe = self._context_stack.pop()
         self._update_column_categories()
         # Don't suppress exceptions
         return False
