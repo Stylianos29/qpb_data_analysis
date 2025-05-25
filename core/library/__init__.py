@@ -9,6 +9,7 @@ Main Components:
 - Data Analysis: Tools for manipulating and analyzing pandas DataFrames
 - Visualization: Plotting utilities for data visualization
 - I/O: Utilities for handling various file formats and filesystem operations
+TODO: Update docustring
 
 For more information, see the documentation at: docs/api
 """
@@ -22,11 +23,14 @@ from .visualization import DataPlotter, HDF5Plotter
 # Import constants 
 from .constants import ROOT, RAW_DATA_FILES_DIRECTORY, PROCESSED_DATA_FILES_DIRECTORY
 
+# Import input validation functions
+from library.filesystem_utilities import validate_file, validate_output_directory
+
 # Define public API
 __all__ = [
     # Data components
     "DataFrameAnalyzer",
-    "EnhancedHDF5Analyzer", 
+    "EnhancedHDF5Analyzer",
     "TableGenerator",
     "load_csv",
     
@@ -38,4 +42,8 @@ __all__ = [
     "ROOT",
     "RAW_DATA_FILES_DIRECTORY",
     "PROCESSED_DATA_FILES_DIRECTORY",
+
+    # Input validation functions
+    "validate_file",
+    "validate_output_directory"
 ]
