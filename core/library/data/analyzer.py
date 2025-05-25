@@ -1,3 +1,45 @@
+"""
+DataFrame analysis and manipulation tools for distinguishing between tunable
+parameters and output quantities.
+
+This module provides classes for analyzing and manipulating Pandas DataFrames in
+the context of scientific data analysis, with special focus on categorizing
+columns as either tunable parameters (inputs) or output quantities (results).
+
+Classes:
+    DataFrameAnalyzer: Main public class for DataFrame analysis and
+    manipulation.
+        Provides methods for filtering, grouping, adding derived columns, and
+        managing DataFrame state through context managers.
+
+    _DataFrameInspector: Private base class for read-only DataFrame inspection.
+        Not intended for direct use.
+
+Example:
+    >>> import pandas as pd
+    >>> from library.data.analyzer import DataFrameAnalyzer
+    >>> 
+    >>> df = pd.DataFrame({
+    ...     'temperature': [300, 310, 320],
+    ...     'pressure': [1.0, 1.5, 2.0],
+    ...     'yield': [0.85, 0.90, 0.92]
+    ... })
+    >>> 
+    >>> analyzer = DataFrameAnalyzer(df)
+    >>> print(analyzer.list_of_multivalued_tunable_parameter_names)
+    ['temperature', 'pressure']
+    >>> 
+    >>> # Use context manager for temporary modifications
+    >>> with analyzer:
+    ...     analyzer.restrict_dataframe("temperature > 305")
+    ...     print(len(analyzer.dataframe))  # 2 rows
+    >>> print(len(analyzer.dataframe))  # 3 rows (restored)
+
+Dependencies:
+    - pandas: For DataFrame operations
+    - library.constants: For TUNABLE_PARAMETER_NAMES_LIST
+"""
+
 import pandas as pd
 
 from ..constants import TUNABLE_PARAMETER_NAMES_LIST
