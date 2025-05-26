@@ -24,7 +24,7 @@ FIT_LABEL_POSITIONS = {
 }
 
 
-class EnhancedHDF5Analyzer:
+class HDF5Analyzer:
     """
     An enhanced analyzer for HDF5 files, with a focus on parameter categorization and dataset analysis aligned with the
     project's conceptual framework.
@@ -2386,11 +2386,11 @@ class DataPlotter(DataFrameAnalyzer):
         return self
 
 
-class HDF5Plotter(EnhancedHDF5Analyzer):
+class HDF5Plotter(HDF5Analyzer):
     """
     A class for plotting datasets from HDF5 files using DataPlotter.
 
-    This class extends EnhancedHDF5Analyzer to provide methods for converting
+    This class extends HDF5Analyzer to provide methods for converting
     HDF5 datasets into DataFrames compatible with the DataPlotter class.
     It uses composition to work with DataPlotter instances for visualizing
     HDF5 data without needing to modify the DataPlotter class.
@@ -2408,7 +2408,7 @@ class HDF5Plotter(EnhancedHDF5Analyzer):
             default_output_directory (str, optional): Default directory where plots will be saved
                 If None, a temporary directory will be used.
         """
-        # Initialize the parent EnhancedHDF5Analyzer
+        # Initialize the parent HDF5Analyzer
         super().__init__(hdf5_file_path)
 
         # Set up default output directory

@@ -5,7 +5,7 @@ import h5py
 from collections import defaultdict
 
 
-class EnhancedHDF5Analyzer:
+class HDF5Analyzer:
     """
     An enhanced analyzer for HDF5 files, with a focus on parameter categorization and dataset analysis aligned with the
     project's conceptual framework.

@@ -3,15 +3,15 @@ import os
 import numpy as np
 import pandas as pd
 
-from library.data.hdf5_analyzer import EnhancedHDF5Analyzer
+from library.data.hdf5_analyzer import HDF5Analyzer
 from .data_plotter import DataPlotter
 
 
-class HDF5Plotter(EnhancedHDF5Analyzer):
+class HDF5Plotter(HDF5Analyzer):
     """
     A class for plotting datasets from HDF5 files using DataPlotter.
 
-    This class extends EnhancedHDF5Analyzer to provide methods for converting
+    This class extends HDF5Analyzer to provide methods for converting
     HDF5 datasets into DataFrames compatible with the DataPlotter class.
     It uses composition to work with DataPlotter instances for visualizing
     HDF5 data without needing to modify the DataPlotter class.
@@ -29,7 +29,7 @@ class HDF5Plotter(EnhancedHDF5Analyzer):
             default_output_directory (str, optional): Default directory where plots will be saved
                 If None, a temporary directory will be used.
         """
-        # Initialize the parent EnhancedHDF5Analyzer
+        # Initialize the parent HDF5Analyzer
         super().__init__(hdf5_file_path)
 
         # Set up default output directory

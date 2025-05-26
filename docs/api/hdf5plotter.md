@@ -3,13 +3,13 @@
 ## Overview
 
 `HDF5Plotter` is a specialized class for visualizing datasets from HDF5 files.
-It extends `EnhancedHDF5Analyzer` with DataFrame generation capabilities that
+It extends `HDF5Analyzer` with DataFrame generation capabilities that
 are compatible with the `DataPlotter` class, allowing for seamless visualization
 of HDF5 datasets without modifying the existing plotting infrastructure.
 
 ## Class Hierarchy
 
-- Inherits from: `EnhancedHDF5Analyzer`
+- Inherits from: `HDF5Analyzer`
 - Uses composition with: `DataPlotter`
 
 ## Constructor
