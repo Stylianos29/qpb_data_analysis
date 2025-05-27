@@ -70,11 +70,32 @@ class _HDF5DataManager(_HDF5Inspector):
             return self.list_of_multivalued_tunable_parameter_names.copy()
 
         # Find parameters that still have multiple values in active groups
-        param_values = defaultdict(set)
+        param_values = defaultdict(list)  # Use list instead of set
         for group_path in self.active_groups:
             params = self._get_all_parameters_for_group(group_path)
             for param_name, value in params.items():
-                param_values[param_name].add(value)
+                # Convert to hashable type if needed
+                if isinstance(value, np.ndarray):
+                    # Convert array to tuple for comparison
+                    hashable_value = tuple(value.flatten())
+                else:
+                    hashable_value = value
+
+                # Check if this value is already in the list
+                already_exists = False
+                for existing in param_values[param_name]:
+                    if isinstance(existing, tuple) and isinstance(
+                        hashable_value, tuple
+                    ):
+                        if existing == hashable_value:
+                            already_exists = True
+                            break
+                    elif existing == hashable_value:
+                        already_exists = True
+                        break
+
+                if not already_exists:
+                    param_values[param_name].append(hashable_value)
 
         # Return parameters that still have multiple values
         return sorted(
