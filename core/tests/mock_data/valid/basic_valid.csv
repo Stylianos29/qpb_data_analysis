@@ -1,0 +1,5 @@
+Overlap_operator_method,Kernel_operator_type,QCD_beta_value,Configuration_label,Bare_mass,CG_epsilon,MSCG_epsilon,Clover_coefficient,KL_diagonal_order,Number_of_Chebyshev_terms
+KL,Wilson,6.00,001,-0.15,1.0e-12,1.0e-08,1,4,100
+KL,Brillouin,6.00,002,-0.10,5.0e-13,5.0e-09,1,6,150
+Chebyshev,Wilson,6.20,003,-0.05,1.0e-11,1.0e-07,0,8,200
+KL,Wilson,6.20,004,0.00,2.0e-12,2.0e-08,1,4,100

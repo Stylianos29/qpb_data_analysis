@@ -1,0 +1,6 @@
+Overlap_operator_method,Kernel_operator_type,QCD_beta_value,Configuration_label,Bare_mass,CG_epsilon,MSCG_epsilon
+KL,Wilson,6.00,001,-0.15,1.0e-12,1.0e-08
+,Brillouin,6.00,002,-0.10,,5.0e-09
+Chebyshev,,6.20,003,-0.05,1.0e-11,
+KL,Wilson,,004,N/A,2.0e-12,NULL
+,NULL,6.40,005,0.05,NA,none
