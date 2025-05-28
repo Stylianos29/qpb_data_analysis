@@ -64,6 +64,7 @@ Example:
 
 import glob
 import os
+from functools import partial
 
 import numpy as np
 import pandas as pd
@@ -75,8 +76,11 @@ from library import (
     extraction,
     filesystem_utilities,
     RAW_DATA_FILES_DIRECTORY,
+    # validate_input_directory,
+    # validate_input_script_log_filename,
     validate_input_directory,
-    validate_input_script_log_filename,
+    validate_output_directory,
+    validate_output_file,
 )
 
 
@@ -94,7 +98,7 @@ from library import (
     "--output_files_directory",
     "output_files_directory",
     default=None,
-    callback=validate_input_directory,
+    callback=validate_output_directory,
     help="Path to directory where all output files will be stored.",
 )
 @click.option(
@@ -102,7 +106,7 @@ from library import (
     "--output_hdf5_filename",
     "output_hdf5_filename",
     default="qpb_log_files_multivalued_parameters.h5",
-    callback=filesystem_utilities.validate_output_HDF5_filename,
+    callback=partial(validate_output_file, ['.h5']),
     help=(
         "Specific name for the output HDF5 file containing extracted values of "
         "multivalued parameters from qpb log files."
@@ -121,7 +125,7 @@ from library import (
     "--log_file_directory",
     "log_file_directory",
     default=None,
-    callback=filesystem_utilities.validate_script_log_file_directory,
+    callback=partial(validate_output_directory, check_parent_exists=True),
     help="Directory where the script's log file will be stored.",
 )
 @click.option(
@@ -129,7 +133,7 @@ from library import (
     "--log_filename",
     "log_filename",
     default=None,
-    callback=validate_input_script_log_filename,
+    callback=partial(validate_output_file, ['.log']),
     help="Specific name for the script's log file.",
 )
 def main(
@@ -145,6 +149,9 @@ def main(
     # If no output directory is provided, use the directory of the input file
     if output_files_directory is None:
         output_files_directory = os.path.dirname(qpb_correlators_files_directory)
+    
+    if log_file_directory is None and enable_logging:
+        log_file_directory = output_files_directory
 
     # INITIATE LOGGING
 
@@ -156,7 +163,7 @@ def main(
     # Log script start
     logger.initiate_script_logging()
 
-    #
+    # EXTRACT SINGLE- AND MULTI-VALUED PARAMETERS
 
     scalar_parameter_values_list = []
     # Loop over all .dat files in log files directory
