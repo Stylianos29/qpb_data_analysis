@@ -63,6 +63,7 @@ Example:
 """
 
 import glob
+import sys
 import os
 from functools import partial
 
@@ -75,6 +76,7 @@ from library import (
     constants,
     extraction,
     filesystem_utilities,
+    LoggingWrapper,
     RAW_DATA_FILES_DIRECTORY,
     # validate_input_directory,
     # validate_input_script_log_filename,
@@ -106,7 +108,7 @@ from library import (
     "--output_hdf5_filename",
     "output_hdf5_filename",
     default="qpb_log_files_multivalued_parameters.h5",
-    callback=partial(validate_output_file, ['.h5']),
+    callback=partial(validate_output_file, extensions=['.h5']),
     help=(
         "Specific name for the output HDF5 file containing extracted values of "
         "multivalued parameters from qpb log files."
@@ -133,7 +135,7 @@ from library import (
     "--log_filename",
     "log_filename",
     default=None,
-    callback=partial(validate_output_file, ['.log']),
+    callback=partial(validate_output_file, extensions=['.log']),
     help="Specific name for the script's log file.",
 )
 def main(
@@ -153,10 +155,15 @@ def main(
     if log_file_directory is None and enable_logging:
         log_file_directory = output_files_directory
 
+    # If no log filename is provided, generate a default name
+    if log_filename is None:
+        script_name = os.path.basename(sys.argv[0])
+        log_filename = script_name.replace(".py", "_python_script.log")
+
     # INITIATE LOGGING
 
     # Setup logging
-    logger = filesystem_utilities.LoggingWrapper(
+    logger = LoggingWrapper(
         log_file_directory, log_filename, enable_logging
     )
 
