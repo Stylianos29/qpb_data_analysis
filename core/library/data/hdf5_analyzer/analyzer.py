@@ -268,13 +268,15 @@ class HDF5Analyzer(_HDF5DataManager):
             with self:  # Use context manager to restore state after
                 self.restrict_data(filter_func=filter_func)
                 df = self.to_dataframe(
-                    datasets=[dataset_name], flatten_arrays=flatten_arrays
+                    datasets=[dataset_name],
+                    flatten_arrays=flatten_arrays,
+                    add_time_column=add_time_column,
                 )
         else:
             df = self.to_dataframe(
                 datasets=[dataset_name],
                 flatten_arrays=flatten_arrays,
-                include_time_index=add_time_column,
+                add_time_column=add_time_column,
             )
 
         # Adjust time indices if needed
@@ -340,16 +342,15 @@ class HDF5Analyzer(_HDF5DataManager):
         compression_opts: int = 4,
     ) -> None:
         """
-        Save current data view (with restrictions and transformations) to a new
-        HDF5 file.
+        Save current data view (with restrictions and transformations) to a new HDF5 file.
 
         The output file maintains the same hierarchical structure as the input.
 
         Args:
-            output_path: Path for the output HDF5 file include_virtual: Whether
-            to include virtual (transformed) datasets compression: HDF5
-            compression filter ('gzip', 'lzf', or None) compression_opts:
-            Compression level (1-9 for gzip)
+            output_path: Path for the output HDF5 file
+            include_virtual: Whether to include virtual (transformed) datasets
+            compression: HDF5 compression filter ('gzip', 'lzf', or None)
+            compression_opts: Compression level (1-9 for gzip)
         """
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -402,16 +403,32 @@ class HDF5Analyzer(_HDF5DataManager):
                                     group_path=group_path,
                                 )
 
-                        # Create dataset with compression
-                        if compression:
-                            out_group.create_dataset(
-                                dataset_name,
-                                data=data,
-                                compression=compression,
-                                compression_opts=compression_opts,
-                            )
-                        else:
+                        # Convert to numpy array if needed
+                        if isinstance(data, (int, float)):
+                            data = np.array(data)
+
+                        # Create dataset with or without compression based on shape
+                        if data.shape == ():
+                            # Scalar dataset - no compression allowed
                             out_group.create_dataset(dataset_name, data=data)
+                        else:
+                            # Non-scalar dataset - can use compression
+                            if compression:
+                                if compression == "lzf":
+                                    # LZF doesn't support compression_opts
+                                    out_group.create_dataset(
+                                        dataset_name, data=data, compression=compression
+                                    )
+                                else:
+                                    # Other compression types (like gzip) support options
+                                    out_group.create_dataset(
+                                        dataset_name,
+                                        data=data,
+                                        compression=compression,
+                                        compression_opts=compression_opts,
+                                    )
+                            else:
+                                out_group.create_dataset(dataset_name, data=data)
 
                 # Add virtual datasets if requested
                 if include_virtual:
@@ -428,37 +445,77 @@ class HDF5Analyzer(_HDF5DataManager):
                             mean_data = gvar.mean(data)
                             error_data = gvar.sdev(data)
 
-                            if compression:
-                                out_group.create_dataset(
-                                    f"{virtual_name}_mean_values",
-                                    data=mean_data,
-                                    compression=compression,
-                                    compression_opts=compression_opts,
-                                )
-                                out_group.create_dataset(
-                                    f"{virtual_name}_error_values",
-                                    data=error_data,
-                                    compression=compression,
-                                    compression_opts=compression_opts,
-                                )
-                            else:
+                            # Check if scalar
+                            if mean_data.shape == ():
                                 out_group.create_dataset(
                                     f"{virtual_name}_mean_values", data=mean_data
                                 )
                                 out_group.create_dataset(
                                     f"{virtual_name}_error_values", data=error_data
                                 )
+                            else:
+                                if compression:
+                                    if compression == "lzf":
+                                        # LZF doesn't support compression_opts
+                                        out_group.create_dataset(
+                                            f"{virtual_name}_mean_values",
+                                            data=mean_data,
+                                            compression=compression,
+                                        )
+                                        out_group.create_dataset(
+                                            f"{virtual_name}_error_values",
+                                            data=error_data,
+                                            compression=compression,
+                                        )
+                                    else:
+                                        # Other compression types (like gzip) support options
+                                        out_group.create_dataset(
+                                            f"{virtual_name}_mean_values",
+                                            data=mean_data,
+                                            compression=compression,
+                                            compression_opts=compression_opts,
+                                        )
+                                        out_group.create_dataset(
+                                            f"{virtual_name}_error_values",
+                                            data=error_data,
+                                            compression=compression,
+                                            compression_opts=compression_opts,
+                                        )
+                                else:
+                                    out_group.create_dataset(
+                                        f"{virtual_name}_mean_values", data=mean_data
+                                    )
+                                    out_group.create_dataset(
+                                        f"{virtual_name}_error_values", data=error_data
+                                    )
                         else:
                             # Regular dataset
-                            if compression:
-                                out_group.create_dataset(
-                                    virtual_name,
-                                    data=data,
-                                    compression=compression,
-                                    compression_opts=compression_opts,
-                                )
-                            else:
+                            # Convert to numpy array if needed
+                            if isinstance(data, (int, float)):
+                                data = np.array(data)
+
+                            # Check if scalar
+                            if data.shape == ():
                                 out_group.create_dataset(virtual_name, data=data)
+                            else:
+                                if compression:
+                                    if compression == "lzf":
+                                        # LZF doesn't support compression_opts
+                                        out_group.create_dataset(
+                                            virtual_name,
+                                            data=data,
+                                            compression=compression,
+                                        )
+                                    else:
+                                        # Other compression types (like gzip) support options
+                                        out_group.create_dataset(
+                                            virtual_name,
+                                            data=data,
+                                            compression=compression,
+                                            compression_opts=compression_opts,
+                                        )
+                                else:
+                                    out_group.create_dataset(virtual_name, data=data)
 
     def close(self):
         """Close the HDF5 file."""
