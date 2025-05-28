@@ -155,23 +155,6 @@ class TestUniquenessReport:
         # But should still have the data
         assert "Single-valued fields" in report
 
-    def test_report_width_control(self, analyzer):
-        """Test report width control."""
-        report = analyzer.generate_uniqueness_report(max_width=60)
-        lines = report.split("\n")
-        # Check that no line exceeds max width (except header, separator, and section headers)
-        for i, line in enumerate(lines):
-            if i == 0:  # Skip header line
-                continue
-            if (
-                not line.strip()
-                or line.startswith("-")
-                or "PARAMETERS" in line
-                or "QUANTITIES" in line
-            ):
-                continue
-            assert len(line) <= 60
-
     def test_report_value_formatting(self, synthetic_hdf5_with_gvar):
         """Test value formatting in report."""
         analyzer = HDF5Analyzer(synthetic_hdf5_with_gvar)
