@@ -66,11 +66,13 @@ import glob
 import os
 
 import numpy as np
+import pandas as pd
 import h5py
 import click
 
 from library import (
     constants,
+    extraction,
     filesystem_utilities,
     RAW_DATA_FILES_DIRECTORY,
     validate_input_directory,
@@ -154,6 +156,49 @@ def main(
     # Log script start
     logger.initiate_script_logging()
 
+    #
+
+    scalar_parameter_values_list = []
+    # Loop over all .dat files in log files directory
+    for count, correlators_file_full_path in enumerate(
+        glob.glob(os.path.join(qpb_correlators_files_directory, "*.dat")), start=1
+    ):
+        correlators_filename = os.path.basename(correlators_file_full_path)
+
+        # Initialize a dictionary to store extracted parameter values
+        extracted_values_dictionary = {}
+
+        # Add the filename to the dictionary
+        extracted_values_dictionary["Filename"] = correlators_filename
+
+        # Extract parameter values from the filename
+        extracted_values_from_filename_dictionary = (
+            extraction.extract_parameters_values_from_filename(
+                correlators_filename, logger)
+        )
+
+        # Update the dictionary with all extracted values from filename
+        extracted_values_dictionary.update(extracted_values_from_filename_dictionary)
+
+        # Append extracted values dictionary to the list of parameters
+        scalar_parameter_values_list.append(extracted_values_dictionary)
+
+    # Convert the list of parameter dictionaries into a Pandas DataFrame
+    parameter_values_dataframe = pd.DataFrame(scalar_parameter_values_list)
+
+    # Get the counts of unique values for each column
+    unique_values_counts = parameter_values_dataframe.nunique()
+
+    # Create lists of parameters based on their unique value counts
+    single_valued_parameters_list = unique_values_counts[unique_values_counts == 1].index.tolist()
+    multivalued_parameters_list = unique_values_counts[unique_values_counts > 1].index.tolist()
+
+    # Create a dictionary of single-valued parameters and their unique values
+    single_valued_parameters_dict = {
+        col: parameter_values_dataframe[col].iloc[0] 
+        for col in single_valued_parameters_list
+    }
+
     # PARSE RAW CORRELATORS DATA FILES
 
     output_hdf5_file_path = os.path.join(output_files_directory, output_hdf5_filename)
@@ -166,6 +211,10 @@ def main(
         data_files_set_group = filesystem_utilities.create_hdf5_group_structure(
             hdf5_file, RAW_DATA_FILES_DIRECTORY, qpb_correlators_files_directory, logger
         )
+
+        # Add single-valued parameters as attributes to the data files set group
+        for param_name, param_value in single_valued_parameters_dict.items():
+            data_files_set_group.attrs[param_name] = param_value
 
         # Loop over all .dat files in log files directory
         for count, correlators_file_full_path in enumerate(
@@ -205,6 +254,16 @@ def main(
             correlators_file_group = data_files_set_group.create_group(
                 correlators_filename
             )
+
+            # Extract parameter values from the filename
+            extracted_values_from_filename_dictionary = (
+                extraction.extract_parameters_values_from_filename(
+                    correlators_filename, logger)
+            )
+
+            # Add single-valued parameters as attributes to the data files set group
+            for param_name, param_value in extracted_values_from_filename_dictionary.items():
+                correlators_file_group.attrs[param_name] = param_value
 
             # EXPORT CORRELATORS VALUES
 
