@@ -185,7 +185,7 @@ log "INFO" "$log_message"
 # VALIDATE THE RAW SATA FILES OF THE DATA FILES SET
 
 python_script_path="${PYTHON_SCRIPTS_DIRECTORY}"
-python_script_path+="/data_files_processing/validate_qpb_data_files.py"
+python_script_path+="/utils/validate_qpb_data_files.py"
 check_if_file_exists "$python_script_path" || exit 1
 
 python $python_script_path \
