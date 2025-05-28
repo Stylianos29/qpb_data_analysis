@@ -136,7 +136,10 @@ from library import (
 @click.option(
     "--separate_by_type",
     is_flag=True,
-    help="Separate columns by tunable parameters and output quantities in the uniqueness report.",
+    help=(
+        "Separate columns by tunable parameters and output quantities in "
+        "the uniqueness report."
+    ),
 )
 @click.option(
     "--show_unique_values",
@@ -353,7 +356,10 @@ def main(
                 # If some but not all values look like dates
                 if 0 < date_count < len(sample) * 0.9:
                     unusual_data_detected = True
-                    date_message = f"  Column '{column}' may have inconsistent date formats or mixed data types"
+                    date_message = (
+                        f"  Column '{column}' may have "
+                        "inconsistent date formats or mixed data types"
+                    )
                     write_content(date_message)
 
         except Exception as e:
@@ -430,13 +436,13 @@ def main(
         if show_unique_values_for:
             write_section(f"Unique Values for '{show_unique_values_for}'")
             try:
-                # Capture output from print_unique_values method
+                # Capture output from unique_values method
                 import io
                 from contextlib import redirect_stdout
 
                 output = io.StringIO()
                 with redirect_stdout(output):
-                    analyzer.get_unique_values(
+                    analyzer.unique_values(
                         show_unique_values_for, print_output=True
                     )
 
