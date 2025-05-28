@@ -51,13 +51,15 @@ import os
 import sys
 import glob
 import datetime
+from functools import partial
 
 import click
 
 from library import (
-    filesystem_utilities,
+    LoggingWrapper,
     validate_input_directory,
-    validate_input_script_log_filename,
+    validate_output_directory,
+    validate_output_file,
     get_yes_or_no_user_response,
 )
 
@@ -84,7 +86,7 @@ from library import (
     "--auxiliary_files_directory",
     "auxiliary_files_directory",
     default=None,
-    callback=validate_input_directory,
+    callback=partial(validate_output_directory, check_parent_exists=True),
     help="Directory where the script's log file will be stored.",
 )
 @click.option(
@@ -92,7 +94,7 @@ from library import (
     "--log_filename",
     "log_filename",
     default=None,
-    callback=validate_input_script_log_filename,
+    callback=partial(validate_output_file, extensions=[".log"]),
     help="Specific name for the script's log file.",
 )
 def main(
@@ -101,19 +103,23 @@ def main(
     auxiliary_files_directory,
     log_filename,
 ):
-
-    # INITIATE SCRIPT AND LOGGING
-
-    click.echo("   -- Validating raw qpb data files set initiated.")
+    # HANDLE EMPTY INPUT ARGUMENTS
 
     # Default to input file's parent directory if no auxiliary directory specified
     if auxiliary_files_directory is None:
         auxiliary_files_directory = os.path.dirname(raw_data_files_set_directory_path)
 
+    # If no log filename is provided, generate a default name
+    if log_filename is None:
+        script_name = os.path.basename(sys.argv[0])
+        log_filename = script_name.replace(".py", "_python_script.log")
+
+    # INITIATE SCRIPT AND LOGGING
+
+    click.echo("   -- Validating raw qpb data files set initiated.")
+
     # Setup logging
-    logger = filesystem_utilities.LoggingWrapper(
-        auxiliary_files_directory, log_filename, enable_logging
-    )
+    logger = LoggingWrapper(auxiliary_files_directory, log_filename, enable_logging)
 
     # Log script start
     logger.initiate_script_logging()
