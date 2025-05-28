@@ -26,8 +26,8 @@ from .constants import ROOT, RAW_DATA_FILES_DIRECTORY, PROCESSED_DATA_FILES_DIRE
 # Import input validation functions
 from library.filesystem_utilities import (
     validate_file,
-    validate_output_directory,
-    validate_input_directory,
+    # validate_output_directory,
+    # validate_input_directory,
     validate_input_script_log_filename,
     is_valid_file,
     is_valid_directory
@@ -38,6 +38,13 @@ from library.data_files_checks import get_yes_or_no_user_response
 
 # Import
 from library.specialized import generate_config_labels
+
+from .validation import (
+    validate_input_directory,
+    validate_output_directory,
+    validate_input_file,
+    validate_output_file,
+)
 
 
 # Define public API
@@ -65,4 +72,9 @@ __all__ = [
     "get_yes_or_no_user_response",
     # Specialized functions
     "generate_config_labels",
+    # Click Validators
+    "validate_input_directory",
+    "validate_output_directory",
+    "validate_input_file",
+    "validate_output_file",
 ]
