@@ -267,12 +267,8 @@ class TestGvarHandling:
         """Test accessing mean/error datasets explicitly."""
         manager = _HDF5DataManager(synthetic_hdf5_file)
 
-        mean_values = manager.dataset_values(
-            "signal_mean_values", return_gvar=False
-        )
-        error_values = manager.dataset_values(
-            "signal_error_values", return_gvar=False
-        )
+        mean_values = manager.dataset_values("signal_mean_values", return_gvar=False)
+        error_values = manager.dataset_values("signal_error_values", return_gvar=False)
 
         assert len(mean_values) == len(error_values)
         assert all(m.shape == e.shape for m, e in zip(mean_values, error_values))
