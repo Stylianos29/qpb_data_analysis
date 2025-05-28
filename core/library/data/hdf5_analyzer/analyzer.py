@@ -210,6 +210,13 @@ class HDF5Analyzer(_HDF5DataManager):
         Raises:
             ValueError: If the parameter doesn't exist
         """
+        # Check if it's a dataset first
+        if parameter_name in self.list_of_output_quantity_names_from_dataframe:
+            raise ValueError(
+                f"'{parameter_name}' is a dataset (output quantity), "
+                "not a parameter. Use dataset_values() instead."
+            )
+
         try:
             values = self.column_unique_values(parameter_name)
 
@@ -229,16 +236,7 @@ class HDF5Analyzer(_HDF5DataManager):
             return values
 
         except ValueError:
-            # Provide more helpful error message
-            if parameter_name in self.list_of_output_quantity_names_from_dataframe:
-                raise ValueError(
-                    f"'{parameter_name}' is a dataset (output quantity), "
-                    "not a parameter. Use dataset_values() instead."
-                )
-            else:
-                raise ValueError(
-                    f"Parameter '{parameter_name}' not found in HDF5 file."
-                )
+            raise ValueError(f"Parameter '{parameter_name}' not found in HDF5 file.")
 
     def create_dataset_dataframe(
         self,
@@ -274,7 +272,9 @@ class HDF5Analyzer(_HDF5DataManager):
                 )
         else:
             df = self.to_dataframe(
-                datasets=[dataset_name], flatten_arrays=flatten_arrays
+                datasets=[dataset_name],
+                flatten_arrays=flatten_arrays,
+                include_time_index=add_time_column,
             )
 
         # Adjust time indices if needed
@@ -416,9 +416,7 @@ class HDF5Analyzer(_HDF5DataManager):
                 # Add virtual datasets if requested
                 if include_virtual:
                     for virtual_name in self._virtual_datasets:
-                        data = self.dataset_values(
-                            virtual_name, group_path=group_path
-                        )
+                        data = self.dataset_values(virtual_name, group_path=group_path)
 
                         # Handle gvar arrays
                         if (
