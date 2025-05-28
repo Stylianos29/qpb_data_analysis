@@ -210,32 +210,32 @@ class TestContextManager:
 class TestDatasetRetrieval:
     """Test dataset value retrieval."""
 
-    def test_get_standard_dataset(self, synthetic_hdf5_file):
+    def test_retrieve_standard_dataset(self, synthetic_hdf5_file):
         """Test retrieving standard dataset values."""
         manager = _HDF5DataManager(synthetic_hdf5_file)
 
         # Get all values
-        time_values = manager.get_dataset_values("time", return_gvar=False)
+        time_values = manager.dataset_values("time", return_gvar=False)
         assert isinstance(time_values, list)
         assert len(time_values) == 3
         assert all(isinstance(v, np.ndarray) for v in time_values)
 
-    def test_get_dataset_from_specific_group(self, synthetic_hdf5_file):
+    def test_retrieve_dataset_from_specific_group(self, synthetic_hdf5_file):
         """Test retrieving dataset from specific group."""
         manager = _HDF5DataManager(synthetic_hdf5_file)
 
         # Get specific group
         group_path = list(manager.active_groups)[0]
-        time_values = manager.get_dataset_values(
+        time_values = manager.dataset_values(
             "time", return_gvar=False, group_path=group_path
         )
         assert isinstance(time_values, np.ndarray)
         assert len(time_values) == 10
 
-    def test_get_nonexistent_dataset(self, manager):
+    def test_nonexistent_dataset_error(self, manager):
         """Test error handling for non-existent datasets."""
         with pytest.raises(ValueError, match="Dataset 'nonexistent' not found"):
-            manager.get_dataset_values("nonexistent")
+            manager.dataset_values("nonexistent")
 
 
 class TestGvarHandling:
@@ -246,7 +246,7 @@ class TestGvarHandling:
         manager = _HDF5DataManager(synthetic_hdf5_file)
 
         # Request base name with gvar=True
-        signal_values = manager.get_dataset_values("signal", return_gvar=True)
+        signal_values = manager.dataset_values("signal", return_gvar=True)
         assert isinstance(signal_values, list)
         assert len(signal_values) == 3
 
@@ -260,17 +260,17 @@ class TestGvarHandling:
         manager = _HDF5DataManager(synthetic_hdf5_file)
 
         manager.restrict_data("configuration_id < 2")
-        signal_values = manager.get_dataset_values("signal", return_gvar=True)
+        signal_values = manager.dataset_values("signal", return_gvar=True)
         assert len(signal_values) == 2
 
     def test_explicit_mean_error_access(self, synthetic_hdf5_file):
         """Test accessing mean/error datasets explicitly."""
         manager = _HDF5DataManager(synthetic_hdf5_file)
 
-        mean_values = manager.get_dataset_values(
+        mean_values = manager.dataset_values(
             "signal_mean_values", return_gvar=False
         )
-        error_values = manager.get_dataset_values(
+        error_values = manager.dataset_values(
             "signal_error_values", return_gvar=False
         )
 
@@ -289,8 +289,8 @@ class TestVirtualDatasets:
         manager.transform_dataset("time", lambda x: x**2, "time_squared")
 
         # Retrieve transformed values
-        squared_values = manager.get_dataset_values("time_squared")
-        original_values = manager.get_dataset_values("time")
+        squared_values = manager.dataset_values("time_squared")
+        original_values = manager.dataset_values("time")
 
         assert len(squared_values) == len(original_values)
         for sq, orig in zip(squared_values, original_values):
@@ -303,8 +303,8 @@ class TestVirtualDatasets:
         # Transform gvar dataset
         manager.transform_dataset("signal", lambda x: 2 * x, "signal_doubled")
 
-        doubled = manager.get_dataset_values("signal_doubled")
-        original = manager.get_dataset_values("signal")
+        doubled = manager.dataset_values("signal_doubled")
+        original = manager.dataset_values("signal")
 
         for d, o in zip(doubled, original):
             np.testing.assert_allclose(gvar.mean(d), 2 * gvar.mean(o))
@@ -424,7 +424,7 @@ class TestCaching:
         assert len(manager._data_cache) == 0
 
         # Access dataset
-        manager.get_dataset_values("time")
+        manager.dataset_values("time")
 
         assert len(manager._data_cache) > 0
 
@@ -433,7 +433,7 @@ class TestCaching:
         manager = _HDF5DataManager(synthetic_hdf5_file)
 
         with manager:
-            manager.get_dataset_values("time")
+            manager.dataset_values("time")
             assert len(manager._data_cache) > 0
 
         assert len(manager._data_cache) == 0
@@ -444,7 +444,7 @@ class TestCaching:
     [
         ("restrict_data", ["configuration_id >= 0"]),
         ("restore_all_groups", []),
-        ("get_dataset_values", ["time"]),
+        ("dataset_values", ["time"]),
         ("to_dataframe", []),
     ],
 )
@@ -457,7 +457,7 @@ def test_method_chaining(synthetic_hdf5_file, method_name, args):
 
     # Most methods should return self for chaining
     if method_name not in [
-        "get_dataset_values",
+        "dataset_values",
         "to_dataframe",
         "group_by_multivalued_tunable_parameters",
     ]:
