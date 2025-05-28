@@ -6,7 +6,7 @@ inspection and data management capabilities while maintaining a familiar API
 similar to DataFrameAnalyzer.
 """
 
-from typing import Dict, List, Any, Optional, Callable, Union, Tuple
+from typing import List, Any, Optional, Callable, Union
 import numpy as np
 import pandas as pd
 import h5py
@@ -40,7 +40,7 @@ class HDF5Analyzer(_HDF5DataManager):
         >>> analyzer.restrict_data("temperature > 300")
         >>>
         >>> # Work with gvar arrays automatically
-        >>> pcac_mass = analyzer.get_dataset_values('PCAC_mass')  # Auto-merges mean/error
+        >>> pcac_mass = analyzer.dataset_values('PCAC_mass')  # Auto-merges mean/error
         >>>
         >>> # Transform datasets
         >>> analyzer.transform_dataset('energy', lambda x: x**2, 'energy_squared')
@@ -191,7 +191,7 @@ class HDF5Analyzer(_HDF5DataManager):
         else:
             return str(value)
 
-    def get_unique_values(
+    def unique_values(
         self, parameter_name: str, print_output: bool = False
     ) -> List[Any]:
         """
@@ -233,7 +233,7 @@ class HDF5Analyzer(_HDF5DataManager):
             if parameter_name in self.list_of_output_quantity_names_from_dataframe:
                 raise ValueError(
                     f"'{parameter_name}' is a dataset (output quantity), "
-                    "not a parameter. Use get_dataset_values() instead."
+                    "not a parameter. Use dataset_values() instead."
                 )
             else:
                 raise ValueError(
@@ -386,7 +386,7 @@ class HDF5Analyzer(_HDF5DataManager):
                         # Handle gvar splitting
                         if dataset_name in self._gvar_dataset_pairs.values():
                             # This is part of a gvar pair, copy as-is
-                            data = self.get_dataset_values(
+                            data = self.dataset_values(
                                 dataset_name, return_gvar=False, group_path=group_path
                             )
                         else:
@@ -396,7 +396,7 @@ class HDF5Analyzer(_HDF5DataManager):
                                 # Skip - will be handled by mean/error separately
                                 continue
                             else:
-                                data = self.get_dataset_values(
+                                data = self.dataset_values(
                                     dataset_name,
                                     return_gvar=False,
                                     group_path=group_path,
@@ -416,7 +416,7 @@ class HDF5Analyzer(_HDF5DataManager):
                 # Add virtual datasets if requested
                 if include_virtual:
                     for virtual_name in self._virtual_datasets:
-                        data = self.get_dataset_values(
+                        data = self.dataset_values(
                             virtual_name, group_path=group_path
                         )
 

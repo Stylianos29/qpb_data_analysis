@@ -72,7 +72,7 @@ class _HDF5DataManager(_HDF5Inspector):
         # Find parameters that still have multiple values in active groups
         param_values = defaultdict(list)  # Use list instead of set
         for group_path in self.active_groups:
-            params = self._get_all_parameters_for_group(group_path)
+            params = self._all_parameters_for_group(group_path)
             for param_name, value in params.items():
                 # Convert to hashable type if needed
                 if isinstance(value, np.ndarray):
@@ -107,7 +107,7 @@ class _HDF5DataManager(_HDF5Inspector):
             ]
         )
 
-    def _get_all_parameters_for_group(self, group_path: str) -> Dict[str, Any]:
+    def _all_parameters_for_group(self, group_path: str) -> Dict[str, Any]:
         """
         Get all parameters (single and multi-valued) for a specific group.
 
@@ -160,7 +160,7 @@ class _HDF5DataManager(_HDF5Inspector):
         filtered_groups = set()
 
         for group_path in candidate_groups:
-            params = self._get_all_parameters_for_group(group_path)
+            params = self._all_parameters_for_group(group_path)
 
             # Apply filtering
             include_group = False
@@ -213,7 +213,7 @@ class _HDF5DataManager(_HDF5Inspector):
         self._data_cache.clear()
         return False
 
-    def get_dataset_values(
+    def dataset_values(
         self,
         dataset_name: str,
         return_gvar: bool = True,
@@ -234,17 +234,17 @@ class _HDF5DataManager(_HDF5Inspector):
         """
         # Check if this is a virtual dataset
         if dataset_name in self._virtual_datasets:
-            return self._get_virtual_dataset_values(dataset_name, group_path)
+            return self._virtual_dataset_values(dataset_name, group_path)
 
         # Check if we should look for gvar pairs
         if return_gvar and dataset_name in self._gvar_dataset_pairs:
             mean_name, error_name = self._gvar_dataset_pairs[dataset_name]
-            return self._get_gvar_dataset_values(mean_name, error_name, group_path)
+            return self._gvar_dataset_values(mean_name, error_name, group_path)
 
         # Standard dataset retrieval
-        return self._get_standard_dataset_values(dataset_name, group_path)
+        return self._standard_dataset_values(dataset_name, group_path)
 
-    def _get_standard_dataset_values(
+    def _standard_dataset_values(
         self, dataset_name: str, group_path: Optional[str] = None
     ) -> Union[np.ndarray, List[np.ndarray]]:
         """Get values for a standard dataset."""
@@ -274,12 +274,12 @@ class _HDF5DataManager(_HDF5Inspector):
                     values.append(self._data_cache[cache_key])
             return values
 
-    def _get_gvar_dataset_values(
+    def _gvar_dataset_values(
         self, mean_name: str, error_name: str, group_path: Optional[str] = None
     ) -> Union[np.ndarray, List[np.ndarray]]:
         """Get merged gvar values from mean/error dataset pairs."""
-        mean_values = self._get_standard_dataset_values(mean_name, group_path)
-        error_values = self._get_standard_dataset_values(error_name, group_path)
+        mean_values = self._standard_dataset_values(mean_name, group_path)
+        error_values = self._standard_dataset_values(error_name, group_path)
 
         if isinstance(mean_values, list):
             # Multiple groups
@@ -320,14 +320,14 @@ class _HDF5DataManager(_HDF5Inspector):
 
         return self
 
-    def _get_virtual_dataset_values(
+    def _virtual_dataset_values(
         self, dataset_name: str, group_path: Optional[str] = None
     ) -> Union[np.ndarray, List[np.ndarray]]:
         """Get values for a virtual (transformed) dataset."""
         transform_func, source_datasets = self._virtual_datasets[dataset_name]
 
         # Get source values
-        source_values = self.get_dataset_values(
+        source_values = self.dataset_values(
             source_datasets[0], return_gvar=True, group_path=group_path
         )
 
@@ -364,7 +364,7 @@ class _HDF5DataManager(_HDF5Inspector):
         for group_path in sorted(self.active_groups):
             # Get parameters for this group
             if include_parameters:
-                group_params = self._get_all_parameters_for_group(group_path)
+                group_params = self._all_parameters_for_group(group_path)
             else:
                 group_params = {}
 
@@ -372,7 +372,7 @@ class _HDF5DataManager(_HDF5Inspector):
             group_data = {}
             for dataset_name in datasets:
                 try:
-                    values = self.get_dataset_values(
+                    values = self.dataset_values(
                         dataset_name, return_gvar=True, group_path=group_path
                     )
                     group_data[dataset_name] = values
@@ -440,7 +440,7 @@ class _HDF5DataManager(_HDF5Inspector):
         grouped = defaultdict(list)
 
         for group_path in self.active_groups:
-            params = self._get_all_parameters_for_group(group_path)
+            params = self._all_parameters_for_group(group_path)
 
             # Extract grouping parameter values
             group_key = tuple(params.get(p) for p in grouping_params)
