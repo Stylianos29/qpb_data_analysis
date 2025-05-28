@@ -190,7 +190,7 @@ class _DataFrameInspector:
 
         return multivalued_columns_count_dictionary
 
-    def column_unique_values(self, column_name: str) -> list:
+    def unique_values(self, column_name: str) -> list:
         """
         Return sorted list of unique values for the specified column.
 
