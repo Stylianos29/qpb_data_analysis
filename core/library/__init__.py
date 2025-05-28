@@ -24,7 +24,7 @@ from .data import DataFrameAnalyzer, TableGenerator, load_csv
 from .constants import ROOT, RAW_DATA_FILES_DIRECTORY, PROCESSED_DATA_FILES_DIRECTORY
 
 # Import input validation functions
-from library.filesystem_utilities import (
+from .filesystem_utilities import (
     validate_file,
     # validate_output_directory,
     # validate_input_directory,
@@ -34,10 +34,10 @@ from library.filesystem_utilities import (
 )
 
 # Import
-from library.data_files_checks import get_yes_or_no_user_response
+from .data_files_checks import get_yes_or_no_user_response
 
 # Import
-from library.specialized import generate_config_labels
+from .specialized import generate_config_labels
 
 from .validation import (
     validate_input_directory,
@@ -45,6 +45,8 @@ from .validation import (
     validate_input_file,
     validate_output_file,
 )
+
+from .filesystem_utilities import LoggingWrapper
 
 
 # Define public API
@@ -77,4 +79,6 @@ __all__ = [
     "validate_output_directory",
     "validate_input_file",
     "validate_output_file",
+    # Logging system
+    "LoggingWrapper",
 ]
