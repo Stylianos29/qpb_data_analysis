@@ -180,6 +180,12 @@ def main(
         # Update the dictionary with all extracted values from filename
         extracted_values_dictionary.update(extracted_values_from_filename_dictionary)
 
+        # Convert any list values to tuples
+        extracted_values_dictionary = {
+            k: tuple(v) if isinstance(v, list) else v 
+            for k, v in extracted_values_dictionary.items()
+        }
+
         # Append extracted values dictionary to the list of parameters
         scalar_parameter_values_list.append(extracted_values_dictionary)
 
