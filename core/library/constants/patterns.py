@@ -3,7 +3,7 @@
 # Log files filenames might contain specific labels corresponding to
 # parameters next to their values. Listed below are the parameters and their
 # identifying labels
-FILENAME_SINGLE_VALUE_PATTERNS_DICTIONARY = {
+FILENAME_SCALAR_PATTERNS_DICTIONARY = {
     # General parameters
     "Overlap_operator_method": {
         "pattern": r"(?P<Overlap_operator_method>Chebyshev|KL|Bare)",
@@ -67,7 +67,7 @@ FILENAME_SINGLE_VALUE_PATTERNS_DICTIONARY = {
 # log files. Listed below are the line identifiers for locating the
 # line containing the parameter value, along with the regex type and the
 # value type
-FILE_CONTENTS_SINGLE_VALUE_PATTERNS_DICTIONARY = {
+FILE_CONTENTS_SCALAR_PATTERNS_DICTIONARY = {
     # General parameters
     "Cluster_partition": {
         "line_identifier": "Partition:",
@@ -246,7 +246,7 @@ FILE_CONTENTS_SINGLE_VALUE_PATTERNS_DICTIONARY = {
 }
 
 
-FILE_CONTENTS_MULTIVALUED_PATTERNS_DICTIONARY = {
+FILE_CONTENTS_ARRAY_PATTERNS_DICTIONARY = {
     "Calculation_result_per_vector": {
         "line_identifier": "Done vector",
         "regex_pattern": r"= (\d+\.\d+e[+-]\d+)",
