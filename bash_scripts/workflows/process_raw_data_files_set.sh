@@ -250,7 +250,7 @@ log "INFO" "$log_message"
 
 # Process the extracted values from the qpb log files from the 
 python_script_path="${PYTHON_SCRIPTS_DIRECTORY}/post_processing_analysis"
-python_script_path+="/process_qpb_log_files_extracted_values.py"
+python_script_path+="/process_extracted_parameters.py"
 check_if_file_exists "$python_script_path" || exit 1
 
 python $python_script_path \

@@ -29,7 +29,7 @@ flowchart TD
             }
 
     InvertMainProgram -- No --> ProcessingRawFiles[
-        process_qpb_log_files_extracted_values.py
+        process_extracted_parameters.py
         ]
     
     InvertMainProgram -- Yes --> InvertCorrelatorFilesParsing[
@@ -37,7 +37,7 @@ flowchart TD
         ]
 
     InvertCorrelatorFilesParsing --> InvertProcessingRawFiles[
-        process_qpb_log_files_extracted_values.py
+        process_extracted_parameters.py
         ]
 
     InvertProcessingRawFiles --> InvertJackknifeAnalysis[
