@@ -1,6 +1,4 @@
 """
-data_files_processing/parse_qpb_correlator_files.py
-
 Summary:
     This script processes correlator data stored in .dat files within a
     specified directory and converts it into HDF5 format for efficient storage
@@ -68,22 +66,117 @@ import os
 from functools import partial
 
 import numpy as np
-import pandas as pd
-import h5py
 import click
 
+from library.constants import RAW_DATA_FILES_DIRECTORY, CORRELATOR_IDENTIFIERS_LIST
+from library.extraction import extract_parameters_values_from_filename
 from library import (
-    constants,
-    extraction,
-    filesystem_utilities,
     LoggingWrapper,
-    RAW_DATA_FILES_DIRECTORY,
-    # validate_input_directory,
-    # validate_input_script_log_filename,
     validate_input_directory,
     validate_output_directory,
     validate_output_file,
 )
+
+# Import shared private functions
+from src.data_files_processing._shared_processing import (
+    _classify_parameters_by_uniqueness,
+    _export_arrays_to_hdf5_with_proper_structure,
+)
+
+
+def _process_correlator_files_and_extract_data(correlators_files_directory, logger):
+    """
+    Process all correlator files and extract both scalar parameters and
+    correlator arrays.
+
+    Args:
+        correlators_files_directory (str): Directory containing correlator files
+        logger: Logger instance
+
+    Returns:
+        tuple: (scalar_params_list, correlator_arrays_dict)
+            - scalar_params_list: List of dicts with scalar parameters per file
+            - correlator_arrays_dict: Dict with filename as key, correlator
+              arrays as value
+    """
+    scalar_params_list = []
+    correlator_arrays_dict = {}
+
+    file_count = 0
+    for correlators_file_path in glob.glob(
+        os.path.join(correlators_files_directory, "*.dat")
+    ):
+        file_count += 1
+        correlators_filename = os.path.basename(correlators_file_path)
+
+        # Initialize parameter dictionary for this file
+        scalar_params = {"Filename": correlators_filename}
+
+        # Extract parameters from filename
+        filename_params = extract_parameters_values_from_filename(
+            correlators_filename, logger
+        )
+        scalar_params.update(filename_params)
+
+        # Convert list values to tuples for consistency
+        scalar_params = {
+            k: tuple(v) if isinstance(v, list) else v for k, v in scalar_params.items()
+        }
+
+        # Parse correlator arrays from file
+        correlator_arrays = _parse_correlator_file(correlators_file_path, logger)
+
+        # Store results
+        scalar_params_list.append(scalar_params)
+        correlator_arrays_dict[correlators_filename] = correlator_arrays
+
+    logger.info(
+        f"A total of {file_count} qpb correlator files were parsed for "
+        "parameter values and correlator data extraction from the "
+        f"'{os.path.basename(correlators_files_directory)}' raw data files "
+        "set directory."
+    )
+
+    return scalar_params_list, correlator_arrays_dict
+
+
+def _parse_correlator_file(file_path, logger):
+    """
+    Parse a single correlator file and extract correlator values.
+
+    Args:
+        file_path (str): Full path to the correlator file
+        logger: Logger instance
+
+    Returns:
+        dict: Dictionary with correlator identifiers as keys and numpy arrays as values
+    """
+    # Initialize correlator values dictionary
+    correlator_values = {}
+    for identifier in CORRELATOR_IDENTIFIERS_LIST:
+        correlator_values[identifier] = []
+
+    # Read and parse the correlator file
+    with open(file_path, "r") as file:
+        for line in file:
+            columns = line.split()
+            if len(columns) >= 5:  # Ensure line has enough columns
+                # Check each correlator identifier (identifier is in last column, value in column 4)
+                for identifier in CORRELATOR_IDENTIFIERS_LIST:
+                    if columns[-1] == identifier:
+                        try:
+                            correlator_values[identifier].append(float(columns[4]))
+                        except (ValueError, IndexError) as e:
+                            if logger:
+                                logger.warning(
+                                    f"Error parsing line in {file_path}: {e}"
+                                )
+
+    # Convert lists to NumPy arrays
+    for identifier in CORRELATOR_IDENTIFIERS_LIST:
+        correlator_values[identifier] = np.array(correlator_values[identifier])
+
+    return correlator_values
 
 
 @click.command()
@@ -107,11 +200,11 @@ from library import (
     "-out_hdf5_name",
     "--output_hdf5_filename",
     "output_hdf5_filename",
-    default="qpb_log_files_multivalued_parameters.h5",
-    callback=partial(validate_output_file, extensions=['.h5']),
+    default="qpb_correlator_files_values.h5",
+    callback=partial(validate_output_file, extensions=[".h5"]),
     help=(
-        "Specific name for the output HDF5 file containing extracted values of "
-        "multivalued parameters from qpb log files."
+        "Specific name for the output HDF5 file containing extracted correlator "
+        "values from qpb correlator files."
     ),
 )
 @click.option(
@@ -135,7 +228,7 @@ from library import (
     "--log_filename",
     "log_filename",
     default=None,
-    callback=partial(validate_output_file, extensions=['.log']),
+    callback=partial(validate_output_file, extensions=[".log"]),
     help="Specific name for the script's log file.",
 )
 def main(
@@ -147,163 +240,55 @@ def main(
     log_filename,
 ):
     # HANDLE EMPTY INPUT ARGUMENTS
-
-    # If no output directory is provided, use the directory of the input file
     if output_files_directory is None:
         output_files_directory = os.path.dirname(qpb_correlators_files_directory)
-    
+
     if log_file_directory is None and enable_logging:
         log_file_directory = output_files_directory
 
-    # If no log filename is provided, generate a default name
     if log_filename is None:
         script_name = os.path.basename(sys.argv[0])
         log_filename = script_name.replace(".py", "_python_script.log")
 
     # INITIATE LOGGING
-
-    # Setup logging
-    logger = LoggingWrapper(
-        log_file_directory, log_filename, enable_logging
-    )
-
-    # Log script start
+    logger = LoggingWrapper(log_file_directory, log_filename, enable_logging)
     logger.initiate_script_logging()
 
-    # EXTRACT SINGLE- AND MULTI-VALUED PARAMETERS
-
-    scalar_parameter_values_list = []
-    # Loop over all .dat files in log files directory
-    for count, correlators_file_full_path in enumerate(
-        glob.glob(os.path.join(qpb_correlators_files_directory, "*.dat")), start=1
-    ):
-        correlators_filename = os.path.basename(correlators_file_full_path)
-
-        # Initialize a dictionary to store extracted parameter values
-        extracted_values_dictionary = {}
-
-        # Add the filename to the dictionary
-        extracted_values_dictionary["Filename"] = correlators_filename
-
-        # Extract parameter values from the filename
-        extracted_values_from_filename_dictionary = (
-            extraction.extract_parameters_values_from_filename(
-                correlators_filename, logger)
+    # PROCESS FILES AND EXTRACT DATA
+    scalar_params_list, correlator_arrays_dict = (
+        _process_correlator_files_and_extract_data(
+            qpb_correlators_files_directory, logger
         )
+    )
 
-        # Update the dictionary with all extracted values from filename
-        extracted_values_dictionary.update(extracted_values_from_filename_dictionary)
+    # CLASSIFY PARAMETERS
+    _, constant_params_dict, multivalued_params_list = (
+        _classify_parameters_by_uniqueness(scalar_params_list)
+    )
 
-        # Convert any list values to tuples
-        extracted_values_dictionary = {
-            k: tuple(v) if isinstance(v, list) else v 
-            for k, v in extracted_values_dictionary.items()
-        }
-
-        # Append extracted values dictionary to the list of parameters
-        scalar_parameter_values_list.append(extracted_values_dictionary)
-
-    # Convert the list of parameter dictionaries into a Pandas DataFrame
-    parameter_values_dataframe = pd.DataFrame(scalar_parameter_values_list)
-
-    # Get the counts of unique values for each column
-    unique_values_counts = parameter_values_dataframe.nunique()
-
-    # Create lists of parameters based on their unique value counts
-    single_valued_parameters_list = unique_values_counts[unique_values_counts == 1].index.tolist()
-    multivalued_parameters_list = unique_values_counts[unique_values_counts > 1].index.tolist()
-
-    # Create a dictionary of single-valued parameters and their unique values
-    single_valued_parameters_dict = {
-        col: parameter_values_dataframe[col].iloc[0] 
-        for col in single_valued_parameters_list
-    }
-
-    # PARSE RAW CORRELATORS DATA FILES
-
+    # EXPORT CORRELATOR DATA TO HDF5
     output_hdf5_file_path = os.path.join(output_files_directory, output_hdf5_filename)
-    # Open the HDF5 file in 'w' mode (write, replace existing file)
-    with h5py.File(output_hdf5_file_path, "w") as hdf5_file:
-
-        # The top HDF5 file groups mirror the directory structure of the data
-        # files set directory itself and its parent directories relative to the
-        # 'data_files/raw/' directory
-        data_files_set_group = filesystem_utilities.create_hdf5_group_structure(
-            hdf5_file, RAW_DATA_FILES_DIRECTORY, qpb_correlators_files_directory, logger
-        )
-
-        # Add single-valued parameters as attributes to the data files set group
-        for param_name, param_value in single_valued_parameters_dict.items():
-            data_files_set_group.attrs[param_name] = param_value
-
-        # Loop over all .dat files in log files directory
-        for count, correlators_file_full_path in enumerate(
-            glob.glob(os.path.join(qpb_correlators_files_directory, "*.dat")), start=1
-        ):
-            correlators_filename = os.path.basename(correlators_file_full_path)
-
-            # Create a dictionary with correlator identifiers as keys, each
-            # initialized to an empty list for storing correlator values.
-            correlator_values_dictionary = {}
-            for correlator_identifier in constants.CORRELATOR_IDENTIFIERS_LIST:
-                correlator_values_dictionary[correlator_identifier] = []
-
-            # Read each correlators values file and fill in the empty lists
-            with open(correlators_file_full_path, "r") as file:
-                lines = file.readlines()
-
-                for line in lines:
-                    columns = line.split()
-
-                    # Check and append values for each correlator identifier
-                    # NOTE: The identifier is always placed in the last column
-                    # and value in the 4 one
-                    for correlator_identifier in constants.CORRELATOR_IDENTIFIERS_LIST:
-                        if columns[-1] == correlator_identifier:
-                            correlator_values_dictionary[correlator_identifier].append(
-                                float(columns[4])
-                            )
-
-            # Convert lists to NumPy arrays for each correlator
-            for correlator_identifier in constants.CORRELATOR_IDENTIFIERS_LIST:
-                correlator_values_dictionary[correlator_identifier] = np.array(
-                    correlator_values_dictionary[correlator_identifier]
-                )
-
-            # Create a subgroup in the HDF5 file for this correlators file
-            correlators_file_group = data_files_set_group.create_group(
-                correlators_filename
-            )
-
-            # Extract parameter values from the filename
-            extracted_values_from_filename_dictionary = (
-                extraction.extract_parameters_values_from_filename(
-                    correlators_filename, logger)
-            )
-
-            # Add single-valued parameters as attributes to the data files set group
-            for param_name, param_value in extracted_values_from_filename_dictionary.items():
-                correlators_file_group.attrs[param_name] = param_value
-
-            # EXPORT CORRELATORS VALUES
-
-            # Store each correlator array in the correlator group
-            for correlator_identifier in constants.CORRELATOR_IDENTIFIERS_LIST:
-                correlators_file_group.create_dataset(
-                    correlator_identifier,
-                    data=correlator_values_dictionary[correlator_identifier],
-                )
+    _export_arrays_to_hdf5_with_proper_structure(
+        constant_params_dict,
+        multivalued_params_list,
+        correlator_arrays_dict,
+        scalar_params_list,
+        output_hdf5_file_path,
+        RAW_DATA_FILES_DIRECTORY,
+        qpb_correlators_files_directory,
+        logger,
+        "correlator arrays",
+    )
 
     logger.info(
-        f"A total of {count} qpb correlators files "
+        f"A total of {len(correlator_arrays_dict)} qpb correlators files "
         f"were parsed for correlator values extraction from the "
         f"'{os.path.basename(qpb_correlators_files_directory)}' raw data "
         "files set directory."
     )
 
-    # Terminate logging
+    # TERMINATE LOGGING
     logger.terminate_script_logging()
-
     click.echo("   -- Parsing raw correlators files completed.")
 
 
