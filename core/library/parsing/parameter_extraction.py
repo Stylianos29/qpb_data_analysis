@@ -1,207 +1,201 @@
+"""
+Filename parameter extraction utilities.
+
+This module provides functionality for extracting parameters from filenames
+using regex patterns. It handles file extension removal, pattern matching, type
+conversion, and special parameter transformations.
+"""
+
 import os
 import re
-
-import numpy as np
-
+from typing import Dict, List, Optional, Any, Tuple
+import logging
 
 import library.constants as constants
+from ._shared_parsing_utils import SUPPORTED_FILE_EXTENSIONS, _convert_to_type
 
 
-def extract_parameters_values_from_filename(filename, logger=None):
+def _remove_file_extension(filename: str) -> str:
     """
-    Extract parameters from a filename based on predefined regex patterns.
+    Remove known file extension from filename.
 
-    Parameters:
-        filename (str): The filename to process. logger (logging.Logger,
-        optional): Logger instance for warnings. Defaults to None.
+    Args:
+        filename: Original filename with extension
 
     Returns:
-        dict: Extracted values from the filename.
+        Filename without extension if extension is recognized, otherwise
+        original filename
+
+    Example:
+        >>> _remove_file_extension("data.txt")
+        "data"
+        >>> _remove_file_extension("data.unknown")
+        "data.unknown"
     """
-
-    # List of known extensions to trim
-    known_extensions = [
-        ".txt",
-        ".log",
-        ".dat",
-        ".bin",
-        ".jpg",
-        ".jpeg",
-        ".png",
-        ".csv",
-        ".xml",
-        ".json",
-        ".gz",
-    ]
-
-    # Trim trailing known extension if it exists
     base_filename, ext = os.path.splitext(filename)
-    if ext in known_extensions:
-        filename = base_filename
+    if ext in SUPPORTED_FILE_EXTENSIONS:
+        return base_filename
+    return filename
 
-    # Initialize a dictionary to store extracted values from filename
-    extracted_values_dictionary = {}
-    matched_segments = []  # List to store all matched parts of the filename
+
+def _extract_parameters_with_regex(
+    filename: str, logger: Optional[logging.Logger] = None
+) -> Tuple[Dict[str, Any], List[str]]:
+    """
+    Extract parameters from filename using regex patterns from constants.
+
+    Args:
+        - filename: The filename to process (without extension)
+        - logger: Optional logger for warnings
+
+    Returns:
+        Tuple of (extracted_parameters_dict, matched_segments_list)
+
+    Example:
+        >>> _extract_parameters_with_regex("test_beta2p5_config001")
+        ({'QCD_beta_value': 2.5, 'Configuration_label': '001'}, ['beta2p5', 'config001'])
+    """
+    extracted_values = {}
+    matched_segments = []
 
     # Apply each regex pattern to the filename
     for (
-        parameter_name,
-        parameter_info,
-    ) in constants.FILENAME_SINGLE_VALUE_PATTERNS_DICTIONARY.items():
-        regex_pattern = parameter_info["pattern"]
-        expected_type = parameter_info["type"]
+        param_name,
+        param_info,
+    ) in constants.FILENAME_SCALAR_PATTERNS_DICTIONARY.items():
+        regex_pattern = param_info["pattern"]
+        expected_type = param_info["type"]
 
         match = re.search(regex_pattern, filename)
         if match:
-            raw_value = match.group(parameter_name)
-            # Store the full matched substring
+            raw_value = match.group(param_name)
             matched_segments.append(match.group(0))
 
-            # Preprocess the value if it contains 'p' instead of '.'
-            if "p" in raw_value and expected_type in {float, int}:
-                raw_value = raw_value.replace("p", ".")
+            # Convert to expected type
+            converted_value = _convert_to_type(
+                raw_value, expected_type, param_name, logger
+            )
+            if converted_value is not None:
+                extracted_values[param_name] = converted_value
 
-            try:
-                # Convert to the expected type
-                extracted_values_dictionary[parameter_name] = expected_type(raw_value)
-            except ValueError:
-                # Handle type conversion errors
-                if logger:
-                    logger.warning(
-                        f"Could not convert {raw_value} to "
-                        f"{expected_type.__name__} for {parameter_name}."
-                    )
+    return extracted_values, matched_segments
 
-    # Create a regex pattern to match all matched segments
-    matched_segments_combined_pattern = "|".join(map(re.escape, matched_segments))
-    # Split the filename by the matched pattern and filter out empty strings
-    non_matched_segments = [
+
+def _extract_unmatched_segments(
+    filename: str, matched_segments: List[str]
+) -> List[str]:
+    """
+    Extract segments of filename that weren't matched by any regex pattern.
+
+    Args:
+        - filename: The original filename (without extension)
+        - matched_segments: List of segments that were matched by regex patterns
+
+    Returns:
+        List of unmatched segments, cleaned of underscores
+
+    Example:
+        >>> _extract_unmatched_segments(
+        >>>     "test_beta2p5_extra_config001", ["beta2p5", "config001"]
+        >>>     )
+        ["test", "extra"]
+    """
+    if not matched_segments:
+        return []
+
+    # Create combined pattern to match all matched segments
+    matched_segments_pattern = "|".join(map(re.escape, matched_segments))
+
+    # Split filename by matched patterns and filter out empty strings
+    unmatched_segments = [
         segment.strip("_")
-        for segment in re.split(matched_segments_combined_pattern, filename)
+        for segment in re.split(matched_segments_pattern, filename)
         if segment.strip("_")
     ]
 
-    # Specific treatment for "MPI_geometry"
-    if "MPI_geometry" in extracted_values_dictionary:
-        raw_cores = extracted_values_dictionary["MPI_geometry"]
-        extracted_values_dictionary["MPI_geometry"] = f"(1, {', '.join(raw_cores)})"
-
-    # Add unmatched text as "Additional_text"
-    if non_matched_segments:
-        extracted_values_dictionary["Additional_text"] = non_matched_segments
-
-    return extracted_values_dictionary
+    return unmatched_segments
 
 
-def extract_single_valued_parameter_values_from_file_contents(
-    file_contents_list, logger=None
-):
+def _apply_special_transformations(extracted_values: Dict[str, Any]) -> None:
     """
-    Extract parameter values from file contents based on patterns defined in
-    FILE_CONTENTS_SINGLE_VALUE_PATTERNS_DICTIONARY, along with determining
-    the 'Main_program_type' based on specific key phrases.
+    Apply special transformations to specific parameters.
 
-    Parameters:
-        - file_contents_list (list): List of lines read from the file.
-        - logger (logging.Logger, optional): Logger for logging warnings.
+    Note: This function modifies the dictionary in-place.
+    Currently handles MPI_geometry formatting.
+
+    Args:
+        extracted_values: Dictionary of extracted parameters to transform
+
+    Example:
+        >>> params = {"MPI_geometry": "123"}
+        >>> _apply_special_transformations(params)
+        >>> params["MPI_geometry"]
+        "(1, 1, 2, 3)"
+    """
+    # Special treatment for "MPI_geometry"
+    if "MPI_geometry" in extracted_values:
+        raw_cores = extracted_values["MPI_geometry"]
+        # Format as string representation of tuple
+        extracted_values["MPI_geometry"] = f"(1, {', '.join(raw_cores)})"
+
+
+def extract_scalar_parameters_from_filename(
+    filename: str, logger: Optional[logging.Logger] = None
+) -> Dict[str, Any]:
+    """
+    Extract scalar parameters from a filename based on predefined regex
+    patterns.
+
+    This function parses filenames to extract parameter values using regex
+    patterns defined in constants.FILENAME_SCALAR_PATTERNS_DICTIONARY. It
+    handles type conversion, special formatting, and captures any unmatched text
+    segments.
+
+    The function processes filenames in the following steps: 1. Remove
+    recognized file extensions 2. Apply regex patterns to extract known
+    parameters 3. Identify unmatched segments for additional context 4. Apply
+    special transformations (e.g., MPI_geometry formatting)
+
+    Args:
+        - filename: The filename to process
+        - logger: Optional logger instance for warnings
 
     Returns:
-        dict: Dictionary of extracted parameter values.
+        - Dictionary containing extracted parameter names as keys and their
+          values.
+        - May include an "Additional_text" key with unmatched filename segments.
+
+    Raises:
+        - ValueError: If filename is empty or None
+        - TypeError: If filename is not a string
+
+    Example:
+        >>> extract_scalar_parameters_from_filename("test_beta2p3_config001.dat")
+        {'QCD_beta_value': 2.3, 'Configuration_label': '001', 'Additional_text': ['test']}
+
+        >>> extract_scalar_parameters_from_filename("Chebyshev_cores123.log")
+        {'Overlap_operator_method': 'Chebyshev', 'MPI_geometry': '(1, 1, 2, 3)'}
     """
+    # Input validation
+    if not filename:
+        raise ValueError("Filename cannot be empty or None")
+    if not isinstance(filename, str):
+        raise TypeError("Filename must be a string")
 
-    # Initialize output dictionary
-    extracted_values = {}
+    # Remove file extension
+    clean_filename = _remove_file_extension(filename)
 
-    # SPECIAL EXTRACTION OF THE MAIN PROGRAM TYPE
+    # Extract parameters using regex patterns
+    extracted_values, matched_segments = _extract_parameters_with_regex(
+        clean_filename, logger
+    )
 
-    # Initialize "Main_program_type" as None (or a default value if needed)
-    main_program_type = None
-    for line in file_contents_list:
-        # Check for the special string matches
-        for key_string, program_type in constants.MAIN_PROGRAM_TYPE_MAPPING.items():
-            if key_string in line:
-                main_program_type = program_type
-                break  # Stop checking further if a match is found
-    # If a match was found, store it in the dictionary
-    if main_program_type:
-        extracted_values["Main_program_type"] = main_program_type
+    # Extract unmatched segments
+    unmatched_segments = _extract_unmatched_segments(clean_filename, matched_segments)
+    if unmatched_segments:
+        extracted_values["Additional_text"] = unmatched_segments
 
-    # EXTRACT THE REST PIECES OF INFORMATION
-
-    for (
-        parameter_name,
-        parameter_info,
-    ) in constants.FILE_CONTENTS_SINGLE_VALUE_PATTERNS_DICTIONARY.items():
-        line_identifier = parameter_info["line_identifier"]
-        regex_pattern = parameter_info["regex_pattern"]
-        expected_type = parameter_info["type"]
-
-        # Search for the line containing the parameter
-        matched_line = next(
-            (line for line in file_contents_list if line_identifier in line), None
-        )
-
-        if matched_line:
-            # Apply regex to extract the value
-            match = re.search(regex_pattern, matched_line)
-            if match:
-                # Assume the first capture group contains the value
-                raw_value = match.group(1)
-
-                # Preprocess the value if it contains 'p' instead of '.'
-                if "p" in raw_value and expected_type in {float, int}:
-                    raw_value = raw_value.replace("p", ".")
-
-                try:
-                    # Convert to the expected type
-                    extracted_values[parameter_name] = expected_type(raw_value)
-                except ValueError:
-                    if logger:
-                        logger.warning(
-                            f"Failed to convert '{raw_value}' "
-                            f"to {expected_type} for {parameter_name}."
-                        )
-            else:
-                if logger:
-                    logger.warning(
-                        f"Regex pattern '{regex_pattern}' did not "
-                        f"match for {parameter_name}."
-                    )
+    # Apply special transformations
+    _apply_special_transformations(extracted_values)
 
     return extracted_values
-
-
-def extract_multivalued_parameters_from_file_contents(file_contents_list, logger=None):
-    # TODO: Include logging
-
-    # Initialize a dictionary to store multivalued parameters
-    multivalued_parameters = {}
-
-    # Loop through each line in the file contents
-    for line in file_contents_list:
-        # Check for each multivalued parameter in the dictionary
-        for (
-            parameter,
-            pattern_details,
-        ) in constants.FILE_CONTENTS_MULTIVALUED_PATTERNS_DICTIONARY.items():
-            # If the line contains the line identifier for the current parameter
-            if pattern_details["line_identifier"] in line:
-                # Find all matches using the regex pattern
-                matches = re.findall(pattern_details["regex_pattern"], line)
-                if matches:
-                    # Initialize a non-existing key with an empty list
-                    if parameter not in multivalued_parameters:
-                        multivalued_parameters[parameter] = []
-
-                    # Convert extracted values to correct type and add to list
-                    for match in matches:
-                        multivalued_parameters[parameter].append(
-                            pattern_details["type"](match)
-                        )
-
-    # Convert lists to numpy arrays
-    for key, value in multivalued_parameters.items():
-        multivalued_parameters[key] = np.array(value)
-
-    # Return the dictionary with Numpy arrays
-    return multivalued_parameters
