@@ -1,9 +1,9 @@
 """
 Private shared processing utilities for data file processing scripts.
 
-This module contains common functionality used by both process_qpb_log_files.py
-and parse_qpb_correlator_files.py. It is marked as private (underscore prefix)
-and should not be part of the public API.
+This module contains common functionality used by both parse_log_files and
+parse_correlator_files.py. It is marked as private (underscore prefix) and
+should not be part of the public API.
 """
 
 import os

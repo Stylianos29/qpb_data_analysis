@@ -17,13 +17,13 @@
 #
 # Processing Logic:
 # - **QPB Log Files:**
-#   * The Python script `process_qpb_log_files.py` is called to process any
+#   * The Python script `parse_log_files` is called to process any
 #     `.txt` files found in the data files sets directory.
 #   * The script automatically filters and processes qpb log files, generating
 #     output files with appropriate names in the processed data directory.
 #
 # - **QPB Correlator Data Files:**
-#   * The Python script `parse_qpb_correlator_files.py` is called to process any
+#   * The Python script `parse_correlator_files.py` is called to process any
 #     `.dat` files found in the data files sets directory.
 #   * The script parses the correlator data and generates output in HDF5 format
 #     in the processed data directory.

@@ -46,7 +46,7 @@ Processing Steps:
 
 Usage:
     Run the script from the command line as follows:
-        python parse_qpb_correlator_files.py
+        python parse_correlator_files.py
         --qpb_correlators_files_directory <path_to_data>
         --output_files_directory <path_to_hdf5>
         --output_hdf5_filename <output_filename.h5>

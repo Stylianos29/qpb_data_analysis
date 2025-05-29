@@ -17,13 +17,13 @@
 #
 # Processing Logic:
 # - **QPB Log Files:**
-#   * The Python script `process_qpb_log_files.py` is called to process any
+#   * The Python script `parse_log_files` is called to process any
 #     `.txt` files found in the data files sets directory.
 #   * The script automatically filters and processes qpb log files, generating
 #     output files with appropriate names in the processed data directory.
 #
 # - **QPB Correlator Data Files:**
-#   * The Python script `parse_qpb_correlator_files.py` is called to process any
+#   * The Python script `parse_correlator_files.py` is called to process any
 #     `.dat` files found in the data files sets directory.
 #   * The script parses the correlator data and generates output in HDF5 format
 #     in the processed data directory.
@@ -199,7 +199,7 @@ fi
 # Process all qpb log files of the data files set by extracting all useful
 # pieces of information they might contain without any further processing
 python_script_path="${PYTHON_SCRIPTS_DIRECTORY}"
-python_script_path+="/data_files_processing/process_qpb_log_files.py"
+python_script_path+="/parsing/parse_log_files"
 check_if_file_exists "$python_script_path" || exit 1
 
 python $python_script_path \
@@ -292,7 +292,7 @@ if find "$raw_data_files_set_directory" \
 
     # Parse 
     python_script_path="${PYTHON_SCRIPTS_DIRECTORY}"
-    python_script_path+="/data_files_processing/parse_qpb_correlator_files.py"
+    python_script_path+="/parsing/parse_correlator_files.py"
     check_if_file_exists "$python_script_path" || exit 1
 
     python $python_script_path \

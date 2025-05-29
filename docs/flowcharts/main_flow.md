@@ -17,7 +17,7 @@ flowchart TD
 
     %% RAW FILES PARSING
     Validation --> qpbFilesParsing[
-        process_qpb_log_files.py
+        parse_log_files
         ]
 
     %% PARSING QPB FILES
@@ -33,7 +33,7 @@ flowchart TD
         ]
     
     InvertMainProgram -- Yes --> InvertCorrelatorFilesParsing[
-        parse_qpb_correlator_files.py
+        parse_correlator_files.py
         ]
 
     InvertCorrelatorFilesParsing --> InvertProcessingRawFiles[
