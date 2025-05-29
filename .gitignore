@@ -8,11 +8,12 @@ core/library/__pycache__/*
 core/library/constants/__pycache__/*
 core/library/data/__pycache__/*
 core/library/data/hdf5_analyzer/__pycache__/*
+core/library/parsing/__pycache__/*
 core/library/validation/__pycache__/*
 core/library/visualization/__pycache__/*
 core/qpb_data_analysis.egg-info/*
 core/src/__pycache__/*
-core/src/data_files_processing/__pycache__/*
+core/src/parsing/__pycache__/*
 core/tests/integration_tests/*/*
 core/tests/mock_data/golden_masters/*
 core/tests/mock_data/valid/*

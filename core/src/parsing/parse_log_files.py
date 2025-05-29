@@ -50,7 +50,7 @@ import click
 from functools import partial
 
 from library import (
-    extraction,
+    parsing,
     LoggingWrapper,
     RAW_DATA_FILES_DIRECTORY,
     validate_input_directory,
@@ -59,7 +59,7 @@ from library import (
 )
 
 # Import shared private functions
-from src.data_files_processing._shared_processing import (
+from src.parsing._shared_parsing import (
     _classify_parameters_by_uniqueness,
     _export_dataframe_to_csv,
     _export_arrays_to_hdf5_with_proper_structure,
@@ -96,7 +96,7 @@ def _process_log_files_and_extract_parameters(qpb_log_files_directory, logger):
         scalar_params = {"Filename": qpb_log_filename}
 
         # Extract parameters from filename
-        filename_params = extraction.extract_parameters_values_from_filename(
+        filename_params = parsing.extract_scalar_parameters_from_filename(
             qpb_log_filename, logger
         )
 
@@ -106,14 +106,14 @@ def _process_log_files_and_extract_parameters(qpb_log_files_directory, logger):
 
         # Extract scalar parameters from file contents
         file_scalar_params = (
-            extraction.extract_single_valued_parameter_values_from_file_contents(
+            parsing.extract_scalar_parameters_from_file_contents(
                 file_contents, logger
             )
         )
 
         # Extract array parameters from file contents
         file_array_params = (
-            extraction.extract_multivalued_parameters_from_file_contents(
+            parsing.extract_array_parameters_from_file_contents(
                 file_contents, logger
             )
         )
@@ -146,7 +146,7 @@ def _process_log_files_and_extract_parameters(qpb_log_files_directory, logger):
 
     logger.info(
         f"A total of {file_count} qpb log files were parsed for parameter "
-        "values extraction from the "
+        "values parsing from the "
         f"'{os.path.basename(qpb_log_files_directory)}' "
         "raw data files set directory."
     )

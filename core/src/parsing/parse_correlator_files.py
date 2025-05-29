@@ -69,7 +69,7 @@ import numpy as np
 import click
 
 from library.constants import RAW_DATA_FILES_DIRECTORY, CORRELATOR_IDENTIFIERS_LIST
-from library.extraction import extract_parameters_values_from_filename
+from library.parsing import extract_scalar_parameters_from_filename
 from library import (
     LoggingWrapper,
     validate_input_directory,
@@ -78,7 +78,7 @@ from library import (
 )
 
 # Import shared private functions
-from src.data_files_processing._shared_processing import (
+from src.parsing._shared_parsing import (
     _classify_parameters_by_uniqueness,
     _export_arrays_to_hdf5_with_proper_structure,
 )
@@ -113,7 +113,7 @@ def _process_correlator_files_and_extract_data(correlators_files_directory, logg
         scalar_params = {"Filename": correlators_filename}
 
         # Extract parameters from filename
-        filename_params = extract_parameters_values_from_filename(
+        filename_params = extract_scalar_parameters_from_filename(
             correlators_filename, logger
         )
         scalar_params.update(filename_params)
