@@ -195,8 +195,8 @@ data_files_set_plots_directory=$(replace_parent_directory \
 check_if_directory_exists "$data_files_set_plots_directory" -c
 
 # Validate python script
-python_script_path="${PYTHON_SCRIPTS_DIRECTORY}/post_processing_analysis"
-python_script_path+="/perform_jackknife_analysis_on_correlators.py"
+python_script_path="${PYTHON_SCRIPTS_DIRECTORY}/preprocessing"
+python_script_path+="/apply_jackknife_analysis.py"
 check_if_file_exists "$python_script_path" || exit 1
 
 python $python_script_path \
@@ -234,7 +234,7 @@ log "INFO" "$log_message"
 # PCAC MASS ESTIMATES ANALYSIS
 
 # Validate python script
-python_script_path="${PYTHON_SCRIPTS_DIRECTORY}/post_processing_analysis"
+python_script_path="${PYTHON_SCRIPTS_DIRECTORY}/analysis"
 python_script_path+="/calculate_PCAC_mass_estimates.py"
 check_if_file_exists "$python_script_path" || exit 1
 
@@ -280,7 +280,7 @@ log "INFO" "$log_message"
 # PION EFFECTIVE MASS ESTIMATES ANALYSIS
 
 # Validate python script
-python_script_path="${PYTHON_SCRIPTS_DIRECTORY}/post_processing_analysis"
+python_script_path="${PYTHON_SCRIPTS_DIRECTORY}/analysis"
 python_script_path+="/calculate_effective_mass_estimates.py"
 check_if_file_exists "$python_script_path" || exit 1
 
@@ -321,7 +321,7 @@ log "INFO" "$log_message"
 # CRITICAL BARE VALUES FROM PCAC MASS ESTIMATES CALCULATION
 
 # Validate python script
-python_script_path="${PYTHON_SCRIPTS_DIRECTORY}/post_processing_analysis"
+python_script_path="${PYTHON_SCRIPTS_DIRECTORY}/analysis"
 python_script_path+="/calculate_critical_bare_mass_from_PCAC_mass.py"
 check_if_file_exists "$python_script_path" || exit 1
 
@@ -365,7 +365,7 @@ log "INFO" "$log_message"
 # CRITICAL BARE VALUES FROM PION EFFECTIVE MASS ESTIMATES CALCULATION
 
 # Validate python script
-python_script_path="${PYTHON_SCRIPTS_DIRECTORY}/post_processing_analysis"
+python_script_path="${PYTHON_SCRIPTS_DIRECTORY}/analysis"
 python_script_path+="/calculate_critical_bare_mass_from_effective_mass.py"
 check_if_file_exists "$python_script_path" || exit 1
 
@@ -404,7 +404,7 @@ log "INFO" "$log_message"
 # CALCULATION COST OF CRITICAL BARE FROM PCAC MASS ESTIMATES
 
 # Validate python script
-python_script_path="${PYTHON_SCRIPTS_DIRECTORY}/post_processing_analysis"
+python_script_path="${PYTHON_SCRIPTS_DIRECTORY}/analysis"
 python_script_path+="/estimate_calculation_cost_of_critical_bare_from_PCAC_mass.py"
 check_if_file_exists "$python_script_path" || exit 1
 
@@ -446,7 +446,7 @@ log "INFO" "$log_message"
 # # CALCULATION COST OF CRITICAL BARE FROM EFFECTIVE MASS ESTIMATES
 
 # # Validate python script
-# python_script_path="${PYTHON_SCRIPTS_DIRECTORY}/post_processing_analysis"
+# python_script_path="${PYTHON_SCRIPTS_DIRECTORY}/analysis"
 # python_script_path+="/estimate_calculation_cost_of_critical_bare_from_effective_mass.py"
 # check_if_file_exists "$python_script_path" || exit 1
 
