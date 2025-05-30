@@ -18,7 +18,7 @@ For more information, see the documentation at: docs/api
 from .data import DataFrameAnalyzer, TableGenerator, load_csv
 
 # Import from visualization module
-# from .visualization import DataPlotter
+from .visualization import DataPlotter
 
 # Import constants
 from .constants import ROOT, RAW_DATA_FILES_DIRECTORY, PROCESSED_DATA_FILES_DIRECTORY
@@ -29,8 +29,8 @@ from .filesystem_utilities import (
     # validate_output_directory,
     # validate_input_directory,
     validate_input_script_log_filename,
-    is_valid_file,
-    is_valid_directory
+    # is_valid_file,
+    # is_valid_directory
 )
 
 # Import
@@ -46,6 +46,9 @@ from .validation import (
     validate_output_file,
 )
 
+# Import 
+from .validation.filesystem import is_valid_directory, is_valid_file
+
 from .filesystem_utilities import LoggingWrapper
 
 
@@ -57,7 +60,7 @@ __all__ = [
     "TableGenerator",
     "load_csv",
     # Visualization components
-    # "DataPlotter",
+    "DataPlotter",
     # "HDF5Plotter",
     # Important constants
     "ROOT",
@@ -68,6 +71,7 @@ __all__ = [
     "validate_file",
     "validate_output_directory",
     "validate_input_script_log_filename",
+    # Filesystem validation utilities
     "is_valid_file",
     "is_valid_directory",
     # User input
