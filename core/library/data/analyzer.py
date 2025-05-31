@@ -126,9 +126,9 @@ class _DataFrameInspector:
         ]
 
         # Get single and multi-valued columns
-        self.unique_value_columns_dictionary = self._get_unique_value_columns()
+        self.unique_value_columns_dictionary = self._unique_value_columns()
         self.multivalued_columns_count_dictionary = (
-            self._get_multivalued_columns_count()
+            self._multivalued_columns_count()
         )
 
         # Extract column name lists
@@ -160,7 +160,7 @@ class _DataFrameInspector:
             & set(self.list_of_multivalued_column_names)
         )
 
-    def _get_unique_value_columns(self) -> dict:
+    def _unique_value_columns(self) -> dict:
         """
         Identify columns that have only a single unique value.
 
@@ -175,7 +175,7 @@ class _DataFrameInspector:
 
         return unique_value_columns_dictionary
 
-    def _get_multivalued_columns_count(self) -> dict:
+    def _multivalued_columns_count(self) -> dict:
         """
         Identify columns with multiple unique values and count them.
 
