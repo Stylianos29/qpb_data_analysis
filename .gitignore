@@ -23,6 +23,7 @@ core/tests/unit_tests/data/__pycache__/*
 core/tests/unit_tests/data/test_hdf5_analyzer/__pycache__/*
 core/tests/unit_tests/mock_data/valid/*
 core/tests/unit_tests/output_from_mock_data/*
+core/tests/unit_tests/visualization/__pycache__/*
 
 data_files/processed/*
 !data_files/processed/README.md
