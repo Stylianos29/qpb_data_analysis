@@ -536,6 +536,12 @@ class DataPlotter(DataFrameAnalyzer):
                 y_coords = np.array([val for val, _ in y_filtered])
             else:
                 y_coords = y_filtered
+            
+            # Sort based on x_coords
+            sort_indices = np.argsort(x_coords)
+            x_coords = x_coords[sort_indices]
+            y_coords = y_coords[sort_indices]
+            annotation_values = annotation_values[sort_indices]
 
             # Add annotations
             for idx in annotation_indices:
@@ -886,17 +892,22 @@ class DataPlotter(DataFrameAnalyzer):
 
                 def power_law(x, p):
                     return p[0] * x ** p[1]
+                
+                def shifted_power_law(x, p):
+                    return p[0] / (x - p[1]) + p[2]
 
                 fit_func_map = {
                     "linear": linear,
                     "exponential": exponential,
                     "power_law": power_law,
+                    "shifted_power_law": shifted_power_law,
                 }
 
                 p0_map = {
                     "linear": [1, 1],
                     "exponential": [1, 1, 1],
                     "power_law": [1, 1],
+                    "shifted_power_law": [1, 1, 1],
                 }
 
                 fcn = fit_func_map.get(fit_function)
@@ -958,10 +969,14 @@ class DataPlotter(DataFrameAnalyzer):
                 def power_law(x, a, b):
                     return a * x**b
 
+                def shifted_power_law(x, a, b, c):
+                    return a / (x - b) + c
+
                 fit_func_map = {
                     "linear": linear,
                     "exponential": exponential,
                     "power_law": power_law,
+                    "shifted_power_law": shifted_power_law,
                 }
 
                 fit_func = fit_func_map.get(fit_function)
@@ -1173,7 +1188,7 @@ class DataPlotter(DataFrameAnalyzer):
             ):
                 raise ValueError("'styling_variable' must be tunable parameter.")
 
-            styling_variable_unique_values = self.get_unique_values(styling_variable)
+            styling_variable_unique_values = self.unique_values(styling_variable)
             style_lookup = self._generate_marker_color_map(
                 styling_variable_unique_values,
                 custom_map=marker_color_map,
@@ -1210,6 +1225,7 @@ class DataPlotter(DataFrameAnalyzer):
 
         # Initialize marker and color
         marker, color = (".", "blue")
+        self.color = color
 
         # At the end, store the most recent plot information
         self._last_plot_grouping = grouped
@@ -1425,7 +1441,11 @@ class DataPlotter(DataFrameAnalyzer):
                     if alternate_filled_markers:
                         empty_marker = curve_index % 2 == 1  # odd indices → empty
                         if alternate_filled_markers_reversed:
-                            empty_marker = not empty_marker
+                            # empty_marker = not empty_marker
+                            if empty_marker:
+                                empty_marker = 0
+                            else:
+                                empty_marker = 1
                     else:
                         empty_marker = (
                             empty_markers  # regular user setting (could be False)

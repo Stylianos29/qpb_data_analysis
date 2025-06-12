@@ -397,35 +397,60 @@ def main(
 
             # CALCULATE JACKKNIFE AVERAGE MASS CORRELATORS
 
-            jackknife_average_correlators_jackknife_array = np.mean(
-                jackknife_samples_of_PCAC_mass_correlators_2D_array, axis=0
-            )
-
-            # Restrict the calculation range to a possible plateau range
-            calculation_range = np.arange(
-                temporal_lattice_size // 4 - temporal_lattice_size // 8,
-                temporal_lattice_size // 4 + temporal_lattice_size // 8,
-            )
-            integrated_autocorrelation_time = (
-                jackknife_analysis.calculate_integrated_autocorrelation_time(
-                    jackknife_average_correlators_jackknife_array[calculation_range]
+            jackknife_average_correlators_jackknife_array = (
+                jackknife_analysis.jackknife_average(
+                    jackknife_samples_of_PCAC_mass_correlators_2D_array,
+                    use_covariance=True,
                 )
             )
 
-            if integrated_autocorrelation_time < 1:
-                integrated_autocorrelation_time = 1
+            # jackknife_average_correlators_jackknife_array = np.mean(
+            #     jackknife_samples_of_PCAC_mass_correlators_2D_array, axis=0
+            # )
+
+            # # Restrict the calculation range to a possible plateau range
+            # calculation_range = np.arange(
+            #     temporal_lattice_size // 4 - temporal_lattice_size // 8,
+            #     temporal_lattice_size // 4 + temporal_lattice_size // 8,
+            # )
+            # integrated_autocorrelation_time = (
+            #     jackknife_analysis.calculate_integrated_autocorrelation_time(
+            #         jackknife_average_correlators_jackknife_array[calculation_range]
+            #     )
+            # )
+
+            # if integrated_autocorrelation_time < 1:
+            #     integrated_autocorrelation_time = 1
 
             integrated_autocorrelation_time = 1
 
-            jackknife_average_correlators_jackknife_array = gv.gvar(
-                jackknife_average_correlators_jackknife_array,
-                jackknife_analysis.jackknife_correlated_error(
-                    jackknife_samples_of_PCAC_mass_correlators_2D_array,
-                    integrated_autocorrelation_time,
-                ),
-            )
+            # jackknife_average_correlators_jackknife_array = gv.gvar(
+            #     jackknife_average_correlators_jackknife_array,
+            #     jackknife_analysis.jackknife_correlated_error(
+            #         jackknife_samples_of_PCAC_mass_correlators_2D_array,
+            #         integrated_autocorrelation_time,
+            #     ),
+            # )
 
             # PLATEAU RANGE FOR PCAC MASS CORRELATOR
+            # NEW!!!!!!!!!!!!!!!
+            sigma_thresholds = [2, 3, 4, 5, 7]
+            plateau_found = False
+
+            for sigma_threshold in sigma_thresholds:
+                try:
+                    plateau_start, plateau_final, _ = jackknife_analysis.detect_plateau_region(
+                        jackknife_average_correlators_jackknife_array, 
+                        sigma_threshold=sigma_threshold
+                    )
+                    plateau_found = True
+                    break
+                except:
+                    continue
+
+            if not plateau_found:
+                logger.critical("Could not detect plateau region with any sigma threshold", to_console=True)
+                sys.exit(1)
 
             sigma_criterion_factor = 1.5
             plateau_indices_list = []
@@ -481,10 +506,19 @@ def main(
                 )
             )
 
+            # New method
+            PCAC_mass_estimate, _ = jackknife_analysis.plateau_estimate(
+                jackknife_samples_of_PCAC_mass_correlators_2D_array,
+                plateau_start,
+                plateau_final,
+                method="simple",
+                use_inverse_variance=True,
+            )
+
             # PLOT PCAC MASS CORRELATORS
 
             if plot_PCAC_mass_correlators:
-                starting_time = 1
+                starting_time = 5
                 y = jackknife_average_correlators_jackknife_array[starting_time:]
                 x = np.arange(starting_time, len(y) + starting_time)
 
@@ -531,11 +565,11 @@ def main(
                     x, gv.mean(y), yerr=gv.sdev(y), fmt=".", markersize=8, capsize=10
                 )
 
-                if zoom_in_PCAC_mass_correlators_plots:
-                    y_limits = [0.9 * y[0].mean, 1.1 * PCAC_mass_estimate.mean]
-                    if y[0] > y[temporal_lattice_size // 4]:
-                        y_limits = [y_limits[1], y_limits[0]]
-                    ax.set_ylim(y_limits)
+                # if zoom_in_PCAC_mass_correlators_plots:
+                #     y_limits = [0.9 * y[0].mean, 1.1 * PCAC_mass_estimate.mean]
+                #     if y[0] > y[temporal_lattice_size // 4]:
+                #         y_limits = [y_limits[1], y_limits[0]]
+                #     ax.set_ylim(y_limits)
 
                 plateau_range_minimum = x[plateau_indices_list[0] - starting_time]
                 plateau_range_maximum = x[plateau_indices_list[-1] - starting_time]

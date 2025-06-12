@@ -38,10 +38,10 @@ from library import (
     validate_input_script_log_filename,
 )
 
-REFERENCE_BARE_MASS = 0.02
-REFERENCE_PCAC_MASS = 0.02
+REFERENCE_BARE_MASS = 0.05
+REFERENCE_PCAC_MASS = 0.05
 
-UPPER_BARE_MASS_CUT = 0.15
+UPPER_BARE_MASS_CUT = 0.06
 
 
 @click.command()
@@ -390,7 +390,7 @@ def main(
             power_law(REFERENCE_BARE_MASS, *fit_params)
         )
         adjusted_average_core_hours_reference_value_for_constant_PCAC_mass = (
-            power_law(bare_mass_reference_value, *fit_params)
+            power_law(np.abs(bare_mass_reference_value), *fit_params)
         )
 
         # FIT ON CORE-HOURS VS NUMBER OF MV MULTIPLICATIONS DATA

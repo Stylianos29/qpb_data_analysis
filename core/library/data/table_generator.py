@@ -199,7 +199,9 @@ class TableGenerator(DataFrameAnalyzer):
 
                         # Format the value appropriately
                         if isinstance(value, float):
-                            if value == int(value):
+                            if pd.isna(value):
+                                formatted_value = 'NaN'
+                            elif value == int(value):
                                 formatted_value = str(int(value))
                             else:
                                 formatted_value = f"{value:.8g}"
@@ -253,7 +255,9 @@ class TableGenerator(DataFrameAnalyzer):
 
                         # Format the value appropriately
                         if isinstance(value, float):
-                            if value == int(value):
+                            if pd.isna(value):
+                                formatted_value = 'NaN'
+                            elif value == int(value):
                                 formatted_value = str(int(value))
                             else:
                                 formatted_value = f"{value:.8g}"
@@ -301,7 +305,9 @@ class TableGenerator(DataFrameAnalyzer):
 
                     # Format the value appropriately
                     if isinstance(value, float):
-                        if value == int(value):
+                        if pd.isna(value):
+                            formatted_value = 'NaN'
+                        elif value == int(value):
                             formatted_value = str(int(value))
                         else:
                             formatted_value = (

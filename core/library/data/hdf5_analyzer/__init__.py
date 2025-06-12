@@ -1,6 +1,3 @@
-# from .analyzer import DataFrameAnalyzer
-from .inspector import _HDF5Inspector
+from .analyzer import HDF5Analyzer
 
-# from .data_manager import TableGenerator
-
-__all__ = ["_HDF5Inspector"]
+__all__ = ["HDF5Analyzer"]

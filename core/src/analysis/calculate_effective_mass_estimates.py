@@ -734,10 +734,32 @@ def main(
                 )
             )
 
+            # New!!!!!!!!!!!!!
+
+            # Effective mass in an array of T//2 size
+            effective_mass_correlator_average = jackknife_analysis.jackknife_average(
+                effective_mass_correlator_replicas_2D_array, use_covariance=True
+            )
+
+            plateau_start, plateau_final, _ = jackknife_analysis.detect_plateau_region(
+                effective_mass_correlator_average, sigma_threshold=2
+            )
+
+            pion_effective_mass_estimate, _ = jackknife_analysis.plateau_estimate(
+                effective_mass_correlator_replicas_2D_array,
+                plateau_start,
+                plateau_final,
+                method="simple",
+                use_inverse_variance=True,
+            )
+
+            # plateau_indices_list = list(np.arange(plateau_start, plateau_final))
+
             # PLOT EFFECTIVE MASS CORRELATORS
             if plot_effective_mass_correlators:
-                y = jackknife_average_effective_mass_correlator
-                x = np.arange(len(y))
+                initial_shift = 2
+                y = jackknife_average_effective_mass_correlator[initial_shift:]
+                x = np.arange(initial_shift, len(y)+initial_shift)
 
                 fig, ax = plt.subplots()
                 ax.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
@@ -782,7 +804,7 @@ def main(
 
                 label_string = (
                     f"Plateau fit:\n- fit range: t/a$\\in[${x[plateau_indices_list[0]]}, "
-                    f"{x[plateau_indices_list[-1]]}$]$,\n- $m^{{best\!-\!fit}}_{{eff.}}$"
+                    f"{x[plateau_indices_list[-1]-1]}$]$,\n- $m^{{best\!-\!fit}}_{{eff.}}$"
                     f"={pion_effective_mass_estimate:.3f}\n"
                 )
 

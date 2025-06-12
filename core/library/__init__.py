@@ -15,7 +15,7 @@ For more information, see the documentation at: docs/api
 """
 
 # Import from data module
-from .data import DataFrameAnalyzer, TableGenerator, load_csv
+from .data import DataFrameAnalyzer, TableGenerator, HDF5Analyzer, load_csv
 
 # Import from visualization module
 from .visualization import DataPlotter
@@ -56,7 +56,7 @@ from .filesystem_utilities import LoggingWrapper
 __all__ = [
     # Data components
     "DataFrameAnalyzer",
-    # "HDF5Analyzer",
+    "HDF5Analyzer",
     "TableGenerator",
     "load_csv",
     # Visualization components
