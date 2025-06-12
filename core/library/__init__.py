@@ -18,7 +18,7 @@ For more information, see the documentation at: docs/api
 from .data import DataFrameAnalyzer, TableGenerator, HDF5Analyzer, load_csv
 
 # Import from visualization module
-from .visualization import DataPlotter
+from .visualization import DataPlotter, HDF5Plotter
 
 # Import constants
 from .constants import ROOT, RAW_DATA_FILES_DIRECTORY, PROCESSED_DATA_FILES_DIRECTORY
@@ -61,7 +61,7 @@ __all__ = [
     "load_csv",
     # Visualization components
     "DataPlotter",
-    # "HDF5Plotter",
+    "HDF5Plotter",
     # Important constants
     "ROOT",
     "RAW_DATA_FILES_DIRECTORY",

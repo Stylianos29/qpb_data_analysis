@@ -3,7 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 
-from library.data.hdf5_analyzer import HDF5Analyzer
+from ..data.hdf5_analyzer import HDF5Analyzer
 from .data_plotter import DataPlotter
 
 
