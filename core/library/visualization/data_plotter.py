@@ -1619,9 +1619,10 @@ class DataPlotter(DataFrameAnalyzer):
             filename = self._construct_plot_filename(
                 metadata_dict=metadata,
                 include_combined_prefix=(
-                    grouping_variable is not None and leading_plot_substring is None
+                    grouping_variable is not None #and leading_plot_substring is None
                 ),
-                custom_leading_substring=leading_plot_substring,
+                custom_leading_substring="",
+                # leading_plot_substring,
                 grouping_variable=grouping_variable,
             )
             if grouping_variable:

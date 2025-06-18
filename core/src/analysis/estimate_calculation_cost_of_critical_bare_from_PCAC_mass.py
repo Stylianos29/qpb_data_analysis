@@ -41,7 +41,7 @@ from library import (
 REFERENCE_BARE_MASS = 0.05
 REFERENCE_PCAC_MASS = 0.05
 
-UPPER_BARE_MASS_CUT = 0.06
+UPPER_BARE_MASS_CUT = 0.10
 
 
 @click.command()
@@ -370,6 +370,7 @@ def main(
 
         def power_law(x, a, b):
             return a * x**b
+            # return a/(x-b)+c
 
         x = bare_mass_values_array
         y = adjusted_average_core_hours_per_spinor_per_configuration_array

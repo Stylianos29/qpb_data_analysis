@@ -122,26 +122,9 @@ class _HDF5Inspector:
         self._file.visititems(visit_group)
 
     def _extract_parameters(self):
-        """Extract parameters from groups according to hierarchy rules."""
-        if not self._groups_by_level:
-            return
-
-        max_level = max(self._groups_by_level.keys())
-
-        # Track ALL parameter values across all groups for proper categorization
+        """Extract and categorize parameters from group attributes."""
         all_param_values = defaultdict(set)
-
-        # Extract single-valued parameters from second-to-last level
-        if max_level >= 1:
-            second_to_last_level = max_level - 1
-            for group_path in self._groups_by_level[second_to_last_level]:
-                group = self._file[group_path]
-                attrs = dict(group.attrs)
-                if attrs:  # Only store if attributes exist
-                    self._parameters_by_group[group_path] = attrs
-                    # Track all values for complete categorization
-                    for param_name, value in attrs.items():
-                        all_param_values[param_name].add(value)
+        max_level = max(self._groups_by_level.keys())
 
         # Extract multi-valued parameters from deepest level
         deepest_groups = self._groups_by_level[max_level]
@@ -153,13 +136,22 @@ class _HDF5Inspector:
                 self._parameters_by_group[group_path] = attrs
                 # Track all values for each parameter
                 for param_name, value in attrs.items():
+                    # Convert numpy arrays to tuples for hashability
+                    if isinstance(value, np.ndarray):
+                        value = tuple(value.flatten())
+                    elif isinstance(value, (np.integer, np.floating)):
+                        value = value.item()  # Convert to native Python type
                     all_param_values[param_name].add(value)
 
         # Now categorize ALL parameters based on their value counts
         for param_name, values in all_param_values.items():
             if len(values) == 1:
                 # Single-valued parameter
-                self.unique_value_columns_dictionary[param_name] = next(iter(values))
+                value = next(iter(values))
+                # Convert back from tuple if it was an array
+                if isinstance(value, tuple):
+                    value = np.array(value)
+                self.unique_value_columns_dictionary[param_name] = value
             else:
                 # Multi-valued parameter
                 self.multivalued_columns_count_dictionary[param_name] = len(values)
@@ -324,8 +316,21 @@ class _HDF5Inspector:
             values = set()
             for _, params in self._parameters_by_group.items():
                 if column_name in params:
-                    values.add(params[column_name])
-            return sorted(list(values))
+                    value = params[column_name]
+                    # Convert numpy arrays to tuples for hashability
+                    if isinstance(value, np.ndarray):
+                        value = tuple(value.flatten())
+                    elif isinstance(value, (np.integer, np.floating)):
+                        value = value.item()  # Convert to native Python type
+                    values.add(value)
+            
+            # Convert back to numpy arrays if needed
+            result = []
+            for value in values:
+                if isinstance(value, tuple):
+                    value = np.array(value)
+                result.append(value)
+            return sorted(result)
 
         raise ValueError(f"Column '{column_name}' not found in HDF5 file")
 

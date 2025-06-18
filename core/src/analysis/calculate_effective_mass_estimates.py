@@ -811,14 +811,14 @@ def main(
                 ax.hlines(
                     y=pion_effective_mass_estimate.mean,
                     xmin=x[plateau_indices_list[0]],
-                    xmax=x[plateau_indices_list[-1]],
+                    xmax=x[plateau_indices_list[-1]-1],
                     color="r",
                     linestyle="--",
                     label=label_string,
                 )
 
                 ax.fill_between(
-                    x[plateau_indices_list],
+                    x[plateau_indices_list[:-1]],
                     pion_effective_mass_estimate.mean
                     - pion_effective_mass_estimate.sdev,
                     pion_effective_mass_estimate.mean
