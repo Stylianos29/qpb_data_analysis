@@ -39,6 +39,7 @@ Dependencies:
     - pandas: For DataFrame operations
     - library.constants: For TUNABLE_PARAMETER_NAMES_LIST
 """
+from typing import Optional
 
 import pandas as pd
 
@@ -356,7 +357,7 @@ class DataFrameAnalyzer(_DataFrameInspector):
 
     def group_by_multivalued_tunable_parameters(
         self,
-        filter_out_parameters_list: list = None,
+        filter_out_parameters_list: Optional[list] = None,
         verbose: bool = False,
     ):
         """
@@ -481,6 +482,8 @@ class DataFrameAnalyzer(_DataFrameInspector):
                 self.dataframe = self.dataframe.query(condition)
             elif filter_func is not None:
                 mask = filter_func(self.dataframe)
+                if not isinstance(mask, pd.Series) or mask.dtype != bool:
+                    raise TypeError("filter_func must return a boolean Series")
                 self.dataframe = self.dataframe[mask]
 
             # Update column categories after filtering
