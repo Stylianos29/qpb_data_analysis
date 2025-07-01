@@ -267,7 +267,7 @@ class TestDataFrameAnalyzer:
 
         # But should have same content
         pd.testing.assert_frame_equal(analyzer.original_dataframe, simple_dataframe)
-        pd.testing.assert_frame_equal(analyzer.dataframe, simple_dataframe)
+        pd.testing.assert_frame_equal(analyzer.dataframe, simple_dataframe) # type: ignore
 
     def test_context_manager_basic(self, analyzer):
         """Test basic context manager functionality."""
