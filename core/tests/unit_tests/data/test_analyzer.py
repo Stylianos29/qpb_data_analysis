@@ -60,13 +60,13 @@ class TestDataFrameInspector:
     def test_initialization_with_invalid_input(self):
         """Test that inspector raises TypeError for non-DataFrame input."""
         with pytest.raises(TypeError, match="Input must be a pandas DataFrame"):
-            _DataFrameInspector([1, 2, 3])
+            _DataFrameInspector([1, 2, 3]) # type: ignore
 
         with pytest.raises(TypeError, match="Input must be a pandas DataFrame"):
-            _DataFrameInspector("not a dataframe")
+            _DataFrameInspector("not a dataframe") # type: ignore
 
         with pytest.raises(TypeError, match="Input must be a pandas DataFrame"):
-            _DataFrameInspector(None)
+            _DataFrameInspector(None) # type: ignore
 
     def test_column_categorization(self, simple_dataframe):
         """Test that columns are correctly categorized."""
@@ -164,15 +164,15 @@ class TestDataFrameInspector:
         inspector = _DataFrameInspector(simple_dataframe)
 
         # Test with multi-valued column
-        kernel_values = inspector.column_unique_values("Kernel_operator_type")
+        kernel_values = inspector.unique_values("Kernel_operator_type")
         assert kernel_values == ["Brillouin", "Wilson"]  # Sorted
 
         # Test with single-valued column
-        ape_values = inspector.column_unique_values("APE_alpha")
+        ape_values = inspector.unique_values("APE_alpha")
         assert ape_values == [0.72]
 
         # Test with column containing numpy types
-        epsilon_values = inspector.column_unique_values("MSCG_epsilon")
+        epsilon_values = inspector.unique_values("MSCG_epsilon")
         assert epsilon_values == [1e-6, 1e-5]  # Should be Python floats, not numpy
         assert all(isinstance(v, (int, float, str)) for v in epsilon_values)
 
@@ -181,7 +181,7 @@ class TestDataFrameInspector:
         inspector = _DataFrameInspector(simple_dataframe)
 
         with pytest.raises(ValueError, match="Column 'nonexistent' does not exist"):
-            inspector.column_unique_values("nonexistent")
+            inspector.unique_values("nonexistent")
 
     def test_empty_dataframe_handling(self, empty_dataframe):
         """Test inspector handles empty DataFrame correctly."""
@@ -267,7 +267,7 @@ class TestDataFrameAnalyzer:
 
         # But should have same content
         pd.testing.assert_frame_equal(analyzer.original_dataframe, simple_dataframe)
-        pd.testing.assert_frame_equal(analyzer.dataframe, simple_dataframe)
+        pd.testing.assert_frame_equal(analyzer.dataframe, simple_dataframe) # type: ignore
 
     def test_context_manager_basic(self, analyzer):
         """Test basic context manager functionality."""
@@ -458,7 +458,10 @@ class TestDataFrameAnalyzer:
         """Test basic groupby functionality."""
         # Group by all multivalued tunable parameters
         grouped = analyzer.group_by_multivalued_tunable_parameters()
-        assert isinstance(grouped, pd.core.groupby.generic.DataFrameGroupBy)
+        
+        # Create a reference groupby object for type checking
+        reference_groupby = pd.DataFrame().groupby(lambda x: x)
+        assert isinstance(grouped, type(reference_groupby))
 
         # Should group by all multivalued tunable parameters
         expected_grouping_cols = [

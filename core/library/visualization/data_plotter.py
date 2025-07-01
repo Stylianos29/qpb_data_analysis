@@ -1,4 +1,5 @@
 import os, shutil
+from typing import Optional, Callable
 
 import numpy as np
 import pandas as pd
@@ -21,6 +22,8 @@ FIT_LABEL_POSITIONS = {
     "bottom right": ((0.95, 0.05), ("right", "bottom")),
     "center": ((0.5, 0.5), ("center", "center")),
 }
+
+from .base_plotter import _PlotFileManager, _PlotTitleBuilder, _PlotFilenameBuilder
 
 
 class DataPlotter(DataFrameAnalyzer):
@@ -76,20 +79,31 @@ class DataPlotter(DataFrameAnalyzer):
         """
         super().__init__(dataframe)
 
-        if not os.path.isdir(plots_directory):
-            raise ValueError(f"Invalid plots directory: '{plots_directory}'")
-
+        # Initialize file manager
+        self._file_manager = _PlotFileManager(plots_directory)
         self.plots_directory = plots_directory
+
+        # Initialize builders
+        self._title_builder = _PlotTitleBuilder(constants.TITLE_LABELS_BY_COLUMN_NAME)
+        self._filename_builder = _PlotFilenameBuilder(
+            constants.FILENAME_LABELS_BY_COLUMN_NAME
+        )
+
+        # if not os.path.isdir(plots_directory):
+        #     raise ValueError(f"Invalid plots directory: '{plots_directory}'")
+
+        # self.plots_directory = plots_directory
         self.individual_plots_subdirectory = plots_directory
         self.combined_plots_subdirectory = plots_directory
 
-        self.xaxis_variable_name = None
-        self.yaxis_variable_name = None
-        self.plots_base_name = None
+        self.Optional[xaxis_variable_name] = None
+        self.Optional[yaxis_variable_name] = None
+        self.Optional[plots_base_name] = None
 
     def generate_column_uniqueness_report(
         self, max_width=80, separate_by_type=True
     ) -> str:
+        assert isinstance(self.dataframe, pd.DataFrame), "self.dataframe must be a DataFrame"
         table_generator = TableGenerator(self.dataframe)
         return table_generator.generate_column_uniqueness_report(
             max_width=max_width,
@@ -100,50 +114,23 @@ class DataPlotter(DataFrameAnalyzer):
     def _prepare_plot_subdirectory(
         self, subdir_name: str, clear_existing: bool = False
     ) -> str:
-        """
-        Create or clean a subdirectory for storing plots.
-
-        Parameters:
-        -----------
-        subdir_name : str
-            The name of the subdirectory to create inside the main plots
-            directory.
-        clear_existing : bool, optional
-            If True, delete all contents of the subdirectory if it already
-            exists.
-
-        Returns:
-        --------
-        str:
-            The full path to the prepared subdirectory.
-        """
-        full_path = os.path.join(self.plots_directory, subdir_name)
-        os.makedirs(full_path, exist_ok=True)
-
-        if clear_existing:
-            for item in os.listdir(full_path):
-                item_path = os.path.join(full_path, item)
-                if os.path.isfile(item_path):
-                    os.remove(item_path)
-                elif os.path.isdir(item_path):
-                    shutil.rmtree(item_path)
-
-        return full_path
+        """Delegate to file manager."""
+        return self._file_manager.prepare_subdirectory(subdir_name, clear_existing)
 
     def _plot_group(
         self,
         ax,
         group_df: pd.DataFrame,
-        label: str = None,
+        label: Optional[strOptional[]] = None,
         color: str = "blue",
         marker: str = "o",
         marker_size: int = 6,
         capsize: float = 5,
         empty_markers: bool = False,
         include_interpolation: bool = False,
-        annotation_variable: str = None,
+        annotation_variable: Optional[strOptional[]] = None,
         annotation_label: str = "",
-        annotation_range: tuple = None,
+        annotation_range: Optional[tupleOptional[]] = None,
         annotation_fontsize: int = 8,
         annotation_boxstyle: str = "round,pad=0.3",
         annotation_alpha: float = 0.7,
@@ -597,7 +584,7 @@ class DataPlotter(DataFrameAnalyzer):
     def _generate_marker_color_map(
         self,
         grouping_values: list,
-        custom_map: dict = None,
+        custom_map: Optional[dict] = None,
         index_shift: int = 0,
     ) -> dict:
         """
@@ -631,16 +618,34 @@ class DataPlotter(DataFrameAnalyzer):
 
         return style_map
 
+    # def _construct_plot_title(self, metadata_dict: dict, **kwargs) -> str:
+    #     """Delegate to title builder."""
+    #     # Extract the excluded set from various sources
+    #     excluded = set(kwargs.get("excluded_from_title_list", []))
+    #     if kwargs.get("grouping_variable"):
+    #         excluded.add(kwargs["grouping_variable"])
+    #     if kwargs.get("labeling_variable"):
+    #         excluded.add(kwargs["labeling_variable"])
+
+    #     return self._title_builder.build(
+    #         metadata_dict,
+    #         self.list_of_tunable_parameter_names_from_dataframe,
+    #         excluded=excluded,
+    #         leading_substring=kwargs.get("leading_plot_substring"),
+    #         title_from_columns=kwargs.get("title_from_columns"),
+    #         wrapping_length=kwargs.get("title_wrapping_length", 90),
+    #     )
+
     def _construct_plot_title(
         self,
         metadata_dict: dict,
-        grouping_variable: str = None,
-        labeling_variable: str = None,
-        leading_plot_substring: str = None,
-        excluded_from_title_list: list = None,
+        grouping_variable: Optional[str] = None,
+        labeling_variable: Optional[str] = None,
+        leading_plot_substring: Optional[str] = None,
+        excluded_from_title_list: Optional[list] = None,
         title_number_format: str = ".2f",  # ".4g" for scientific/float hybrid format
         title_wrapping_length: int = 90,
-        title_from_columns: list = None,
+        title_from_columns: Optional[list] = None,
     ) -> str:
         """
         Construct an informative plot title based on metadata and user
@@ -771,89 +776,20 @@ class DataPlotter(DataFrameAnalyzer):
 
         return full_title
 
-    def _construct_plot_filename(
-        self,
-        metadata_dict: dict,
-        include_combined_prefix: bool = False,
-        custom_leading_substring: str = None,
-        grouping_variable: str = None,
-    ) -> str:
-        """
-        Construct a plot filename based on metadata and class configuration.
-
-        Parameters:
-        -----------
-        metadata_dict : dict
-            Dictionary containing values of tunable parameters for this plot
-            group.
-        include_combined_prefix : bool, optional
-            Whether to prepend "Combined_" to the filename (used when
-            grouping_variable is defined).
-        custom_leading_substring : str, optional
-            An optional custom prefix that overrides "Combined_".
-        grouping_variable : str, optional
-            If provided, appends "_grouped_by_{grouping_variable}" to the
-            filename.
-
-        Returns:
-        --------
-        str:
-            A string to use as the plot filename (without extension).
-        """
-
-        def sanitize(value):
-            return (
-                str(value)
-                .replace(".", "p")
-                .replace(",", "")
-                .replace("(", "")
-                .replace(")", "")
-            )
-
-        # -- Build filename in parts
-        filename_parts = []
-
-        # 1. Overlap_operator_method
-        overlap_method = metadata_dict.get("Overlap_operator_method")
-        if overlap_method in {"KL", "Chebyshev", "Bare"}:
-            filename_parts.append(overlap_method)
-            metadata_dict.pop("Overlap_operator_method", None)
-
-        # 2. plots_base_name (y_Vs_x)
-        filename_parts.append(self.plots_base_name)
-
-        # 3. Kernel_operator_type
-        kernel_type = metadata_dict.get("Kernel_operator_type")
-        if kernel_type in {"Brillouin", "Wilson"}:
-            filename_parts.append(kernel_type)
-            metadata_dict.pop("Kernel_operator_type", None)
-
-        # 4. Parameters from reduced tunable parameter list
-        for param in self.reduced_multivalued_tunable_parameter_names_list:
-            if param in metadata_dict:
-                label = constants.FILENAME_LABELS_BY_COLUMN_NAME.get(param, param)
-                value = sanitize(metadata_dict[param])
-                filename_parts.append(f"{label}{value}")
-
-        # 5. Optional prefix override
-        if custom_leading_substring is not None:
-            prefix = custom_leading_substring
-        elif include_combined_prefix:
-            prefix = "Combined_"
-        else:
-            prefix = ""
-
-        # 6. Optional grouping variable suffix
-        if grouping_variable:
-            if isinstance(grouping_variable, str):
-                suffix = f"_grouped_by_{grouping_variable}"
-            else:
-                suffix = "_grouped_by_" + "_and_".join(grouping_variable)
-            # suffix = f"_grouped_by_{grouping_variable}"
-        else:
-            suffix = ""
-
-        return prefix + "_".join(filename_parts) + suffix
+    def _construct_plot_filename(self,
+                            metadata_dict: dict,
+                            include_combined_prefix: bool = False,
+                            custom_leading_substring: Optional[str] = None,
+                            grouping_variable: Optional[str] = None) -> str:
+        """Delegate to filename builder."""
+        return self._filename_builder.build(
+            metadata_dict,
+            self.plots_base_name,
+            self.reduced_multivalued_tunable_parameter_names_list,
+            grouping_variable=grouping_variable or "",
+            include_combined_prefix=include_combined_prefix,
+            custom_prefix=custom_leading_substring or ""
+        )
 
     def _apply_curve_fit(
         self,
@@ -862,11 +798,11 @@ class DataPlotter(DataFrameAnalyzer):
         y_raw,
         fit_function: str,
         show_fit_parameters_on_plot: bool = True,
-        fit_curve_style: dict = None,
+        fit_curve_style: Optional[dict] = None,
         fit_label_format: str = ".2e",
         fit_label_location: str = "top left",
         fit_index_range: slice = slice(None),
-        fit_curve_range: tuple = None,
+        fit_curve_range: Optional[tuple] = None,
     ):
         try:
 
@@ -884,13 +820,13 @@ class DataPlotter(DataFrameAnalyzer):
                 y_gv = gvar.gvar([t[0] for t in y_raw], [t[1] for t in y_raw])
                 x_raw = np.asarray(x_raw, dtype=float)
 
-                def linear(x, p):
+                def linear_gvar(x, p):
                     return p[0] * x + p[1]
 
-                def exponential(x, p):
+                def exponential_gvar(x, p):
                     return p[0] * np.exp(-p[1] * x) + p[2]
 
-                def power_law(x, p):
+                def power_law_gvar(x, p):
                     return p[0] * x ** p[1]
                 
                 def shifted_power_law(x, p):
@@ -900,7 +836,6 @@ class DataPlotter(DataFrameAnalyzer):
                     "linear": linear,
                     "exponential": exponential,
                     "power_law": power_law,
-                    "shifted_power_law": shifted_power_law,
                 }
 
                 p0_map = {
@@ -1068,34 +1003,34 @@ class DataPlotter(DataFrameAnalyzer):
 
     def plot(
         self,
-        grouping_variable: str = None,
-        excluded_from_grouping_list: list = None,
-        labeling_variable: str = None,
+        grouping_variable: Optional[str] = None,
+        excluded_from_grouping_list: Optional[list] = None,
+        labeling_variable: Optional[str] = None,
         legend_number_format: str = ".2f",
         include_legend_title: bool = True,
         include_legend: bool = True,
         legend_location: str = "upper left",
         legend_columns: int = 1,
-        sorting_variable: str = None,
-        sort_ascending: bool = None,
+        sorting_variable: Optional[str] = None,
+        sort_ascending: Optional[bool] = None,
         figure_size=(7, 5),
         font_size: int = 13,
-        xaxis_label: str = None,
-        yaxis_label: str = None,
+        xaxis_label: Optional[str] = None,
+        yaxis_label: Optional[str] = None,
         xaxis_log_scale: bool = False,
         yaxis_log_scale: bool = False,
         invert_xaxis: bool = False,
         invert_yaxis: bool = False,
-        xlim: tuple = None,
-        ylim: tuple = None,
+        xlim: Optional[tuple] = None,
+        ylim: Optional[tuple] = None,
         xaxis_start_at_zero: bool = False,
         yaxis_start_at_zero: bool = False,
         left_margin_adjustment: float = 0.15,
         right_margin_adjustment: float = 0.94,
         bottom_margin_adjustment: float = 0.12,
         top_margin_adjustment: float = 0.92,
-        styling_variable: str = None,
-        marker_color_map: dict = None,
+        styling_variable: Optional[str] = None,
+        marker_color_map: Optional[dict] = None,
         color_index_shift: int = 0,
         marker_size: int = 8,
         empty_markers: bool = False,
@@ -1103,26 +1038,26 @@ class DataPlotter(DataFrameAnalyzer):
         alternate_filled_markers_reversed: bool = False,
         capsize: float = 5,
         include_plot_title: bool = False,
-        custom_plot_title: str = None,
-        title_from_columns: list = None,
-        custom_plot_titles_dict: dict = None,
+        custom_plot_title: Optional[str] = None,
+        title_from_columns: Optional[list] = None,
+        custom_plot_titles_dict: Optional[dict] = None,
         title_size: int = 15,
         bold_title: bool = False,
-        leading_plot_substring: str = None,
-        excluded_from_title_list: list = None,
+        leading_plot_substring: Optional[str] = None,
+        excluded_from_title_list: Optional[list] = None,
         title_number_format: str = ".2f",
         title_wrapping_length: int = 90,
-        customization_function: callable = None,
+        customization_function: Optional[Callable] = None,
         verbose: bool = True,
-        fit_function: str = None,  # e.g. "linear"
+        fit_function: Optional[str] = None,  # e.g. "linear"
         fit_label_format: str = ".2f",
         show_fit_parameters_on_plot: bool = True,
-        fit_curve_style: dict = None,  # optional override
+        fit_curve_style: Optional[dict] = None,  # optional override
         fit_label_location: str = "top left",
-        fit_index_range: tuple = None,  # default: include all
-        fit_on_values: list = None,
+        fit_index_range: Optional[tuple] = None,  # default: include all
+        fit_on_values: Optional[list] = None,
         fit_label_in_legend: bool = False,
-        fit_curve_range: tuple = None,
+        fit_curve_range: Optional[tuple] = None,
         target_ax=None,
         is_inset=False,
         save_figure=True,

@@ -39,6 +39,7 @@ Dependencies:
     - pandas: For DataFrame operations
     - library.constants: For TUNABLE_PARAMETER_NAMES_LIST
 """
+from typing import Optional
 
 import pandas as pd
 
@@ -126,9 +127,9 @@ class _DataFrameInspector:
         ]
 
         # Get single and multi-valued columns
-        self.unique_value_columns_dictionary = self._get_unique_value_columns()
+        self.unique_value_columns_dictionary = self._unique_value_columns()
         self.multivalued_columns_count_dictionary = (
-            self._get_multivalued_columns_count()
+            self._multivalued_columns_count()
         )
 
         # Extract column name lists
@@ -160,7 +161,7 @@ class _DataFrameInspector:
             & set(self.list_of_multivalued_column_names)
         )
 
-    def _get_unique_value_columns(self) -> dict:
+    def _unique_value_columns(self) -> dict:
         """
         Identify columns that have only a single unique value.
 
@@ -175,7 +176,7 @@ class _DataFrameInspector:
 
         return unique_value_columns_dictionary
 
-    def _get_multivalued_columns_count(self) -> dict:
+    def _multivalued_columns_count(self) -> dict:
         """
         Identify columns with multiple unique values and count them.
 
@@ -356,7 +357,7 @@ class DataFrameAnalyzer(_DataFrameInspector):
 
     def group_by_multivalued_tunable_parameters(
         self,
-        filter_out_parameters_list: list = None,
+        filter_out_parameters_list: Optional[list] = None,
         verbose: bool = False,
     ):
         """
@@ -481,6 +482,8 @@ class DataFrameAnalyzer(_DataFrameInspector):
                 self.dataframe = self.dataframe.query(condition)
             elif filter_func is not None:
                 mask = filter_func(self.dataframe)
+                if not isinstance(mask, pd.Series) or mask.dtype != bool:
+                    raise TypeError("filter_func must return a boolean Series")
                 self.dataframe = self.dataframe[mask]
 
             # Update column categories after filtering
