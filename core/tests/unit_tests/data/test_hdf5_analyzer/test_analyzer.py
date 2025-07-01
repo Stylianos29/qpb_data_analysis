@@ -322,16 +322,23 @@ class TestDataTransformation:
         with h5py.File(output_path, "r") as f:
             # Should have same structure
             assert "analysis/run_001/config_0000" in f
+            group = f["analysis/run_001/config_0000"]
+            assert isinstance(group, h5py.Group), "Expected a Group at this path"
 
             # Check original dataset
-            assert "evolution_time" in f["analysis/run_001/config_0000"]
-
+            assert "evolution_time" in group
+            assert isinstance(group["evolution_time"], h5py.Dataset)
             # Check transformed dataset
-            assert "evolution_time_squared" in f["analysis/run_001/config_0000"]
+            assert "evolution_time_squared" in group
+            assert isinstance(group["evolution_time_squared"], h5py.Dataset)
 
             # Verify transformation
-            original = f["analysis/run_001/config_0000/evolution_time"][()]
-            transformed = f["analysis/run_001/config_0000/evolution_time_squared"][()]
+            evolution_time_dataset = group["evolution_time"]
+            assert isinstance(evolution_time_dataset, h5py.Dataset)
+            original = evolution_time_dataset[()]
+            evolution_time_squared_dataset = group["evolution_time"]
+            assert isinstance(evolution_time_squared_dataset, h5py.Dataset)
+            transformed = evolution_time_squared_dataset[()]
             np.testing.assert_allclose(transformed, original**2)
 
     def test_save_with_restrictions(self, synthetic_hdf5_with_gvar, temp_output_dir):
@@ -347,9 +354,13 @@ class TestDataTransformation:
 
         # Verify only HMC configs are saved
         with h5py.File(output_path, "r") as f:
+            analysis_group = f["analysis/run_001"]
+            assert isinstance(
+                analysis_group, h5py.Group
+            ), "Expected a Group at this path"
             # Count config groups
             config_count = 0
-            for key in f["analysis/run_001"].keys():
+            for key in analysis_group.keys():
                 if key.startswith("config_"):
                     config_count += 1
                     # Check algorithm attribute
@@ -374,15 +385,27 @@ class TestDataTransformation:
         # Check that gvar is properly split
         with h5py.File(output_path, "r") as f:
             group = f["analysis/run_001/config_0000"]
+            assert isinstance(group, h5py.Group), "Expected a Group at this path"
+
             assert "correlator_doubled_mean_values" in group
+            dataset = group["correlator_doubled_mean_values"]
+            assert isinstance(dataset, h5py.Dataset)
+            mean = dataset[()]
+
             assert "correlator_doubled_error_values" in group
+            error_dataset = group["correlator_doubled_error_values"]
+            assert isinstance(error_dataset, h5py.Dataset)
+            error = error_dataset[()]
 
-            # Verify the transformation
-            mean = group["correlator_doubled_mean_values"][()]
-            error = group["correlator_doubled_error_values"][()]
+            assert "correlator_mean_values" in group
+            orig_mean_dataset = group["correlator_mean_values"]
+            assert isinstance(orig_mean_dataset, h5py.Dataset)
+            orig_mean = orig_mean_dataset[()]
 
-            orig_mean = group["correlator_mean_values"][()]
-            orig_error = group["correlator_error_values"][()]
+            assert "correlator_error_values" in group
+            orig_error_dataset = group["correlator_error_values"]
+            assert isinstance(orig_error_dataset, h5py.Dataset)
+            orig_error = orig_error_dataset[()]
 
             np.testing.assert_allclose(mean, 2 * orig_mean, rtol=1e-10)
             np.testing.assert_allclose(error, 2 * orig_error, rtol=1e-10)
@@ -403,6 +426,7 @@ class TestDataTransformation:
         # Verify virtual dataset is not included
         with h5py.File(output_path, "r") as f:
             group = f["analysis/run_001/config_0000"]
+            assert isinstance(group, h5py.Group), "Expected a Group at this path"
             assert "evolution_time" in group  # Original dataset
             assert "time_plus_100" not in group  # Virtual dataset excluded
 
@@ -433,7 +457,11 @@ class TestDataTransformation:
 
             # Verify data integrity
             with h5py.File(output_path, "r") as f:
-                data = f["analysis/run_001/config_0000/evolution_time"][()]
+                dataset = f["analysis/run_001/config_0000/evolution_time"]
+                assert isinstance(
+                    dataset, h5py.Dataset
+                ), "Expected a Dataset at this path"
+                data = dataset[()]
                 assert len(data) == 20
 
 
