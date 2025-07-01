@@ -1,4 +1,5 @@
 import os, shutil
+from typing import Optional, Callable
 
 import numpy as np
 import pandas as pd
@@ -95,13 +96,14 @@ class DataPlotter(DataFrameAnalyzer):
         self.individual_plots_subdirectory = plots_directory
         self.combined_plots_subdirectory = plots_directory
 
-        self.xaxis_variable_name = None
-        self.yaxis_variable_name = None
-        self.plots_base_name = None
+        self.Optional[xaxis_variable_name] = None
+        self.Optional[yaxis_variable_name] = None
+        self.Optional[plots_base_name] = None
 
     def generate_column_uniqueness_report(
         self, max_width=80, separate_by_type=True
     ) -> str:
+        assert isinstance(self.dataframe, pd.DataFrame), "self.dataframe must be a DataFrame"
         table_generator = TableGenerator(self.dataframe)
         return table_generator.generate_column_uniqueness_report(
             max_width=max_width,
@@ -119,16 +121,16 @@ class DataPlotter(DataFrameAnalyzer):
         self,
         ax,
         group_df: pd.DataFrame,
-        label: str = None,
+        label: Optional[strOptional[]] = None,
         color: str = "blue",
         marker: str = "o",
         marker_size: int = 6,
         capsize: float = 5,
         empty_markers: bool = False,
         include_interpolation: bool = False,
-        annotation_variable: str = None,
+        annotation_variable: Optional[strOptional[]] = None,
         annotation_label: str = "",
-        annotation_range: tuple = None,
+        annotation_range: Optional[tupleOptional[]] = None,
         annotation_fontsize: int = 8,
         annotation_boxstyle: str = "round,pad=0.3",
         annotation_alpha: float = 0.7,
@@ -576,7 +578,7 @@ class DataPlotter(DataFrameAnalyzer):
     def _generate_marker_color_map(
         self,
         grouping_values: list,
-        custom_map: dict = None,
+        custom_map: Optional[dict] = None,
         index_shift: int = 0,
     ) -> dict:
         """
@@ -631,13 +633,13 @@ class DataPlotter(DataFrameAnalyzer):
     def _construct_plot_title(
         self,
         metadata_dict: dict,
-        grouping_variable: str = None,
-        labeling_variable: str = None,
-        leading_plot_substring: str = None,
-        excluded_from_title_list: list = None,
+        grouping_variable: Optional[str] = None,
+        labeling_variable: Optional[str] = None,
+        leading_plot_substring: Optional[str] = None,
+        excluded_from_title_list: Optional[list] = None,
         title_number_format: str = ".2f",  # ".4g" for scientific/float hybrid format
         title_wrapping_length: int = 90,
-        title_from_columns: list = None,
+        title_from_columns: Optional[list] = None,
     ) -> str:
         """
         Construct an informative plot title based on metadata and user
@@ -771,16 +773,16 @@ class DataPlotter(DataFrameAnalyzer):
     def _construct_plot_filename(self,
                             metadata_dict: dict,
                             include_combined_prefix: bool = False,
-                            custom_leading_substring: str = None,
-                            grouping_variable: str = None) -> str:
+                            custom_leading_substring: Optional[str] = None,
+                            grouping_variable: Optional[str] = None) -> str:
         """Delegate to filename builder."""
         return self._filename_builder.build(
             metadata_dict,
             self.plots_base_name,
             self.reduced_multivalued_tunable_parameter_names_list,
-            grouping_variable=grouping_variable,
+            grouping_variable=grouping_variable or "",
             include_combined_prefix=include_combined_prefix,
-            custom_prefix=custom_leading_substring
+            custom_prefix=custom_leading_substring or ""
         )
 
     def _apply_curve_fit(
@@ -790,11 +792,11 @@ class DataPlotter(DataFrameAnalyzer):
         y_raw,
         fit_function: str,
         show_fit_parameters_on_plot: bool = True,
-        fit_curve_style: dict = None,
+        fit_curve_style: Optional[dict] = None,
         fit_label_format: str = ".2e",
         fit_label_location: str = "top left",
         fit_index_range: slice = slice(None),
-        fit_curve_range: tuple = None,
+        fit_curve_range: Optional[tuple] = None,
     ):
         try:
 
@@ -812,19 +814,19 @@ class DataPlotter(DataFrameAnalyzer):
                 y_gv = gvar.gvar([t[0] for t in y_raw], [t[1] for t in y_raw])
                 x_raw = np.asarray(x_raw, dtype=float)
 
-                def linear(x, p):
+                def linear_gvar(x, p):
                     return p[0] * x + p[1]
 
-                def exponential(x, p):
+                def exponential_gvar(x, p):
                     return p[0] * np.exp(-p[1] * x) + p[2]
 
-                def power_law(x, p):
+                def power_law_gvar(x, p):
                     return p[0] * x ** p[1]
 
                 fit_func_map = {
-                    "linear": linear,
-                    "exponential": exponential,
-                    "power_law": power_law,
+                    "linear": linear_gvar,
+                    "exponential": exponential_gvar,
+                    "power_law": power_law_gvar,
                 }
 
                 p0_map = {
@@ -987,34 +989,34 @@ class DataPlotter(DataFrameAnalyzer):
 
     def plot(
         self,
-        grouping_variable: str = None,
-        excluded_from_grouping_list: list = None,
-        labeling_variable: str = None,
+        grouping_variable: Optional[str] = None,
+        excluded_from_grouping_list: Optional[list] = None,
+        labeling_variable: Optional[str] = None,
         legend_number_format: str = ".2f",
         include_legend_title: bool = True,
         include_legend: bool = True,
         legend_location: str = "upper left",
         legend_columns: int = 1,
-        sorting_variable: str = None,
-        sort_ascending: bool = None,
+        sorting_variable: Optional[str] = None,
+        sort_ascending: Optional[bool] = None,
         figure_size=(7, 5),
         font_size: int = 13,
-        xaxis_label: str = None,
-        yaxis_label: str = None,
+        xaxis_label: Optional[str] = None,
+        yaxis_label: Optional[str] = None,
         xaxis_log_scale: bool = False,
         yaxis_log_scale: bool = False,
         invert_xaxis: bool = False,
         invert_yaxis: bool = False,
-        xlim: tuple = None,
-        ylim: tuple = None,
+        xlim: Optional[tuple] = None,
+        ylim: Optional[tuple] = None,
         xaxis_start_at_zero: bool = False,
         yaxis_start_at_zero: bool = False,
         left_margin_adjustment: float = 0.15,
         right_margin_adjustment: float = 0.94,
         bottom_margin_adjustment: float = 0.12,
         top_margin_adjustment: float = 0.92,
-        styling_variable: str = None,
-        marker_color_map: dict = None,
+        styling_variable: Optional[str] = None,
+        marker_color_map: Optional[dict] = None,
         color_index_shift: int = 0,
         marker_size: int = 8,
         empty_markers: bool = False,
@@ -1022,26 +1024,26 @@ class DataPlotter(DataFrameAnalyzer):
         alternate_filled_markers_reversed: bool = False,
         capsize: float = 5,
         include_plot_title: bool = False,
-        custom_plot_title: str = None,
-        title_from_columns: list = None,
-        custom_plot_titles_dict: dict = None,
+        custom_plot_title: Optional[str] = None,
+        title_from_columns: Optional[list] = None,
+        custom_plot_titles_dict: Optional[dict] = None,
         title_size: int = 15,
         bold_title: bool = False,
-        leading_plot_substring: str = None,
-        excluded_from_title_list: list = None,
+        leading_plot_substring: Optional[str] = None,
+        excluded_from_title_list: Optional[list] = None,
         title_number_format: str = ".2f",
         title_wrapping_length: int = 90,
-        customization_function: callable = None,
+        customization_function: Optional[Callable] = None,
         verbose: bool = True,
-        fit_function: str = None,  # e.g. "linear"
+        fit_function: Optional[str] = None,  # e.g. "linear"
         fit_label_format: str = ".2f",
         show_fit_parameters_on_plot: bool = True,
-        fit_curve_style: dict = None,  # optional override
+        fit_curve_style: Optional[dict] = None,  # optional override
         fit_label_location: str = "top left",
-        fit_index_range: tuple = None,  # default: include all
-        fit_on_values: list = None,
+        fit_index_range: Optional[tuple] = None,  # default: include all
+        fit_on_values: Optional[list] = None,
         fit_label_in_legend: bool = False,
-        fit_curve_range: tuple = None,
+        fit_curve_range: Optional[tuple] = None,
         target_ax=None,
         is_inset=False,
         save_figure=True,
@@ -1107,7 +1109,7 @@ class DataPlotter(DataFrameAnalyzer):
             ):
                 raise ValueError("'styling_variable' must be tunable parameter.")
 
-            styling_variable_unique_values = self.get_unique_values(styling_variable)
+            styling_variable_unique_values = self.unique_values(styling_variable)
             style_lookup = self._generate_marker_color_map(
                 styling_variable_unique_values,
                 custom_map=marker_color_map,
