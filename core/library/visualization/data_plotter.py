@@ -96,9 +96,9 @@ class DataPlotter(DataFrameAnalyzer):
         self.individual_plots_subdirectory = plots_directory
         self.combined_plots_subdirectory = plots_directory
 
-        self.Optional[xaxis_variable_name] = None
-        self.Optional[yaxis_variable_name] = None
-        self.Optional[plots_base_name] = None
+        self.xaxis_variable_name = None
+        self.yaxis_variable_name = None
+        self.plots_base_name = None
 
     def generate_column_uniqueness_report(
         self, max_width=80, separate_by_type=True
@@ -121,16 +121,16 @@ class DataPlotter(DataFrameAnalyzer):
         self,
         ax,
         group_df: pd.DataFrame,
-        label: Optional[strOptional[]] = None,
+        label: Optional[str] = None,
         color: str = "blue",
         marker: str = "o",
         marker_size: int = 6,
         capsize: float = 5,
         empty_markers: bool = False,
         include_interpolation: bool = False,
-        annotation_variable: Optional[strOptional[]] = None,
+        annotation_variable: Optional[str] = None,
         annotation_label: str = "",
-        annotation_range: Optional[tupleOptional[]] = None,
+        annotation_range: Optional[tuple] = None,
         annotation_fontsize: int = 8,
         annotation_boxstyle: str = "round,pad=0.3",
         annotation_alpha: float = 0.7,
@@ -618,163 +618,163 @@ class DataPlotter(DataFrameAnalyzer):
 
         return style_map
 
-    # def _construct_plot_title(self, metadata_dict: dict, **kwargs) -> str:
-    #     """Delegate to title builder."""
-    #     # Extract the excluded set from various sources
-    #     excluded = set(kwargs.get("excluded_from_title_list", []))
-    #     if kwargs.get("grouping_variable"):
-    #         excluded.add(kwargs["grouping_variable"])
-    #     if kwargs.get("labeling_variable"):
-    #         excluded.add(kwargs["labeling_variable"])
+    def _construct_plot_title(self, metadata_dict: dict, **kwargs) -> str:
+        """Delegate to title builder."""
+        # Extract the excluded set from various sources
+        excluded = set(kwargs.get("excluded_from_title_list", []))
+        if kwargs.get("grouping_variable"):
+            excluded.add(kwargs["grouping_variable"])
+        if kwargs.get("labeling_variable"):
+            excluded.add(kwargs["labeling_variable"])
 
-    #     return self._title_builder.build(
-    #         metadata_dict,
-    #         self.list_of_tunable_parameter_names_from_dataframe,
-    #         excluded=excluded,
-    #         leading_substring=kwargs.get("leading_plot_substring"),
-    #         title_from_columns=kwargs.get("title_from_columns"),
-    #         wrapping_length=kwargs.get("title_wrapping_length", 90),
-    #     )
+        return self._title_builder.build(
+            metadata_dict,
+            self.list_of_tunable_parameter_names_from_dataframe,
+            excluded=excluded,
+            leading_substring=kwargs.get("leading_plot_substring"),
+            title_from_columns=kwargs.get("title_from_columns"),
+            wrapping_length=kwargs.get("title_wrapping_length", 90),
+        )
 
-    def _construct_plot_title(
-        self,
-        metadata_dict: dict,
-        grouping_variable: Optional[str] = None,
-        labeling_variable: Optional[str] = None,
-        leading_plot_substring: Optional[str] = None,
-        excluded_from_title_list: Optional[list] = None,
-        title_number_format: str = ".2f",  # ".4g" for scientific/float hybrid format
-        title_wrapping_length: int = 90,
-        title_from_columns: Optional[list] = None,
-    ) -> str:
-        """
-        Construct an informative plot title based on metadata and user
-        preferences.
+    # def _construct_plot_title(
+    #     self,
+    #     metadata_dict: dict,
+    #     grouping_variable: Optional[str] = None,
+    #     labeling_variable: Optional[str] = None,
+    #     leading_plot_substring: Optional[str] = None,
+    #     excluded_from_title_list: Optional[list] = None,
+    #     title_number_format: str = ".2f",  # ".4g" for scientific/float hybrid format
+    #     title_wrapping_length: int = 90,
+    #     title_from_columns: Optional[list] = None,
+    # ) -> str:
+    #     """
+    #     Construct an informative plot title based on metadata and user
+    #     preferences.
 
-        Parameters:
-        -----------
-        metadata_dict : dict
-            Dictionary containing key-value pairs for this plot group.
-        grouping_variable : str, optional
-            If provided, exclude this variable from appearing in the title.
-        labeling_variable : str, optional
-            If provided, exclude this variable from appearing in the title.
-        leading_plot_substring : str, optional
-            Optional leading string to prepend to the title.
-        excluded_from_title_list : list, optional
-            List of additional variable names to exclude from the title.
+    #     Parameters:
+    #     -----------
+    #     metadata_dict : dict
+    #         Dictionary containing key-value pairs for this plot group.
+    #     grouping_variable : str, optional
+    #         If provided, exclude this variable from appearing in the title.
+    #     labeling_variable : str, optional
+    #         If provided, exclude this variable from appearing in the title.
+    #     leading_plot_substring : str, optional
+    #         Optional leading string to prepend to the title.
+    #     excluded_from_title_list : list, optional
+    #         List of additional variable names to exclude from the title.
 
-        Returns:
-        --------
-        str
-            The constructed plot title.
-        """
-        title_parts = []
+    #     Returns:
+    #     --------
+    #     str
+    #         The constructed plot title.
+    #     """
+    #     title_parts = []
 
-        # 1. Include leading substring if given
-        if leading_plot_substring:
-            title_parts.append(leading_plot_substring)
+    #     # 1. Include leading substring if given
+    #     if leading_plot_substring:
+    #         title_parts.append(leading_plot_substring)
 
-        # 1.5. Shortcut override: simple title from selected columns
-        if title_from_columns:
-            simple_parts = []
-            for col in title_from_columns:
-                value = metadata_dict.get(col)
-                if value is None:
-                    continue
-                label = constants.TITLE_LABELS_BY_COLUMN_NAME.get(col, col)
-                if isinstance(value, (int, float)):
-                    formatted_value = format(value, title_number_format)
-                else:
-                    formatted_value = str(value)
+    #     # 1.5. Shortcut override: simple title from selected columns
+    #     if title_from_columns:
+    #         simple_parts = []
+    #         for col in title_from_columns:
+    #             value = metadata_dict.get(col)
+    #             if value is None:
+    #                 continue
+    #             label = constants.TITLE_LABELS_BY_COLUMN_NAME.get(col, col)
+    #             if isinstance(value, (int, float)):
+    #                 formatted_value = format(value, title_number_format)
+    #             else:
+    #                 formatted_value = str(value)
 
-                if "Kernel_operator_type" in col:
-                    simple_parts.append(f"{formatted_value} Kernel")
-                else:
-                    simple_parts.append(f"{label}={formatted_value}")
-            return ", ".join(simple_parts)
+    #             if "Kernel_operator_type" in col:
+    #                 simple_parts.append(f"{formatted_value} Kernel")
+    #             else:
+    #                 simple_parts.append(f"{label}={formatted_value}")
+    #         return ", ".join(simple_parts)
 
-        # 2. Handle Overlap/Kernel/KL_or_Chebyshev_Order special logic
-        excluded = set(excluded_from_title_list or [])
-        if grouping_variable:
-            excluded.add(grouping_variable)
-        if labeling_variable:
-            excluded.add(labeling_variable)
+    #     # 2. Handle Overlap/Kernel/KL_or_Chebyshev_Order special logic
+    #     excluded = set(excluded_from_title_list or [])
+    #     if grouping_variable:
+    #         excluded.add(grouping_variable)
+    #     if labeling_variable:
+    #         excluded.add(labeling_variable)
 
-        overlap_method = metadata_dict.get("Overlap_operator_method")
-        kernel_type = metadata_dict.get("Kernel_operator_type")
-        chebyshev_terms = metadata_dict.get("Number_of_Chebyshev_terms")
-        kl_order = metadata_dict.get("KL_diagonal_order")
+    #     overlap_method = metadata_dict.get("Overlap_operator_method")
+    #     kernel_type = metadata_dict.get("Kernel_operator_type")
+    #     chebyshev_terms = metadata_dict.get("Number_of_Chebyshev_terms")
+    #     kl_order = metadata_dict.get("KL_diagonal_order")
 
-        if overlap_method and "Overlap_operator_method" not in excluded:
-            if overlap_method == "Bare":
-                # Only Overlap_operator_method + Kernel_operator_type
-                temp = []
-                temp.append(str(overlap_method))
-                if kernel_type and "Kernel_operator_type" not in excluded:
-                    temp.append(str(kernel_type))
-                title_parts.append(" ".join(temp) + ",")
-            else:
-                # Chebyshev or KL
-                temp = []
-                temp.append(str(overlap_method))
-                if kernel_type and "Kernel_operator_type" not in excluded:
-                    temp.append(str(kernel_type))
-                if (
-                    overlap_method == "Chebyshev"
-                    and "Number_of_Chebyshev_terms" not in excluded
-                    and chebyshev_terms is not None
-                ):
-                    temp.append(str(chebyshev_terms))
-                if (
-                    overlap_method == "KL"
-                    and "KL_diagonal_order" not in excluded
-                    and kl_order is not None
-                ):
-                    temp.append(str(kl_order))
-                title_parts.append(" ".join(temp) + ",")
+    #     if overlap_method and "Overlap_operator_method" not in excluded:
+    #         if overlap_method == "Bare":
+    #             # Only Overlap_operator_method + Kernel_operator_type
+    #             temp = []
+    #             temp.append(str(overlap_method))
+    #             if kernel_type and "Kernel_operator_type" not in excluded:
+    #                 temp.append(str(kernel_type))
+    #             title_parts.append(" ".join(temp) + ",")
+    #         else:
+    #             # Chebyshev or KL
+    #             temp = []
+    #             temp.append(str(overlap_method))
+    #             if kernel_type and "Kernel_operator_type" not in excluded:
+    #                 temp.append(str(kernel_type))
+    #             if (
+    #                 overlap_method == "Chebyshev"
+    #                 and "Number_of_Chebyshev_terms" not in excluded
+    #                 and chebyshev_terms is not None
+    #             ):
+    #                 temp.append(str(chebyshev_terms))
+    #             if (
+    #                 overlap_method == "KL"
+    #                 and "KL_diagonal_order" not in excluded
+    #                 and kl_order is not None
+    #             ):
+    #                 temp.append(str(kl_order))
+    #             title_parts.append(" ".join(temp) + ",")
 
-        # 3. Handle all remaining tunable parameters
-        for param_name in self.list_of_tunable_parameter_names_from_dataframe:
-            if param_name in excluded:
-                continue
-            if param_name not in metadata_dict:
-                continue
+    #     # 3. Handle all remaining tunable parameters
+    #     for param_name in self.list_of_tunable_parameter_names_from_dataframe:
+    #         if param_name in excluded:
+    #             continue
+    #         if param_name not in metadata_dict:
+    #             continue
 
-            value = metadata_dict[param_name]
-            label = constants.TITLE_LABELS_BY_COLUMN_NAME.get(param_name, param_name)
+    #         value = metadata_dict[param_name]
+    #         label = constants.TITLE_LABELS_BY_COLUMN_NAME.get(param_name, param_name)
 
-            # Format number values cleanly
-            if isinstance(value, (int, float)):
-                formatted_value = format(value, title_number_format)
-            else:
-                formatted_value = str(value)
+    #         # Format number values cleanly
+    #         if isinstance(value, (int, float)):
+    #             formatted_value = format(value, title_number_format)
+    #         else:
+    #             formatted_value = str(value)
 
-            title_parts.append(f"{label} {formatted_value},")
+    #         title_parts.append(f"{label} {formatted_value},")
 
-        # 4. Merge and clean up final title
-        full_title = " ".join(title_parts).strip()
+    #     # 4. Merge and clean up final title
+    #     full_title = " ".join(title_parts).strip()
 
-        # Remove trailing comma if any
-        if full_title.endswith(","):
-            full_title = full_title[:-1]
+    #     # Remove trailing comma if any
+    #     if full_title.endswith(","):
+    #         full_title = full_title[:-1]
 
-        if title_wrapping_length and len(full_title) > title_wrapping_length:
-            # Find a good place (comma) to insert newline
-            comma_positions = [
-                pos for pos, char in enumerate(full_title) if char == ","
-            ]
+    #     if title_wrapping_length and len(full_title) > title_wrapping_length:
+    #         # Find a good place (comma) to insert newline
+    #         comma_positions = [
+    #             pos for pos, char in enumerate(full_title) if char == ","
+    #         ]
 
-            if comma_positions:
-                # Find best comma to split around the middle
-                split_pos = min(
-                    comma_positions, key=lambda x: abs(x - len(full_title) // 2)
-                )
-                full_title = (
-                    full_title[: split_pos + 1] + "\n" + full_title[split_pos + 1 :]
-                )
+    #         if comma_positions:
+    #             # Find best comma to split around the middle
+    #             split_pos = min(
+    #                 comma_positions, key=lambda x: abs(x - len(full_title) // 2)
+    #             )
+    #             full_title = (
+    #                 full_title[: split_pos + 1] + "\n" + full_title[split_pos + 1 :]
+    #             )
 
-        return full_title
+    #     return full_title
 
     def _construct_plot_filename(self,
                             metadata_dict: dict,
@@ -1530,6 +1530,7 @@ class DataPlotter(DataFrameAnalyzer):
                         title_wrapping_length=title_wrapping_length,
                         title_from_columns=title_from_columns,
                     )
+                print(plot_title)
                 if not is_inset:
                     ax.set_title(
                         plot_title,

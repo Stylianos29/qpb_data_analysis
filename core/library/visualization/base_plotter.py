@@ -1,5 +1,6 @@
 import os
 import shutil
+from typing import Optional
 
 
 class _PlotFileManager:
@@ -43,10 +44,10 @@ class _PlotTitleBuilder:
         self,
         metadata_dict: dict,
         tunable_params: list,
-        excluded: set = None,
-        leading_substring: str = None,
-        title_from_columns: list = None,
-        wrapping_length: int = 90,
+        excluded: Optional[set] = None,
+        leading_substring: Optional[str] = None,
+        title_from_columns: Optional[list] = None,
+        wrapping_length: int = 80,
     ) -> str:
         """Build a plot title from metadata."""
 
@@ -201,9 +202,9 @@ class _PlotFilenameBuilder:
         metadata_dict: dict,
         base_name: str,
         multivalued_params: list,
-        grouping_variable: str = None,
+        grouping_variable: Optional[str] = None,
         include_combined_prefix: bool = False,
-        custom_prefix: str = None,
+        custom_prefix: Optional[str] = None,
     ) -> str:
         """
         Build a filename from metadata following the structured format.
