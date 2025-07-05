@@ -47,7 +47,7 @@ class _PlotTitleBuilder:
         excluded: Optional[set] = None,
         leading_substring: Optional[str] = None,
         title_from_columns: Optional[list] = None,
-        wrapping_length: int = 80,
+        wrapping_length: int = 40,
     ) -> str:
         """Build a plot title from metadata."""
 
@@ -146,7 +146,7 @@ class _PlotTitleBuilder:
             value = metadata[param_name]
             label = self.title_labels.get(param_name, param_name)
             formatted_value = self._format_value(value)
-            parts.append(f"{label} {formatted_value},")
+            parts.append(f"{label}={formatted_value},")
 
         return parts
 
@@ -157,12 +157,19 @@ class _PlotTitleBuilder:
         return str(value)
 
     def _wrap_title(self, title: str, max_length: int) -> str:
-        """Wrap title at a comma near the middle."""
+        """Wrap title at a comma nearest to max_length, or near the middle if not possible."""
         comma_positions = [pos for pos, char in enumerate(title) if char == ","]
-        if comma_positions:
+        if not comma_positions:
+            return title
+
+        # Find the comma closest to max_length, but not before 0
+        split_pos = min(comma_positions, key=lambda x: abs(x - max_length))
+
+        # If max_length is too far from any comma, fall back to the middle
+        if abs(split_pos - max_length) > max_length // 4:
             split_pos = min(comma_positions, key=lambda x: abs(x - len(title) // 2))
-            return title[: split_pos + 1] + "\n" + title[split_pos + 1 :]
-        return title
+
+        return title[: split_pos + 1] + "\n" + title[split_pos + 1 :]
 
 
 class _PlotFilenameBuilder:

@@ -621,7 +621,7 @@ class DataPlotter(DataFrameAnalyzer):
     def _construct_plot_title(self, metadata_dict: dict, **kwargs) -> str:
         """Delegate to title builder."""
         # Extract the excluded set from various sources
-        excluded = set(kwargs.get("excluded_from_title_list", []))
+        excluded = set(kwargs.get("excluded_from_title_list") or [])
         if kwargs.get("grouping_variable"):
             excluded.add(kwargs["grouping_variable"])
         if kwargs.get("labeling_variable"):
@@ -633,7 +633,7 @@ class DataPlotter(DataFrameAnalyzer):
             excluded=excluded,
             leading_substring=kwargs.get("leading_plot_substring"),
             title_from_columns=kwargs.get("title_from_columns"),
-            wrapping_length=kwargs.get("title_wrapping_length", 90),
+            wrapping_length=kwargs.get("title_wrapping_length", 80),
         )
 
     # def _construct_plot_title(
@@ -1046,13 +1046,13 @@ class DataPlotter(DataFrameAnalyzer):
         leading_plot_substring: Optional[str] = None,
         excluded_from_title_list: Optional[list] = None,
         title_number_format: str = ".2f",
-        title_wrapping_length: int = 90,
+        title_wrapping_length: int = 80,
         customization_function: Optional[Callable] = None,
         verbose: bool = True,
         fit_function: Optional[str] = None,  # e.g. "linear"
         fit_label_format: str = ".2f",
         show_fit_parameters_on_plot: bool = True,
-        fit_curve_style: Optional[dict] = None,  # optional override
+        fit_curve_style: Optional[dict] = None,
         fit_label_location: str = "top left",
         fit_index_range: Optional[tuple] = None,  # default: include all
         fit_on_values: Optional[list] = None,
@@ -1520,8 +1520,16 @@ class DataPlotter(DataFrameAnalyzer):
                     title_key = group_keys if len(group_keys) > 1 else group_keys[0]
                     plot_title = custom_plot_titles_dict.get(title_key, "")
                 else:
+                    if excluded_from_title_list is None:
+                        excluded_from_title_list = []
+                    excluded_from_title_list.append("Main_program_type")
+                    excluded_from_title_list.append("MPI_geometry")
+                    excluded_from_title_list.append("Threads_per_process")
+                    excluded_from_title_list.append("Maximum_Lanczos_iterations")
+
+
                     plot_title = self._construct_plot_title(
-                        metadata_dict=metadata,
+                        metadata_dict={**metadata, **self.unique_value_columns_dictionary},
                         grouping_variable=grouping_variable,
                         labeling_variable=labeling_variable,
                         leading_plot_substring=leading_plot_substring,
@@ -1530,7 +1538,6 @@ class DataPlotter(DataFrameAnalyzer):
                         title_wrapping_length=title_wrapping_length,
                         title_from_columns=title_from_columns,
                     )
-                print(plot_title)
                 if not is_inset:
                     ax.set_title(
                         plot_title,
