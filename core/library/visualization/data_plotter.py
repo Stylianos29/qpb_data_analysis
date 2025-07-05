@@ -1522,10 +1522,12 @@ class DataPlotter(DataFrameAnalyzer):
                 else:
                     if excluded_from_title_list is None:
                         excluded_from_title_list = []
-                    excluded_from_title_list.append("Main_program_type")
-                    excluded_from_title_list.append("MPI_geometry")
-                    excluded_from_title_list.append("Threads_per_process")
-                    excluded_from_title_list.append("Maximum_Lanczos_iterations")
+                    excluded_from_title_list.extend([
+                        "Main_program_type",
+                        "MPI_geometry",
+                        "Threads_per_process",
+                        "Maximum_Lanczos_iterations",
+                    ])
 
 
                     plot_title = self._construct_plot_title(
