@@ -4,26 +4,14 @@ archive/*
 
 bash_scripts/unit_tests/mock_data/*
 
-core/library/__pycache__/*
-core/library/constants/__pycache__/*
-core/library/data/__pycache__/*
-core/library/data/hdf5_analyzer/__pycache__/*
-core/library/parsing/__pycache__/*
-core/library/validation/__pycache__/*
-core/library/visualization/__pycache__/*
+core/**/__pycache__/*
 core/qpb_data_analysis.egg-info/*
-core/src/__pycache__/*
-core/src/parsing/__pycache__/*
 core/tests/integration_tests/*/*
 core/tests/mock_data/golden_masters/*
 core/tests/mock_data/valid/*
 core/tests/test_outputs/*
-core/tests/unit_tests/__pycache__/*
-core/tests/unit_tests/data/__pycache__/*
-core/tests/unit_tests/data/test_hdf5_analyzer/__pycache__/*
 core/tests/unit_tests/mock_data/valid/*
 core/tests/unit_tests/output_from_mock_data/*
-core/tests/unit_tests/visualization/__pycache__/*
 
 data_files/processed/*
 !data_files/processed/README.md
@@ -39,3 +27,4 @@ examples/tables/*
 output/*
 !output/plots/README.md
 !output/tables/README.md
+
