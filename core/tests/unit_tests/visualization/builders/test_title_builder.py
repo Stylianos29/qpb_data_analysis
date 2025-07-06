@@ -1,5 +1,4 @@
 import pytest
-from unittest.mock import Mock
 
 from library.visualization.builders import PlotTitleBuilder
 
@@ -532,9 +531,3 @@ class TestParametrized:
 if __name__ == "__main__":
     # Run all tests
     pytest.main([__file__, "-v"])
-
-    # Run specific test class
-    # pytest.main([f'{__file__}::TestInitialization', '-v'])
-
-    # Run with coverage
-    # pytest.main([__file__, '--cov=library.visualization.builders.title_builder', '-v'])
