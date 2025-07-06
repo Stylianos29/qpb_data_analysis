@@ -208,7 +208,7 @@ class TestPrivateSetupAxesScaling:
 class TestPrivateSetupIntegerTicks:
     """Test private _setup_integer_ticks functionality."""
 
-    @patch("matplotlib.ticker.MaxNLocator")
+    @patch("library.visualization.managers.layout_manager.MaxNLocator")
     def test_setup_integer_ticks_both_axes(
         self, mock_locator, layout_manager, mock_axes
     ):
@@ -238,7 +238,7 @@ class TestPrivateSetupIntegerTicks:
         mock_axes.xaxis.set_major_locator.assert_not_called()
         mock_axes.yaxis.set_major_locator.assert_not_called()
 
-    @patch("matplotlib.ticker.MaxNLocator")
+    @patch("library.visualization.managers.layout_manager.MaxNLocator")
     def test_setup_integer_ticks_single_axis(
         self, mock_locator, layout_manager, mock_axes
     ):
