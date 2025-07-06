@@ -5,7 +5,7 @@ from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 from matplotlib.ticker import MaxNLocator
 
-from library.visualization.managers.layout_manager import PlotLayoutManager
+from library.visualization.managers import PlotLayoutManager
 
 
 # Module-level fixtures (accessible to all test classes)
