@@ -118,7 +118,7 @@ class PlotStyleManager:
         """
         Configure axes styling including labels, scales, and grid.
 
-        Args:        
+        Args:
             - ax: Matplotlib axes to configure.
             - xaxis_variable: Name of x-axis variable (for determining
               formatting).
@@ -295,7 +295,7 @@ class PlotStyleManager:
         """
         Get marker properties dict for scatter/errorbar plots.
 
-        Args:        
+        Args:
             - marker: Marker style string.
             - filled: Whether marker should be filled.
             - color: Marker color.
