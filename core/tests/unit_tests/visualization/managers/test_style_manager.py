@@ -7,10 +7,8 @@ styling functionality.
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock, patch
-from typing import Dict, Any
+from unittest.mock import MagicMock
 
-import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.legend import Legend

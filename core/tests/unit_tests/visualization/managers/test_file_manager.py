@@ -1,9 +1,10 @@
-import pytest
 import os
 import tempfile
 import shutil
 from pathlib import Path
-from unittest.mock import patch, mock_open
+from unittest.mock import patch
+
+import pytest
 
 from library.visualization.managers import PlotFileManager
 

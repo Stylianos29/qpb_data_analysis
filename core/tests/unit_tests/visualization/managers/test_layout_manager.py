@@ -1,9 +1,9 @@
+from unittest.mock import Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
-from matplotlib.ticker import MaxNLocator
 
 from library.visualization.managers import PlotLayoutManager
 
