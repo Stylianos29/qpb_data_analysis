@@ -1,8 +1,9 @@
 """
 Plot data processing and validation for visualization components.
 
-This module provides the PlotDataProcessor class for handling data validation,
-filtering, transformation, and preparation for plotting operations.
+This module provides the PlotDataProcessor class for handling data
+validation, filtering, transformation, and preparation for plotting
+operations.
 """
 
 from typing import Dict, List, Optional, Tuple, Union, Any, Callable
@@ -16,8 +17,8 @@ class PlotDataProcessor:
     """
     Processes and validates data for plotting operations.
 
-    This class handles all data-related operations needed before plotting,
-    including:
+    This class handles all data-related operations needed before
+    plotting, including:
     - Data validation and type checking
     - Filtering invalid values (NaN, Inf)
     - Extracting values and errors from tuple data
@@ -26,7 +27,8 @@ class PlotDataProcessor:
     - Data transformation for different plot types
 
     Attributes:
-        _validation_cache: Cache for validation results to improve performance
+        _validation_cache: Cache for validation results to improve
+        performance
     """
 
     def __init__(self):
@@ -83,15 +85,28 @@ class PlotDataProcessor:
             arr: Array to check
 
         Returns:
-            True if array contains 2-element tuples
+            True if array contains 2-element tuples or is a 2D array
+            with shape (n, 2)
         """
         if len(arr) == 0:
             return False
 
-        # Check first few non-None elements
-        for element in arr[: min(5, len(arr))]:
-            if element is not None and isinstance(element, tuple) and len(element) == 2:
-                return True
+        # Check if it's a 2D array with 2 columns (common when tuples
+        # are passed to np.array)
+        if arr.ndim == 2 and arr.shape[1] == 2:
+            return True
+
+        # Check if it's an object array with actual tuples
+        if arr.dtype == object:
+            # Check first few non-None elements
+            for element in arr[: min(5, len(arr))]:
+                if (
+                    element is not None
+                    and isinstance(element, tuple)
+                    and len(element) == 2
+                ):
+                    return True
+
         return False
 
     def is_numeric_array(self, arr: np.ndarray) -> bool:
@@ -123,7 +138,8 @@ class PlotDataProcessor:
         Args:
             - x_data: X-axis data
             - y_data: Y-axis data
-            - additional_data: Optional dict of additional arrays to filter
+            - additional_data: Optional dict of additional arrays to
+              filter
 
         Returns:
             Tuple of (filtered_x, filtered_y, filtered_additional_data)
@@ -184,7 +200,8 @@ class PlotDataProcessor:
         Extract values and errors from data that may contain tuples.
 
         Args:
-            data: Array that may contain scalar values or (value, error) tuples
+            data: Array that may contain scalar values or (value, error)
+            tuples
 
         Returns:
             Tuple of (values_array, errors_array_or_none)
@@ -192,13 +209,23 @@ class PlotDataProcessor:
         if not self.is_tuple_array(data):
             return data, None
 
+        # Handle 2D arrays (common when tuples are passed to np.array)
+        if data.ndim == 2 and data.shape[1] == 2:
+            values = data[:, 0]
+            errors = data[:, 1]
+            return values, errors
+
+        # Handle actual tuple arrays
         values = np.array([val for val, _ in data])
         errors = np.array([err for _, err in data])
 
         return values, errors
 
     def prepare_data_for_interpolation(
-        self, x_data: np.ndarray, y_data: np.ndarray, min_points: int = 4
+        self,
+        x_data: np.ndarray,
+        y_data: np.ndarray,
+        min_points: int = 2,  # Changed from 4 to 2 to allow linear interpolation
     ) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
         """
         Prepare data for interpolation by ensuring monotonic x values.
@@ -209,7 +236,8 @@ class PlotDataProcessor:
             - min_points: Minimum points required for interpolation
 
         Returns:
-            Tuple of (x_unique, y_unique) or (None, None) if interpolation not possible
+            Tuple of (x_unique, y_unique) or (None, None) if
+            interpolation not possible
         """
         # Extract values if data contains tuples
         x_values, _ = self.extract_values_and_errors(x_data)
@@ -250,7 +278,8 @@ class PlotDataProcessor:
             - kind: Interpolation type ('cubic', 'linear')
 
         Returns:
-            Tuple of (x_smooth, y_smooth) or (None, None) if interpolation fails
+            Tuple of (x_smooth, y_smooth) or (None, None) if
+            interpolation fails
         """
         # Prepare data
         x_unique, y_unique = self.prepare_data_for_interpolation(x_data, y_data)
@@ -266,9 +295,11 @@ class PlotDataProcessor:
                 spl = make_interp_spline(x_unique, y_unique, k=3)
                 y_smooth = spl(x_smooth)
             else:
-                # Fall back to linear interpolation
+                # Fall back to linear interpolation (for any kind if not enough
+                # points)
 
-                # Ensure all arrays are 1D float arrays for np.interp compatibility
+                # Ensure all arrays are 1D float arrays for np.interp
+                # compatibility and to avoid type errors
                 x_unique = np.asarray(x_unique, dtype=float).flatten()
                 y_unique = np.asarray(y_unique, dtype=float).flatten()
                 x_smooth = np.asarray(x_smooth, dtype=float).flatten()
@@ -302,6 +333,15 @@ class PlotDataProcessor:
         """
         if isinstance(grouping_columns, str):
             grouping_columns = [grouping_columns]
+
+        # Check if dataframe is empty or columns don't exist
+        if len(dataframe) == 0:
+            return []
+
+        # Check if all grouping columns exist
+        missing_cols = [col for col in grouping_columns if col not in dataframe.columns]
+        if missing_cols:
+            return []
 
         # Get unique group values
         if sorting_variable:
@@ -363,7 +403,8 @@ class PlotDataProcessor:
             - x_variable: X-axis column name
             - y_variable: Y-axis column name
             - annotation_variable: Column containing annotation values
-            - annotation_range: Optional (start, end, step) for annotation indices
+            - annotation_range: Optional (start, end, step) for
+              annotation indices
 
         Returns:
             List of (x, y, annotation_value) tuples
