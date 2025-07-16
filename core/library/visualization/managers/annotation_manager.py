@@ -9,6 +9,7 @@ arrows, and other visual annotations.
 from typing import Dict, List, Optional, Tuple, Union, Any, Callable
 
 import pandas as pd
+import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.text import Text
 from matplotlib.collections import Collection
@@ -504,7 +505,8 @@ class PlotAnnotationManager:
         Returns:
         --------
         str or None
-            Color of the most recent series as hex string, or None if cannot determine
+            Color of the most recent series as hex string, or None if
+            cannot determine
         """
         try:
             # Try to get color from the last line
@@ -516,8 +518,15 @@ class PlotAnnotationManager:
             if hasattr(ax, "collections") and ax.collections:
                 collection: Collection = ax.collections[-1]
                 color = collection.get_facecolor()
-                if color.size > 0:  # Check if we got any colors
-                    return rgb2hex(color[0])  # Convert first color to hex
+
+                if len(color) > 0:
+                    first_color = color[0]
+                    # Ensure first_color is a tuple/list of 3 or 4 floats
+                    if isinstance(first_color, (list, tuple, np.ndarray)) and len(
+                        first_color
+                    ) in (3, 4):
+                        return rgb2hex(first_color)
+                    # If it's a single float (invalid), skip
 
             return None
 
@@ -589,8 +598,8 @@ class PlotAnnotationManager:
         - spacing : float
             Minimum spacing in points
         """
-        # This is a placeholder for a more sophisticated algorithm
-        # that could consider:
+        # This is a placeholder for a more sophisticated algorithm that
+        # could consider:
         # - Annotation box sizes
         # - Data point density
         # - Optimal offset directions
