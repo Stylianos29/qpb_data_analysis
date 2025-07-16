@@ -145,14 +145,16 @@ class _PlotTitleBuilder:
 
             value = metadata[param_name]
             label = self.title_labels.get(param_name, param_name)
-            formatted_value = self._format_value(value)
+            formatted_value = self._format_value(param_name, value)
             parts.append(f"{label}={formatted_value},")
 
         return parts
 
-    def _format_value(self, value) -> str:
+    def _format_value(self, name, value) -> str:
         """Format a value for display in title."""
         if isinstance(value, (int, float)):
+            if name in ["MSCG_epsilon", "CG_epsilon"]:
+                return format(value, ".0e")
             return format(value, self.title_number_format)
         return str(value)
 
