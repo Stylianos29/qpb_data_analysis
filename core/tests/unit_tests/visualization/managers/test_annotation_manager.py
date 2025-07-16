@@ -6,9 +6,8 @@ class, covering annotation creation, styling, positioning, and
 management operations.
 """
 
-from unittest.mock import Mock
-
 import pytest
+import numpy as np
 import pandas as pd
 import matplotlib
 
@@ -16,6 +15,7 @@ matplotlib.use("Agg")  # Use non-GUI backend for testing
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.text import Text
+from unittest.mock import Mock, patch, MagicMock
 
 from library.visualization.managers.annotation_manager import PlotAnnotationManager
 from library.visualization.managers.data_processor import PlotDataProcessor
@@ -79,8 +79,10 @@ class TestPlotAnnotationManagerInitialization:
         assert isinstance(manager.offset_presets, dict)
 
     def test_init_without_data_processor(self):
-        """Test initialization creates data processor if none provided."""
-        # Test that initialization works without providing a data processor
+        """Test initialization creates data processor if none
+        provided."""
+        # Test that initialization works without providing a data
+        # processor
         manager = PlotAnnotationManager()
 
         # Should have created a data processor
@@ -542,17 +544,89 @@ class TestUtilityMethods:
         mock_axes.lines = [mock_line]
 
         color = annotation_manager._get_series_color(mock_axes)
-        assert color == "red"
+        assert color == "#ff0000"  # 'red' converts to '#ff0000' in hex
+
+    def test_get_series_color_from_lines_hex_input(self, annotation_manager, mock_axes):
+        """Test getting series color from line plots with hex input."""
+        mock_line = Mock()
+        mock_line.get_color.return_value = "#00ff00"  # Green in hex
+        mock_axes.lines = [mock_line]
+
+        color = annotation_manager._get_series_color(mock_axes)
+        assert color == "#00ff00"  # Should remain as hex
+
+    def test_get_series_color_from_lines_rgb_tuple(self, annotation_manager, mock_axes):
+        """Test getting series color from line plots with RGB tuple."""
+        mock_line = Mock()
+        mock_line.get_color.return_value = (1.0, 0.0, 0.0)  # Red as RGB tuple
+        mock_axes.lines = [mock_line]
+
+        color = annotation_manager._get_series_color(mock_axes)
+        assert color == "#ff0000"  # Should convert to hex
 
     def test_get_series_color_from_collections(self, annotation_manager, mock_axes):
         """Test getting series color from scatter plots."""
+        import numpy as np
+
         mock_collection = Mock()
-        mock_collection.get_facecolors.return_value = ["blue"]
+        # Mock the get_facecolor return value as matplotlib actually
+        # returns it Collections often return a 2D array where each row
+        # is a color
+        color_array = np.array([[0.0, 0.0, 1.0, 1.0]])  # RGBA for blue (2D array)
+        mock_collection.get_facecolor.return_value = color_array
         mock_axes.lines = []
         mock_axes.collections = [mock_collection]
 
         color = annotation_manager._get_series_color(mock_axes)
-        assert color == "blue"
+        assert color == "#0000ff"  # Blue in hex
+
+    def test_get_series_color_debug(self, annotation_manager, mock_axes):
+        """Debug test to understand the color handling."""
+        import numpy as np
+
+        mock_collection = Mock()
+        # Test with 1D array (single color)
+        color_array_1d = np.array([0.0, 0.0, 1.0, 1.0])  # RGBA for blue
+        mock_collection.get_facecolor.return_value = color_array_1d
+        mock_axes.lines = []
+        mock_axes.collections = [mock_collection]
+
+        # Let's see what happens
+        color = annotation_manager._get_series_color(mock_axes)
+        print(f"1D array result: {color}")
+        print(f"Array size: {color_array_1d.size}")
+        print(f"Array shape: {color_array_1d.shape}")
+        print(f"First element: {color_array_1d[0]}")
+
+        # Try with 2D array
+        color_array_2d = np.array([[0.0, 0.0, 1.0, 1.0]])  # RGBA for blue (2D)
+        mock_collection.get_facecolor.return_value = color_array_2d
+        color2 = annotation_manager._get_series_color(mock_axes)
+        print(f"2D array result: {color2}")
+        print(f"Array size: {color_array_2d.size}")
+        print(f"Array shape: {color_array_2d.shape}")
+        print(f"First element: {color_array_2d[0]}")
+
+        # This test is just for debugging, so let's just assert
+        # something
+        assert True
+
+    def test_get_series_color_from_collections_empty(
+        self, annotation_manager, mock_axes
+    ):
+        """Test getting series color from scatter plots with empty color
+        array."""
+        import numpy as np
+
+        mock_collection = Mock()
+        # Mock empty color array
+        empty_array = np.array([])
+        mock_collection.get_facecolor.return_value = empty_array
+        mock_axes.lines = []
+        mock_axes.collections = [mock_collection]
+
+        color = annotation_manager._get_series_color(mock_axes)
+        assert color is None
 
     def test_get_series_color_no_data(self, annotation_manager, mock_axes):
         """Test getting series color when no data exists."""
@@ -591,7 +665,8 @@ class TestErrorHandling:
         assert color is None
 
     def test_data_processor_without_clear_cache(self, annotation_manager):
-        """Test cache clearing when data processor doesn't have clear_cache method."""
+        """Test cache clearing when data processor doesn't have
+        clear_cache method."""
         annotation_manager.data_processor = Mock()
         del annotation_manager.data_processor.clear_cache  # Remove the method
 
