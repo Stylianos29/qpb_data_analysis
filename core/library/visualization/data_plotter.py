@@ -103,7 +103,9 @@ class DataPlotter(DataFrameAnalyzer):
     def generate_column_uniqueness_report(
         self, max_width=80, separate_by_type=True
     ) -> str:
-        assert isinstance(self.dataframe, pd.DataFrame), "self.dataframe must be a DataFrame"
+        assert isinstance(
+            self.dataframe, pd.DataFrame
+        ), "self.dataframe must be a DataFrame"
         table_generator = TableGenerator(self.dataframe)
         return table_generator.generate_column_uniqueness_report(
             max_width=max_width,
@@ -523,7 +525,7 @@ class DataPlotter(DataFrameAnalyzer):
                 y_coords = np.array([val for val, _ in y_filtered])
             else:
                 y_coords = y_filtered
-            
+
             # Sort based on x_coords
             sort_indices = np.argsort(x_coords)
             x_coords = x_coords[sort_indices]
@@ -776,11 +778,13 @@ class DataPlotter(DataFrameAnalyzer):
 
     #     return full_title
 
-    def _construct_plot_filename(self,
-                            metadata_dict: dict,
-                            include_combined_prefix: bool = False,
-                            custom_leading_substring: Optional[str] = None,
-                            grouping_variable: Optional[str] = None) -> str:
+    def _construct_plot_filename(
+        self,
+        metadata_dict: dict,
+        include_combined_prefix: bool = False,
+        custom_leading_substring: Optional[str] = None,
+        grouping_variable: Optional[str] = None,
+    ) -> str:
         """Delegate to filename builder."""
         return self._filename_builder.build(
             metadata_dict,
@@ -788,7 +792,7 @@ class DataPlotter(DataFrameAnalyzer):
             self.reduced_multivalued_tunable_parameter_names_list,
             grouping_variable=grouping_variable or "",
             include_combined_prefix=include_combined_prefix,
-            custom_prefix=custom_leading_substring or ""
+            custom_prefix=custom_leading_substring or "",
         )
 
     def _apply_curve_fit(
@@ -828,7 +832,7 @@ class DataPlotter(DataFrameAnalyzer):
 
                 def power_law_gvar(x, p):
                     return p[0] * x ** p[1]
-                
+
                 def shifted_power_law(x, p):
                     return p[0] / (x - p[1]) + p[2]
 
@@ -1314,7 +1318,6 @@ class DataPlotter(DataFrameAnalyzer):
 
                             if isinstance(val2, (int, float)):
                                 val2 = format(val2, legend_number_format)
-
                             label = f"{val1} ({constants.LEGEND_LABELS_BY_COLUMN_NAME.get(var2, var2)}{val2})"
 
                         else:
@@ -1522,16 +1525,20 @@ class DataPlotter(DataFrameAnalyzer):
                 else:
                     if excluded_from_title_list is None:
                         excluded_from_title_list = []
-                    excluded_from_title_list.extend([
-                        "Main_program_type",
-                        "MPI_geometry",
-                        "Threads_per_process",
-                        "Maximum_Lanczos_iterations",
-                    ])
-
+                    excluded_from_title_list.extend(
+                        [
+                            "Main_program_type",
+                            "MPI_geometry",
+                            # "Threads_per_process",
+                            "Maximum_Lanczos_iterations",
+                        ]
+                    )
 
                     plot_title = self._construct_plot_title(
-                        metadata_dict={**metadata, **self.unique_value_columns_dictionary},
+                        metadata_dict={
+                            **metadata,
+                            **self.unique_value_columns_dictionary,
+                        },
                         grouping_variable=grouping_variable,
                         labeling_variable=labeling_variable,
                         leading_plot_substring=leading_plot_substring,
@@ -1564,7 +1571,7 @@ class DataPlotter(DataFrameAnalyzer):
             filename = self._construct_plot_filename(
                 metadata_dict=metadata,
                 include_combined_prefix=(
-                    grouping_variable is not None #and leading_plot_substring is None
+                    grouping_variable is not None  # and leading_plot_substring is None
                 ),
                 custom_leading_substring="",
                 # leading_plot_substring,
