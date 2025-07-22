@@ -2,7 +2,7 @@ import os
 
 import numpy as np
 import pandas as pd
-from typing import Callable, Union
+from typing import Callable, Union, Optional
 
 from .analyzer import DataFrameAnalyzer
 
@@ -20,7 +20,7 @@ class TableGenerator(DataFrameAnalyzer):
     combinations.
     """
 
-    def __init__(self, dataframe: pd.DataFrame, output_directory: str = None):
+    def __init__(self, dataframe: pd.DataFrame, output_directory: Optional[str] = None):
         """
         Initialize the TableGenerator with a DataFrame and optional output
         directory.
@@ -43,7 +43,7 @@ class TableGenerator(DataFrameAnalyzer):
     def _save_table_to_file(
         self,
         table_string: str,
-        output_directory: str = None,
+        output_directory: Optional[str] = None,
         filename: str = "table",
         file_format: str = "md",
     ) -> None:
@@ -200,7 +200,7 @@ class TableGenerator(DataFrameAnalyzer):
                         # Format the value appropriately
                         if isinstance(value, float):
                             if pd.isna(value):
-                                formatted_value = 'NaN'
+                                formatted_value = "NaN"
                             elif value == int(value):
                                 formatted_value = str(int(value))
                             else:
@@ -256,7 +256,7 @@ class TableGenerator(DataFrameAnalyzer):
                         # Format the value appropriately
                         if isinstance(value, float):
                             if pd.isna(value):
-                                formatted_value = 'NaN'
+                                formatted_value = "NaN"
                             elif value == int(value):
                                 formatted_value = str(int(value))
                             else:
@@ -306,7 +306,7 @@ class TableGenerator(DataFrameAnalyzer):
                     # Format the value appropriately
                     if isinstance(value, float):
                         if pd.isna(value):
-                            formatted_value = 'NaN'
+                            formatted_value = "NaN"
                         elif value == int(value):
                             formatted_value = str(int(value))
                         else:
@@ -348,12 +348,12 @@ class TableGenerator(DataFrameAnalyzer):
     def generate_grouped_summary_tables(
         self,
         value_variable: str,
-        row_variable: str = None,
-        column_variable: str = None,
+        row_variable: Optional[str] = None,
+        column_variable: Optional[str] = None,
         aggregation: Union[str, Callable] = "count",
-        exclude_from_grouping: list = None,
+        exclude_from_grouping: Optional[list] = None,
         export_to_file: bool = False,
-        output_directory: str = None,
+        output_directory: Optional[str] = None,
         filename: str = "summary_tables",
         file_format: str = "md",
         verbose: bool = False,
@@ -385,7 +385,7 @@ class TableGenerator(DataFrameAnalyzer):
             str: A single formatted string containing all tables.
         """
         # If aggregation is a string, check if it's a supported built-in
-        built_in_aggregations = {"count", "list", "len", "min", "max", "mean"}
+        built_in_aggregations = {"count", "list", "len", "min", "max", "mean", "std"}
         if isinstance(aggregation, str) and aggregation not in built_in_aggregations:
             raise ValueError(
                 f"Unsupported aggregation: '{aggregation}'. "
@@ -444,6 +444,8 @@ class TableGenerator(DataFrameAnalyzer):
                 return series.max()
             elif agg == "mean":
                 return series.mean()
+            elif agg == "std":
+                return series.std() / np.sqrt(series.nunique())
 
         for idx, (group_keys, group_df) in enumerate(groupby_obj):
             if not isinstance(group_keys, tuple):
@@ -534,9 +536,9 @@ class TableGenerator(DataFrameAnalyzer):
         pivot_variable: str,
         id_variable: str,
         comparison: str = "ratio",
-        exclude_from_grouping: list = None,
+        exclude_from_grouping: Optional[list] = None,
         export_to_file: bool = False,
-        output_directory: str = None,
+        output_directory: Optional[str] = None,
         filename: str = "comparison_table",
         file_format: str = "md",
         verbose: bool = False,
