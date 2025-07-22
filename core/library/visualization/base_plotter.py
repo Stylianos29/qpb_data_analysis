@@ -87,7 +87,7 @@ class _PlotTitleBuilder:
             if value is None:
                 continue
             label = self.title_labels.get(col, col)
-            formatted_value = self._format_value(value)
+            formatted_value = self._format_value(col, value)
 
             if "Kernel_operator_type" in col:
                 parts.append(f"{formatted_value} Kernel")
@@ -155,6 +155,8 @@ class _PlotTitleBuilder:
         if isinstance(value, (int, float)):
             if name in ["MSCG_epsilon", "CG_epsilon"]:
                 return format(value, ".0e")
+            elif name in ["Threads_per_process"]:
+                return str(int(value))
             return format(value, self.title_number_format)
         return str(value)
 
@@ -177,10 +179,10 @@ class _PlotTitleBuilder:
 class _PlotFilenameBuilder:
     """
     Constructs plot filenames from metadata following a specific format pattern.
-    
+
     The filename format is:
     [prefix][overlap]_[base_name]_[kernel]_[param1][value1]_[param2][value2]...[suffix]
-    
+
     Where:
         - prefix: Optional "Combined_" or custom prefix
         - overlap: Overlap operator method (KL/Chebyshev/Bare) if present
@@ -188,7 +190,7 @@ class _PlotFilenameBuilder:
         - kernel: Kernel operator type (Brillouin/Wilson) if present
         - paramN/valueN: Parameter labels and sanitized values
         - suffix: Optional "_grouped_by_[grouping_var]" for grouped plots
-    
+
     Example outputs:
         - "Chebyshev_energy_Vs_time_Wilson_T300_P1p5"
         - "Combined_KL_mass_Vs_volume_L32_grouped_by_temperature"
@@ -197,7 +199,7 @@ class _PlotFilenameBuilder:
     def __init__(self, filename_labels: dict):
         """
         Initialize with a mapping of parameter names to abbreviated labels.
-        
+
         Parameters:
         -----------
         filename_labels : dict
@@ -244,14 +246,15 @@ class _PlotFilenameBuilder:
         str:
             A formatted filename (without extension) following the pattern:
             [prefix][overlap]_[base_name]_[kernel]_[params]_[suffix]
-            
+
         Example:
-            >>> metadata = {"Overlap_operator_method": "Chebyshev", 
+            >>> metadata = {"Overlap_operator_method": "Chebyshev",
             ...            "temperature": 3.14, "pressure": 2.0}
-            >>> builder.build(metadata, "energy_Vs_time", ["temperature"], 
+            >>> builder.build(metadata, "energy_Vs_time", ["temperature"],
             ...              grouping_variable="pressure")
             'energy_Vs_time_T3p14_grouped_by_pressure'
         """
+
         def sanitize(value):
             return (
                 str(value)
