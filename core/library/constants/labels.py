@@ -5,7 +5,7 @@ TITLE_LABELS_DICTIONARY = {
     "APE_iterations": "APE iters",
     "APE_alpha": "$\\alpha_{APE}$",
     "QCD_beta_value": "$\\beta$",
-    "Configuration_label": "config label",
+    "Configuration_label": "config",
     "Rho_value": "$\\rho$",
     "Bare_mass": "am",
     "Clover_coefficient": "$c_{SW}$",
@@ -25,6 +25,7 @@ TITLE_LABELS_DICTIONARY = {
     "Minimum_eigenvalue_squared": "$\\lambda_{min}^2$",
     "Maximum_eigenvalue_squared": "$\\lambda_{max}^2$",
     "Number_of_gauge_configurations": "# of configs",
+    "Threads_per_process": "$n_{\\text{OMP}}$"
 }
 
 AXES_LABELS_DICTIONARY = {
@@ -132,6 +133,7 @@ LEGEND_LABELS_BY_COLUMN_NAME = {
     "KL_diagonal_order": "n=",
     "Kernel_operator_type": "Kernel:",
     "Bare_mass": "a$m_{\\text{bare}}=$",
+    "Threads_per_process": "$n_{\\text{OMP}}=$",
 }
 
 TITLE_LABELS_BY_COLUMN_NAME = TITLE_LABELS_DICTIONARY.copy()
