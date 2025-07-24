@@ -1,5 +1,7 @@
 from typing import Optional
 
+from library.constants.data_types import PARAMETERS_WITH_EXPONENTIAL_FORMAT
+
 
 class PlotTitleBuilder:
     """
@@ -21,7 +23,12 @@ class PlotTitleBuilder:
         Wrapped title: "Chebyshev Wilson 50, Temperature 300.00,\nPressure 1.50"
     """
 
-    def __init__(self, title_labels: dict, title_number_format: str = ".2f"):
+    def __init__(
+        self, 
+        title_labels: dict, 
+        title_number_format: str = ".2f",
+        title_exponential_format: str = ".0e"
+    ):
         """
         Initialize the title builder with label mappings and formatting options.
 
@@ -31,11 +38,16 @@ class PlotTitleBuilder:
             Maps parameter names to human-readable labels for titles.
             E.g., {"temperature": "Temperature (K)", "pressure": "Pressure (Pa)"}
         title_number_format : str, optional
-            Format string for numeric values. Default is ".2f" for 2 decimal places.
+            Format string for regular numeric values. Default is ".2f" for 2 decimal places.
             Examples: ".2f", ".3g", ".1e"
+        title_exponential_format : str, optional
+            Format string for parameters requiring exponential notation.
+            Default is ".0e" for clean exponential display.
+            Examples: ".0e", ".1e", ".2e"
         """
         self.title_labels = title_labels
         self.title_number_format = title_number_format
+        self.title_exponential_format = title_exponential_format
 
     def build(
         self,
@@ -133,7 +145,7 @@ class PlotTitleBuilder:
             if value is None:
                 continue
             label = self.title_labels.get(col, col)
-            formatted_value = self._format_value(value)
+            formatted_value = self._format_value(col, value)
 
             if "Kernel_operator_type" in col:
                 parts.append(f"{formatted_value} Kernel")
@@ -229,20 +241,23 @@ class PlotTitleBuilder:
 
             value = metadata[param_name]
             label = self.title_labels.get(param_name, param_name)
-            formatted_value = self._format_value(value)
+            formatted_value = self._format_value(param_name, value)
             parts.append(f"{label}={formatted_value},")
 
         return parts
 
-    def _format_value(self, value) -> str:
+    def _format_value(self, param_name: str, value) -> str:
         """
         Format a value for display in title.
 
         Applies the configured number formatting to numeric values
-        and converts other types to strings.
+        and converts other types to strings. Uses exponential formatting
+        for parameters specified in PARAMETERS_WITH_EXPONENTIAL_FORMAT.
 
         Parameters:
         -----------
+        param_name : str
+            Name of the parameter (used to determine formatting type)
         value : any
             The value to format
 
@@ -252,6 +267,8 @@ class PlotTitleBuilder:
             Formatted string representation
         """
         if isinstance(value, (int, float)):
+            if param_name in PARAMETERS_WITH_EXPONENTIAL_FORMAT:
+                return format(value, self.title_exponential_format)
             return format(value, self.title_number_format)
         return str(value)
 
@@ -294,9 +311,20 @@ class PlotTitleBuilder:
         Parameters:
         -----------
         format_string : str
-            New format string (e.g., ".3f", ".2e", ".4g")
+            New format string for regular numbers (e.g., ".3f", ".2e", ".4g")
         """
         self.title_number_format = format_string
+
+    def set_exponential_format(self, format_string: str) -> None:
+        """
+        Update the exponential formatting for future title builds.
+
+        Parameters:
+        -----------
+        format_string : str
+            New format string for exponential numbers (e.g., ".0e", ".1e", ".2e")
+        """
+        self.title_exponential_format = format_string
 
     def update_labels(self, new_labels: dict) -> None:
         """
