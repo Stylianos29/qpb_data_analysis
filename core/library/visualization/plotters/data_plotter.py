@@ -73,7 +73,11 @@ class DataPlotter(DataFrameAnalyzer):
         self.style_manager = PlotStyleManager(constants)
         self.data_processor = PlotDataProcessor()
         self.annotation_manager = PlotAnnotationManager(self.data_processor)
-        self.title_builder = PlotTitleBuilder(constants.TITLE_LABELS_BY_COLUMN_NAME)
+        self.title_builder = PlotTitleBuilder(
+            constants.TITLE_LABELS_BY_COLUMN_NAME,
+            title_number_format=".2f",
+            title_exponential_format=".0e"
+        )
         self.filename_builder = PlotFilenameBuilder(
             constants.FILENAME_LABELS_BY_COLUMN_NAME
         )
@@ -186,6 +190,7 @@ class DataPlotter(DataFrameAnalyzer):
         leading_plot_substring: Optional[str] = None,
         excluded_from_title_list: Optional[List[str]] = None,
         title_number_format: str = ".2f",
+        title_exponential_format: str = ".0e",
         title_wrapping_length: int = 80,
         # Advanced features
         customization_function: Optional[Callable[[Axes], None]] = None,
@@ -381,6 +386,7 @@ class DataPlotter(DataFrameAnalyzer):
                     leading_plot_substring=leading_plot_substring,
                     excluded_from_title_list=excluded_from_title_list,
                     title_number_format=title_number_format,
+                    title_exponential_format=title_exponential_format,
                     title_wrapping_length=title_wrapping_length,
                 )
                 ax.set_title(
@@ -667,9 +673,10 @@ class DataPlotter(DataFrameAnalyzer):
                 x_filtered,
                 y_vals,
                 yerr=y_errs,
-                fmt=marker,
+                # marker=marker,
                 capsize=capsize,
                 label=label,
+                linestyle="none",  # No connecting lines, just markers
                 **marker_props,
             )
         elif x_is_tuple and not y_is_tuple:
@@ -679,9 +686,10 @@ class DataPlotter(DataFrameAnalyzer):
                 x_vals,
                 y_filtered,
                 xerr=x_errs,
-                fmt=marker,
+                # marker=marker,
                 capsize=capsize,
                 label=label,
+                linestyle="none",  # No connecting lines, just markers
                 **marker_props,
             )
         else:
@@ -693,9 +701,10 @@ class DataPlotter(DataFrameAnalyzer):
                 y_vals,
                 xerr=x_errs,
                 yerr=y_errs,
-                fmt=marker,
+                # marker=marker,
                 capsize=capsize,
                 label=label,
+                linestyle="none",  # No connecting lines, just markers
                 **marker_props,
             )
 
@@ -781,6 +790,7 @@ class DataPlotter(DataFrameAnalyzer):
         leading_plot_substring: Optional[str],
         excluded_from_title_list: Optional[List[str]],
         title_number_format: str,
+        title_exponential_format: str,
         title_wrapping_length: int,
     ) -> str:
         """Construct plot title using the title builder."""
@@ -819,14 +829,28 @@ class DataPlotter(DataFrameAnalyzer):
         # Combine metadata with unique value columns
         full_metadata = {**metadata, **self.unique_value_columns_dictionary}
 
-        return self.title_builder.build(
-            metadata_dict=full_metadata,
-            tunable_params=self.list_of_tunable_parameter_names_from_dataframe,
-            excluded=excluded,
-            leading_substring=leading_plot_substring,
-            title_from_columns=title_from_columns,
-            wrapping_length=title_wrapping_length,
-        )
+        # Temporarily update title builder formatting
+        original_number_format = self.title_builder.title_number_format
+        original_exponential_format = self.title_builder.title_exponential_format
+        
+        self.title_builder.title_number_format = title_number_format
+        self.title_builder.title_exponential_format = title_exponential_format
+
+        try:
+            result = self.title_builder.build(
+                metadata_dict=full_metadata,
+                tunable_params=self.list_of_tunable_parameter_names_from_dataframe,
+                excluded=excluded,
+                leading_substring=leading_plot_substring,
+                title_from_columns=title_from_columns,
+                wrapping_length=title_wrapping_length,
+            )
+        finally:
+            # Restore original formatting
+            self.title_builder.title_number_format = original_number_format
+            self.title_builder.title_exponential_format = original_exponential_format
+
+        return result
 
     def _save_plot(
         self,
@@ -1153,6 +1177,24 @@ class DataPlotter(DataFrameAnalyzer):
     def plots_base_name(self, value: Optional[str]) -> None:
         """Set the base name for plots."""
         self._plots_base_name = value
+
+    def set_default_title_formats(
+        self, number_format: Optional[str] = None, exponential_format: Optional[str] = None
+    ) -> None:
+        """
+        Set default title formatting for numbers and exponential values.
+
+        Parameters:
+        -----------
+        number_format : str, optional
+            Format string for regular numeric values (e.g., ".2f", ".3g")
+        exponential_format : str, optional
+            Format string for exponential values (e.g., ".0e", ".1e")
+        """
+        if number_format is not None:
+            self.title_builder.set_number_format(number_format)
+        if exponential_format is not None:
+            self.title_builder.set_exponential_format(exponential_format)
 
     def __repr__(self) -> str:
         """String representation of the DataPlotter."""
