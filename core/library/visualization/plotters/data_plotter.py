@@ -1,10 +1,3 @@
-"""
-Refactored DataPlotter class using modular components.
-
-This module provides the main DataPlotter class that orchestrates all
-plotting functionality using specialized managers and builders.
-"""
-
 import os
 from typing import Optional, Callable, Dict, List, Union, Any, Tuple
 
@@ -76,7 +69,7 @@ class DataPlotter(DataFrameAnalyzer):
         self.title_builder = PlotTitleBuilder(
             constants.TITLE_LABELS_BY_COLUMN_NAME,
             title_number_format=".2f",
-            title_exponential_format=".0e"
+            title_exponential_format=".0e",
         )
         self.filename_builder = PlotFilenameBuilder(
             constants.FILENAME_LABELS_BY_COLUMN_NAME
@@ -832,7 +825,7 @@ class DataPlotter(DataFrameAnalyzer):
         # Temporarily update title builder formatting
         original_number_format = self.title_builder.title_number_format
         original_exponential_format = self.title_builder.title_exponential_format
-        
+
         self.title_builder.title_number_format = title_number_format
         self.title_builder.title_exponential_format = title_exponential_format
 
@@ -1179,7 +1172,9 @@ class DataPlotter(DataFrameAnalyzer):
         self._plots_base_name = value
 
     def set_default_title_formats(
-        self, number_format: Optional[str] = None, exponential_format: Optional[str] = None
+        self,
+        number_format: Optional[str] = None,
+        exponential_format: Optional[str] = None,
     ) -> None:
         """
         Set default title formatting for numbers and exponential values.
