@@ -688,11 +688,6 @@ class DataPlotter(DataFrameAnalyzer):
         x_is_tuple = self.data_processor.is_tuple_array(x_filtered)
         y_is_tuple = self.data_processor.is_tuple_array(y_filtered)
 
-        # # Get marker properties
-        # marker_props = self.style_manager.get_marker_properties(
-        #     marker, not empty_markers, color, marker_size
-        # )
-
         # Plot based on data types
         if not x_is_tuple and not y_is_tuple:
             # Scatter plot - use plot_type="scatter"
