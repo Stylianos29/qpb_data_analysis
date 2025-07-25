@@ -531,9 +531,12 @@ class DataPlotter(DataFrameAnalyzer):
         if not isinstance(group_keys, tuple):
             group_keys = (group_keys,)
 
-        metadata = dict(
-            zip(self.reduced_multivalued_tunable_parameter_names_list, group_keys)
-        )
+        metadata = {
+            name: group_key
+            for name, group_key in zip(
+                self.reduced_multivalued_tunable_parameter_names_list, group_keys
+            )
+        }
 
         # Add method and kernel type if constant in the group
         for special in ["Overlap_operator_method", "Kernel_operator_type"]:
