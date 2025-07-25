@@ -210,6 +210,7 @@ class DataPlotter(DataFrameAnalyzer):
         target_ax: Optional[Axes] = None,
         is_inset: bool = False,
         save_figure: bool = True,
+        file_format: Optional[str] = None,
         verbose: bool = True,
     ) -> "DataPlotter":
         """
@@ -219,6 +220,20 @@ class DataPlotter(DataFrameAnalyzer):
         This method orchestrates the entire plotting process using the
         specialized managers and builders. It supports both individual
         and grouped plots with extensive customization capabilities.
+
+        Key Parameters:
+        ---------------
+        file_format : str, optional
+            Output file format for saved plots. If None, uses the default format
+            set in the file manager (default: "png"). Supported formats include:
+            "png", "pdf", "svg", "eps", "jpg", "tiff", "ps".
+            Examples: "pdf", "svg", "png"
+        
+        target_ax : matplotlib.axes.Axes, optional
+            If provided, plot on this existing axes instead of creating new figure.
+        
+        save_figure : bool, optional
+            Whether to save the figure to disk. Default is True.
 
         Returns:
         --------
@@ -406,6 +421,7 @@ class DataPlotter(DataFrameAnalyzer):
                     metadata=metadata,
                     group_keys=group_keys,
                     grouping_variable=grouping_variable,
+                    file_format=file_format,
                 )
 
         return self
@@ -851,6 +867,7 @@ class DataPlotter(DataFrameAnalyzer):
         metadata: Dict[str, Any],
         group_keys: Tuple[Any, ...],
         grouping_variable: Optional[Union[str, List[str]]],
+        file_format: Optional[str] = None,
     ) -> None:
         """Save the plot using file manager and filename builder."""
 
@@ -884,7 +901,7 @@ class DataPlotter(DataFrameAnalyzer):
             save_directory = self.individual_plots_subdirectory
 
         # Get full path and save
-        full_path = self.file_manager.plot_path(save_directory, filename)
+        full_path = self.file_manager.plot_path(save_directory, filename, format=file_format)
         self._last_plot_paths[group_keys] = full_path
 
         fig.savefig(full_path)
