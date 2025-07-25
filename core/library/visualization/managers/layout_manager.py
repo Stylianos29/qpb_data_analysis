@@ -451,7 +451,7 @@ class PlotLayoutManager:
         # Return abbreviation if available, otherwise create a generic one
         if variable_name in abbreviations:
             return abbreviations[variable_name]
-        
+
         # Generic abbreviation: take first few characters and remove underscores
         abbreviated = variable_name.replace("_", " ").title()
         if len(abbreviated) > 10:
@@ -461,5 +461,5 @@ class PlotLayoutManager:
                 return words[0]
             else:
                 return abbreviated[:8] + "..."
-        
+
         return abbreviated
