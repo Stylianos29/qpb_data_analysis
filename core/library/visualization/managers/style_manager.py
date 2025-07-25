@@ -290,7 +290,12 @@ class PlotStyleManager:
         return str(value)
 
     def get_marker_properties(
-        self, marker: str, filled: bool = True, color: str = "blue", size: int = 8
+        self,
+        marker: str,
+        filled: bool = True,
+        color: str = "blue",
+        size: int = 8,
+        plot_type: str = "errorbar",
     ) -> Dict[str, Any]:
         """
         Get marker properties dict for scatter/errorbar plots.
@@ -300,26 +305,51 @@ class PlotStyleManager:
             - filled: Whether marker should be filled.
             - color: Marker color.
             - size: Marker size.
+            - plot_type: "scatter" or "errorbar" to determine correct size parameter.
 
         Returns:
             Dict of marker properties suitable for matplotlib functions.
         """
-        if filled:
-            return {
-                "marker": marker,
-                "color": color,
-                "markersize": size,
-                "markerfacecolor": color,
-                "markeredgecolor": color,
-            }
-        else:
-            return {
-                "marker": marker,
-                "markersize": size,
-                "markerfacecolor": "none",
-                "markeredgecolor": color,
-                "color": color,  # For error bars
-            }
+        # Choose the correct size parameter based on plot type
+        size_key = "s" if plot_type == "scatter" else "markersize"
+
+        if plot_type == "scatter":
+            # For scatter plots, use 'c' and avoid 'color'
+            if filled:
+                base_props = {
+                    "marker": marker,
+                    "c": color,
+                    "edgecolors": color,
+                    size_key: size,
+                }
+            else:
+                base_props = {
+                    "marker": marker,
+                    "facecolors": "none",
+                    "edgecolors": color,
+                    "c": color,
+                    size_key: size,
+                }
+        else:  # errorbar
+            # For errorbar plots, use 'color' and marker properties
+            if filled:
+                base_props = {
+                    "marker": marker,
+                    "color": color,
+                    "markerfacecolor": color,
+                    "markeredgecolor": color,
+                    size_key: size,
+                }
+            else:
+                base_props = {
+                    "marker": marker,
+                    "color": color,
+                    "markerfacecolor": "none",
+                    "markeredgecolor": color,
+                    size_key: size,
+                }
+
+        return base_props
 
     def apply_figure_margins(
         self,
