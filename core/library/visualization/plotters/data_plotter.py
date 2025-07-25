@@ -228,10 +228,10 @@ class DataPlotter(DataFrameAnalyzer):
             set in the file manager (default: "png"). Supported formats include:
             "png", "pdf", "svg", "eps", "jpg", "tiff", "ps".
             Examples: "pdf", "svg", "png"
-        
+
         target_ax : matplotlib.axes.Axes, optional
             If provided, plot on this existing axes instead of creating new figure.
-        
+
         save_figure : bool, optional
             Whether to save the figure to disk. Default is True.
 
@@ -479,6 +479,7 @@ class DataPlotter(DataFrameAnalyzer):
             except Exception as e:
                 print(f"Warning: Failed to add inset to group {group_keys}: {e}")
                 import traceback
+
                 traceback.print_exc()
 
         return self
@@ -684,43 +685,53 @@ class DataPlotter(DataFrameAnalyzer):
         x_is_tuple = self.data_processor.is_tuple_array(x_filtered)
         y_is_tuple = self.data_processor.is_tuple_array(y_filtered)
 
-        # Get marker properties
-        marker_props = self.style_manager.get_marker_properties(
-            marker, not empty_markers, color, marker_size
-        )
+        # # Get marker properties
+        # marker_props = self.style_manager.get_marker_properties(
+        #     marker, not empty_markers, color, marker_size
+        # )
 
         # Plot based on data types
         if not x_is_tuple and not y_is_tuple:
-            # Scatter plot
+            # Scatter plot - use plot_type="scatter"
+            marker_props = self.style_manager.get_marker_properties(
+                marker, not empty_markers, color, marker_size, plot_type="scatter"
+            )
             ax.scatter(x_filtered, y_filtered, label=label, **marker_props)
         elif not x_is_tuple and y_is_tuple:
-            # Error bars in y
+            # Error bars in y - use plot_type="errorbar"
+            marker_props = self.style_manager.get_marker_properties(
+                marker, not empty_markers, color, marker_size, plot_type="errorbar"
+            )
             y_vals, y_errs = self.data_processor.extract_values_and_errors(y_filtered)
             ax.errorbar(
                 x_filtered,
                 y_vals,
                 yerr=y_errs,
-                # marker=marker,
                 capsize=capsize,
                 label=label,
                 linestyle="none",  # No connecting lines, just markers
                 **marker_props,
             )
         elif x_is_tuple and not y_is_tuple:
-            # Error bars in x (less common)
+            # Error bars in x - use plot_type="errorbar"
+            marker_props = self.style_manager.get_marker_properties(
+                marker, not empty_markers, color, marker_size, plot_type="errorbar"
+            )
             x_vals, x_errs = self.data_processor.extract_values_and_errors(x_filtered)
             ax.errorbar(
                 x_vals,
                 y_filtered,
                 xerr=x_errs,
-                # marker=marker,
                 capsize=capsize,
                 label=label,
                 linestyle="none",  # No connecting lines, just markers
                 **marker_props,
             )
         else:
-            # Error bars in both x and y
+            # Error bars in both x and y - use plot_type="errorbar"
+            marker_props = self.style_manager.get_marker_properties(
+                marker, not empty_markers, color, marker_size, plot_type="errorbar"
+            )
             x_vals, x_errs = self.data_processor.extract_values_and_errors(x_filtered)
             y_vals, y_errs = self.data_processor.extract_values_and_errors(y_filtered)
             ax.errorbar(
@@ -728,7 +739,6 @@ class DataPlotter(DataFrameAnalyzer):
                 y_vals,
                 xerr=x_errs,
                 yerr=y_errs,
-                # marker=marker,
                 capsize=capsize,
                 label=label,
                 linestyle="none",  # No connecting lines, just markers
@@ -919,7 +929,9 @@ class DataPlotter(DataFrameAnalyzer):
             save_directory = self.individual_plots_subdirectory
 
         # Get full path and save
-        full_path = self.file_manager.plot_path(save_directory, filename, format=file_format)
+        full_path = self.file_manager.plot_path(
+            save_directory, filename, format=file_format
+        )
         self._last_plot_paths[group_keys] = full_path
 
         fig.savefig(full_path)
