@@ -164,6 +164,8 @@ class PlotInsetManager:
 
             # Configure inset-specific plot parameters
             inset_plot_kwargs = self._prepare_inset_plot_kwargs(plot_kwargs)
+            # Set the target axes to the inset axes
+            inset_plot_kwargs["target_ax"] = inset_ax
 
             # Create the inset plot
             temp_plotter.plot(**inset_plot_kwargs)
@@ -364,6 +366,8 @@ class PlotInsetManager:
 
             # Configure for inset plotting
             inset_plot_kwargs = self._prepare_inset_plot_kwargs(plot_kwargs)
+            # Set the target axes to the inset axes
+            inset_plot_kwargs["target_ax"] = inset_ax
             temp_plotter.plot(**inset_plot_kwargs)
 
             return True
@@ -558,7 +562,6 @@ class PlotInsetManager:
         # Override settings for inset behavior
         inset_kwargs.update(
             {
-                "target_ax": inset_kwargs.get("target_ax"),  # Will be set by caller
                 "is_inset": True,
                 "include_plot_title": False,
                 "save_figure": False,

@@ -381,3 +381,85 @@ class PlotLayoutManager:
         # Apply custom modifications if provided
         if apply_custom_function is not None:
             apply_custom_function(ax)
+
+    def configure_inset_axes(
+        self,
+        ax: Axes,
+        x_variable: str,
+        y_variable: str,
+        font_size: int = 8,
+        xaxis_log_scale: bool = False,
+        yaxis_log_scale: bool = False,
+        xlim: Optional[Tuple[float, float]] = None,
+        ylim: Optional[Tuple[float, float]] = None,
+        xaxis_start_at_zero: bool = False,
+        yaxis_start_at_zero: bool = False,
+        invert_xaxis: bool = False,
+        invert_yaxis: bool = False,
+    ) -> None:
+        """
+        Configure axes specifically for insets with simplified styling.
+        """
+        # Apply grid with lighter styling for insets
+        ax.grid(True, linestyle="--", alpha=0.3, linewidth=0.5)
+
+        # Setup log scaling
+        self._setup_axes_scaling(
+            ax, x_variable, y_variable, xaxis_log_scale, yaxis_log_scale
+        )
+
+        # Configure limits and orientation
+        self._setup_axes_limits_and_orientation(
+            ax,
+            xlim,
+            ylim,
+            xaxis_start_at_zero,
+            yaxis_start_at_zero,
+            invert_xaxis,
+            invert_yaxis,
+        )
+
+        # Setup simplified labels for insets
+        self._setup_inset_labels(ax, x_variable, y_variable)
+
+        # Configure font sizes for inset
+        ax.tick_params(labelsize=font_size)
+
+    def _setup_inset_labels(self, ax: Axes, x_variable: str, y_variable: str) -> None:
+        """Setup simplified labels for inset axes."""
+        # Create abbreviated labels for insets
+        x_label = self._create_abbreviated_label(x_variable)
+        y_label = self._create_abbreviated_label(y_variable)
+
+        ax.set_xlabel(x_label, fontsize=8)
+        ax.set_ylabel(y_label, fontsize=8)
+
+    def _create_abbreviated_label(self, variable_name: str) -> str:
+        """Create abbreviated labels for inset axes."""
+        # Create mapping for common variables to short labels
+        abbreviations = {
+            "Number_of_Chebyshev_terms": "N_Cheb",
+            "Average_sign_squared_violation_values": "Sign²",
+            "Bare_mass": "m₀",
+            "QCD_beta_value": "β",
+            "Plaquette": "P",
+            "Condition_number": "κ",
+            "Delta_Min": "Δ_min",
+            "Delta_Max": "Δ_max",
+        }
+
+        # Return abbreviation if available, otherwise create a generic one
+        if variable_name in abbreviations:
+            return abbreviations[variable_name]
+        
+        # Generic abbreviation: take first few characters and remove underscores
+        abbreviated = variable_name.replace("_", " ").title()
+        if len(abbreviated) > 10:
+            # Take first word or first 8 characters
+            words = abbreviated.split()
+            if len(words) > 1 and len(words[0]) <= 8:
+                return words[0]
+            else:
+                return abbreviated[:8] + "..."
+        
+        return abbreviated

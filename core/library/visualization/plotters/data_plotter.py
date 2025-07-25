@@ -300,6 +300,22 @@ class DataPlotter(DataFrameAnalyzer):
                     invert_yaxis=invert_yaxis,
                     apply_custom_function=customization_function,
                 )
+            else:
+                # For insets, apply essential configurations but with inset-specific styling
+                self.layout_manager.configure_inset_axes(
+                    ax=ax,
+                    x_variable=self.xaxis_variable_name,
+                    y_variable=self.yaxis_variable_name,
+                    font_size=max(8, font_size - 4),  # Smaller font for insets
+                    xaxis_log_scale=xaxis_log_scale,
+                    yaxis_log_scale=yaxis_log_scale,
+                    xlim=xlim,
+                    ylim=ylim,
+                    xaxis_start_at_zero=xaxis_start_at_zero,
+                    yaxis_start_at_zero=yaxis_start_at_zero,
+                    invert_xaxis=invert_xaxis,
+                    invert_yaxis=invert_yaxis,
+                )
 
             # Prepare metadata for this group
             metadata = self._extract_group_metadata(group_keys, group_df)
@@ -462,6 +478,8 @@ class DataPlotter(DataFrameAnalyzer):
 
             except Exception as e:
                 print(f"Warning: Failed to add inset to group {group_keys}: {e}")
+                import traceback
+                traceback.print_exc()
 
         return self
 
