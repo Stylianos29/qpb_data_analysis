@@ -1,23 +1,27 @@
 """
 Private class for HDF5 data management and manipulation.
 
-This module provides the _HDF5DataManager class, which extends _HDF5Inspector to
-add data filtering, transformation, and virtual dataset capabilities while
-maintaining the read-only nature of the underlying HDF5 file.
+This module provides the _HDF5DataManager class, which extends
+_HDF5Inspector to add data filtering, transformation, and virtual
+dataset capabilities while maintaining the read-only nature of the
+underlying HDF5 file.
 """
 
 from typing import Dict, List, Set, Any, Optional, Callable, Union, Tuple
+from collections import defaultdict
+
 import numpy as np
 import pandas as pd
-from collections import defaultdict
 import gvar
+import h5py
 
 from .inspector import _HDF5Inspector
 
 
 class _HDF5DataManager(_HDF5Inspector):
     """
-    Private class that adds data manipulation capabilities to HDF5 inspection.
+    Private class that adds data manipulation capabilities to HDF5
+    inspection.
 
     This class extends _HDF5Inspector to provide:
     - Data filtering/restriction based on parameter values
@@ -26,7 +30,8 @@ class _HDF5DataManager(_HDF5Inspector):
     - DataFrame generation from filtered data
     - Context manager support for temporary restrictions
 
-    The HDF5 file remains read-only; all operations work on virtual views.
+    The HDF5 file remains read-only; all operations work on virtual
+    views.
     """
 
     def __init__(self, hdf5_file_path: str):
@@ -133,17 +138,19 @@ class _HDF5DataManager(_HDF5Inspector):
 
         return all_params
 
-    def restrict_data(self, condition: str = None, filter_func: Callable = None):
+    def restrict_data(
+        self, condition: Optional[str] = None, filter_func: Optional[Callable] = None
+    ):
         """
         Restrict data to groups matching the given condition.
 
         This method mirrors DataFrameAnalyzer's restrict_dataframe API.
 
         Args:
-            condition: Pandas-style query string (e.g., "param > 5 and param2 ==
-            'value'")
-            filter_func: Custom function that takes parameters dict and returns
-            bool
+            - condition: Pandas-style query string (e.g., "param > 5 and
+              param2 == 'value'")
+            - filter_func: Custom function that takes parameters dict
+              and returns bool
 
         Returns:
             self for method chaining
@@ -170,8 +177,13 @@ class _HDF5DataManager(_HDF5Inspector):
                 # Create a temporary DataFrame for query evaluation
                 temp_df = pd.DataFrame([params])
                 try:
-                    mask = temp_df.eval(condition)
-                    include_group = bool(mask.iloc[0])
+                    result = temp_df.eval(condition)
+                    # Handle different return types from eval()
+                    if isinstance(result, pd.Series):
+                        include_group = bool(result.iloc[0])
+                    else:
+                        # Handle scalar results directly
+                        include_group = bool(result)
                 except Exception as e:
                     raise ValueError(f"Failed to evaluate condition: {e}")
 
@@ -222,11 +234,12 @@ class _HDF5DataManager(_HDF5Inspector):
         Get dataset values, with automatic gvar merging if applicable.
 
         Args:
-            dataset_name: Name of the dataset (or base name for gvar pairs)
-            return_gvar: If True, automatically merge mean/error pairs into gvar
-            arrays
-            group_path: Specific group to get data from (None = all active
-            groups)
+            - dataset_name: Name of the dataset (or base name for gvar
+              pairs)
+            - return_gvar: If True, automatically merge mean/error pairs
+              into gvar arrays
+            - group_path: Specific group to get data from (None = all
+              active groups)
 
         Returns:
             Array of values or list of arrays (one per group)
@@ -256,7 +269,11 @@ class _HDF5DataManager(_HDF5Inspector):
             if cache_key not in self._data_cache:
                 full_path = f"{group_path}/{dataset_name}"
                 if full_path in self._file:
-                    self._data_cache[cache_key] = self._file[full_path][()]
+                    hdf5_obj = self._file[full_path]
+                    if isinstance(hdf5_obj, h5py.Dataset):
+                        self._data_cache[cache_key] = hdf5_obj[()]
+                    else:
+                        raise ValueError(f"Path '{full_path}' is not a dataset")
                 else:
                     raise ValueError(f"Dataset not found in group: {group_path}")
             return self._data_cache[cache_key]
@@ -268,7 +285,11 @@ class _HDF5DataManager(_HDF5Inspector):
                 if cache_key not in self._data_cache:
                     full_path = f"{group}/{dataset_name}"
                     if full_path in self._file:
-                        self._data_cache[cache_key] = self._file[full_path][()]
+                        hdf5_obj = self._file[full_path]
+                        if isinstance(hdf5_obj, h5py.Dataset):
+                            self._data_cache[cache_key] = hdf5_obj[()]
+                        else:
+                            raise ValueError(f"Path '{full_path}' is not a dataset")
                 if cache_key in self._data_cache:
                     values.append(self._data_cache[cache_key])
             return values
@@ -300,9 +321,9 @@ class _HDF5DataManager(_HDF5Inspector):
         Create a virtual dataset by transforming an existing one.
 
         Args:
-            source_dataset: Name of the source dataset
-            transform_func: Function to apply to the dataset values
-            new_name: Name for the virtual dataset
+            - source_dataset: Name of the source dataset
+            - transform_func: Function to apply to the dataset values
+            - new_name: Name for the virtual dataset
 
         Returns:
             self for method chaining
@@ -347,11 +368,13 @@ class _HDF5DataManager(_HDF5Inspector):
         Convert active groups' data to a pandas DataFrame.
 
         Args:
-            datasets: List of datasets to include (None = all)
-            include_parameters: Whether to include parameters as columns
-            flatten_arrays: Whether to create one row per array element
-            add_time_column: Whether to add time_index column when flattening
-            arrays
+            - datasets: List of datasets to include (None = all)
+            - include_parameters: Whether to include parameters as
+              columns
+            - flatten_arrays: Whether to create one row per array
+              element
+            - add_time_column: Whether to add time_index column when
+              flattening arrays
 
         Returns:
             DataFrame with requested data
@@ -425,11 +448,13 @@ class _HDF5DataManager(_HDF5Inspector):
         This mirrors DataFrameAnalyzer's grouping functionality.
 
         Args:
-            filter_out_parameters_list: Parameters to exclude from grouping
-            verbose: Whether to print grouping information
+            - filter_out_parameters_list: Parameters to exclude from
+              grouping
+            - verbose: Whether to print grouping information
 
         Returns:
-            Dictionary mapping parameter value tuples to lists of group paths
+            Dictionary mapping parameter value tuples to lists of group
+            paths
         """
         # Get parameters that are still multivalued in active groups
         grouping_params = self.reduced_multivalued_tunable_parameter_names_list
