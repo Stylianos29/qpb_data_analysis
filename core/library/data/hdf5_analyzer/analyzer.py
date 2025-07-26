@@ -192,18 +192,12 @@ class HDF5Analyzer(_HDF5DataManager):
         else:
             return str(value)
 
-    def unique_values(
-        self, parameter_name: str, print_output: bool = False
-    ) -> List[Any]:
+    def unique_values(self, parameter_name: str) -> List[Any]:
         """
         Get sorted list of unique values for a parameter.
 
-        This method provides backward compatibility with the original
-        HDF5Analyzer.
-
         Args:
-            - parameter_name: Name of the parameter to analyze
-            - print_output: Whether to print the values (default: False)
+            parameter_name: Name of the parameter to analyze
 
         Returns:
             Sorted list of unique values
@@ -220,20 +214,6 @@ class HDF5Analyzer(_HDF5DataManager):
 
         try:
             values = self.column_unique_values(parameter_name)
-
-            if print_output:
-                if len(values) == 1:
-                    print(
-                        f"Parameter '{parameter_name}' has only one "
-                        f"value: {values[0]}"
-                    )
-                else:
-                    print(
-                        f"Parameter '{parameter_name}' has {len(values)} "
-                        f"unique values:"
-                    )
-                    print(values)
-
             return values
 
         except ValueError:
