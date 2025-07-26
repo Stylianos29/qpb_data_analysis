@@ -112,7 +112,7 @@ class TestHDF5InspectorStructure:
                     for param_name in params:
                         if (
                             param_name
-                            in inspector.list_of_tunable_parameter_names_from_dataframe
+                            in inspector.list_of_tunable_parameter_names_from_hdf5
                         ):
                             assert (
                                 param_name
@@ -136,7 +136,7 @@ class TestHDF5InspectorParameters:
         assert len(single_set & multi_set) == 0
 
         # All tunable parameters should be categorized
-        all_tunable = set(inspector.list_of_tunable_parameter_names_from_dataframe)
+        all_tunable = set(inspector.list_of_tunable_parameter_names_from_hdf5)
         categorized = single_set | multi_set
         assert all_tunable == categorized
 
@@ -170,7 +170,7 @@ class TestHDF5InspectorDatasets:
 
     def test_dataset_collection(self, inspector):
         """Test that datasets are correctly identified."""
-        assert len(inspector.list_of_output_quantity_names_from_dataframe) > 0
+        assert len(inspector.list_of_output_quantity_names_from_hdf5) > 0
         assert len(inspector._dataset_paths) > 0
 
         # Each dataset should have at least one path
@@ -196,13 +196,39 @@ class TestHDF5InspectorDatasets:
             assert error_name in inspector._dataset_paths
 
     def test_single_valued_dataset_detection(self, inspector):
-        """Test detection of single-valued datasets (rare but possible)."""
-        single_valued_datasets = inspector.list_of_single_valued_output_quantity_names
+        """Test detection of single-valued datasets (not including
+        non-tunable parameters)."""
+        # Filter to only actual datasets (not non-tunable parameters)
+        single_valued_datasets = [
+            name
+            for name in inspector.list_of_single_valued_output_quantity_names
+            if name in inspector._dataset_paths
+        ]
 
         for dataset_name in single_valued_datasets:
             assert dataset_name in inspector.unique_value_columns_dictionary
             value = inspector.unique_value_columns_dictionary[dataset_name]
-            assert isinstance(value, np.ndarray)
+            assert isinstance(
+                value, np.ndarray
+            ), f"Dataset '{dataset_name}' should be numpy array, got {type(value)}"
+
+    def test_single_valued_non_tunable_parameters(self, inspector):
+        """Test detection of single-valued non-tunable parameters."""
+        # Filter to only non-tunable parameters (not datasets)
+        single_valued_non_tunable = [
+            name
+            for name in inspector.list_of_single_valued_output_quantity_names
+            if name not in inspector._dataset_paths
+        ]
+
+        for param_name in single_valued_non_tunable:
+            assert param_name in inspector.unique_value_columns_dictionary
+            value = inspector.unique_value_columns_dictionary[param_name]
+            # Non-tunable parameters can be scalars or arrays
+            assert value is not None, f"Parameter '{param_name}' should have a value"
+            assert isinstance(
+                value, (int, float, str, np.ndarray, np.integer, np.floating)
+            ), f"Parameter '{param_name}' should be scalar or array, got {type(value)}"
 
 
 class TestHDF5InspectorConsistency:
@@ -220,8 +246,8 @@ class TestHDF5InspectorConsistency:
 
     def test_parameter_output_separation(self, inspector):
         """Test that parameters and outputs are properly separated."""
-        tunable = set(inspector.list_of_tunable_parameter_names_from_dataframe)
-        outputs = set(inspector.list_of_output_quantity_names_from_dataframe)
+        tunable = set(inspector.list_of_tunable_parameter_names_from_hdf5)
+        outputs = set(inspector.list_of_output_quantity_names_from_hdf5)
 
         # No overlap between parameters and outputs
         assert len(tunable & outputs) == 0
@@ -247,8 +273,8 @@ class TestHDF5InspectorConsistency:
     "property_name",
     [
         "list_of_dataframe_column_names",
-        "list_of_tunable_parameter_names_from_dataframe",
-        "list_of_output_quantity_names_from_dataframe",
+        "list_of_tunable_parameter_names_from_hdf5",
+        "list_of_output_quantity_names_from_hdf5",
         "list_of_single_valued_column_names",
         "list_of_multivalued_column_names",
         "list_of_single_valued_tunable_parameter_names",
