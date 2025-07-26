@@ -391,7 +391,7 @@ class TestDataTransformation:
                     trajectory_value = analysis_group[key].attrs["trajectory"]
                     assert (
                         trajectory_value < 200
-                    ), f"Expected trajectory < 200, got {trajectory_value}" # type: ignore
+                    ), f"Expected trajectory < 200, got {trajectory_value}"  # type: ignore
 
             assert config_count == 2  # Only 2 configs with trajectory < 200
 
