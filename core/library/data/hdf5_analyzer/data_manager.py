@@ -193,12 +193,12 @@ class _HDF5DataManager(_HDF5Inspector):
         self._active_groups = filtered_groups
         return self
 
-    def restore_all_groups(self):
+    def restore_original_data(self):
         """
         Restore all groups (remove all restrictions).
-
-        This mirrors DataFrameAnalyzer's restore_original_dataframe.
-
+        
+        This mirrors DataFrameAnalyzer's restore_original_data.
+        
         Returns:
             self for method chaining
         """
