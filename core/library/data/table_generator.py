@@ -1,35 +1,36 @@
 import os
-
-import numpy as np
-import pandas as pd
 from typing import Callable, Union, Optional
+
+import pandas as pd
+import numpy as np
 
 from .analyzer import DataFrameAnalyzer
 
 
 class TableGenerator(DataFrameAnalyzer):
     """
-    A specialized class for generating formatted analysis tables from DataFrame
-    results.
+    A specialized class for generating formatted analysis tables from
+    DataFrame results.
 
-    Extends DataFrameAnalyzer to create well-structured tables that summarize
-    data across different groupings of tunable parameters. Supports multiple
-    output formats with a focus on Markdown, and provides methods for generating
-    comparison tables, pivot tables, and grouped summaries. Particularly useful
-    for analyzing how output quantities vary across different parameter
-    combinations.
+    Extends DataFrameAnalyzer to create well-structured tables that
+    summarize data across different groupings of tunable parameters.
+    Supports multiple output formats with a focus on Markdown, and
+    provides methods for generating comparison tables, pivot tables, and
+    grouped summaries. Particularly useful for analyzing how output
+    quantities vary across different parameter combinations.
     """
 
     def __init__(self, dataframe: pd.DataFrame, output_directory: Optional[str] = None):
         """
-        Initialize the TableGenerator with a DataFrame and optional output
-        directory.
+        Initialize the TableGenerator with a DataFrame and optional
+        output directory.
 
         Args:
-            - dataframe (pd.DataFrame): The input DataFrame to analyze and
-              generate tables from.
-            - output_directory (str, optional): Default directory to save
-              generated table files. Defaults to current directory (".").
+            - dataframe (pd.DataFrame): The input DataFrame to analyze
+              and generate tables from.
+            - output_directory (str, optional): Default directory to
+              save generated table files. Defaults to current directory
+              (".").
 
         Raises:
             TypeError: If the input is not a Pandas DataFrame.
@@ -48,17 +49,19 @@ class TableGenerator(DataFrameAnalyzer):
         file_format: str = "md",
     ) -> None:
         """
-        Save a table string to a file in the specified directory and format.
+        Save a table string to a file in the specified directory and
+        format.
 
         Args:
-            - table_string (str): The string representation of the table to
-              save.
-            - output_directory (str, optional): Directory path where the table
-              will be saved. If None, uses the class's default output directory.
+            - table_string (str): The string representation of the table
+              to save.
+            - output_directory (str, optional): Directory path where the
+              table will be saved. If None, uses the class's default
+              output directory.
             - filename (str, optional): Base name of the file (without
               extension). Default is 'table'.
-            - file_format (str, optional): Format of the file: 'md', 'txt', or
-              'tex'. Default is 'md'.
+            - file_format (str, optional): Format of the file: 'md',
+              'txt', or 'tex'. Default is 'md'.
 
         Raises:
             ValueError: If an unsupported file format is provided.
@@ -100,36 +103,39 @@ class TableGenerator(DataFrameAnalyzer):
         file_format="md",
     ) -> str:
         """
-        Generate a table reporting uniqueness characteristics of DataFrame
-        columns, showing single-valued and multi-valued fields, optionally
-        organized by parameter type (tunable parameters vs output quantities).
+        Generate a table reporting uniqueness characteristics of
+        DataFrame columns, showing single-valued and multi-valued
+        fields, optionally organized by parameter type (tunable
+        parameters vs output quantities).
 
-        This method creates a formatted table with two columns: 1. Single-valued
-        fields with their unique values 2. Multi-valued fields with the count of
-        their unique values
+        This method creates a formatted table with two columns: 1.
+        Single-valued fields with their unique values 2. Multi-valued
+        fields with the count of their unique values
 
-        When separate_by_type is True, each column is further divided into
-        tunable parameters and output quantities, with headers centered across
-        the entire table width.
+        When separate_by_type is True, each column is further divided
+        into tunable parameters and output quantities, with headers
+        centered across the entire table width.
 
         Args:
             - max_width (int, optional): Maximum width of the table in
               characters. Default is 80.
-            - separate_by_type (bool, optional): Whether to separate fields by
-              their type (tunable parameters vs output quantities). Default is
-              True.
-            - export_to_file (bool, optional): Whether to export the table to a
-              file. Default is False.
-            - output_directory (str, optional): Directory to save the output
-              file. If None, uses the class's default output directory.
-            - filename (str, optional): Base name for the output file (without
-              extension). Default is 'column_uniqueness_report'.
-            - file_format (str, optional): Format of the file: 'md', 'txt', or
-              'tex'. Default is 'md'.
+            - separate_by_type (bool, optional): Whether to separate
+              fields by their type (tunable parameters vs output
+              quantities). Default is True.
+            - export_to_file (bool, optional): Whether to export the
+              table to a file. Default is False.
+            - output_directory (str, optional): Directory to save the
+              output file. If None, uses the class's default output
+              directory.
+            - filename (str, optional): Base name for the output file
+              (without extension). Default is
+              'column_uniqueness_report'.
+            - file_format (str, optional): Format of the file: 'md',
+              'txt', or 'tex'. Default is 'md'.
 
         Returns:
-            str: A formatted string containing the table, optimized for Markdown
-            display.
+            str: A formatted string containing the table, optimized for
+            Markdown display.
         """
         # Calculate how much space to allocate for each column
         half_width = (max_width - 3) // 2  # -3 for the separator and spacing
@@ -359,27 +365,29 @@ class TableGenerator(DataFrameAnalyzer):
         verbose: bool = False,
     ) -> str:
         """
-        Generate grouped summary tables with optional row/column pivots and
-        aggregations.
+        Generate grouped summary tables with optional row/column pivots
+        and aggregations.
 
         Args:
             - value_variable (str): The variable to summarize.
             - row_variable (str, optional): Row variable in table.
             - column_variable (str, optional): Column variable in table.
-            - aggregation (Union[str, Callable], optional): Either one of the built-in
-              aggregation methods ('count', 'list', 'len', 'min', 'max', 'mean'), or
-              a custom callable function that takes a pandas Series as input and
-              returns a value.
+            - aggregation (Union[str, Callable], optional): Either one
+              of the built-in aggregation methods ('count', 'list',
+              'len', 'min', 'max', 'mean'), or a custom callable
+              function that takes a pandas Series as input and returns a
+              value.
             - exclude_from_grouping (list, optional): Additional tunable
               parameters to exclude from grouping.
-            - export_to_file (bool, optional): Whether to export the table to a
-              file. Default is False.
-            - output_directory (str, optional): Directory to save the output
-              file. If None, uses the class's default output directory.
-            - filename (str, optional): Filename (without extension). Default:
-              "summary_tables".
-            - file_format (str, optional): Format to save in ('md', 'txt',
-              etc.). Default: 'md'.
+            - export_to_file (bool, optional): Whether to export the
+              table to a file. Default is False.
+            - output_directory (str, optional): Directory to save the
+              output file. If None, uses the class's default output
+              directory.
+            - filename (str, optional): Filename (without extension).
+              Default: "summary_tables".
+            - file_format (str, optional): Format to save in ('md',
+              'txt', etc.). Default: 'md'.
 
         Returns:
             str: A single formatted string containing all tables.
@@ -544,32 +552,34 @@ class TableGenerator(DataFrameAnalyzer):
         verbose: bool = False,
     ) -> str:
         """
-        Generate comparison tables (e.g., ratio or difference) of a value
-        variable across two categories of a pivot variable, grouped by the rest
-        of the multivalued tunable parameters.
+        Generate comparison tables (e.g., ratio or difference) of a
+        value variable across two categories of a pivot variable,
+        grouped by the rest of the multivalued tunable parameters.
 
         Args:
-            - value_variable (str): The numeric variable to compare (e.g.,
-              'Condition_number').
-            - pivot_variable (str): The categorical variable to compare across
-              (e.g., 'Kernel_operator_type'). Must have exactly two unique
-              values per group.
-            - id_variable (str): The ID variable to match entries between pivot
-              values (e.g., 'Configuration_label').
-            - comparison (str): 'ratio' or 'difference'. Default is 'ratio'.
-            - exclude_from_grouping (list, optional): Extra parameters to
-              exclude from grouping.
-            - export_to_file (bool, optional): Whether to export the table to a
-              file. Default is False.
-            - output_directory (str, optional): Directory to save output file.
-              If None, uses the class's default output directory.
-            - filename (str, optional): Name of the file to save (no extension).
-              Default is 'comparison_table'.
-            - file_format (str, optional): Output format: 'md', 'txt', etc.
-              Default is 'md'.
+            - value_variable (str): The numeric variable to compare
+              (e.g., 'Condition_number').
+            - pivot_variable (str): The categorical variable to compare
+              across (e.g., 'Kernel_operator_type'). Must have exactly
+              two unique values per group.
+            - id_variable (str): The ID variable to match entries
+              between pivot values (e.g., 'Configuration_label').
+            - comparison (str): 'ratio' or 'difference'. Default is
+              'ratio'.
+            - exclude_from_grouping (list, optional): Extra parameters
+              to exclude from grouping.
+            - export_to_file (bool, optional): Whether to export the
+              table to a file. Default is False.
+            - output_directory (str, optional): Directory to save output
+              file. If None, uses the class's default output directory.
+            - filename (str, optional): Name of the file to save (no
+              extension). Default is 'comparison_table'.
+            - file_format (str, optional): Output format: 'md', 'txt',
+              etc. Default is 'md'.
 
         Returns:
-            str: A Markdown-formatted string containing all group tables.
+            str: A Markdown-formatted string containing all group
+            tables.
         """
         if comparison not in {"ratio", "difference"}:
             raise ValueError("comparison must be either 'ratio' or 'difference'")
