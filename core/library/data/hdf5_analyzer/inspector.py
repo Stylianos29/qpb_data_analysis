@@ -144,7 +144,8 @@ class _HDF5Inspector:
                     if attrs:
                         # Store parameters from second-to-deepest level
                         self._parameters_by_group[group_path] = attrs
-                        # These are single-valued by definition (constant across all deepest groups)
+                        # These are single-valued by definition
+                        # (constant across all deepest groups)
                         for param_name, value in attrs.items():
                             # Convert numpy types to native Python types
                             if isinstance(value, (np.integer, np.floating)):
@@ -200,17 +201,23 @@ class _HDF5Inspector:
         for group_path in deepest_groups:
             group = self._file[group_path]
 
+            # Ensure we're working with a Group, not a Dataset
+            if not isinstance(group, h5py.Group):
+                continue  # Skip if it's not a group
+
             # Collect datasets in this group
             for dataset_name in group.keys():
-                if isinstance(group[dataset_name], h5py.Dataset):
+                # if isinstance(group[dataset_name], h5py.Dataset):
+                dataset_obj = group[dataset_name]
+                if isinstance(dataset_obj, h5py.Dataset):
                     full_path = f"{group_path}/{dataset_name}"
                     self._dataset_paths[dataset_name].append(full_path)
                     self._datasets_by_group[group_path].append(dataset_name)
                     all_dataset_names.add(dataset_name)
 
                     # Track entire arrays for single/multi classification
-                    dataset = group[dataset_name]
-                    dataset_value_tracker[dataset_name].append(dataset[()])
+                    # Use dataset_obj which is confirmed to be h5py.Dataset
+                    dataset_value_tracker[dataset_name].append(dataset_obj[()])
 
         # Identify gvar pairs
         self._identify_gvar_pairs(all_dataset_names)
