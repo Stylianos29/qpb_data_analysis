@@ -1,9 +1,9 @@
 """
 Private base class for read-only HDF5 file inspection.
 
-This module provides the _HDF5Inspector class, which handles the analysis of
-HDF5 file structure, parameter categorization, and dataset discovery. It serves
-as the foundation for the HDF5Analyzer public API.
+This module provides the _HDF5Inspector class, which handles the
+analysis of HDF5 file structure, parameter categorization, and dataset
+discovery. It serves as the foundation for the HDF5Analyzer public API.
 """
 
 import os
@@ -18,15 +18,15 @@ class _HDF5Inspector:
     """
     Private base class for read-only inspection of HDF5 files.
 
-    This class analyzes HDF5 file structure and categorizes parameters and
-    datasets according to the project's conventions:
+    This class analyzes HDF5 file structure and categorizes parameters
+    and datasets according to the project's conventions:
     - Directory hierarchy mirroring in top-level groups
     - Single-valued parameters as attributes at second-to-last level
     - Multi-valued parameters as attributes at deepest level
     - Datasets stored in deepest level groups
 
-    Attributes follow the same naming convention as DataFrameAnalyzer for
-    consistency.
+    Attributes follow the same naming convention as DataFrameAnalyzer
+    for consistency.
     """
 
     def __init__(self, hdf5_file_path: str):
@@ -85,12 +85,17 @@ class _HDF5Inspector:
         self._datasets_by_group = defaultdict(list)  # group_path -> [dataset_names]
         self._dataset_paths = defaultdict(list)  # dataset_name -> [full_paths]
 
+        # NEW: Single-valued parameters from second-to-deepest level
+        # groups
+        self._single_valued_parameters_from_parent = {}  # param_name -> value
+
         # Cache for gvar dataset pairs
         self._gvar_dataset_pairs = {}  # base_name -> (mean_dataset, error_dataset)
 
     def _analyze_structure(self):
         """
-        Analyze the HDF5 file structure and categorize parameters and datasets.
+        Analyze the HDF5 file structure and categorize parameters and
+        datasets.
 
         This method identifies:
         - Group hierarchy levels
@@ -124,26 +129,54 @@ class _HDF5Inspector:
     def _extract_parameters(self):
         """Extract and categorize parameters from group attributes."""
         all_param_values = defaultdict(set)
-        max_level = max(self._groups_by_level.keys())
+        max_level = max(self._groups_by_level.keys()) if self._groups_by_level else -1
+
+        # Extract single-valued parameters from second-to-deepest level
+        self._single_valued_parameters_from_parent = {}
+        if max_level > 0:  # Ensure there's a second-to-deepest level
+            second_deepest_level = max_level - 1
+            second_deepest_groups = self._groups_by_level.get(second_deepest_level, [])
+
+            for group_path in second_deepest_groups:
+                if group_path in self._file:
+                    group = self._file[group_path]
+                    attrs = dict(group.attrs)
+                    if attrs:
+                        # Store parameters from second-to-deepest level
+                        self._parameters_by_group[group_path] = attrs
+                        # These are single-valued by definition (constant across all deepest groups)
+                        for param_name, value in attrs.items():
+                            # Convert numpy types to native Python types
+                            if isinstance(value, (np.integer, np.floating)):
+                                value = value.item()
+                            self._single_valued_parameters_from_parent[param_name] = (
+                                value
+                            )
 
         # Extract multi-valued parameters from deepest level
-        deepest_groups = self._groups_by_level[max_level]
+        deepest_groups = self._groups_by_level.get(max_level, [])
 
         for group_path in deepest_groups:
-            group = self._file[group_path]
-            attrs = dict(group.attrs)
-            if attrs:
-                self._parameters_by_group[group_path] = attrs
-                # Track all values for each parameter
-                for param_name, value in attrs.items():
-                    # Convert numpy arrays to tuples for hashability
-                    if isinstance(value, np.ndarray):
-                        value = tuple(value.flatten())
-                    elif isinstance(value, (np.integer, np.floating)):
-                        value = value.item()  # Convert to native Python type
-                    all_param_values[param_name].add(value)
+            if group_path in self._file:
+                group = self._file[group_path]
+                attrs = dict(group.attrs)
+                if attrs:
+                    self._parameters_by_group[group_path] = attrs
+                    # Track all values for each parameter
+                    for param_name, value in attrs.items():
+                        # Convert numpy arrays to tuples for hashability
+                        if isinstance(value, np.ndarray):
+                            value = tuple(value.flatten())
+                        elif isinstance(value, (np.integer, np.floating)):
+                            value = value.item()  # Convert to native Python type
+                        all_param_values[param_name].add(value)
 
         # Now categorize ALL parameters based on their value counts
+        # First add the single-valued parameters from parent groups
+        for param_name, value in self._single_valued_parameters_from_parent.items():
+            self.unique_value_columns_dictionary[param_name] = value
+
+        # Then categorize parameters from deepest level groups
         for param_name, values in all_param_values.items():
             if len(values) == 1:
                 # Single-valued parameter
@@ -219,9 +252,9 @@ class _HDF5Inspector:
         """
         Check if all dataset values are identical across all groups.
 
-        A dataset is single-valued if the entire array is the same across all
-        subgroups at the same level (analogous to a column having the same value
-        across all DataFrame rows).
+        A dataset is single-valued if the entire array is the same
+        across all subgroups at the same level (analogous to a column
+        having the same value across all DataFrame rows).
 
         Args:
             values_list: List of numpy arrays from different groups
@@ -243,7 +276,8 @@ class _HDF5Inspector:
         return True
 
     def _categorize_columns(self):
-        """Categorize all parameters and datasets into appropriate lists."""
+        """Categorize all parameters and datasets into appropriate
+        lists."""
         # Combine all column names
         all_params = set(self.unique_value_columns_dictionary.keys()) | set(
             self.multivalued_columns_count_dictionary.keys()

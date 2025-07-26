@@ -109,7 +109,8 @@ class _HDF5DataManager(_HDF5Inspector):
 
     def _parameters_for_group(self, group_path: str) -> Dict[str, Any]:
         """
-        Get all parameters (single and multi-valued) for a specific group.
+        Get all parameters (single and multi-valued) for a specific
+        group.
 
         Args:
             group_path: Path to the deepest level group
@@ -119,18 +120,16 @@ class _HDF5DataManager(_HDF5Inspector):
         """
         all_params = {}
 
-        # Start with single-valued parameters
-        all_params.update(self.unique_value_columns_dictionary)
+        # Start with single-valued parameters from parent groups
+        all_params.update(self._single_valued_parameters_from_parent)
 
-        # Add parameters from all levels up to this group
-        current_path = group_path
-        while current_path:
-            if current_path in self._parameters_by_group:
-                # Add parameters from this level (don't overwrite existing)
-                for param, value in self._parameters_by_group[current_path].items():
-                    if param not in all_params:
-                        all_params[param] = value
-            current_path = current_path.rsplit("/", 1)[0] if "/" in current_path else ""
+        # Add parameters from this specific deepest group
+        if group_path in self._parameters_by_group:
+            # Add parameters from this group (don't overwrite parent
+            # parameters)
+            for param, value in self._parameters_by_group[group_path].items():
+                if param not in all_params:
+                    all_params[param] = value
 
         return all_params
 
