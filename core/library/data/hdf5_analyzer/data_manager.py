@@ -196,9 +196,9 @@ class _HDF5DataManager(_HDF5Inspector):
     def restore_original_data(self):
         """
         Restore all groups (remove all restrictions).
-        
+
         This mirrors DataFrameAnalyzer's restore_original_data.
-        
+
         Returns:
             self for method chaining
         """
