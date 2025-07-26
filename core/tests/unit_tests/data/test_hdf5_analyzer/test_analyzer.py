@@ -190,7 +190,7 @@ class TestUniqueValuesMethod:
     def test_unique_values_with_print(self, synthetic_hdf5_with_gvar, capsys):
         """Test unique_values with print_output=True."""
         analyzer = HDF5Analyzer(synthetic_hdf5_with_gvar)
-        values = analyzer.unique_values("algorithm", print_output=True)
+        values = analyzer.unique_values("algorithm")
 
         captured = capsys.readouterr()
         assert "2 unique values" in captured.out
