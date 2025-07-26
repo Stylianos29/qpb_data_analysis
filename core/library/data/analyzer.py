@@ -39,6 +39,7 @@ Dependencies:
     - pandas: For DataFrame operations
     - library.constants: For TUNABLE_PARAMETER_NAMES_LIST
 """
+
 from typing import Optional
 
 import pandas as pd
@@ -128,9 +129,7 @@ class _DataFrameInspector:
 
         # Get single and multi-valued columns
         self.unique_value_columns_dictionary = self._unique_value_columns()
-        self.multivalued_columns_count_dictionary = (
-            self._multivalued_columns_count()
-        )
+        self.multivalued_columns_count_dictionary = self._multivalued_columns_count()
 
         # Extract column name lists
         self.list_of_single_valued_column_names = list(

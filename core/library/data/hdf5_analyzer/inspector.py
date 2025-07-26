@@ -323,7 +323,7 @@ class _HDF5Inspector:
                     elif isinstance(value, (np.integer, np.floating)):
                         value = value.item()  # Convert to native Python type
                     values.add(value)
-            
+
             # Convert back to numpy arrays if needed
             result = []
             for value in values:
