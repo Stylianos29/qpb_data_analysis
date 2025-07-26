@@ -289,7 +289,7 @@ class HDF5Plotter(HDF5Analyzer):
 
         return df
 
-    def _create_regular_dataframe(self, dataset_name: str, x_variable: str) -> pd.DataFrame:
+    def _create_regular_dataframe_retired(self, dataset_name: str, x_variable: str) -> pd.DataFrame:
         """Create DataFrame for regular (non-gvar) datasets."""
         # Validate that dataset exists
         if dataset_name not in self.list_of_output_quantity_names_from_hdf5:
@@ -301,6 +301,78 @@ class HDF5Plotter(HDF5Analyzer):
             add_time_column=(x_variable == "time_index"),
             flatten_arrays=True,
         )
+
+        return df
+
+    def _create_regular_dataframe(self, dataset_name: str, x_variable: str) -> pd.DataFrame:
+        """Create DataFrame for regular (non-gvar) datasets."""
+        # Validate that dataset exists
+        if dataset_name not in self.list_of_output_quantity_names_from_hdf5:
+            raise ValueError(f"'{dataset_name}' is not a dataset in the HDF5 file.")
+
+        if x_variable == "time_index":
+            # Standard case: plot vs time indices
+            df = self.create_dataset_dataframe(
+                dataset_name,
+                add_time_column=True,
+                flatten_arrays=True,
+            )
+        elif x_variable in self.list_of_output_quantity_names_from_hdf5:
+            # x_variable is another dataset - need to merge them
+            y_df = self.create_dataset_dataframe(
+                dataset_name,
+                add_time_column=False,
+                flatten_arrays=True,
+            )
+            
+            x_df = self.create_dataset_dataframe(
+                x_variable,
+                add_time_column=False,
+                flatten_arrays=True,
+            )
+            
+            # Find common parameter columns (excluding the dataset columns themselves)
+            parameter_columns = [
+                col for col in y_df.columns 
+                if col in x_df.columns and col != dataset_name and col != x_variable
+            ]
+            
+            if not parameter_columns:
+                raise ValueError(
+                    f"No common parameter columns found between '{dataset_name}' and '{x_variable}' "
+                    "datasets. Cannot merge for plotting."
+                )
+            
+            # Merge the DataFrames on common parameter columns
+            df = pd.merge(
+                y_df, x_df, 
+                on=parameter_columns, 
+                how='inner',
+                suffixes=('', '_x')
+            )
+            
+            # Verify the merge worked
+            if df.empty:
+                raise ValueError(
+                    f"Merging '{dataset_name}' and '{x_variable}' resulted in empty DataFrame. "
+                    "Check that they have matching parameter combinations."
+                )
+                
+        else:
+            # x_variable might be a parameter column - use standard approach
+            df = self.create_dataset_dataframe(
+                dataset_name,
+                add_time_column=False,
+                flatten_arrays=True,
+            )
+            
+            # Validate that x_variable exists as a column
+            if x_variable not in df.columns:
+                raise ValueError(
+                    f"'{x_variable}' is not a dataset in the HDF5 file and not a parameter column. "
+                    f"Available datasets: {self.list_of_output_quantity_names_from_hdf5[:5]}... "
+                    f"Available parameter columns: {[col for col in df.columns if col != dataset_name][:5]}..."
+                )
 
         return df
 
