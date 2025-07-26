@@ -58,18 +58,16 @@ class _HDF5Inspector:
         self._analyze_structure()
 
     def _initialize_storage(self):
-        """Initialize internal storage structures with
-        DataFrameAnalyzer-compatible names."""
+        """Initialize internal storage structures with HDF5-appropriate
+        names."""
         # Column (parameter/dataset) lists
-        self.list_of_dataframe_column_names = []  # All parameters and datasets
-        self.list_of_tunable_parameter_names_from_dataframe = []
-        self.list_of_output_quantity_names_from_dataframe = []
+        self.list_of_dataframe_column_names = []  # Keep this for API compatibility
+        self.list_of_tunable_parameter_names_from_hdf5 = []
+        self.list_of_output_quantity_names_from_hdf5 = []
 
         # Value analysis dictionaries
-        self.unique_value_columns_dictionary = {}  # Single-valued params -> value
-        self.multivalued_columns_count_dictionary = defaultdict(
-            int
-        )  # Multi-valued -> count
+        self.unique_value_columns_dictionary = {}
+        self.multivalued_columns_count_dictionary = defaultdict(int)
 
         # Categorized lists
         self.list_of_single_valued_column_names = []
@@ -80,17 +78,12 @@ class _HDF5Inspector:
         self.list_of_multivalued_output_quantity_names = []
 
         # HDF5-specific storage
-        self._groups_by_level = defaultdict(list)  # level -> [group_paths]
-        self._parameters_by_group = {}  # group_path -> {param: value}
-        self._datasets_by_group = defaultdict(list)  # group_path -> [dataset_names]
-        self._dataset_paths = defaultdict(list)  # dataset_name -> [full_paths]
-
-        # NEW: Single-valued parameters from second-to-deepest level
-        # groups
-        self._single_valued_parameters_from_parent = {}  # param_name -> value
-
-        # Cache for gvar dataset pairs
-        self._gvar_dataset_pairs = {}  # base_name -> (mean_dataset, error_dataset)
+        self._groups_by_level = defaultdict(list)
+        self._parameters_by_group = {}
+        self._datasets_by_group = defaultdict(list)
+        self._dataset_paths = defaultdict(list)
+        self._single_valued_parameters_from_parent = {}
+        self._gvar_dataset_pairs = {}
 
     def _analyze_structure(self):
         """
@@ -285,23 +278,30 @@ class _HDF5Inspector:
     def _categorize_columns(self):
         """Categorize all parameters and datasets into appropriate
         lists."""
-        # Combine all column names
+        from ...constants import TUNABLE_PARAMETER_NAMES_LIST
+
+        # Combine all column names (parameters + datasets)
         all_params = set(self.unique_value_columns_dictionary.keys()) | set(
             self.multivalued_columns_count_dictionary.keys()
         )
         self.list_of_dataframe_column_names = sorted(list(all_params))
 
-        # Separate tunable parameters from output quantities
-        # For now, all attributes are considered tunable parameters
-        # and all datasets are output quantities
+        # Get all parameter names from HDF5 attributes
         param_names = set()
         for params in self._parameters_by_group.values():
             param_names.update(params.keys())
+        # Also include single-valued parameters from parent groups
+        param_names.update(self._single_valued_parameters_from_parent.keys())
 
-        self.list_of_tunable_parameter_names_from_dataframe = sorted(list(param_names))
+        # FIXED: Filter parameters using TUNABLE_PARAMETER_NAMES_LIST
+        # Only parameters that are in the constant list are considered tunable
+        self.list_of_tunable_parameter_names_from_hdf5 = sorted(
+            [name for name in param_names if name in TUNABLE_PARAMETER_NAMES_LIST]
+        )
 
+        # Datasets are always output quantities
         dataset_names = set(self._dataset_paths.keys())
-        self.list_of_output_quantity_names_from_dataframe = sorted(list(dataset_names))
+        self.list_of_output_quantity_names_from_hdf5 = sorted(list(dataset_names))
 
         # Single vs multi-valued lists
         self.list_of_single_valued_column_names = sorted(
@@ -311,8 +311,8 @@ class _HDF5Inspector:
             list(self.multivalued_columns_count_dictionary.keys())
         )
 
-        # Categorized parameter lists
-        param_set = set(self.list_of_tunable_parameter_names_from_dataframe)
+        # Categorized parameter lists (using the filtered tunable parameters)
+        param_set = set(self.list_of_tunable_parameter_names_from_hdf5)
         self.list_of_single_valued_tunable_parameter_names = [
             name
             for name in self.list_of_single_valued_column_names
@@ -323,7 +323,7 @@ class _HDF5Inspector:
         ]
 
         # Categorized output quantity lists
-        output_set = set(self.list_of_output_quantity_names_from_dataframe)
+        output_set = set(self.list_of_output_quantity_names_from_hdf5)
         self.list_of_single_valued_output_quantity_names = [
             name
             for name in self.list_of_single_valued_column_names

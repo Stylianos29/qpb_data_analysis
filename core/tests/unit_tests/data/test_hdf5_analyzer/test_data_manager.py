@@ -310,14 +310,11 @@ class TestVirtualDatasets:
         """Test that virtual datasets appear in dataset lists."""
         manager = _HDF5DataManager(synthetic_hdf5_file)
 
-        initial_count = len(manager.list_of_output_quantity_names_from_dataframe)
+        initial_count = len(manager.list_of_output_quantity_names_from_hdf5)
         manager.transform_dataset("time", lambda x: x + 1, "time_plus_one")
 
-        assert "time_plus_one" in manager.list_of_output_quantity_names_from_dataframe
-        assert (
-            len(manager.list_of_output_quantity_names_from_dataframe)
-            == initial_count + 1
-        )
+        assert "time_plus_one" in manager.list_of_output_quantity_names_from_hdf5
+        assert len(manager.list_of_output_quantity_names_from_hdf5) == initial_count + 1
 
 
 class TestDataFrameGeneration:

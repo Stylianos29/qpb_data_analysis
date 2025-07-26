@@ -129,8 +129,8 @@ class TestHDF5AnalyzerInitialization:
         """Test that all DataFrameAnalyzer-like properties are accessible."""
         # These should all work from inheritance
         assert hasattr(analyzer, "list_of_dataframe_column_names")
-        assert hasattr(analyzer, "list_of_tunable_parameter_names_from_dataframe")
-        assert hasattr(analyzer, "list_of_output_quantity_names_from_dataframe")
+        assert hasattr(analyzer, "list_of_tunable_parameter_names_from_hdf5")
+        assert hasattr(analyzer, "list_of_output_quantity_names_from_hdf5")
         assert hasattr(analyzer, "list_of_multivalued_tunable_parameter_names")
         assert hasattr(analyzer, "list_of_single_valued_tunable_parameter_names")
 

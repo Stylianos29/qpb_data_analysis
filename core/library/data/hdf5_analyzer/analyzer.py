@@ -212,7 +212,7 @@ class HDF5Analyzer(_HDF5DataManager):
             ValueError: If the parameter doesn't exist
         """
         # Check if it's a dataset first
-        if parameter_name in self.list_of_output_quantity_names_from_dataframe:
+        if parameter_name in self.list_of_output_quantity_names_from_hdf5:
             raise ValueError(
                 f"'{parameter_name}' is a dataset (output quantity), "
                 "not a parameter. Use dataset_values() instead."
@@ -575,7 +575,7 @@ class HDF5Analyzer(_HDF5DataManager):
             f"HDF5Analyzer('{self._original_file_path}')\n"
             f"  Total groups: {len(self._all_deepest_groups)}\n"
             f"  Active groups: {len(self.active_groups)}\n"
-            f"  Tunable parameters: {len(self.list_of_tunable_parameter_names_from_dataframe)}\n"
-            f"  Output quantities: {len(self.list_of_output_quantity_names_from_dataframe)}\n"
+            f"  Tunable parameters: {len(self.list_of_tunable_parameter_names_from_hdf5)}\n"
+            f"  Output quantities: {len(self.list_of_output_quantity_names_from_hdf5)}\n"
             f"  Virtual datasets: {len(self._virtual_datasets)}"
         )

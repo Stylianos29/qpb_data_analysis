@@ -331,8 +331,8 @@ class _HDF5DataManager(_HDF5Inspector):
         self._virtual_datasets[new_name] = (transform_func, [source_dataset])
 
         # Add to output quantities list
-        if new_name not in self.list_of_output_quantity_names_from_dataframe:
-            self.list_of_output_quantity_names_from_dataframe.append(new_name)
+        if new_name not in self.list_of_output_quantity_names_from_hdf5:
+            self.list_of_output_quantity_names_from_hdf5.append(new_name)
             self.list_of_dataframe_column_names.append(new_name)
             # Assume transformed datasets are multi-valued
             self.list_of_multivalued_column_names.append(new_name)
@@ -380,7 +380,7 @@ class _HDF5DataManager(_HDF5Inspector):
             DataFrame with requested data
         """
         if datasets is None:
-            datasets = self.list_of_output_quantity_names_from_dataframe.copy()
+            datasets = self.list_of_output_quantity_names_from_hdf5.copy()
             # Include virtual datasets
             datasets.extend(self._virtual_datasets.keys())
 
