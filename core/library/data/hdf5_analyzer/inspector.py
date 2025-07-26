@@ -276,32 +276,36 @@ class _HDF5Inspector:
         return True
 
     def _categorize_columns(self):
-        """Categorize all parameters and datasets into appropriate
-        lists."""
+        """Categorize all parameters and datasets into appropriate lists."""
         from ...constants import TUNABLE_PARAMETER_NAMES_LIST
+        
+        # Get all parameter names from HDF5 attributes
+        all_param_names = set()
+        for params in self._parameters_by_group.values():
+            all_param_names.update(params.keys())
+        # Also include single-valued parameters from parent groups
+        all_param_names.update(self._single_valued_parameters_from_parent.keys())
+
+        # Get all dataset names
+        dataset_names = set(self._dataset_paths.keys())
+
+        # FIXED: Proper categorization logic
+        # Tunable parameters = attributes that ARE in TUNABLE_PARAMETER_NAMES_LIST
+        self.list_of_tunable_parameter_names_from_hdf5 = sorted([
+            name for name in all_param_names 
+            if name in TUNABLE_PARAMETER_NAMES_LIST
+        ])
+
+        # Output quantities = ALL datasets + attributes that are NOT tunable parameters
+        tunable_param_names = set(self.list_of_tunable_parameter_names_from_hdf5)
+        non_tunable_param_names = all_param_names - tunable_param_names
+        self.list_of_output_quantity_names_from_hdf5 = sorted(
+            list(dataset_names | non_tunable_param_names)
+        )
 
         # Combine all column names (parameters + datasets)
-        all_params = set(self.unique_value_columns_dictionary.keys()) | set(
-            self.multivalued_columns_count_dictionary.keys()
-        )
-        self.list_of_dataframe_column_names = sorted(list(all_params))
-
-        # Get all parameter names from HDF5 attributes
-        param_names = set()
-        for params in self._parameters_by_group.values():
-            param_names.update(params.keys())
-        # Also include single-valued parameters from parent groups
-        param_names.update(self._single_valued_parameters_from_parent.keys())
-
-        # FIXED: Filter parameters using TUNABLE_PARAMETER_NAMES_LIST
-        # Only parameters that are in the constant list are considered tunable
-        self.list_of_tunable_parameter_names_from_hdf5 = sorted(
-            [name for name in param_names if name in TUNABLE_PARAMETER_NAMES_LIST]
-        )
-
-        # Datasets are always output quantities
-        dataset_names = set(self._dataset_paths.keys())
-        self.list_of_output_quantity_names_from_hdf5 = sorted(list(dataset_names))
+        all_columns = tunable_param_names | dataset_names | non_tunable_param_names
+        self.list_of_dataframe_column_names = sorted(list(all_columns))
 
         # Single vs multi-valued lists
         self.list_of_single_valued_column_names = sorted(
@@ -322,7 +326,7 @@ class _HDF5Inspector:
             name for name in self.list_of_multivalued_column_names if name in param_set
         ]
 
-        # Categorized output quantity lists
+        # Categorized output quantity lists  
         output_set = set(self.list_of_output_quantity_names_from_hdf5)
         self.list_of_single_valued_output_quantity_names = [
             name
@@ -332,7 +336,7 @@ class _HDF5Inspector:
         self.list_of_multivalued_output_quantity_names = [
             name for name in self.list_of_multivalued_column_names if name in output_set
         ]
-
+        
     def column_unique_values(self, column_name: str) -> List[Any]:
         """
         Return sorted list of unique values for the specified column.
