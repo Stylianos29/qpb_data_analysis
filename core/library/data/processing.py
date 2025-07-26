@@ -1,7 +1,8 @@
-import pandas as pd
 import logging
 from pathlib import Path
 from typing import Dict, Callable, Optional, Union, Set
+
+import pandas as pd
 
 from ..constants import DTYPE_MAPPING, CONVERTERS_MAPPING
 
@@ -16,24 +17,25 @@ def load_csv(
     apply_categorical: bool = True,
 ) -> pd.DataFrame:
     """
-    Loads a CSV file into a Pandas DataFrame with robust error handling and
-    optional filtering of dtypes and converters based on the CSV file's header.
+    Loads a CSV file into a Pandas DataFrame with robust error handling
+    and optional filtering of dtypes and converters based on the CSV
+    file's header.
 
     Parameters:
     -----------
     input_csv_file_path : str or Path
         Path to the input CSV file.
     dtype_mapping : dict, optional
-        A dictionary mapping column names to data types.
-        Defaults to DTYPE_MAPPING from constants.
+        A dictionary mapping column names to data types. Defaults to
+        DTYPE_MAPPING from constants.
     converters_mapping : dict, optional
         A dictionary mapping column names to converter functions.
         Defaults to CONVERTERS_MAPPING from constants.
     categorical_columns : dict, optional
         A dictionary mapping column names to categorical configuration:
-        {column_name: {'categories': [list], 'ordered': bool}}
-        Example: {'Kernel_operator_type': {'categories': ['Wilson',
-        'Brillouin'], 'ordered': True}}
+        {column_name: {'categories': [list], 'ordered': bool}} Example:
+        {'Kernel_operator_type': {'categories': ['Wilson', 'Brillouin'],
+        'ordered': True}}
     validate_required_columns : set, optional
         Set of column names that must be present in the CSV.
     encoding : str, optional
@@ -44,14 +46,16 @@ def load_csv(
     Returns:
     --------
     pd.DataFrame
-        The loaded DataFrame with the specified dtypes and converters applied.
+        The loaded DataFrame with the specified dtypes and converters
+        applied.
 
     Raises:
     -------
     FileNotFoundError
         If the CSV file doesn't exist.
     ValueError
-        If required columns are missing or if the file is not a valid CSV.
+        If required columns are missing or if the file is not a valid
+        CSV.
     pd.errors.EmptyDataError
         If the CSV file is empty.
     UnicodeDecodeError
