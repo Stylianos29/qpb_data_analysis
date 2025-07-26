@@ -381,6 +381,14 @@ class HDF5Analyzer(_HDF5DataManager):
             for group_path in self.active_groups:
                 out_group = out_file[group_path]
 
+                # Check if out_group is actually a Group
+                if not isinstance(out_group, h5py.Group):
+                    print(
+                        f"Warning: {group_path} is not a Group, "
+                        f"it's a {type(out_group)}"
+                    )
+                    continue
+
                 # Copy original datasets
                 if group_path in self._datasets_by_group:
                     for dataset_name in self._datasets_by_group[group_path]:
@@ -406,6 +414,16 @@ class HDF5Analyzer(_HDF5DataManager):
                         # Convert to numpy array if needed
                         if isinstance(data, (int, float)):
                             data = np.array(data)
+                        elif isinstance(data, list):
+                            # Handle list of arrays - you have a few
+                            # options: Option 1: Stack into single array
+                            # (if arrays have compatible shapes)
+                            try:
+                                data = np.array(data)
+                            except ValueError:
+                                # Option 2: If can't stack, handle as
+                                # separate datasets or flatten
+                                data = np.concatenate([arr.flatten() for arr in data])
 
                         # Create dataset with or without compression based on shape
                         if data.shape == ():
@@ -493,6 +511,18 @@ class HDF5Analyzer(_HDF5DataManager):
                             # Convert to numpy array if needed
                             if isinstance(data, (int, float)):
                                 data = np.array(data)
+                            elif isinstance(data, list):
+                                # Handle list of arrays - you have a few
+                                # options: Option 1: Stack into single array
+                                # (if arrays have compatible shapes)
+                                try:
+                                    data = np.array(data)
+                                except ValueError:
+                                    # Option 2: If can't stack, handle as
+                                    # separate datasets or flatten
+                                    data = np.concatenate(
+                                        [arr.flatten() for arr in data]
+                                    )
 
                             # Check if scalar
                             if data.shape == ():
