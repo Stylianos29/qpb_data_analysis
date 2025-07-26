@@ -22,13 +22,13 @@ TUNABLE_PARAMETER_NAMES_LIST = [
     "Number_of_Chebyshev_terms",
     "Number_of_spinors",
     "Number_of_vectors",
+    "Outer_solver_epsilon",
     "Overlap_operator_method",
     "QCD_beta_value",
     "Rho_value",
     "Solver_epsilon",
     "Threads_per_process",
 ]
-
 
 OUTPUT_QUANTITY_NAMES_LIST = [
     "Adjusted_average_core_hours_per_spinor",
