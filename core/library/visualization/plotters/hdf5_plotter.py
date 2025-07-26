@@ -226,12 +226,23 @@ class HDF5Plotter(HDF5Analyzer):
         **plot_kwargs
             Plotting arguments
         """
+
+        # Fix: Check for the actual datasets that will be used
+        mean_dataset = f"{base_name}_mean_values"
+        error_dataset = f"{base_name}_error_values"
+
+        if mean_dataset not in self.list_of_output_quantity_names_from_hdf5:
+            raise ValueError(f"'{mean_dataset}' is not a dataset in the HDF5 file.")
+        
+        if error_dataset not in self.list_of_output_quantity_names_from_hdf5:
+            raise ValueError(f"'{error_dataset}' is not a dataset in the HDF5 file.")
+        
         # Use the HDF5Analyzer's gvar DataFrame creation
         df = self.create_merged_value_error_dataframe(
             base_name, add_time_column=(x_variable == "time_index")
         )
 
-        self.set_plot_variables(x_variable, base_name)
+        self.set_plot_variables(x_variable, mean_dataset)
         return self._plot_via_dataframer(df, **plot_kwargs)
 
     def add_inset(self, **kwargs) -> "HDF5Plotter":
