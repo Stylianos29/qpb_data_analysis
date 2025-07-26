@@ -112,6 +112,7 @@ AXES_LABELS_BY_COLUMN_NAME = {
     "Core_hours_for_constant_PCAC_mass": "Computational cost (core-hours/spinor/config)",
     "Critical_bare_mass": "a$m^{\\text{critical}}_{\\text{bare}}$",
     "Jackknife_average_of_PCAC_mass_correlator": "a$m_{\\text{PCAC}}$(t)",
+    "Jackknife_average_of_PCAC_mass_correlator_mean_values": "a$m_{\\text{PCAC}}$(t)",
     "Jackknife_average_of_pion_effective_mass_correlator": "a$m_{\\text{eff.}}(t)$",
     "KL_diagonal_order": "n",
     "Number_of_Chebyshev_terms": "N",
