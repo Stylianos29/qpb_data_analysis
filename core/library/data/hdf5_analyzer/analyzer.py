@@ -1,17 +1,18 @@
 """
 Public HDF5Analyzer class for analyzing HDF5 files with structured data.
 
-This module provides the main public interface for HDF5 file analysis, combining
-inspection and data management capabilities while maintaining a familiar API
-similar to DataFrameAnalyzer.
+This module provides the main public interface for HDF5 file analysis,
+combining inspection and data management capabilities while maintaining
+a familiar API similar to DataFrameAnalyzer.
 """
 
 from typing import List, Any, Optional, Callable, Union
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import h5py
 import gvar
-from pathlib import Path
 
 from .data_manager import _HDF5DataManager
 
@@ -21,15 +22,16 @@ class HDF5Analyzer(_HDF5DataManager):
     A comprehensive analyzer for HDF5 files following the project's data
     structure.
 
-    This class provides a familiar API similar to DataFrameAnalyzer while
-    working directly with HDF5 files. It supports:
+    This class provides a familiar API similar to DataFrameAnalyzer
+    while working directly with HDF5 files. It supports:
     - Parameter categorization (single/multi-valued, tunable/output)
     - Data filtering and restrictions
     - Automatic gvar array handling
     - Virtual dataset transformations
     - DataFrame export for compatibility with other tools
 
-    The HDF5 file remains read-only; all operations work on virtual views.
+    The HDF5 file remains read-only; all operations work on virtual
+    views.
 
     Examples:
         >>> analyzer = HDF5Analyzer('data.h5')
@@ -57,8 +59,8 @@ class HDF5Analyzer(_HDF5DataManager):
             hdf5_file_path: Path to the HDF5 file to analyze
 
         Raises:
-            FileNotFoundError: If the file doesn't exist
-            ValueError: If the file is not a valid HDF5 file
+            - FileNotFoundError: If the file doesn't exist
+            - ValueError: If the file is not a valid HDF5 file
         """
         # Convert Path to string if needed
         if isinstance(hdf5_file_path, Path):
@@ -76,14 +78,13 @@ class HDF5Analyzer(_HDF5DataManager):
         Generate a formatted report on parameter and dataset uniqueness.
 
         This method creates a table showing:
-
         - Single-valued parameters/datasets with their values
         - Multi-valued parameters/datasets with counts of unique values
 
         Args:
-            max_width: Maximum width of the report in characters
-            separate_by_type: Whether to separate tunable parameters from output
-            quantities
+            - max_width: Maximum width of the report in characters
+            - separate_by_type: Whether to separate tunable parameters
+              from output quantities
 
         Returns:
             Formatted string containing the uniqueness report
@@ -201,8 +202,8 @@ class HDF5Analyzer(_HDF5DataManager):
         HDF5Analyzer.
 
         Args:
-            parameter_name: Name of the parameter to analyze print_output:
-            Whether to print the values (default: False)
+            - parameter_name: Name of the parameter to analyze
+            - print_output: Whether to print the values (default: False)
 
         Returns:
             Sorted list of unique values
@@ -248,17 +249,22 @@ class HDF5Analyzer(_HDF5DataManager):
         flatten_arrays: bool = True,
     ) -> pd.DataFrame:
         """
-        Create a DataFrame from a specific dataset across all active groups.
+        Create a DataFrame from a specific dataset across all active
+        groups.
 
-        This method provides compatibility with the original HDF5Analyzer API.
+        This method provides compatibility with the original
+        HDF5Analyzer API.
 
         Args:
-            dataset_name: Name of the dataset (or base name for gvar pairs)
-            add_time_column: Whether to add time_index column
-            time_offset: Offset for time indices
-            filter_func: Optional function to filter groups
-            include_group_path: Whether to include group paths in DataFrame
-            flatten_arrays: Whether to create one row per array element
+            - dataset_name: Name of the dataset (or base name for gvar
+              pairs)
+            - add_time_column: Whether to add time_index column
+            - time_offset: Offset for time indices
+            - filter_func: Optional function to filter groups
+            - include_group_path: Whether to include group paths in
+              DataFrame
+            - flatten_arrays: Whether to create one row per array
+              element
 
         Returns:
             DataFrame containing the dataset and associated parameters
@@ -300,14 +306,16 @@ class HDF5Analyzer(_HDF5DataManager):
         include_group_path: bool = False,
     ) -> pd.DataFrame:
         """
-        Create a DataFrame with automatic gvar merging for mean/error pairs.
+        Create a DataFrame with automatic gvar merging for mean/error
+        pairs.
 
         Args:
-            base_name: Base dataset name (without _mean_values/_error_values)
-            add_time_column: Whether to add time_index column
-            time_offset: Offset for time indices
-            filter_func: Optional function to filter groups
-            include_group_path: Whether to include group paths
+            - base_name: Base dataset name (without
+              _mean_values/_error_values)
+            - add_time_column: Whether to add time_index column
+            - time_offset: Offset for time indices
+            - filter_func: Optional function to filter groups
+            - include_group_path: Whether to include group paths
 
         Returns:
             DataFrame with gvar values
@@ -342,15 +350,19 @@ class HDF5Analyzer(_HDF5DataManager):
         compression_opts: int = 4,
     ) -> None:
         """
-        Save current data view (with restrictions and transformations) to a new HDF5 file.
+        Save current data view (with restrictions and transformations)
+        to a new HDF5 file.
 
-        The output file maintains the same hierarchical structure as the input.
+        The output file maintains the same hierarchical structure as the
+        input.
 
         Args:
-            output_path: Path for the output HDF5 file
-            include_virtual: Whether to include virtual (transformed) datasets
-            compression: HDF5 compression filter ('gzip', 'lzf', or None)
-            compression_opts: Compression level (1-9 for gzip)
+            - output_path: Path for the output HDF5 file
+            - include_virtual: Whether to include virtual (transformed)
+              datasets
+            - compression: HDF5 compression filter ('gzip', 'lzf', or
+              None)
+            - compression_opts: Compression level (1-9 for gzip)
         """
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -425,7 +437,8 @@ class HDF5Analyzer(_HDF5DataManager):
                                 # separate datasets or flatten
                                 data = np.concatenate([arr.flatten() for arr in data])
 
-                        # Create dataset with or without compression based on shape
+                        # Create dataset with or without compression
+                        # based on shape
                         if data.shape == ():
                             # Scalar dataset - no compression allowed
                             out_group.create_dataset(dataset_name, data=data)
@@ -433,12 +446,14 @@ class HDF5Analyzer(_HDF5DataManager):
                             # Non-scalar dataset - can use compression
                             if compression:
                                 if compression == "lzf":
-                                    # LZF doesn't support compression_opts
+                                    # LZF doesn't support
+                                    # compression_opts
                                     out_group.create_dataset(
                                         dataset_name, data=data, compression=compression
                                     )
                                 else:
-                                    # Other compression types (like gzip) support options
+                                    # Other compression types (like
+                                    # gzip) support options
                                     out_group.create_dataset(
                                         dataset_name,
                                         data=data,
@@ -486,7 +501,8 @@ class HDF5Analyzer(_HDF5DataManager):
                                             compression=compression,
                                         )
                                     else:
-                                        # Other compression types (like gzip) support options
+                                        # Other compression types (like
+                                        # gzip) support options
                                         out_group.create_dataset(
                                             f"{virtual_name}_mean_values",
                                             data=mean_data,
@@ -537,7 +553,8 @@ class HDF5Analyzer(_HDF5DataManager):
                                             compression=compression,
                                         )
                                     else:
-                                        # Other compression types (like gzip) support options
+                                        # Other compression types (like
+                                        # gzip) support options
                                         out_group.create_dataset(
                                             virtual_name,
                                             data=data,
