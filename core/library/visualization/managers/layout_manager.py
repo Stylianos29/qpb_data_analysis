@@ -469,18 +469,59 @@ class PlotLayoutManager:
         show_yaxis_label: bool = False,
     ) -> None:
         """
-        Setup simplified labels for inset axes with visibility control.
+        Setup labels for inset axes with visibility control.
 
-        By default, insets don't show labels, but this can be overridden.
+        This method now properly uses the constants module like the main
+        _setup_axes_labels method, ensuring consistent labeling between
+        main plots and insets.
+
+        By default, insets don't show labels, but this can be
+        overridden.
         """
+        # Determine x-axis label (similar to _setup_axes_labels)
         if show_xaxis_label:
-            x_label = self._create_abbreviated_label(x_variable)
+            if self.constants:
+                x_label = getattr(self.constants, "AXES_LABELS_BY_COLUMN_NAME", {}).get(
+                    x_variable, None
+                )
+
+                # If not found in axes labels, try title labels as
+                # fallback
+                if x_label is None:
+                    x_label = getattr(
+                        self.constants, "TITLE_LABELS_BY_COLUMN_NAME", {}
+                    ).get(x_variable, None)
+
+                # If still not found, create abbreviated label
+                if x_label is None:
+                    x_label = self._create_abbreviated_label(x_variable)
+            else:
+                x_label = self._create_abbreviated_label(x_variable)
+
             ax.set_xlabel(x_label, fontsize=8)
         else:
             ax.set_xlabel("", fontsize=8)
 
+        # Determine y-axis label (similar to _setup_axes_labels)
         if show_yaxis_label:
-            y_label = self._create_abbreviated_label(y_variable)
+            if self.constants:
+                y_label = getattr(self.constants, "AXES_LABELS_BY_COLUMN_NAME", {}).get(
+                    y_variable, None
+                )
+
+                # If not found in axes labels, try title labels as
+                # fallback
+                if y_label is None:
+                    y_label = getattr(
+                        self.constants, "TITLE_LABELS_BY_COLUMN_NAME", {}
+                    ).get(y_variable, None)
+
+                # If still not found, create abbreviated label
+                if y_label is None:
+                    y_label = self._create_abbreviated_label(y_variable)
+            else:
+                y_label = self._create_abbreviated_label(y_variable)
+
             ax.set_ylabel(y_label, fontsize=8)
         else:
             ax.set_ylabel("", fontsize=8)
