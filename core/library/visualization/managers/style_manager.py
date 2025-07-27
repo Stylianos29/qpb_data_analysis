@@ -155,7 +155,8 @@ class PlotStyleManager:
         # Configure tick parameters
         ax.tick_params(axis="both", labelsize=font_size)
 
-        # Set scales (log scale if variable is in exponential format or explicitly requested)
+        # Set scales (log scale if variable is in exponential format or
+        # explicitly requested)
         if (
             xaxis_variable in self.constants.PARAMETERS_WITH_EXPONENTIAL_FORMAT
             or xaxis_log_scale
@@ -373,25 +374,25 @@ class PlotStyleManager:
         """
         Convert errorbar markersize to equivalent scatter size for
         visual consistency.
-        
+
         Args:
             errorbar_size: The size that would be used for errorbar
             markersize
-            
+
         Returns:
             Equivalent size for scatter plot 's' parameter
-            
+
         The conversion aims to make markers appear the same visual size
         between scatter and errorbar plots.
         """
         # Method 1: Mathematical conversion (diameter to area)
         # scatter_area = π * (diameter/2)². But this often looks too big,
         # so we use a calibrated conversion
-        
+
         # Method 2: Empirically calibrated conversion (recommended)
         # Based on visual testing, this gives good equivalence:
-        return errorbar_size ** 1.8
-        
+        return errorbar_size**1.8
+
         # Alternative conversions you could try:
         # return errorbar_size ** 2      # Pure area conversion (often too big)
         # return errorbar_size * 6.25    # Linear approximation
