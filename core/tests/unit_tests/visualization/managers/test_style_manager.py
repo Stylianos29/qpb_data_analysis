@@ -1,9 +1,9 @@
 """
 Unit tests for PlotStyleManager class.
 
-This module provides comprehensive testing for the PlotStyleManager class,
-covering marker/color generation, axes configuration, legend handling, and other
-styling functionality.
+This module provides comprehensive testing for the PlotStyleManager
+class, covering marker/color generation, axes configuration, legend
+handling, and other styling functionality.
 """
 
 import pytest
@@ -154,7 +154,8 @@ class TestPlotStyleManager:
         # Check tick params
         mock_axes.tick_params.assert_called_once_with(axis="both", labelsize=13)
 
-        # Check log scale was set (both variables in PARAMETERS_WITH_EXPONENTIAL_FORMAT)
+        # Check log scale was set (both variables in
+        # PARAMETERS_WITH_EXPONENTIAL_FORMAT)
         mock_axes.set_xscale.assert_called_once_with("log")
         mock_axes.set_yscale.assert_called_once_with("log")
 
@@ -245,7 +246,8 @@ class TestPlotStyleManager:
         mock_axes.legend.assert_not_called()
 
     def test_configure_legend_title_cleanup(self, style_manager, mock_axes):
-        """Test that non-LaTeX legend titles have underscores replaced."""
+        """Test that non-LaTeX legend titles have underscores
+        replaced."""
         mock_legend = mock_axes.legend.return_value
 
         # Use a variable not in LEGEND_LABELS_BY_COLUMN_NAME
