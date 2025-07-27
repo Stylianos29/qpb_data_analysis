@@ -298,21 +298,39 @@ class PlotStyleManager:
         plot_type: str = "errorbar",
     ) -> Dict[str, Any]:
         """
-        Get marker properties dict for scatter/errorbar plots.
+        Get marker properties dict for scatter/errorbar plots with
+        consistent visual sizing.
+
+        The key fix: Convert marker sizes so they appear visually
+        equivalent between scatter plots (area-based) and errorbar plots
+        (diameter-based).
 
         Args:
             - marker: Marker style string.
             - filled: Whether marker should be filled.
             - color: Marker color.
-            - size: Marker size.
-            - plot_type: "scatter" or "errorbar" to determine correct size parameter.
+            - size: Marker size (this will be converted appropriately
+              for each plot type).
+            - plot_type: "scatter" or "errorbar" to determine correct
+              size parameter.
 
         Returns:
             Dict of marker properties suitable for matplotlib functions.
         """
-        # Choose the correct size parameter based on plot type
-        size_key = "s" if plot_type == "scatter" else "markersize"
+        # Convert size for visual equivalence
+        if plot_type == "scatter":
+            # For scatter: convert diameter to area for visual
+            # equivalence. Formula: area = π * (diameter/2)². But
+            # matplotlib scatter uses a simpler conversion that looks
+            # good
+            visual_size = self._convert_size_for_scatter(size)
+            size_key = "s"
+        else:  # errorbar
+            # For errorbar: use size directly as diameter
+            visual_size = size
+            size_key = "markersize"
 
+        # Rest of the method stays the same, but use visual_size
         if plot_type == "scatter":
             # For scatter plots, use 'c' and avoid 'color'
             if filled:
@@ -320,7 +338,7 @@ class PlotStyleManager:
                     "marker": marker,
                     "c": color,
                     "edgecolors": color,
-                    size_key: size,
+                    size_key: visual_size,
                 }
             else:
                 base_props = {
@@ -328,7 +346,7 @@ class PlotStyleManager:
                     "facecolors": "none",
                     "edgecolors": color,
                     "c": color,
-                    size_key: size,
+                    size_key: visual_size,
                 }
         else:  # errorbar
             # For errorbar plots, use 'color' and marker properties
@@ -338,7 +356,7 @@ class PlotStyleManager:
                     "color": color,
                     "markerfacecolor": color,
                     "markeredgecolor": color,
-                    size_key: size,
+                    size_key: visual_size,
                 }
             else:
                 base_props = {
@@ -346,10 +364,38 @@ class PlotStyleManager:
                     "color": color,
                     "markerfacecolor": "none",
                     "markeredgecolor": color,
-                    size_key: size,
+                    size_key: visual_size,
                 }
 
         return base_props
+
+    def _convert_size_for_scatter(self, errorbar_size: int) -> float:
+        """
+        Convert errorbar markersize to equivalent scatter size for
+        visual consistency.
+        
+        Args:
+            errorbar_size: The size that would be used for errorbar
+            markersize
+            
+        Returns:
+            Equivalent size for scatter plot 's' parameter
+            
+        The conversion aims to make markers appear the same visual size
+        between scatter and errorbar plots.
+        """
+        # Method 1: Mathematical conversion (diameter to area)
+        # scatter_area = π * (diameter/2)². But this often looks too big,
+        # so we use a calibrated conversion
+        
+        # Method 2: Empirically calibrated conversion (recommended)
+        # Based on visual testing, this gives good equivalence:
+        return errorbar_size ** 1.8
+        
+        # Alternative conversions you could try:
+        # return errorbar_size ** 2      # Pure area conversion (often too big)
+        # return errorbar_size * 6.25    # Linear approximation
+        # return errorbar_size * errorbar_size * 0.7  # Slightly smaller area
 
     def apply_figure_margins(
         self,
