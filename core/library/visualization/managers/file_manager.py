@@ -6,11 +6,12 @@ from pathlib import Path
 
 class PlotFileManager:
     """
-    Handles all file system operations for plots with enhanced safety and format support.
+    Handles all file system operations for plots with enhanced safety
+    and format support.
 
-    This class manages directory creation, file path construction, and cleanup operations
-    for plot files. It provides safety measures for destructive operations and supports
-    multiple output formats.
+    This class manages directory creation, file path construction, and
+    cleanup operations for plot files. It provides safety measures for
+    destructive operations and supports multiple output formats.
 
     Features:
     ---------
@@ -86,9 +87,9 @@ class PlotFileManager:
             If True, remove all existing contents in the subdirectory.
             Default is False.
         confirm_clear : bool, optional
-            If True and clear_existing is True, require explicit confirmation
-            for destructive operations in interactive environments.
-            Default is True.
+            If True and clear_existing is True, require explicit
+            confirmation for destructive operations in interactive
+            environments. Default is True.
 
         Returns:
         --------
@@ -134,11 +135,11 @@ class PlotFileManager:
         filename : str
             Base filename (without extension).
         format : str, optional
-            File format. If None, uses default format.
-            Must be one of the supported formats.
+            File format. If None, uses default format. Must be one of
+            the supported formats.
         ensure_unique : bool, optional
-            If True, append a number to make filename unique if it already exists.
-            Default is False.
+            If True, append a number to make filename unique if it
+            already exists. Default is False.
 
         Returns:
         --------
@@ -148,7 +149,8 @@ class PlotFileManager:
         Raises:
         -------
         ValueError
-            If format is not supported or filename contains invalid characters.
+            If format is not supported or filename contains invalid
+            characters.
         """
         # Use default format if none specified
         if format is None:
@@ -195,7 +197,8 @@ class PlotFileManager:
         Returns:
         --------
         dict
-            Dictionary with format information including extension and description.
+            Dictionary with format information including extension and
+            description.
 
         Raises:
         -------
@@ -248,7 +251,7 @@ class PlotFileManager:
         if format.lower() not in self.SUPPORTED_FORMATS:
             supported = ", ".join(self.SUPPORTED_FORMATS.keys())
             raise ValueError(
-                f"Unsupported format '{format}'. " f"Supported formats: {supported}"
+                f"Unsupported format '{format}'. Supported formats: {supported}"
             )
 
     def _ensure_directory_exists(self, directory_path: Path) -> None:
@@ -295,7 +298,8 @@ class PlotFileManager:
         for char in invalid_chars:
             sanitized = sanitized.replace(char, "_")
 
-        # Replace multiple consecutive spaces/underscores with single underscore
+        # Replace multiple consecutive spaces/underscores with single
+        # underscore
         import re
 
         sanitized = re.sub(r"[_\s]+", "_", sanitized)
@@ -332,14 +336,16 @@ class PlotFileManager:
         if not isinstance(filename, str) or not filename.strip():
             raise ValueError("Filename cannot be empty")
 
-        # Remove/replace problematic characters (similar to directory sanitization)
+        # Remove/replace problematic characters (similar to directory
+        # sanitization)
         invalid_chars = '<>:"|?*/'
         sanitized = filename.strip()
 
         for char in invalid_chars:
             sanitized = sanitized.replace(char, "_")
 
-        # Replace multiple consecutive spaces/underscores with single underscore
+        # Replace multiple consecutive spaces/underscores with single
+        # underscore
         import re
 
         sanitized = re.sub(r"[_\s]+", "_", sanitized)
@@ -377,7 +383,8 @@ class PlotFileManager:
         if not contents:
             return  # Nothing to clear
 
-        # Ask for confirmation if requested and we're in an interactive environment
+        # Ask for confirmation if requested and we're in an interactive
+        # environment
         if confirm and self._is_interactive():
             response = (
                 input(
