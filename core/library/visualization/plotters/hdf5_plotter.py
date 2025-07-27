@@ -1,16 +1,16 @@
 """
-Simplified HDF5Plotter implementation with a clean, focused API.
+Simplified HDF5Plotter implementation with a clean, focused API that
+closely mirrors DataPlotter.
 
-This design uses a single plot_dataset() method that can handle both regular 
-datasets and gvar datasets through parameters, similar to how DataPlotter 
-has a single plot() method with many options.
+This enhanced design provides both plot_dataset() for convenience and
+plot() for DataPlotter-like workflow where you set variables first, then
+plot with different options.
 """
 
-from typing import Optional, Union, Dict, Any
+from typing import Optional, Union
 from pathlib import Path
 
 import pandas as pd
-import numpy as np
 
 from ...data.hdf5_analyzer import HDF5Analyzer
 from .data_plotter import DataPlotter
@@ -30,35 +30,49 @@ from library import constants
 
 class HDF5Plotter(HDF5Analyzer):
     """
-    A simplified plotting interface for HDF5 data that maximally reuses DataPlotter components.
+    A simplified plotting interface for HDF5 data that mirrors
+    DataPlotter's API.
 
-    This class provides a clean, focused API with a single plotting method that can handle
-    both regular datasets and gvar datasets (mean/error pairs). The design philosophy
-    mirrors DataPlotter's single plot() method with comprehensive options.
+    This class provides a clean, dataset-focused API with the same
+    workflow as DataPlotter: 1. set_plot_variables() - Set which
+    datasets to plot 2. plot() - Create plots with grouping, styling,
+    and fitting options
+
+    Key Design Principles:
+    ---------------------
+    - Only datasets can be plotted (not parameters - use parameters for
+      grouping)
+    - Convenient syntax: single argument assumes dataset vs time
+    - Full reuse of DataPlotter infrastructure and options
+    - Automatic gvar handling for error bar plots
 
     Key Features:
     -----------
-    - Single plot_dataset() method for all plotting needs
+    - Dataset-only plotting (parameters used for grouping)
     - Automatic gvar handling via use_gvar parameter
-    - Full reuse of DataPlotter infrastructure
-    - Simple delegation approach for maximum code reuse
-    - Consistent API with DataPlotter where possible
+    - Smart defaults: single dataset argument plots vs time
+    - Full DataPlotter compatibility for all plot options
+    - Clean, consistent API
 
-    Example Usage:
-    --------------
+    Usage Examples:
+    ---------------
     >>> plotter = HDF5Plotter('data.h5', 'plots/')
-    >>> 
-    >>> # Plot regular dataset vs time indices
-    >>> plotter.plot_dataset('energy')
-    >>> 
-    >>> # Plot with grouping by parameters  
-    >>> plotter.plot_dataset('correlator', grouping_variable='temperature')
-    >>> 
-    >>> # Plot gvar data with error bars (automatic mean/error merging)
-    >>> plotter.plot_dataset('PCAC_mass', use_gvar=True)
-    >>> 
-    >>> # Plot vs another parameter instead of time
-    >>> plotter.plot_dataset('plaquette', x_variable='beta')
+    >>>
+    >>> # Most common: dataset vs time (single argument)
+    >>> plotter.set_plot_variables('energy')  # energy vs time_index
+    >>> plotter.plot()
+    >>> plotter.plot(grouping_variable='temperature')
+    >>>
+    >>> # Dataset vs dataset (two arguments)
+    >>> plotter.set_plot_variables('PCAC_mass', 'Number_of_Chebyshev_terms')
+    >>> plotter.plot(grouping_variable='Kernel_operator_type', use_gvar=True)
+    >>>
+    >>> # All DataPlotter options work
+    >>> plotter.plot(
+    ...     grouping_variable='temperature',
+    ...     fit_function='exponential',
+    ...     figure_size=(10, 6)
+    ... )
     """
 
     def __init__(self, hdf5_file_path: Union[str, Path], plots_directory: str):
@@ -110,26 +124,52 @@ class HDF5Plotter(HDF5Analyzer):
         self._dataframe_cache = {}
 
     def set_plot_variables(
-        self, x_variable: str, y_variable: str, clear_existing: bool = False
+        self,
+        y_variable: str,
+        x_variable: str = "time_index",
+        *,
+        clear_existing: bool = False,
     ) -> None:
         """
-        Set the x- and y-axis variables for plotting.
+        Set the x- and y-axis variables for plotting (matches
+        DataPlotter API).
 
-        For HDF5 data, x_variable can be:
-        - 'time_index' for array indices (default)
-        - Name of a parameter column  
-        - Name of another dataset
+        This method only accepts dataset names (not parameters).
+        Parameters should be used for grouping via the grouping_variable
+        argument in plot().
 
         Parameters:
         -----------
-        x_variable : str
-            Variable name for x-axis
         y_variable : str
-            Dataset name for y-axis
+            Dataset name for y-axis (must be a dataset in the HDF5 file)
+        x_variable : str, optional
+            Dataset name for x-axis or 'time_index'. Default is
+            'time_index'.
         clear_existing : bool, optional
             Whether to clear existing plot subdirectory
+
+        Raises:
+        -------
+        ValueError
+            If variables are not valid datasets
+
+        Examples:
+        ---------
+        set_plot_variables("energy")  # energy vs time_index
+        set_plot_variables("PCAC_mass", "Number_of_Chebyshev_terms")  #
+        PCAC_mass vs Number_of_Chebyshev_terms
         """
-        # For HDF5, y_variable should be a dataset or processed dataset name
+        # Validate that non-time_index variables are datasets
+        if y_variable != "time_index":
+            self._validate_dataset_variable(y_variable)
+        if x_variable != "time_index":
+            self._validate_dataset_variable(x_variable)
+
+        # Special case: can't have time_index vs time_index
+        if x_variable == "time_index" and y_variable == "time_index":
+            raise ValueError("Cannot plot time_index vs time_index")
+
+        # Set the variables
         self.xaxis_variable_name = x_variable
         self.yaxis_variable_name = y_variable
         self.plots_base_name = f"{y_variable}_Vs_{x_variable}"
@@ -139,38 +179,33 @@ class HDF5Plotter(HDF5Analyzer):
             self.plots_base_name, clear_existing=clear_existing
         )
 
-    def plot_dataset(
+    def plot(
         self,
-        dataset_name: str,
-        x_variable: str = "time_index",
         use_gvar: bool = False,
         use_dataframe_cache: bool = True,
         **plot_kwargs,
     ) -> "HDF5Plotter":
         """
-        Plot a dataset from the HDF5 file with comprehensive options.
+        Plot using the previously set plot variables (DataPlotter-like
+        API).
 
-        This is the main plotting method that handles all HDF5 plotting scenarios
-        through parameters, similar to how DataPlotter.plot() works.
+        This method works similarly to DataPlotter.plot() - you first
+        call set_plot_variables() to set the x and y variables, then
+        call plot() with grouping and styling options.
 
         Parameters:
         -----------
-        dataset_name : str
-            Name of the dataset to plot. For gvar datasets, this should be the
-            base name (without _mean_values/_error_values suffix)
-        x_variable : str, optional
-            Variable for x-axis. Options:
-            - 'time_index': Use array indices (default)
-            - Parameter name: Use parameter values
-            - Dataset name: Use another dataset values
         use_gvar : bool, optional
-            Whether to treat this as a gvar dataset (mean/error pairs).
-            If True, looks for dataset_name_mean_values and dataset_name_error_values
-            and creates (mean, error) tuples for error bar plotting.
+            Whether to treat the y-variable as a gvar dataset
+            (mean/error pairs). If True, looks for
+            y_variable_mean_values and y_variable_error_values and
+            creates (mean, error) tuples for error bar plotting.
         use_dataframe_cache : bool, optional
             Whether to cache converted DataFrames for performance
         **plot_kwargs
-            All the same plotting arguments as DataPlotter.plot(), including:
+            All the same plotting arguments as DataPlotter.plot(),
+            including:
+
             - grouping_variable, labeling_variable
             - figure_size, font_size, margins
             - xaxis_log_scale, yaxis_log_scale, xlim, ylim
@@ -184,34 +219,44 @@ class HDF5Plotter(HDF5Analyzer):
         HDF5Plotter
             Self for method chaining
 
+        Raises:
+        -------
+        ValueError
+            If plot variables haven't been set via set_plot_variables()
+
         Examples:
         ---------
-        # Basic time series plot
-        plotter.plot_dataset('energy')
+        # Basic workflow like DataPlotter
+        >>> plotter.set_plot_variables('energy')  # energy vs time_index
+        >>> plotter.plot()
 
-        # Plot with error bars from gvar data  
-        plotter.plot_dataset('PCAC_mass', use_gvar=True)
+        # Plot with grouping
+        >>> plotter.set_plot_variables('PCAC_mass', 'Number_of_Chebyshev_terms')
+        >>> plotter.plot(grouping_variable='Kernel_operator_type', use_gvar=True)
 
-        # Plot vs parameter with grouping
-        plotter.plot_dataset('plaquette', x_variable='beta', 
-                           grouping_variable='lattice_size')
+        # Change grouping without changing variables
+        >>> plotter.plot(grouping_variable='Configuration_label')
 
         # All DataPlotter options work
-        plotter.plot_dataset('correlator', use_gvar=True,
-                           fit_function='exponential',
-                           figure_size=(10, 6),
-                           include_legend=True)
+        >>> plotter.plot(
+        ...     grouping_variable='temperature',
+        ...     fit_function='exponential',
+        ...     figure_size=(10, 6),
+        ...     include_legend=True
+        ... )
         """
-        # Convert HDF5 data to DataFrame
+        if self.xaxis_variable_name is None or self.yaxis_variable_name is None:
+            raise ValueError(
+                "Plot variables not set. Call "
+                "'set_plot_variables(y_var, x_var)' before plotting."
+            )
+
+        # Convert HDF5 data to DataFrame using the set variables
         df = self._convert_to_dataframe(
-            dataset_name, x_variable, use_gvar, use_cache=use_dataframe_cache
+            use_gvar=use_gvar, use_cache=use_dataframe_cache
         )
 
-        # Set plot variables based on conversion result
-        y_column = self._determine_y_column_name(dataset_name, use_gvar)
-        self.set_plot_variables(x_variable, y_column)
-
-        # Delegate to DataPlotter
+        # Plot using the converted DataFrame (variables already set)
         return self._plot_via_dataframer(df, **plot_kwargs)
 
     def add_inset(self, **kwargs) -> "HDF5Plotter":
@@ -225,7 +270,7 @@ class HDF5Plotter(HDF5Analyzer):
         -----------
         **kwargs
             Same arguments as DataPlotter.add_inset(), including:
-            - xaxis_variable, yaxis_variable 
+            - xaxis_variable, yaxis_variable
             - location, width, height
             - data_filter_func, data_condition
             - All plotting options for the inset
@@ -236,7 +281,7 @@ class HDF5Plotter(HDF5Analyzer):
             Self for method chaining
         """
         if not hasattr(self, "_last_plot_figures") or not self._last_plot_figures:
-            raise ValueError("Call plot_dataset() before add_inset()")
+            raise ValueError("Call plot() before add_inset()")
 
         # Use the same inset manager
         for group_keys, (fig, ax, group_df) in self._last_plot_figures.items():
@@ -257,179 +302,167 @@ class HDF5Plotter(HDF5Analyzer):
 
         return self
 
+    def _validate_dataset_variable(self, variable_name: str) -> None:
+        """
+        Validate that a variable name corresponds to a dataset in the
+        HDF5 file.
+
+        For gvar datasets, accepts either the base name or the full
+        _mean_values name.
+        """
+        # Check if it's a regular dataset
+        if variable_name in self.list_of_output_quantity_names_from_hdf5:
+            return
+
+        # Check if it's a gvar base name (has corresponding _mean_values
+        # and _error_values)
+        mean_dataset = f"{variable_name}_mean_values"
+        error_dataset = f"{variable_name}_error_values"
+
+        if (
+            mean_dataset in self.list_of_output_quantity_names_from_hdf5
+            and error_dataset in self.list_of_output_quantity_names_from_hdf5
+        ):
+            return
+
+        # If neither worked, raise an error with helpful message
+        available_datasets = self.list_of_output_quantity_names_from_hdf5[
+            :10
+        ]  # Show first 10
+        raise ValueError(
+            f"'{variable_name}' is not a valid dataset in the HDF5 file.\n"
+            f"Available datasets (first 10): {available_datasets}\n"
+            f"For gvar datasets, use the base name "
+            "(without _mean_values/_error_values suffix)"
+        )
+
+    def _validate_x_variable(self, variable_name: str) -> None:
+        """
+        Validate that x_variable is either 'time_index', a parameter, or
+        a dataset.
+
+        This is more permissive than dataset validation since x can be
+        various things.
+        """
+        if variable_name == "time_index":
+            return
+
+        # Check if it's a dataset
+        if variable_name in self.list_of_output_quantity_names_from_hdf5:
+            return
+
+        # Check if it's a parameter (we'll do this by trying to create a
+        # sample DataFrame and seeing if the variable appears as a
+        # column)
+        try:
+            # Get a sample dataset to check parameter columns
+            if self.list_of_output_quantity_names_from_hdf5:
+                sample_dataset = self.list_of_output_quantity_names_from_hdf5[0]
+                sample_df = self.create_dataset_dataframe(
+                    sample_dataset, add_time_column=False, flatten_arrays=True
+                )
+
+                if variable_name in sample_df.columns:
+                    return
+
+        except Exception:
+            pass  # If sampling fails, we'll give a generic error below
+
+        # If we get here, the variable wasn't found
+        print(
+            f"Warning: '{variable_name}' not found as a dataset or parameter. "
+            f"This may cause issues during plotting."
+        )
+
     def _convert_to_dataframe(
-        self, dataset_name: str, x_variable: str, use_gvar: bool, use_cache: bool = True
+        self, use_gvar: bool, use_cache: bool = True
     ) -> pd.DataFrame:
         """
-        Convert HDF5 dataset to DataFrame format compatible with DataPlotter.
+        Convert HDF5 dataset(s) to DataFrame format compatible with
+        DataPlotter.
+
+        Uses the currently set xaxis_variable_name and
+        yaxis_variable_name. Handles cases where either could be
+        "time_index" or actual datasets.
 
         This method handles:
-        - Regular datasets  
+        - Regular datasets
         - Gvar datasets (creating value/error tuples)
         - Time series data (with time_index)
-        - Parameter combinations
+        - Dataset vs dataset plots
 
-        The key insight: we create (value, error) tuples that DataPlotter 
-        already knows how to handle, rather than using gvar objects.
+        The key insight: we create (value, error) tuples that
+        DataPlotter already knows how to handle, rather than using gvar
+        objects.
         """
-        cache_key = (dataset_name, x_variable, use_gvar)
+        cache_key = (self.xaxis_variable_name, self.yaxis_variable_name, use_gvar)
 
         if use_cache and cache_key in self._dataframe_cache:
             return self._dataframe_cache[cache_key]
 
-        if use_gvar:
-            # Handle gvar datasets by creating (mean, error) tuples
-            df = self._create_gvar_dataframe(dataset_name, x_variable)
+        # Determine which variables are datasets vs time_index
+        x_is_time = self.xaxis_variable_name == "time_index"
+        y_is_time = self.yaxis_variable_name == "time_index"
+
+        if x_is_time and y_is_time:
+            raise ValueError("Cannot have both x and y as time_index")
+
+        # Determine the dataset(s) we need to load
+        datasets_to_load = []
+
+        if not y_is_time:
+            if use_gvar:
+                # For gvar, we need both mean and error datasets
+                datasets_to_load.extend(
+                    [
+                        f"{self.yaxis_variable_name}_mean_values",
+                        f"{self.yaxis_variable_name}_error_values",
+                    ]
+                )
+            else:
+                datasets_to_load.append(self.yaxis_variable_name)
+
+        if not x_is_time:
+            datasets_to_load.append(self.xaxis_variable_name)
+
+        # Create the DataFrame
+        if x_is_time or y_is_time:
+            # One axis is time_index
+            df = self.to_dataframe(
+                datasets=datasets_to_load,
+                add_time_column=True,
+                flatten_arrays=True,
+            )
         else:
-            # Handle regular datasets
-            df = self._create_regular_dataframe(dataset_name, x_variable)
+            # Both axes are datasets
+            df = self.to_dataframe(
+                datasets=datasets_to_load,
+                add_time_column=False,
+                flatten_arrays=True,
+            )
+
+        # Handle gvar processing if needed
+        if use_gvar and not y_is_time:
+            mean_col = f"{self.yaxis_variable_name}_mean_values"
+            error_col = f"{self.yaxis_variable_name}_error_values"
+
+            if mean_col in df.columns and error_col in df.columns:
+                # Create (mean, error) tuples
+                mean_values = df[mean_col].values
+                error_values = df[error_col].values
+
+                df[self.yaxis_variable_name] = [
+                    (mean_val, error_val)
+                    for mean_val, error_val in zip(mean_values, error_values)
+                ]
+
+                # Remove the original mean/error columns
+                df = df.drop(columns=[mean_col, error_col])
 
         if use_cache:
             self._dataframe_cache[cache_key] = df
 
         return df
-
-    def _create_regular_dataframe_retired(self, dataset_name: str, x_variable: str) -> pd.DataFrame:
-        """Create DataFrame for regular (non-gvar) datasets."""
-        # Validate that dataset exists
-        if dataset_name not in self.list_of_output_quantity_names_from_hdf5:
-            raise ValueError(f"'{dataset_name}' is not a dataset in the HDF5 file.")
-
-        # Use HDF5Analyzer's standard DataFrame creation
-        df = self.create_dataset_dataframe(
-            dataset_name,
-            add_time_column=(x_variable == "time_index"),
-            flatten_arrays=True,
-        )
-
-        return df
-
-    def _create_regular_dataframe(self, dataset_name: str, x_variable: str) -> pd.DataFrame:
-        """Create DataFrame for regular (non-gvar) datasets."""
-        # Validate that dataset exists
-        if dataset_name not in self.list_of_output_quantity_names_from_hdf5:
-            raise ValueError(f"'{dataset_name}' is not a dataset in the HDF5 file.")
-
-        if x_variable == "time_index":
-            # Standard case: plot vs time indices
-            df = self.create_dataset_dataframe(
-                dataset_name,
-                add_time_column=True,
-                flatten_arrays=True,
-            )
-        elif x_variable in self.list_of_output_quantity_names_from_hdf5:
-            # x_variable is another dataset - need to merge them
-            y_df = self.create_dataset_dataframe(
-                dataset_name,
-                add_time_column=False,
-                flatten_arrays=True,
-            )
-            
-            x_df = self.create_dataset_dataframe(
-                x_variable,
-                add_time_column=False,
-                flatten_arrays=True,
-            )
-            
-            # Find common parameter columns (excluding the dataset columns themselves)
-            parameter_columns = [
-                col for col in y_df.columns 
-                if col in x_df.columns and col != dataset_name and col != x_variable
-            ]
-            
-            if not parameter_columns:
-                raise ValueError(
-                    f"No common parameter columns found between '{dataset_name}' and '{x_variable}' "
-                    "datasets. Cannot merge for plotting."
-                )
-            
-            # Merge the DataFrames on common parameter columns
-            df = pd.merge(
-                y_df, x_df, 
-                on=parameter_columns, 
-                how='inner',
-                suffixes=('', '_x')
-            )
-            
-            # Verify the merge worked
-            if df.empty:
-                raise ValueError(
-                    f"Merging '{dataset_name}' and '{x_variable}' resulted in empty DataFrame. "
-                    "Check that they have matching parameter combinations."
-                )
-                
-        else:
-            # x_variable might be a parameter column - use standard approach
-            df = self.create_dataset_dataframe(
-                dataset_name,
-                add_time_column=False,
-                flatten_arrays=True,
-            )
-            
-            # Validate that x_variable exists as a column
-            if x_variable not in df.columns:
-                raise ValueError(
-                    f"'{x_variable}' is not a dataset in the HDF5 file and not a parameter column. "
-                    f"Available datasets: {self.list_of_output_quantity_names_from_hdf5[:5]}... "
-                    f"Available parameter columns: {[col for col in df.columns if col != dataset_name][:5]}..."
-                )
-
-        return df
-
-    def _create_gvar_dataframe(self, base_name: str, x_variable: str) -> pd.DataFrame:
-        """
-        Create DataFrame for gvar datasets using (mean, error) tuples.
-        
-        This creates tuples that DataPlotter can handle directly with errorbar(),
-        avoiding the complexity of gvar objects in DataFrames.
-        """
-        # Validate that the gvar datasets exist
-        mean_dataset = f"{base_name}_mean_values"
-        error_dataset = f"{base_name}_error_values"
-
-        if mean_dataset not in self.list_of_output_quantity_names_from_hdf5:
-            raise ValueError(f"'{mean_dataset}' is not a dataset in the HDF5 file.")
-
-        if error_dataset not in self.list_of_output_quantity_names_from_hdf5:
-            raise ValueError(f"'{error_dataset}' is not a dataset in the HDF5 file.")
-
-        # Get separate DataFrames for mean and error
-        mean_df = self.create_dataset_dataframe(
-            mean_dataset,
-            add_time_column=(x_variable == "time_index"),
-            flatten_arrays=True,
-        )
-
-        error_df = self.create_dataset_dataframe(
-            error_dataset,
-            add_time_column=(x_variable == "time_index"),
-            flatten_arrays=True,
-        )
-
-        # Create combined DataFrame with (mean, error) tuples
-        # Start with mean_df structure
-        combined_df = mean_df.copy()
-
-        # Replace the dataset column with (mean, error) tuples
-        mean_values = mean_df[mean_dataset].values
-        error_values = error_df[error_dataset].values
-
-        # Create tuples - this is what DataPlotter expects for error bars
-        combined_df[base_name] = [
-            (mean_val, error_val) for mean_val, error_val in zip(mean_values, error_values)
-        ]
-
-        # Remove the original mean/error columns
-        combined_df = combined_df.drop(columns=[mean_dataset])
-
-        return combined_df
-
-    def _determine_y_column_name(self, dataset_name: str, use_gvar: bool) -> str:
-        """Determine what the y-column will be called in the DataFrame."""
-        if use_gvar:
-            return dataset_name  # Base name for gvar
-        else:
-            return dataset_name  # Same for regular datasets
 
     def _plot_via_dataframer(self, df: pd.DataFrame, **plot_kwargs) -> "HDF5Plotter":
         """
@@ -463,7 +496,8 @@ class HDF5Plotter(HDF5Analyzer):
         self, max_width: int = 80, separate_by_type: bool = True
     ) -> str:
         """
-        Generate a report similar to DataPlotter's version but for HDF5 data.
+        Generate a report similar to DataPlotter's version but for HDF5
+        data.
         """
         return self.generate_uniqueness_report(
             max_width=max_width, separate_by_type=separate_by_type
