@@ -46,9 +46,9 @@ class PlotInsetManager:
         # Predefined inset locations
         self.location_presets = {
             "upper right": [0.65, 0.65],
-            "upper left": [0.05, 0.65],
-            "lower right": [0.65, 0.05],
-            "lower left": [0.05, 0.05],
+            "upper left": [0.13, 0.65],
+            "lower right": [0.65, 0.11],
+            "lower left": [0.13, 0.11],
             "center": [0.5, 0.5],
             "upper center": [0.5, 0.75],
             "lower center": [0.5, 0.15],
