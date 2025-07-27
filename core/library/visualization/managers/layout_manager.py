@@ -71,6 +71,8 @@ class PlotLayoutManager:
         xaxis_label: Optional[str] = None,
         yaxis_label: Optional[str] = None,
         font_size: Optional[int] = None,
+        show_xaxis_label: bool = True,
+        show_yaxis_label: bool = True,
     ) -> None:
         """
         Set up x and y axis labels.
@@ -89,24 +91,34 @@ class PlotLayoutManager:
             Custom y-axis label. If None, looks up from constants.
         font_size : int, optional
             Font size for labels. Uses default if None.
+        show_xaxis_label : bool, optional
+            Whether to display the x-axis label. Default is True.
+        show_yaxis_label : bool, optional
+            Whether to display the y-axis label. Default is True.
         """
         font_size = font_size or self.default_font_size
 
         # Determine x-axis label
-        if xaxis_label is None and self.constants:
-            xaxis_label = getattr(self.constants, "AXES_LABELS_BY_COLUMN_NAME", {}).get(
-                x_variable, x_variable
-            )
-        elif xaxis_label is None:
-            xaxis_label = x_variable
+        if show_xaxis_label:
+            if xaxis_label is None and self.constants:
+                xaxis_label = getattr(
+                    self.constants, "AXES_LABELS_BY_COLUMN_NAME", {}
+                ).get(x_variable, x_variable)
+            elif xaxis_label is None:
+                xaxis_label = x_variable
+        else:
+            xaxis_label = ""  # Hide the label
 
         # Determine y-axis label
-        if yaxis_label is None and self.constants:
-            yaxis_label = getattr(self.constants, "AXES_LABELS_BY_COLUMN_NAME", {}).get(
-                y_variable, y_variable
-            )
-        elif yaxis_label is None:
-            yaxis_label = y_variable
+        if show_yaxis_label:
+            if yaxis_label is None and self.constants:
+                yaxis_label = getattr(
+                    self.constants, "AXES_LABELS_BY_COLUMN_NAME", {}
+                ).get(y_variable, y_variable)
+            elif yaxis_label is None:
+                yaxis_label = y_variable
+        else:
+            yaxis_label = ""  # Hide the label
 
         ax.set_xlabel(xaxis_label or "", fontsize=font_size + 2)
         ax.set_ylabel(yaxis_label or "", fontsize=font_size + 2)
@@ -334,6 +346,8 @@ class PlotLayoutManager:
         font_size: Optional[int] = None,
         xaxis_label: Optional[str] = None,
         yaxis_label: Optional[str] = None,
+        show_xaxis_label: bool = True,
+        show_yaxis_label: bool = True,
         xaxis_log_scale: bool = False,
         yaxis_log_scale: bool = False,
         xlim: Optional[Tuple[float, float]] = None,
@@ -359,10 +373,21 @@ class PlotLayoutManager:
         y_variable : str
             Name of y-axis variable
         ... (other parameters same as setup_complete_layout)
+        show_xaxis_label : bool, optional
+            Whether to display the x-axis label. Default is True.
+        show_yaxis_label : bool, optional
+            Whether to display the y-axis label. Default is True.
         """
         # Setup all axes properties (same as complete layout but no figure creation/margins)
         self._setup_axes_labels(
-            ax, x_variable, y_variable, xaxis_label, yaxis_label, font_size
+            ax,
+            x_variable,
+            y_variable,
+            xaxis_label,
+            yaxis_label,
+            font_size,
+            show_xaxis_label=show_xaxis_label,
+            show_yaxis_label=show_yaxis_label,
         )
         self._setup_axes_scaling(
             ax, x_variable, y_variable, xaxis_log_scale, yaxis_log_scale
@@ -387,6 +412,8 @@ class PlotLayoutManager:
         ax: Axes,
         x_variable: str,
         y_variable: str,
+        show_xaxis_label: bool = False,
+        show_yaxis_label: bool = False,
         font_size: int = 8,
         xaxis_log_scale: bool = False,
         yaxis_log_scale: bool = False,
@@ -399,6 +426,8 @@ class PlotLayoutManager:
     ) -> None:
         """
         Configure axes specifically for insets with simplified styling.
+
+        By default, insets don't show axis labels to reduce clutter.
         """
         # Apply grid with lighter styling for insets
         ax.grid(True, linestyle="--", alpha=0.3, linewidth=0.5)
@@ -419,20 +448,42 @@ class PlotLayoutManager:
             invert_yaxis,
         )
 
-        # Setup simplified labels for insets
-        self._setup_inset_labels(ax, x_variable, y_variable)
+        # Setup labels for insets (simplified and conditional)
+        self._setup_inset_labels(
+            ax,
+            x_variable,
+            y_variable,
+            show_xaxis_label=show_xaxis_label,
+            show_yaxis_label=show_yaxis_label,
+        )
 
         # Configure font sizes for inset
         ax.tick_params(labelsize=font_size)
 
-    def _setup_inset_labels(self, ax: Axes, x_variable: str, y_variable: str) -> None:
-        """Setup simplified labels for inset axes."""
-        # Create abbreviated labels for insets
-        x_label = self._create_abbreviated_label(x_variable)
-        y_label = self._create_abbreviated_label(y_variable)
+    def _setup_inset_labels(
+        self,
+        ax: Axes,
+        x_variable: str,
+        y_variable: str,
+        show_xaxis_label: bool = False,
+        show_yaxis_label: bool = False,
+    ) -> None:
+        """
+        Setup simplified labels for inset axes with visibility control.
 
-        ax.set_xlabel(x_label, fontsize=8)
-        ax.set_ylabel(y_label, fontsize=8)
+        By default, insets don't show labels, but this can be overridden.
+        """
+        if show_xaxis_label:
+            x_label = self._create_abbreviated_label(x_variable)
+            ax.set_xlabel(x_label, fontsize=8)
+        else:
+            ax.set_xlabel("", fontsize=8)
+
+        if show_yaxis_label:
+            y_label = self._create_abbreviated_label(y_variable)
+            ax.set_ylabel(y_label, fontsize=8)
+        else:
+            ax.set_ylabel("", fontsize=8)
 
     def _create_abbreviated_label(self, variable_name: str) -> str:
         """Create abbreviated labels for inset axes."""

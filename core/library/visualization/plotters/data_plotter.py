@@ -150,6 +150,8 @@ class DataPlotter(DataFrameAnalyzer):
         # Axes configuration
         xaxis_label: Optional[str] = None,
         yaxis_label: Optional[str] = None,
+        show_xaxis_label: bool = True,
+        show_yaxis_label: bool = True,
         xaxis_log_scale: bool = False,
         yaxis_log_scale: bool = False,
         invert_xaxis: bool = False,
@@ -235,6 +237,13 @@ class DataPlotter(DataFrameAnalyzer):
         save_figure : bool, optional
             Whether to save the figure to disk. Default is True.
 
+        show_xaxis_label : bool, optional
+            Whether to display the x-axis label. Default is True.
+            Useful for insets where axis labels might be redundant.
+        show_yaxis_label : bool, optional
+            Whether to display the y-axis label. Default is True.
+            Useful for insets where axis labels might be redundant.
+
         Returns:
         --------
         DataPlotter
@@ -290,6 +299,8 @@ class DataPlotter(DataFrameAnalyzer):
                     font_size=font_size,
                     xaxis_label=xaxis_label,
                     yaxis_label=yaxis_label,
+                    show_xaxis_label=show_xaxis_label,
+                    show_yaxis_label=show_yaxis_label,
                     xaxis_log_scale=xaxis_log_scale,
                     yaxis_log_scale=yaxis_log_scale,
                     xlim=xlim,
@@ -306,6 +317,8 @@ class DataPlotter(DataFrameAnalyzer):
                     ax=ax,
                     x_variable=self.xaxis_variable_name,
                     y_variable=self.yaxis_variable_name,
+                    show_xaxis_label=show_xaxis_label,
+                    show_yaxis_label=show_yaxis_label,
                     font_size=max(8, font_size - 4),  # Smaller font for insets
                     xaxis_log_scale=xaxis_log_scale,
                     yaxis_log_scale=yaxis_log_scale,
