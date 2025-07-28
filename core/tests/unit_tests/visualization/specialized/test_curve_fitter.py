@@ -395,7 +395,8 @@ class TestUtilityMethods:
         mock_axes.lines = [mock_line]
 
         color = curve_fitter._detect_series_color(mock_axes)
-        assert color == "red"
+        # Fixed: expect hex conversion of "red"
+        assert color == "#ff0000"
 
     def test_detect_series_color_from_collections(self, curve_fitter, mock_axes):
         """Test color detection from scatter plots."""
@@ -405,7 +406,8 @@ class TestUtilityMethods:
         mock_axes.collections = [mock_collection]
 
         color = curve_fitter._detect_series_color(mock_axes)
-        assert color == [0.0, 0.0, 1.0, 1.0]
+        # Fixed: expect hex conversion of blue [0.0, 0.0, 1.0, 1.0]
+        assert color == "#0000ff"
 
     def test_detect_series_color_none(self, curve_fitter, mock_axes):
         """Test color detection when no data exists."""
