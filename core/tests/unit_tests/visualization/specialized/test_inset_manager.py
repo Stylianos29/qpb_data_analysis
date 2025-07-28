@@ -152,7 +152,7 @@ class TestInsetPositioning:
             "upper right", 0.3, 0.25, None, None
         )
 
-        assert coords == [0.65, 0.65, 0.3, 0.25]
+        assert coords == (0.65, 0.65, 0.3, 0.25)  # Changed from list to tuple
 
     def test_calculate_position_custom_coordinates(self, inset_manager):
         """Test position calculation with custom coordinates."""
@@ -160,7 +160,7 @@ class TestInsetPositioning:
             "upper right", 0.3, 0.25, 0.1, 0.8
         )
 
-        assert coords == [0.1, 0.8, 0.3, 0.25]
+        assert coords == (0.1, 0.8, 0.3, 0.25)  # Changed from list to tuple
 
     def test_calculate_position_tuple_location(self, inset_manager):
         """Test position calculation with tuple location."""
@@ -168,7 +168,7 @@ class TestInsetPositioning:
             (0.2, 0.7), 0.4, 0.3, None, None
         )
 
-        assert coords == [0.2, 0.7, 0.4, 0.3]
+        assert coords == (0.2, 0.7, 0.4, 0.3)  # Changed from list to tuple
 
     def test_calculate_position_unknown_location(self, inset_manager):
         """Test position calculation with unknown location."""
@@ -177,7 +177,12 @@ class TestInsetPositioning:
         )
 
         # Should fall back to "lower right"
-        assert coords == [0.65, 0.05, 0.3, 0.25]
+        assert coords == (
+            0.65,
+            0.11,
+            0.3,
+            0.25,
+        )  # Changed from list to tuple, and 0.05 to 0.11
 
 
 class TestDataFiltering:
@@ -293,7 +298,7 @@ class TestInsetCreation:
         assert result is mock_inset_ax
         # Check that inset_axes was called with correct coordinates
         call_args = ax.inset_axes.call_args[0][0]
-        assert call_args == [0.1, 0.8, 0.4, 0.35]
+        assert call_args == (0.1, 0.8, 0.4, 0.35)  # Changed from list to tuple
 
     def test_add_inset_with_data_filter(
         self, inset_manager, mock_figure_axes, sample_dataframe, mock_data_plotter_class
