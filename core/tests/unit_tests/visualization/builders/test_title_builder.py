@@ -140,8 +140,8 @@ class TestComplexTitleBuilding:
 
         title = title_builder.build(complex_metadata, tunable_params)
 
-        # Should start with Chebyshev Wilson 50
-        assert title.startswith("Chebyshev Wilson 50,")
+        # Should start with Chebyshev Wilson N=50 (updated expectation)
+        assert title.startswith("Chebyshev Wilson N=50,")
         assert "Temperature (K)=300.00" in title
         assert "Pressure (Pa)=1.50" in title
         assert "Lattice Size=32" in title
@@ -152,8 +152,8 @@ class TestComplexTitleBuilding:
 
         title = title_builder.build(kl_metadata, tunable_params)
 
-        # Should start with KL Brillouin 3
-        assert title.startswith("KL Brillouin 3,")
+        # Should start with KL Brillouin n=3 (updated expectation)
+        assert title.startswith("KL Brillouin n=3,")
         assert "Temperature (K)=250.00" in title
         assert "Mass (GeV)=0.50" in title
 
@@ -358,15 +358,17 @@ class TestPrivateMethods:
 
     def test_format_value_numeric(self, title_builder):
         """Test _format_value with numeric inputs."""
-        assert title_builder._format_value(3.14159) == "3.14"
-        assert title_builder._format_value(42) == "42.00"
-        assert title_builder._format_value(1.0) == "1.00"
+        # Fixed: now passing both param_name and value
+        assert title_builder._format_value("temperature", 3.14159) == "3.14"
+        assert title_builder._format_value("temperature", 42) == "42.00"
+        assert title_builder._format_value("temperature", 1.0) == "1.00"
 
     def test_format_value_non_numeric(self, title_builder):
         """Test _format_value with non-numeric inputs."""
-        assert title_builder._format_value("string") == "string"
-        assert title_builder._format_value(None) == "None"
-        assert title_builder._format_value([1, 2, 3]) == "[1, 2, 3]"
+        # Fixed: now passing both param_name and value
+        assert title_builder._format_value("method", "string") == "string"
+        assert title_builder._format_value("method", None) == "None"
+        assert title_builder._format_value("method", [1, 2, 3]) == "[1, 2, 3]"
 
     def test_overlap_kernel_parts_full(self, title_builder):
         """Test _overlap_kernel_parts with all components."""
@@ -379,7 +381,8 @@ class TestPrivateMethods:
         parts = title_builder._overlap_kernel_parts(metadata, set())
 
         assert len(parts) == 1
-        assert parts[0] == "Chebyshev Wilson 50,"
+        # Fixed: expecting N=50 instead of just 50
+        assert parts[0] == "Chebyshev Wilson N=50,"
 
     def test_overlap_kernel_parts_excluded(self, title_builder):
         """Test _overlap_kernel_parts with excluded parameters."""
@@ -393,7 +396,8 @@ class TestPrivateMethods:
         parts = title_builder._overlap_kernel_parts(metadata, excluded)
 
         assert len(parts) == 1
-        assert parts[0] == "KL 3,"  # No Brillouin
+        # Fixed: expecting n=3 instead of just 3
+        assert parts[0] == "KL n=3,"  # No Brillouin
 
     def test_parameter_parts_basic(self, title_builder):
         """Test _parameter_parts with regular parameters."""
