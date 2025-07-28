@@ -1,4 +1,3 @@
-from .data_plotter import DataPlotter
-from .hdf5_plotter import HDF5Plotter
+from .plotters import DataPlotter, HDF5Plotter
 
 __all__ = ["DataPlotter", "HDF5Plotter"]
