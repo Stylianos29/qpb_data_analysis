@@ -30,7 +30,8 @@ from library import (
     data_processing,
     custom_plotting,
     PROCESSED_DATA_FILES_DIRECTORY,
-    validate_input_directory, validate_input_script_log_filename
+    validate_input_directory,
+    validate_input_script_log_filename,
 )
 
 
@@ -258,7 +259,7 @@ def main(
             input_parameter_values_csv_file_path
         )
         analyzer = data_processing.DataFrameAnalyzer(parameter_values_dataframe)
-        
+
         # TODO: Change obsolete class attributes
         # Store names and values of tunable parameters with unique values
         single_valued_fields_dictionary = copy.deepcopy(
