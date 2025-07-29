@@ -1,32 +1,288 @@
-# TODO: Write a detailed introductory commentary
+#!/usr/bin/env python3
 """
-post_processing_analysis/process_qpb_log_files_extracted_values.py
+Refactored QPB log file parameter processing script.
 
-Summary:
+This script processes extracted parameter values from QPB log files
+using a configuration-driven, modular approach. It replaces the original
+hardcoded transformation logic with systematic, maintainable processing
+classes.
 
-Input:
-
-Output:
-
-Functionality:
-
-Usage:
+Key improvements: - Configuration-driven transformations - Modular
+processor architecture - Proper use of library classes
+(DataFrameAnalyzer, HDF5Analyzer) - Clear separation of concerns -
+Comprehensive logging and error handling
 """
 
 import os
-import ast
+import logging
+from pathlib import Path
+from typing import Optional
 
-import numpy as np
 import click
 import pandas as pd
-import logging
 
 from library import (
     filesystem_utilities,
-    data_processing,
     validate_input_directory,
     validate_input_script_log_filename,
 )
+from library.data import DataFrameAnalyzer, HDF5Analyzer, load_csv
+from src.preprocessing._param_transform_engine import (
+    ParameterTransformationEngine,
+    HDF5ParameterProcessor,
+    AnalysisCaseProcessor,
+)
+
+
+class QPBParameterProcessor:
+    """
+    Main orchestrator for QPB parameter processing.
+
+    This class coordinates all aspects of parameter processing using the
+    modular, configuration-driven approach.
+    """
+
+    def __init__(
+        self,
+        single_valued_csv_path: str,
+        multivalued_hdf5_path: str,
+        output_directory: str,
+        output_filename: str,
+    ):
+        """
+        Initialize the processor with input and output paths.
+
+        Args:
+            single_valued_csv_path: Path to CSV with single-valued
+            parameters multivalued_hdf5_path: Path to HDF5 with
+            multivalued parameters output_directory: Directory for
+            output files output_filename: Name of output CSV file
+        """
+        self.single_valued_csv_path = single_valued_csv_path
+        self.multivalued_hdf5_path = multivalued_hdf5_path
+        self.output_directory = output_directory
+        self.output_filename = output_filename
+
+        self.logger = logging.getLogger(__name__)
+
+        # Initialize data containers
+        self.dataframe: Optional[pd.DataFrame] = None
+        self.dataframe_analyzer: Optional[DataFrameAnalyzer] = None
+        self.hdf5_analyzer: Optional[HDF5Analyzer] = None
+
+    def process_all_parameters(self) -> pd.DataFrame:
+        """
+        Execute the complete parameter processing pipeline.
+
+        Returns:
+            Processed DataFrame ready for export
+        """
+        self.logger.info("Starting QPB parameter processing pipeline")
+
+        try:
+            # Step 1: Load and validate input data
+            self._load_input_data()
+
+            # Step 2: Process single-valued parameters using
+            # transformation engine
+            self._process_single_valued_parameters()
+
+            # Step 3: Process multivalued parameters from HDF5
+            self._process_multivalued_parameters()
+
+            # Step 4: Apply analysis-case-specific calculations
+            self._process_analysis_cases()
+
+            # Step 5: Final validation and cleanup
+            self._finalize_processing()
+
+            # Step 6: Export results
+            self._export_results()
+
+            if self.dataframe is None:
+                raise RuntimeError("Pipeline completed but dataframe is None")
+
+            self.logger.info("QPB parameter processing pipeline completed successfully")
+            return self.dataframe
+
+        except Exception as e:
+            self.logger.error(f"Pipeline failed with error: {e}")
+            raise
+
+    def _load_input_data(self) -> None:
+        """Load and validate input data using library functions."""
+        self.logger.info("Loading input data")
+
+        # Load single-valued parameters CSV using library function
+        loaded_dataframe = load_csv(
+            self.single_valued_csv_path, encoding="utf-8", apply_categorical=True
+        )
+        
+        if loaded_dataframe is None:
+            raise ValueError(f"Failed to load CSV file: {self.single_valued_csv_path}")
+        
+        self.dataframe = loaded_dataframe
+
+        # Initialize DataFrameAnalyzer for systematic data understanding
+        self.dataframe_analyzer = DataFrameAnalyzer(self.dataframe)
+
+        # Log data structure insights
+        self.logger.info(
+            f"Loaded CSV with {len(self.dataframe)} rows and {len(self.dataframe.columns)} columns"
+        )
+        self.logger.info(
+            f"Identified {len(self.dataframe_analyzer.list_of_single_valued_column_names)} single-valued columns"
+        )
+        self.logger.info(
+            f"Identified {len(self.dataframe_analyzer.list_of_multivalued_column_names)} multivalued columns"
+        )
+
+        # Initialize HDF5Analyzer for multivalued parameter access
+        self.hdf5_analyzer = HDF5Analyzer(self.multivalued_hdf5_path)
+
+        # Log HDF5 structure insights
+        self.logger.info(
+            f"Loaded HDF5 with {len(self.hdf5_analyzer.active_groups)} data groups"
+        )
+        self.logger.info(
+            f"Found {len(self.hdf5_analyzer.list_of_output_quantity_names_from_hdf5)} output quantities"
+        )
+
+        # Validate data compatibility
+        self._validate_data_compatibility()
+
+    def _validate_data_compatibility(self) -> None:
+        """Validate that CSV and HDF5 data are compatible."""
+
+        # Ensure dataframe is loaded
+        if self.dataframe is None:
+            raise RuntimeError("Cannot validate data compatibility: CSV data not loaded")
+
+        # Check that CSV has 'Filename' column for HDF5 mapping
+        if "Filename" not in self.dataframe.columns:
+            raise ValueError("CSV must contain 'Filename' column for HDF5 data mapping")
+
+        # Additional validation logic could be added here
+        csv_filenames = set(self.dataframe["Filename"].unique())
+        self.logger.info(f"CSV contains {len(csv_filenames)} unique filenames")
+
+    def _process_single_valued_parameters(self) -> None:
+        """Process single-valued parameters using the transformation
+        engine."""
+        self.logger.info("Processing single-valued parameters")
+
+        # Create and run transformation engine
+        if self.dataframe is None:
+            raise RuntimeError("DataFrame is None before single-valued parameter processing")
+        transformation_engine = ParameterTransformationEngine(self.dataframe)
+        self.dataframe = transformation_engine.apply_all_transformations()
+
+        # Update analyzer with transformed data
+        self.dataframe_analyzer = DataFrameAnalyzer(self.dataframe)
+
+        self.logger.info("Single-valued parameter processing completed")
+
+    def _process_multivalued_parameters(self) -> None:
+        """Process multivalued parameters from HDF5 file."""
+        self.logger.info("Processing multivalued parameters from HDF5")
+
+        # Create and run HDF5 processor
+        if self.dataframe is None:
+            raise RuntimeError("DataFrame is None before multivalued parameter processing")
+        hdf5_processor = HDF5ParameterProcessor(self.hdf5_analyzer, self.dataframe)
+        self.dataframe = hdf5_processor.process_all_hdf5_parameters()
+
+        # Update analyzer with HDF5-enriched data
+        self.dataframe_analyzer = DataFrameAnalyzer(self.dataframe)
+
+        self.logger.info("Multivalued parameter processing completed")
+
+    def _process_analysis_cases(self) -> None:
+        """Apply analysis-case-specific calculations."""
+        self.logger.info("Processing analysis case calculations")
+
+        # Create and run analysis case processor
+        if self.dataframe is None:
+            raise RuntimeError("DataFrame is None before analysis case processing")
+        analysis_processor = AnalysisCaseProcessor(self.dataframe)
+        self.dataframe = analysis_processor.process_analysis_cases()
+
+        self.logger.info("Analysis case processing completed")
+
+    def _finalize_processing(self) -> None:
+        """Perform final validation and cleanup operations."""
+        self.logger.info("Finalizing processing")
+
+        # Final data validation
+        if self.dataframe is None:
+            raise RuntimeError("Cannot finalize processing: DataFrame is None")
+        if self.dataframe.empty:
+            raise ValueError("Final DataFrame is empty - processing failed")
+
+        # Log final data statistics
+        final_analyzer = DataFrameAnalyzer(self.dataframe)
+        self.logger.info(
+            f"Final DataFrame: {len(self.dataframe)} rows, {len(self.dataframe.columns)} columns"
+        )
+        self.logger.info(
+            f"Final single-valued columns: {len(final_analyzer.list_of_single_valued_column_names)}"
+        )
+        self.logger.info(
+            f"Final multivalued columns: {len(final_analyzer.list_of_multivalued_column_names)}"
+        )
+
+        # Optional: Generate processing report
+        self._generate_processing_report(final_analyzer)
+
+    def _generate_processing_report(self, final_analyzer: DataFrameAnalyzer) -> None:
+        """Generate a summary report of the processing results."""
+        report_lines = [
+            "=== QPB Parameter Processing Report ===",
+            f"Input CSV: {self.single_valued_csv_path}",
+            f"Input HDF5: {self.multivalued_hdf5_path}",
+            f"Output: {os.path.join(self.output_directory, self.output_filename)}",
+            "",
+            f"Final data shape: {self.dataframe.shape if self.dataframe is not None else 'DataFrame is None'}",
+            f"Single-valued parameters: {len(final_analyzer.list_of_single_valued_column_names)}",
+            f"Multivalued parameters: {len(final_analyzer.list_of_multivalued_column_names)}",
+            "",
+            "Column summary:",
+        ]
+
+        # Add column categorization
+        for col in sorted(final_analyzer.list_of_dataframe_column_names):
+            col_type = (
+                "single"
+                if col in final_analyzer.list_of_single_valued_column_names
+                else "multi"
+            )
+            param_type = (
+                "tunable"
+                if col in final_analyzer.list_of_tunable_parameter_names_from_dataframe
+                else "output"
+            )
+            report_lines.append(f"  {col}: {col_type}-valued {param_type}")
+
+        report_content = "\n".join(report_lines)
+
+        # Write report to file
+        report_path = os.path.join(self.output_directory, "processing_report.txt")
+        with open(report_path, "w") as f:
+            f.write(report_content)
+
+        self.logger.info(f"Processing report saved to {report_path}")
+
+    def _export_results(self) -> None:
+        """Export the processed DataFrame to CSV."""
+        output_path = os.path.join(self.output_directory, self.output_filename)
+
+        self.logger.info(f"Exporting results to {output_path}")
+        if self.dataframe is not None:
+            self.dataframe.to_csv(output_path, index=False)
+            self.logger.info("Export completed successfully")
+        else:
+            self.logger.error("Export failed: DataFrame is None")
+            raise RuntimeError("Cannot export results: DataFrame is None")
 
 
 @click.command()
@@ -36,10 +292,7 @@ from library import (
     "input_single_valued_csv_file_path",
     required=True,
     callback=filesystem_utilities.validate_input_csv_file,
-    help=(
-        "Path to .csv file containing extracted single-valued parameter "
-        "values from qpb log files."
-    ),
+    help="Path to .csv file containing extracted single-valued parameter values from qpb log files.",
 )
 @click.option(
     "-in_param_hdf5",
@@ -47,10 +300,7 @@ from library import (
     "input_multivalued_hdf5_file_path",
     required=True,
     callback=filesystem_utilities.validate_input_HDF5_file,
-    help=(
-        "Path to .csv file containing extracted multivalued parameter "
-        "values from qpb log files."
-    ),
+    help="Path to .hdf5 file containing extracted multivalued parameter values from qpb log files.",
 )
 @click.option(
     "-out_dir",
@@ -66,10 +316,7 @@ from library import (
     "output_csv_filename",
     default="processed_qpb_log_files_extracted_values.csv",
     callback=filesystem_utilities.validate_output_csv_filename,
-    help=(
-        "Specific name for the output .csv file containing processed values of "
-        "single-valued parameters from qpb log files."
-    ),
+    help="Specific name for the output .csv file containing processed values.",
 )
 @click.option(
     "-log_on",
@@ -96,601 +343,62 @@ from library import (
     help="Specific name for the script's log file.",
 )
 def main(
-    input_single_valued_csv_file_path,
-    input_multivalued_hdf5_file_path,
-    output_files_directory,
-    output_csv_filename,
-    enable_logging,
-    log_file_directory,
-    log_filename,
-):
-    # HANDLE EMPTY INPUT ARGUMENTS
+    input_single_valued_csv_file_path: str,
+    input_multivalued_hdf5_file_path: str,
+    output_files_directory: Optional[str],
+    output_csv_filename: str,
+    enable_logging: bool,
+    log_file_directory: Optional[str],
+    log_filename: Optional[str],
+) -> None:
+    """
+    Process extracted QPB log file parameters using configuration-driven
+    approach.
 
-    # If no output directory is provided, use the directory of the input file
+    This script transforms raw extracted parameters into analysis-ready
+    format using systematic, maintainable processing classes.
+    """
+
+    # Handle default output directory
     if output_files_directory is None:
-        output_files_directory = output_files_directory = os.path.dirname(
-            input_single_valued_csv_file_path
-        )
-
-    # INITIATE LOGGING
+        output_files_directory = os.path.dirname(input_single_valued_csv_file_path)
 
     # Setup logging
-    logger = filesystem_utilities.LoggingWrapper(
+    logger_wrapper = filesystem_utilities.LoggingWrapper(
         log_file_directory, log_filename, enable_logging
     )
+    logger_wrapper.initiate_script_logging()
 
-    # Log script start
-    logger.initiate_script_logging()
-
-    ## PROCESS EXTRACTED SINGLE-VALUED PARAMETER VALUES ##
-
-    # Load single-valued parameter values .csv file to a dataframe
-    single_valued_parameters_dataframe = pd.read_csv(input_single_valued_csv_file_path)
-
-    # STRING-VALUED PARAMETERS
-
-    # Replace term "Standard" with "Wilson".
-    if "Kernel_operator_type" in single_valued_parameters_dataframe.columns:
-        single_valued_parameters_dataframe["Kernel_operator_type"] = (
-            single_valued_parameters_dataframe["Kernel_operator_type"].replace(
-                "Standard", "Wilson"
-            )
-        )
-    logging.info(
-        f"Replaced 'Kernel_operator_type' string values 'Standard' with 'Wilson'."
-    )
-
-    # Ensure the "Configuration_label" field has 7-digit strings
-    if "Configuration_label" in single_valued_parameters_dataframe.columns:
-        single_valued_parameters_dataframe["Configuration_label"] = (
-            single_valued_parameters_dataframe["Configuration_label"]
-            .astype(str)
-            .str.zfill(7)
-        )
-    logging.info(
-        f"Replaced 'Kernel_operator_type' string values 'Standard' with 'Wilson'."
-    )
-
-    # Ensure "QCD_beta_value" field values are formatted as strings with two
-    # decimal places
-    if "QCD_beta_value" in single_valued_parameters_dataframe.columns:
-        single_valued_parameters_dataframe["QCD_beta_value"] = (
-            single_valued_parameters_dataframe["QCD_beta_value"].apply(
-                lambda x: f"{float(x):.2f}"
-            )
+    try:
+        # Create and run processor
+        processor = QPBParameterProcessor(
+            single_valued_csv_path=input_single_valued_csv_file_path,
+            multivalued_hdf5_path=input_multivalued_hdf5_file_path,
+            output_directory=output_files_directory,
+            output_filename=output_csv_filename,
         )
 
-    # Extract 'Temporal_lattice_size' and 'Spatial_lattice_size'
-    if "Lattice_geometry" in single_valued_parameters_dataframe.columns:
-        single_valued_parameters_dataframe["Temporal_lattice_size"] = (
-            single_valued_parameters_dataframe["Lattice_geometry"].apply(
-                lambda x: int(ast.literal_eval(x)[0])
-            )
-        )
-        single_valued_parameters_dataframe["Spatial_lattice_size"] = (
-            single_valued_parameters_dataframe["Lattice_geometry"].apply(
-                lambda x: int(ast.literal_eval(x)[1])
-            )
-        )
+        # Execute processing pipeline
+        result_dataframe = processor.process_all_parameters()
 
-        # Remove 'Lattice_geometry'
-        single_valued_parameters_dataframe.drop(
-            columns=["Lattice_geometry"], inplace=True
+        click.echo(
+            "✓ Processing extracted values from QPB log files completed successfully."
+        )
+        click.echo(
+            f"✓ Results saved to: {os.path.join(output_files_directory, output_csv_filename)}"
+        )
+        click.echo(
+            f"✓ Final dataset: {result_dataframe.shape[0]} rows, "
+            f"{result_dataframe.shape[1]} columns"
         )
 
-    # Modify the "MPI_geometry" field
-    if "MPI_geometry" in single_valued_parameters_dataframe.columns:
-        single_valued_parameters_dataframe[
-            "MPI_geometry"
-        ] = single_valued_parameters_dataframe["MPI_geometry"].apply(
-            lambda x: str(
-                ast.literal_eval(x)[1:]
-            )  # Remove the first element and convert back to string
-        )
+    except Exception as e:
+        click.echo(f"✗ Processing failed: {e}")
+        raise
 
-    # INTEGER-TYPE PARAMETERS
-
-    if (
-        "MPI_geometry" in single_valued_parameters_dataframe.columns
-        and "Threads_per_process" in single_valued_parameters_dataframe.columns
-    ):
-        single_valued_parameters_dataframe["Number_of_cores"] = (
-            single_valued_parameters_dataframe.apply(
-                lambda row: np.prod(ast.literal_eval(row["MPI_geometry"]))
-                * row["Threads_per_process"],
-                axis=1,
-            )
-        )
-
-    # TODO: Unacceptable!
-    if not "Number_of_vectors" in single_valued_parameters_dataframe.columns:
-        single_valued_parameters_dataframe["Number_of_vectors"] = 1
-
-    # APE_iterations with Initial_APE_iterations
-    if "Initial_APE_iterations" in single_valued_parameters_dataframe.columns:
-        if "APE_iterations" in single_valued_parameters_dataframe.columns:
-            single_valued_parameters_dataframe["APE_iterations"] = pd.to_numeric(
-                single_valued_parameters_dataframe["APE_iterations"], errors="coerce"
-            ) + pd.to_numeric(
-                single_valued_parameters_dataframe["Initial_APE_iterations"],
-                errors="coerce",
-            )
-            # Remove 'Initial_APE_iterations'
-            single_valued_parameters_dataframe.drop(
-                columns=["Initial_APE_iterations"], inplace=True
-            )
-        else:
-            single_valued_parameters_dataframe.rename(
-                columns={"Initial_APE_iterations": "APE_iterations"}, inplace=True
-            )
-
-    # Ensure "Clover_coefficient" field values are integers (0 or 1)
-    if "Clover_coefficient" in single_valued_parameters_dataframe.columns:
-        single_valued_parameters_dataframe["Clover_coefficient"] = (
-            single_valued_parameters_dataframe["Clover_coefficient"].astype(int)
-        )
-
-    # FLOAT-TYPE PARAMETERS
-
-    # Take the square root of the "Solver_epsilon" value
-    if "Solver_epsilon" in single_valued_parameters_dataframe.columns:
-        single_valued_parameters_dataframe["Solver_epsilon"] = np.sqrt(
-            single_valued_parameters_dataframe["Solver_epsilon"].apply(float)
-        )
-
-    # Take the square root of the "CG_epsilon" value
-    if "CG_epsilon" in single_valued_parameters_dataframe.columns:
-        single_valued_parameters_dataframe["CG_epsilon"] = np.sqrt(
-            single_valued_parameters_dataframe["CG_epsilon"].apply(float)
-        )
-
-    # Take the square root of the "MSCG_epsilon" value
-    if "MSCG_epsilon" in single_valued_parameters_dataframe.columns:
-        single_valued_parameters_dataframe["MSCG_epsilon"] = np.sqrt(
-            single_valued_parameters_dataframe["MSCG_epsilon"].apply(float)
-        )
-
-    if ("MSCG_epsilon" in single_valued_parameters_dataframe.columns) and not (
-        ("Outer solver epsilon" in single_valued_parameters_dataframe.columns)
-    ):
-        if "Solver_epsilon" in single_valued_parameters_dataframe.columns:
-            single_valued_parameters_dataframe = (
-                single_valued_parameters_dataframe.drop(columns="Solver_epsilon")
-            )
-
-    #
-    if (
-        "Minimum_eigenvalue_squared" in single_valued_parameters_dataframe.columns
-    ) and ("Maximum_eigenvalue_squared" in single_valued_parameters_dataframe.columns):
-        single_valued_parameters_dataframe[
-            "Condition_number"
-        ] = single_valued_parameters_dataframe["Maximum_eigenvalue_squared"].apply(
-            float
-        ) / single_valued_parameters_dataframe[
-            "Minimum_eigenvalue_squared"
-        ].apply(
-            float
-        )
-
-    ## PROCESS EXTRACTED MULTIVALUED PARAMETER VALUES ##
-
-    # TODO: extract_HDF5_datasets_to_dictionary() custom function opens the
-    # input HDF5 file every time it is called. Better open the file only once.
-
-    # Calculate average calculation result
-    calculation_result_per_vector_dictionary = (
-        data_processing.extract_HDF5_datasets_to_dictionary(
-            input_multivalued_hdf5_file_path, "Calculation_result_per_vector"
-        )
-    )
-    if calculation_result_per_vector_dictionary:
-        # TODO: Check length more comprehensively using a set:
-        # lengths = {len(arr) for arr in my_dict.values()}
-
-        # Ensure all dictionary values (NumPy arrays) have length greater than one
-        all_lengths_greater_than_one = all(
-            len(array) > 1
-            for array in calculation_result_per_vector_dictionary.values()
-        )
-        if all_lengths_greater_than_one:
-            # Calculate the average value and its error
-            average_calculation_result_dictionary = {
-                filename: (
-                    (
-                        float(np.average(dataset)),
-                        float(np.std(dataset, ddof=1) / np.sqrt(len(dataset))),
-                    )
-                )
-                for filename, dataset in calculation_result_per_vector_dictionary.items()
-            }
-            # Add a new column with the dictionary values
-            single_valued_parameters_dataframe[
-                "Average_calculation_result"
-            ] = single_valued_parameters_dataframe["Filename"].map(
-                # lambda x: (float(average_calculation_result_dictionary[x][0]), float(average_calculation_result_dictionary[x][1]))
-                average_calculation_result_dictionary.get
-            )
-        else:
-            # Alternatively check if all NumPy arrays have length one
-            all_lengths_equal_to_one = all(
-                len(array) == 1
-                for array in calculation_result_per_vector_dictionary.values()
-            )
-            if all_lengths_equal_to_one:
-                # Pass the single value to the DataFrame without error
-                Calculation_result_with_no_error_dictionary = {
-                    filename: float(dataset[0])
-                    for filename, dataset in calculation_result_per_vector_dictionary.items()
-                }
-                # Add a new column with the dictionary values
-                single_valued_parameters_dataframe[
-                    "Calculation_result_with_no_error"
-                ] = single_valued_parameters_dataframe["Filename"].map(
-                    Calculation_result_with_no_error_dictionary
-                )
-
-    if "Main_program_type" in single_valued_parameters_dataframe.columns:
-        main_program_type = str(
-            single_valued_parameters_dataframe["Main_program_type"].unique()[0]
-        )
-        if "Average_calculation_result" in single_valued_parameters_dataframe.columns:
-            main_program_type = main_program_type.replace("_values", "")
-            new_column_name = "Average_" + main_program_type + "_values"
-            single_valued_parameters_dataframe.rename(
-                columns={"Average_calculation_result": new_column_name}, inplace=True
-            )
-        elif (
-            "Calculation_result_with_no_error"
-            in single_valued_parameters_dataframe.columns
-        ):
-            main_program_type = main_program_type.replace("_values", "")
-            new_column_name = main_program_type.capitalize() + "_value_with_no_error"
-            single_valued_parameters_dataframe.rename(
-                columns={"Calculation_result_with_no_error": new_column_name},
-                inplace=True,
-            )
-
-    # Calculate average number of MSCG iterations
-    total_number_of_MSCG_iterations_dictionary = (
-        data_processing.extract_HDF5_datasets_to_dictionary(
-            input_multivalued_hdf5_file_path, "Total_number_of_MSCG_iterations"
-        )
-    )
-    if total_number_of_MSCG_iterations_dictionary:
-        # Calculate the average value and its error
-        average_number_of_MSCG_iterations_dictionary = {
-            filename: float(
-                # TODO: Change it later!
-                np.sum(dataset)
-            )
-            for filename, dataset in total_number_of_MSCG_iterations_dictionary.items()
-        }
-        # Add a new column with the dictionary values
-        # Forward operator applications case
-        if not "Number_of_spinors" in single_valued_parameters_dataframe.columns:
-            single_valued_parameters_dataframe[
-                "Average_number_of_MSCG_iterations_per_vector"
-            ] = (
-                single_valued_parameters_dataframe["Filename"].map(
-                    average_number_of_MSCG_iterations_dictionary
-                )
-                / single_valued_parameters_dataframe["Number_of_vectors"].unique()[0]
-            )
-        # Inversions case
-        else:
-            single_valued_parameters_dataframe[
-                "Average_number_of_MSCG_iterations_per_spinor"
-            ] = (
-                single_valued_parameters_dataframe["Filename"].map(
-                    average_number_of_MSCG_iterations_dictionary
-                )
-                / single_valued_parameters_dataframe["Number_of_spinors"].unique()[0]
-            )
-
-    # Calculate average number of MSCG iterations
-    number_of_kernel_applications_per_MSCG_dictionary = (
-        data_processing.extract_HDF5_datasets_to_dictionary(
-            input_multivalued_hdf5_file_path, "Number_of_kernel_applications_per_MSCG"
-        )
-    )
-    if number_of_kernel_applications_per_MSCG_dictionary:
-        #
-        total_number_of_kernel_applications_dictionary = {
-            filename: int(np.sum(dataset)) + len(dataset)
-            for filename, dataset in number_of_kernel_applications_per_MSCG_dictionary.items()
-        }
-        # Add a new column with the dictionary values
-        # Forward operator applications case
-        if not "Number_of_spinors" in single_valued_parameters_dataframe.columns:
-            single_valued_parameters_dataframe[
-                "Average_number_of_MV_multiplications_per_vector"
-            ] = (
-                single_valued_parameters_dataframe["Filename"].map(
-                    total_number_of_kernel_applications_dictionary
-                )
-                / single_valued_parameters_dataframe["Number_of_vectors"].unique()[0]
-            )
-        # Inversions case
-        else:
-            single_valued_parameters_dataframe[
-                "Average_number_of_MV_multiplications_per_spinor"
-            ] = (
-                single_valued_parameters_dataframe["Filename"].map(
-                    total_number_of_kernel_applications_dictionary
-                )
-                / single_valued_parameters_dataframe["Number_of_spinors"].unique()[0]
-            )
-
-    # Extract MS shifts
-    MS_expansion_shifts_dictionary = (
-        data_processing.extract_HDF5_datasets_to_dictionary(
-            input_multivalued_hdf5_file_path, "MS_expansion_shifts"
-        )
-    )
-    if MS_expansion_shifts_dictionary:
-        # Convert the dictionary values to lists of floats
-        MS_expansion_shifts_dictionary = {
-            filename: [float(value) for value in np.unique(dataset)]
-            for filename, dataset in MS_expansion_shifts_dictionary.items()
-        }
-        # Add a new column with the dictionary values
-        single_valued_parameters_dataframe["MS_expansion_shifts"] = (
-            single_valued_parameters_dataframe["Filename"].map(
-                MS_expansion_shifts_dictionary
-            )
-        )
-
-    # # Calculate average CG calculation time per spinor
-    # CG_total_calculation_time_per_spinor_dictionary = (
-    #     data_processing.extract_HDF5_datasets_to_dictionary(
-    #         input_multivalued_hdf5_file_path, "CG_total_calculation_time_per_spinor"
-    #     )
-    # )
-    # if CG_total_calculation_time_per_spinor_dictionary:
-    #     # Calculate the average value and its error
-    #     average_CG_calculation_time_per_spinor_dictionary = {
-    #         filename: np.average(dataset)
-    #         for filename, dataset in CG_total_calculation_time_per_spinor_dictionary.items()
-    #     }
-    #     # Add a new column with the dictionary values
-    #     single_valued_parameters_dataframe["Average_CG_calculation_time_per_spinor"] = (
-    #         single_valued_parameters_dataframe["Filename"].map(
-    #             average_CG_calculation_time_per_spinor_dictionary
-    #         )
-    #     )
-
-    # Calculate average number of CG iterations per spinor
-    total_number_of_CG_iterations_per_spinor_dictionary = (
-        data_processing.extract_HDF5_datasets_to_dictionary(
-            input_multivalued_hdf5_file_path,
-            "Total_number_of_CG_iterations_per_spinor",
-        )
-    )
-    if total_number_of_CG_iterations_per_spinor_dictionary:
-        # Calculate the average value and its error
-        average_number_of_CG_iterations_per_spinor_dictionary = {
-            filename: float(np.average(dataset))
-            for filename, dataset in total_number_of_CG_iterations_per_spinor_dictionary.items()
-        }
-        # Add a new column with the dictionary values
-        single_valued_parameters_dataframe[
-            "Average_number_of_CG_iterations_per_spinor"
-        ] = single_valued_parameters_dataframe["Filename"].map(
-            average_number_of_CG_iterations_per_spinor_dictionary
-        )
-
-    # Forward operator applications
-    if not "Number_of_spinors" in single_valued_parameters_dataframe.columns:
-        # Chebyshev case
-        if (
-            single_valued_parameters_dataframe["Overlap_operator_method"].unique()[0]
-            == "Chebyshev"
-        ):
-            single_valued_parameters_dataframe[
-                "Average_number_of_MV_multiplications_per_vector"
-            ] = (
-                2
-                * single_valued_parameters_dataframe[
-                    "Total_number_of_Lanczos_iterations"
-                ]
-                + 1
-            ) + (
-                2 * single_valued_parameters_dataframe["Number_of_Chebyshev_terms"] - 1
-            )
-
-        # KL case
-        # elif (
-        #     single_valued_parameters_dataframe["Overlap_operator_method"].unique()[0]
-        #     == "KL"
-        # ):
-        #     if (
-        #         "Average_number_of_MSCG_iterations_per_vector"
-        #         in single_valued_parameters_dataframe.columns
-        #     ):
-        #         single_valued_parameters_dataframe[
-        #             "Average_number_of_MV_multiplications_per_vector"
-        #         ] = (
-        #             2
-        #             * single_valued_parameters_dataframe[
-        #                 "Average_number_of_MSCG_iterations_per_vector"
-        #             ]
-        #             + 1
-        #         )
-    # Inversions
-    else:
-        # Chebyshev case
-        if (
-            single_valued_parameters_dataframe["Overlap_operator_method"].unique()[0]
-            == "Chebyshev"
-        ):
-            single_valued_parameters_dataframe[
-                "Average_number_of_MV_multiplications_per_spinor"
-            ] = (
-                2
-                * single_valued_parameters_dataframe[
-                    "Total_number_of_Lanczos_iterations"
-                ]
-                + 1
-            ) + (
-                2
-                * single_valued_parameters_dataframe[
-                    "Average_number_of_CG_iterations_per_spinor"
-                ]
-                + 1
-            ) * (
-                2 * single_valued_parameters_dataframe["Number_of_Chebyshev_terms"] - 1
-            )
-
-        # elif (
-        #     single_valued_parameters_dataframe["Overlap_operator_method"].unique()[0]
-        #     == "KL"
-        # ):
-        #     single_valued_parameters_dataframe[
-        #         "Average_number_of_MV_multiplications_per_spinor"
-        #     ] = (
-        #         2
-        #         * single_valued_parameters_dataframe[
-        #             "Average_number_of_MSCG_iterations_per_spinor"
-        #         ]
-        #         + 1
-        #     )
-
-    # Forward operator applications
-    if "Total_calculation_time" in single_valued_parameters_dataframe.columns:
-        if not "Number_of_spinors" in single_valued_parameters_dataframe.columns:
-
-            if "Total_overhead_time" in single_valued_parameters_dataframe:
-                single_valued_parameters_dataframe[
-                    "Average_wall_clock_time_per_vector"
-                ] = (
-                    single_valued_parameters_dataframe["Total_calculation_time"]
-                    - single_valued_parameters_dataframe["Total_overhead_time"]
-                ) / single_valued_parameters_dataframe[
-                    "Number_of_vectors"
-                ] + single_valued_parameters_dataframe[
-                    "Total_overhead_time"
-                ]
-            else:
-                single_valued_parameters_dataframe[
-                    "Average_wall_clock_time_per_vector"
-                ] = (
-                    single_valued_parameters_dataframe["Total_calculation_time"]
-                ) / single_valued_parameters_dataframe[
-                    "Number_of_vectors"
-                ]
-
-            if "Number_of_cores" in single_valued_parameters_dataframe.columns:
-                single_valued_parameters_dataframe["Average_core_hours_per_vector"] = (
-                    single_valued_parameters_dataframe["Number_of_cores"]
-                    * single_valued_parameters_dataframe[
-                        "Average_wall_clock_time_per_vector"
-                    ]
-                    / 3600
-                )
-
-                single_valued_parameters_dataframe[
-                    "Adjusted_average_core_hours_per_vector"
-                ] = single_valued_parameters_dataframe.apply(
-                    lambda row: (
-                        row["Average_core_hours_per_vector"] * 0.87
-                        if row["Number_of_cores"] == 256
-                        else (
-                            row["Average_core_hours_per_vector"] * 1.13
-                            if row["Number_of_cores"] == 512
-                            else (
-                                row["Average_core_hours_per_vector"] * 0.98
-                                if row["Number_of_cores"] == 768
-                                else row["Average_core_hours_per_vector"]
-                            )
-                        )
-                    ),
-                    axis=1,
-                )
-
-        # Inversions
-        else:
-
-            if "Total_overhead_time" in single_valued_parameters_dataframe:
-                single_valued_parameters_dataframe[
-                    "Average_wall_clock_time_per_spinor"
-                ] = (
-                    single_valued_parameters_dataframe["Total_calculation_time"]
-                    - single_valued_parameters_dataframe["Total_overhead_time"]
-                ) / single_valued_parameters_dataframe[
-                    "Number_of_spinors"
-                ] + single_valued_parameters_dataframe[
-                    "Total_overhead_time"
-                ]
-            else:
-                single_valued_parameters_dataframe[
-                    "Average_wall_clock_time_per_spinor"
-                ] = (
-                    single_valued_parameters_dataframe["Total_calculation_time"]
-                ) / single_valued_parameters_dataframe[
-                    "Number_of_spinors"
-                ]
-
-            if "Number_of_cores" in single_valued_parameters_dataframe.columns:
-                single_valued_parameters_dataframe["Average_core_hours_per_spinor"] = (
-                    single_valued_parameters_dataframe["Number_of_cores"]
-                    * single_valued_parameters_dataframe[
-                        "Average_wall_clock_time_per_spinor"
-                    ]
-                    / 3600
-                )
-
-                single_valued_parameters_dataframe[
-                    "Adjusted_average_core_hours_per_spinor"
-                ] = single_valued_parameters_dataframe.apply(
-                    lambda row: (
-                        row["Average_core_hours_per_spinor"] * 0.95
-                        if (
-                            row["Number_of_cores"] == 3456
-                            and row["Kernel_operator_type"] == "Brillouin"
-                        )
-                        else (
-                            row["Average_core_hours_per_spinor"] * 1.2
-                            if (
-                                row["Number_of_cores"] == 128
-                                and row["Kernel_operator_type"] == "Brillouin"
-                            )
-                            else (
-                                row["Average_core_hours_per_spinor"] * 0.51
-                                if (
-                                    row["Number_of_cores"] == 3456
-                                    and row["Kernel_operator_type"] == "Wilson"
-                                )
-                                else (
-                                    row["Average_core_hours_per_spinor"] * 1.3
-                                    if (
-                                        row["Number_of_cores"] == 128
-                                        and row["Kernel_operator_type"] == "Wilson"
-                                    )
-                                    else row["Average_core_hours_per_spinor"]
-                                )
-                            )
-                        )
-                    ),
-                    axis=1,
-                )
-
-    # EXPORT PROCESSED VALUES
-
-    # Construct the output .csv file path
-    output_qpb_log_files_csv_file_path = os.path.join(
-        output_files_directory,
-        output_csv_filename,
-    )
-
-    # Export modified DataFrame back to the same .csv file
-    single_valued_parameters_dataframe.to_csv(
-        output_qpb_log_files_csv_file_path, index=False
-    )
-
-    # Terminate logging
-    logger.terminate_script_logging()
-
-    click.echo("   -- Processing extracted values from qpb log files completed.")
+    finally:
+        # Terminate logging
+        logger_wrapper.terminate_script_logging()
 
 
 if __name__ == "__main__":
