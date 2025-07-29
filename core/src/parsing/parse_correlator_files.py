@@ -1,28 +1,29 @@
 """
 Summary:
     This script processes correlator data stored in .dat files within a
-    specified directory and converts it into HDF5 format for efficient storage
-    and retrieval. It extracts specific correlator values based on predefined
-    identifiers and organizes the data into structured groups within the HDF5
-    file.
+    specified directory and converts it into HDF5 format for efficient
+    storage and retrieval. It extracts specific correlator values based
+    on predefined identifiers and organizes the data into structured
+    groups within the HDF5 file.
 
 Inputs:
-    - qpb_correlators_files_directory (str): Path to the directory containing
-      the input .dat files with qpb correlator data.
-    - output_files_directory (str, optional): Path to the directory where the
-      output HDF5 file will be saved. If not provided, defaults to the input
-      directory.
-    - output_hdf5_filename (str, optional): Name of the output HDF5 file 
+    - qpb_correlators_files_directory (str): Path to the directory
+      containing the input .dat files with qpb correlator data.
+    - output_files_directory (str, optional): Path to the directory
+      where the output HDF5 file will be saved. If not provided,
+      defaults to the input directory.
+    - output_hdf5_filename (str, optional): Name of the output HDF5 file
       (should include '.h5' extension).
-    - enable_logging (bool, optional): Flag to enable logging. Default is False.
-    - log_file_directory (str, optional): Directory where the script's log file
-      will be stored. Required if logging is enabled.
-    - log_filename (str, optional): Specific name for the script's log file. 
-      Required if logging is enabled.
+    - enable_logging (bool, optional): Flag to enable logging. Default
+      is False.
+    - log_file_directory (str, optional): Directory where the script's
+      log file will be stored. Required if logging is enabled.
+    - log_filename (str, optional): Specific name for the script's log
+      file. Required if logging is enabled.
 
 Outputs:
-    - An HDF5 file containing groups for each input .dat file, with datasets
-      corresponding to the following correlator identifiers:
+    - An HDF5 file containing groups for each input .dat file, with
+      datasets corresponding to the following correlator identifiers:
         - "1-1"
         - "g5-g5"
         - "g5-g4g5"
@@ -37,10 +38,10 @@ Processing Steps:
     1. Validate input arguments and directories.
     2. Set up logging if enabled.
     3. Create the HDF5 file and define its group structure.
-    4. Iterate over all .dat files in the input directory:
-       - Read each file and extract correlator values based on identifiers.
-       - Store extracted values as NumPy arrays.
-       - Save the data into the HDF5 file under a subgroup named after the 
+    4. Iterate over all .dat files in the input directory: - Read each
+       file and extract correlator values based on identifiers. - Store
+       extracted values as NumPy arrays. - Save the data into the HDF5
+       file under a subgroup named after the 
          original .dat filename.
     5. Log the number of processed files and finalize execution.
 
@@ -55,9 +56,9 @@ Usage:
         --log_filename <log_filename.log>
 
 Example:
-    Given .dat files in the specified data directory, the script will generate
-    an HDF5 file in the output directory, structured to allow efficient access
-    to the correlator values.
+    Given .dat files in the specified data directory, the script will
+    generate an HDF5 file in the output directory, structured to allow
+    efficient access to the correlator values.
 """
 
 import glob
@@ -90,14 +91,15 @@ def _process_correlator_files_and_extract_data(correlators_files_directory, logg
     correlator arrays.
 
     Args:
-        correlators_files_directory (str): Directory containing correlator files
-        logger: Logger instance
+        correlators_files_directory (str): Directory containing
+        correlator files logger: Logger instance
 
     Returns:
         tuple: (scalar_params_list, correlator_arrays_dict)
-            - scalar_params_list: List of dicts with scalar parameters per file
-            - correlator_arrays_dict: Dict with filename as key, correlator
-              arrays as value
+            - scalar_params_list: List of dicts with scalar parameters
+              per file
+            - correlator_arrays_dict: Dict with filename as key,
+              correlator arrays as value
     """
     scalar_params_list = []
     correlator_arrays_dict = {}
@@ -145,11 +147,12 @@ def _parse_correlator_file(file_path, logger):
     Parse a single correlator file and extract correlator values.
 
     Args:
-        file_path (str): Full path to the correlator file
-        logger: Logger instance
+        - file_path (str): Full path to the correlator file
+        - logger: Logger instance
 
     Returns:
-        dict: Dictionary with correlator identifiers as keys and numpy arrays as values
+        dict: Dictionary with correlator identifiers as keys and numpy
+        arrays as values
     """
     # Initialize correlator values dictionary
     correlator_values = {}
@@ -161,7 +164,8 @@ def _parse_correlator_file(file_path, logger):
         for line in file:
             columns = line.split()
             if len(columns) >= 5:  # Ensure line has enough columns
-                # Check each correlator identifier (identifier is in last column, value in column 4)
+                # Check each correlator identifier (identifier is in
+                # last column, value in column 4)
                 for identifier in CORRELATOR_IDENTIFIERS_LIST:
                     if columns[-1] == identifier:
                         try:
@@ -203,8 +207,8 @@ def _parse_correlator_file(file_path, logger):
     default="qpb_correlator_files_values.h5",
     callback=partial(validate_output_file, extensions=[".h5"]),
     help=(
-        "Specific name for the output HDF5 file containing extracted correlator "
-        "values from qpb correlator files."
+        "Specific name for the output HDF5 file containing extracted "
+        "correlator values from qpb correlator files."
     ),
 )
 @click.option(
