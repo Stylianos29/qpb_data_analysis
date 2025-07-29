@@ -105,17 +105,13 @@ def _process_log_files_and_extract_parameters(qpb_log_files_directory, logger):
             file_contents = file.readlines()
 
         # Extract scalar parameters from file contents
-        file_scalar_params = (
-            parsing.extract_scalar_parameters_from_file_contents(
-                file_contents, logger
-            )
+        file_scalar_params = parsing.extract_scalar_parameters_from_file_contents(
+            file_contents, logger
         )
 
         # Extract array parameters from file contents
-        file_array_params = (
-            parsing.extract_array_parameters_from_file_contents(
-                file_contents, logger
-            )
+        file_array_params = parsing.extract_array_parameters_from_file_contents(
+            file_contents, logger
         )
 
         # Merge scalar parameters (file contents take precedence over filename)
