@@ -254,6 +254,18 @@ def main(
     logger = LoggingWrapper(log_file_directory, log_filename, enable_logging)
     logger.initiate_script_logging()
 
+    # CHECK IF ANY .DAT FILES EXIST
+    dat_files = glob.glob(os.path.join(qpb_correlators_files_directory, "*.dat"))
+    if not dat_files:
+        logger.info(
+            f"No .dat files found in directory "
+            f"'{os.path.basename(qpb_correlators_files_directory)}'. "
+            "No processing will be performed."
+        )
+        logger.terminate_script_logging()
+        click.echo("   -- No correlator files found to parse.")
+        return
+
     # PROCESS FILES AND EXTRACT DATA
     scalar_params_list, correlator_arrays_dict = (
         _process_correlator_files_and_extract_data(
