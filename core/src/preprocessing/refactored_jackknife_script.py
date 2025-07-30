@@ -22,7 +22,7 @@ Usage:
 import os
 import sys
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Optional
 
 import click
 import numpy as np
@@ -38,26 +38,19 @@ from library import (
 
 # Import our auxiliary modules
 from .jackknife_config import (
-    DerivativeMethod,
     DEFAULT_DERIVATIVE_METHOD,
+    DEFAULT_COMPRESSION,
+    DEFAULT_COMPRESSION_LEVEL,
     EXCLUDED_FROM_GROUPING,
     INPUT_CORRELATOR_DATASETS,
-    OUTPUT_DATASET_PATTERNS,
-    METADATA_DATASETS,
-    DATASET_DESCRIPTIONS,
     REQUIRED_INPUT_DATASETS,
     MIN_GAUGE_CONFIGURATIONS,
-    LOG_MESSAGES,
-    get_output_dataset_name,
     get_dataset_description,
-    validate_derivative_method,
 )
 
 from .jackknife_processor import (
     JackknifeProcessor,
     extract_configuration_metadata,
-    validate_group_for_processing,
-    prepare_output_metadata,
 )
 
 
@@ -82,27 +75,6 @@ from .jackknife_processor import (
     default=None,
     callback=validate_input_directory,
     help="Directory for output files. If not specified, uses input file directory.",
-)
-@click.option(
-    "--derivative_method",
-    default=DEFAULT_DERIVATIVE_METHOD.value,
-    type=click.Choice([method.value for method in DerivativeMethod]),
-    help=(
-        f"Finite difference method for derivatives. "
-        f"Default: {DEFAULT_DERIVATIVE_METHOD.value}"
-    ),
-)
-@click.option(
-    "--compression",
-    default="gzip",
-    type=click.Choice(["gzip", "lzf", "szip", "none"]),
-    help="HDF5 compression method for output. Default: gzip",
-)
-@click.option(
-    "--compression_level",
-    default=4,
-    type=click.IntRange(1, 9),
-    help="Compression level (1-9 for gzip). Default: 4",
 )
 @click.option(
     "-log_on",
@@ -145,9 +117,6 @@ def main(
     input_hdf5_file: str,
     output_hdf5_file: str,
     output_directory: Optional[str],
-    derivative_method: str,
-    compression: str,
-    compression_level: int,
     enable_logging: bool,
     log_directory: Optional[str],
     log_filename: Optional[str],
@@ -158,11 +127,12 @@ def main(
     Apply jackknife analysis to correlator data in HDF5 format.
 
     This script processes correlator data by:
-    1. Loading data using HDF5Analyzer
-    2. Grouping by tunable parameters (excluding Configuration_label)
-    3. Applying jackknife resampling to each group
-    4. Computing finite difference derivatives
-    5. Exporting results in clean, consistent format
+        1. Loading data using HDF5Analyzer
+        2. Grouping by tunable parameters (excluding
+           Configuration_label)
+        3. Applying jackknife resampling to each group
+        4. Computing finite difference derivatives
+        5. Exporting results in clean, consistent format
     """
     # === SETUP AND VALIDATION ===
 
@@ -173,12 +143,10 @@ def main(
     # Ensure output file is in the specified directory
     output_path = Path(output_directory) / Path(output_hdf5_file).name
 
-    # Validate derivative method
-    try:
-        deriv_method = validate_derivative_method(derivative_method)
-    except ValueError as e:
-        click.echo(f"Error: {e}", err=True)
-        sys.exit(1)
+    # Get configuration values from config file
+    deriv_method = DEFAULT_DERIVATIVE_METHOD
+    compression = DEFAULT_COMPRESSION
+    compression_level = DEFAULT_COMPRESSION_LEVEL
 
     # Setup logging
     logger = filesystem_utilities.LoggingWrapper(
@@ -287,7 +255,7 @@ def main(
                 # === EXTRACT CONFIGURATION METADATA ===
 
                 # Get configuration labels and filenames
-                config_metadata = {}
+                config_metadata = {} # TODO: Gather configuration metadata
 
                 # Try to get configuration labels from the analyzer
                 try:
@@ -317,6 +285,7 @@ def main(
                     g5g5_data=g5g5_data,
                     g4g5g5_data=g4g5g5_data,
                     group_metadata=group_metadata,
+                    min_configurations=min_configurations,
                 )
 
                 if not processing_results:
@@ -451,58 +420,6 @@ def _add_dataset_descriptions(hdf5_file: h5py.File, logger) -> None:
     hdf5_file.visititems(add_description)
 
     logger.info(f"Added descriptions to {descriptions_added} datasets")
-
-
-def _validate_file_paths(input_path: str, output_path: str) -> None:
-    """
-    Validate input and output file paths.
-
-    Args:
-        - input_path: Path to input file
-        - output_path: Path to output file
-
-    Raises:
-        click.ClickException: If validation fails
-    """
-    # Check input file exists and is readable
-    if not os.path.exists(input_path):
-        raise click.ClickException(f"Input file not found: {input_path}")
-
-    if not os.access(input_path, os.R_OK):
-        raise click.ClickException(f"Input file not readable: {input_path}")
-
-    # Check output directory is writable
-    output_dir = os.path.dirname(output_path)
-    if output_dir and not os.access(output_dir, os.W_OK):
-        raise click.ClickException(f"Output directory not writable: {output_dir}")
-
-    # Warn if output file exists
-    if os.path.exists(output_path):
-        click.echo(
-            f"Warning: Output file exists and will be overwritten: {output_path}"
-        )
-
-
-def _print_analysis_summary(analyzer: HDF5Analyzer, grouped_data: Dict) -> None:
-    """
-    Print a summary of the analysis setup.
-
-    Args:
-        analyzer: HDF5Analyzer instance
-        grouped_data: Grouped parameter data
-    """
-    click.echo("\n" + "=" * 60)
-    click.echo("JACKKNIFE ANALYSIS SUMMARY")
-    click.echo("=" * 60)
-    click.echo(f"Input groups: {len(analyzer.active_groups)}")
-    click.echo(f"Parameter groupings: {len(grouped_data)}")
-    click.echo(
-        f"Available datasets: {len(analyzer.list_of_output_quantity_names_from_hdf5)}"
-    )
-    click.echo(
-        f"Tunable parameters: {len(analyzer.list_of_tunable_parameter_names_from_hdf5)}"
-    )
-    click.echo("=" * 60 + "\n")
 
 
 if __name__ == "__main__":
