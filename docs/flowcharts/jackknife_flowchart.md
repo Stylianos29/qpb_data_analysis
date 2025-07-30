@@ -68,22 +68,6 @@ flowchart TD
     EarlyExit --> End
     Success --> End([End])
     
-    %% AUXILIARY MODULES DETAIL
-    subgraph ConfigModule [_config.py]
-        Config1[Dataset Naming Patterns:<br/>g5g5_mean_values, etc.]
-        Config2[Finite Difference Methods:<br/>2nd & 4th order stencils]
-        Config3[Processing Parameters:<br/>Exclusion lists, validation]
-        Config4[Dataset Descriptions:<br/>Comprehensive documentation]
-    end
-    
-    subgraph ProcessorModule [_jackknife_processor.py]
-        Proc1[JackknifeProcessor Class:<br/>Main processing orchestration]
-        Proc2[validate_input_data:<br/>Data quality checks]
-        Proc3[generate_jackknife_samples:<br/>Statistical resampling]
-        Proc4[calculate_jackknife_statistics:<br/>Mean & error computation]
-        Proc5[calculate_finite_difference_derivative:<br/>Numerical derivatives]
-    end
-    
     %% STYLING
     classDef inputOutput fill:#e1f5fe
     classDef process fill:#f3e5f5
@@ -102,61 +86,68 @@ flowchart TD
     class Success success
 ```
 
+## Auxiliary Modules Detail
+
+### _config.py Configuration Module
+- **Dataset Naming Patterns**: Clean names like `g5g5_mean_values`
+- **Finite Difference Methods**: 2nd & 4th order stencils with
+  coefficients
+- **Processing Parameters**: Exclusion lists, minimum configurations
+- **Dataset Descriptions**: Comprehensive documentation for all outputs
+
+### _jackknife_processor.py Processing Module
+- **JackknifeProcessor Class**: Main processing orchestration
+- **validate_input_data**: Data quality checks and validation
+- **generate_jackknife_samples**: Statistical resampling implementation
+- **calculate_jackknife_statistics**: Mean & error computation
+- **calculate_finite_difference_derivative**: Numerical derivatives with
+  boundary handling
+```
+
 ## Key Components
 
 ### Main Script (apply_jackknife_analysis.py)
 - **CLI Interface**: Click-based command line with comprehensive options
 - **HDF5Analyzer Integration**: Modern data loading and management
 - **Parameter Grouping**: Automatic grouping by tunable parameters
-- **Virtual Dataset Creation**: Clean integration of results back into
-  HDF5
+- **Virtual Dataset Creation**: Clean integration of results back into HDF5
 - **Error Handling**: Robust validation and graceful failure handling
 
 ### Configuration Module (_config.py)
-- **Dataset Naming**: Clean, consistent naming patterns
-  (`g5g5_mean_values` vs old verbose names)
+- **Dataset Naming**: Clean, consistent naming patterns (`g5g5_mean_values` vs old verbose names)
 - **Finite Difference Methods**: Configurable 2nd and 4th order stencils
-- **Processing Parameters**: Min configurations, exclusion lists,
-  validation rules
-- **Dataset Descriptions**: Comprehensive documentation for all output
-  datasets
+- **Processing Parameters**: Min configurations, exclusion lists, validation rules
+- **Dataset Descriptions**: Comprehensive documentation for all output datasets
 
 ### Jackknife Processor (_jackknife_processor.py)
-- **JackknifeProcessor Class**: Main orchestration of statistical
-  analysis
-- **Data Validation**: Shape checking, NaN detection, minimum sample
-  size
-- **Jackknife Sampling**: Statistical resampling with systematic
-  exclusion
+- **JackknifeProcessor Class**: Main orchestration of statistical analysis
+- **Data Validation**: Shape checking, NaN detection, minimum sample size
+- **Jackknife Sampling**: Statistical resampling with systematic exclusion
 - **Error Estimation**: Jackknife-based uncertainty quantification
-- **Derivative Calculation**: Finite difference with proper boundary
-  handling
+- **Derivative Calculation**: Finite difference with proper boundary handling
 
 ### Key Processing Steps
 
-1. **Data Loading**: Use HDF5Analyzer to load correlator data
-   efficiently
-2. **Parameter Grouping**: Group by all tunable parameters except
-   Configuration_label
+1. **Data Loading**: Use HDF5Analyzer to load correlator data efficiently
+2. **Parameter Grouping**: Group by all tunable parameters except Configuration_label
 3. **Validation**: Ensure sufficient data quality and quantity
-4. **Jackknife Resampling**: Create N samples, each excluding one
-   configuration
+4. **Jackknife Resampling**: Create N samples, each excluding one configuration
 5. **Statistical Analysis**: Compute means and errors for all quantities
-6. **Derivative Calculation**: Apply finite differences with boundary
-   management
-7. **Virtual Dataset Creation**: Add results back to HDF5Analyzer as
-   virtual datasets
-8. **Export**: Use save_transformed_data() to maintain hierarchical
-   structure
+6. **Derivative Calculation**: Apply finite differences with boundary management
+7. **Virtual Dataset Creation**: Add results back to HDF5Analyzer as virtual datasets
+8. **Export**: Use save_transformed_data() to maintain hierarchical structure
 
 ### Data Flow
 
-**Input**: HDF5 file with correlator datasets and parameter attributes ↓
-**Grouping**: Organize by parameter combinations (excluding
-Configuration_label) ↓ **Processing**: Apply jackknife analysis to each
-group independently ↓ **Results**: Clean dataset names with
-comprehensive descriptions ↓ **Output**: HDF5 file with same structure +
-jackknife analysis results
+**Input**: HDF5 file with correlator datasets and parameter attributes
+↓
+**Grouping**: Organize by parameter combinations (excluding Configuration_label)
+↓
+**Processing**: Apply jackknife analysis to each group independently
+↓
+**Results**: Clean dataset names with comprehensive descriptions
+↓
+**Output**: HDF5 file with same structure + jackknife analysis results
 
 ### Error Handling Strategy
 
@@ -170,25 +161,20 @@ jackknife analysis results
 
 ### Code Organization
 - **Modular Design**: Three focused files instead of monolithic script
-- **Separation of Concerns**: Config, processing, and orchestration
-  separated
+- **Separation of Concerns**: Config, processing, and orchestration separated
 - **Reusable Components**: Processor class can be used independently
 
 ### Data Handling
 - **HDF5Analyzer Integration**: Modern, efficient data management
 - **Clean Dataset Names**: Short, consistent naming convention
-- **Automatic Gvar Recognition**: Mean/error pairs automatically
-  detected
+- **Automatic Gvar Recognition**: Mean/error pairs automatically detected
 - **Hierarchical Structure**: Maintains input file organization
 
 ### Processing Focus
-- **Pure Preprocessing**: Removed PCAC mass calculation (moved to
-  analysis)
-- **Configurable Methods**: Support for multiple finite difference
-  orders
+- **Pure Preprocessing**: Removed PCAC mass calculation (moved to analysis)
+- **Configurable Methods**: Support for multiple finite difference orders
 - **Robust Validation**: Comprehensive data quality checks
-- **Better Error Handling**: Continue processing despite individual
-  failures
+- **Better Error Handling**: Continue processing despite individual failures
 
 ### Documentation
 - **Comprehensive Descriptions**: Every dataset thoroughly documented
