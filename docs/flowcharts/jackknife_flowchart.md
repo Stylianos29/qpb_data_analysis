@@ -138,14 +138,15 @@ flowchart TD
 
 ### Data Flow
 
-**Input**: HDF5 file with correlator datasets and parameter attributes
-↓
-**Grouping**: Organize by parameter combinations (excluding Configuration_label)
-↓
-**Processing**: Apply jackknife analysis to each group independently
-↓
-**Results**: Clean dataset names with comprehensive descriptions
-↓
+**Input**: HDF5 file with correlator datasets and parameter attributes  
+↓  
+**Grouping**: Organize by parameter combinations (excluding
+Configuration_label)  
+↓  
+**Processing**: Apply jackknife analysis to each group independently  
+↓  
+**Results**: Clean dataset names with comprehensive descriptions  
+↓  
 **Output**: HDF5 file with same structure + jackknife analysis results
 
 ### Error Handling Strategy
