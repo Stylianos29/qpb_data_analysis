@@ -102,7 +102,6 @@ flowchart TD
 - **calculate_jackknife_statistics**: Mean & error computation
 - **calculate_finite_difference_derivative**: Numerical derivatives with
   boundary handling
-```
 
 ## Key Components
 
