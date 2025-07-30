@@ -13,7 +13,7 @@ import gvar as gv
 from typing import Dict, List, Tuple, Optional, Any
 import logging
 
-from .jackknife_config import (
+from src.preprocessing.jackknife_config import (
     DerivativeMethod,
     get_finite_difference_config,
     MIN_GAUGE_CONFIGURATIONS,
