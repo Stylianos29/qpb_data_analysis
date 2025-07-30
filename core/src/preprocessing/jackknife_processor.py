@@ -2,10 +2,10 @@
 Core jackknife processing functions for correlator analysis.
 
 This module provides functions for:
-- Jackknife resampling of correlator data
-- Finite difference derivative calculations  
-- Statistical analysis of jackknife samples
-- Data validation and error handling
+    - Jackknife resampling of correlator data
+    - Finite difference derivative calculations  
+    - Statistical analysis of jackknife samples
+    - Data validation and error handling
 """
 
 import numpy as np
@@ -26,10 +26,10 @@ class JackknifeProcessor:
     Main processor class for jackknife analysis of correlator data.
 
     This class handles the complete workflow of jackknife analysis:
-    1. Data validation and preprocessing
-    2. Jackknife sample generation
-    3. Derivative calculation using finite differences
-    4. Statistical analysis and error estimation
+        1. Data validation and preprocessing
+        2. Jackknife sample generation
+        3. Derivative calculation using finite differences
+        4. Statistical analysis and error estimation
     """
 
     def __init__(
@@ -41,32 +41,40 @@ class JackknifeProcessor:
         Initialize the jackknife processor.
 
         Args:
-            derivative_method: Method for finite difference calculation
-            logger: Optional logger instance
+            - derivative_method: Method for finite difference
+              calculation
+            - logger: Optional logger instance
         """
         self.derivative_method = derivative_method
         self.finite_diff_config = get_finite_difference_config(derivative_method)
         self.logger = logger or logging.getLogger(__name__)
 
     def validate_input_data(
-        self, g5g5_data: np.ndarray, g4g5g5_data: np.ndarray
+        self,
+        g5g5_data: np.ndarray,
+        g4g5g5_data: np.ndarray,
+        min_configurations: int = MIN_GAUGE_CONFIGURATIONS,
     ) -> Tuple[bool, str]:
         """
         Validate input correlator data for jackknife analysis.
 
         Args:
-            - g5g5_data: 2D array of g5-g5 correlator values (configs × time)
-            - g4g5g5_data: 2D array of g4γ5-g5 correlator values (configs × time)
+            - g5g5_data: 2D array of g5-g5 correlator values (configs ×
+              time)
+            - g4g5g5_data: 2D array of g4γ5-g5 correlator values
+              (configs × time)
+            - min_configurations: Minimum number of configurations
+              required
 
         Returns:
             Tuple of (is_valid, error_message)
         """
         # Check minimum number of configurations
         n_configs = g5g5_data.shape[0]
-        if n_configs < MIN_GAUGE_CONFIGURATIONS:
+        if n_configs < min_configurations:
             return False, (
                 f"Insufficient gauge configurations: {n_configs} "
-                f"(minimum required: {MIN_GAUGE_CONFIGURATIONS})"
+                f"(minimum required: {min_configurations})"
             )
 
         # Check data shape consistency
@@ -99,7 +107,8 @@ class JackknifeProcessor:
             data: 2D array with shape (n_configs, n_time)
 
         Returns:
-            2D array with shape (n_configs, n_time) containing jackknife samples
+            2D array with shape (n_configs, n_time) containing jackknife
+            samples
         """
         n_configs, n_time = data.shape
         jackknife_samples = np.zeros_like(data)
@@ -185,6 +194,7 @@ class JackknifeProcessor:
         g5g5_data: np.ndarray,
         g4g5g5_data: np.ndarray,
         group_metadata: Dict[str, Any],
+        min_configurations: int = MIN_GAUGE_CONFIGURATIONS,
     ) -> Dict[str, Any]:
         """
         Process a single group of correlator data through complete
@@ -194,6 +204,8 @@ class JackknifeProcessor:
             - g5g5_data: 2D array of g5-g5 correlator values
             - g4g5g5_data: 2D array of g4γ5-g5 correlator values
             - group_metadata: Metadata dictionary for this group
+            - min_configurations: Minimum number of configurations
+              required
 
         Returns:
             Dictionary containing all processed results
@@ -202,7 +214,9 @@ class JackknifeProcessor:
         self.logger.info(LOG_MESSAGES["analysis_start"].format(group_name))
 
         # Validate input data
-        is_valid, error_msg = self.validate_input_data(g5g5_data, g4g5g5_data)
+        is_valid, error_msg = self.validate_input_data(
+            g5g5_data, g4g5g5_data, min_configurations
+        )
         if not is_valid:
             self.logger.warning(f"Group {group_name}: {error_msg}")
             return {}
@@ -262,8 +276,8 @@ def create_gvar_arrays(mean_values: np.ndarray, error_values: np.ndarray) -> np.
     Create gvar arrays from mean and error values.
 
     Args:
-        mean_values: Array of mean values
-        error_values: Array of error values
+        - mean_values: Array of mean values
+        - error_values: Array of error values
 
     Returns:
         Array of gvar objects
