@@ -37,7 +37,7 @@ from library import (
 )
 
 # Import our auxiliary modules
-from .jackknife_config import (
+from src.preprocessing.jackknife_config import (
     DEFAULT_DERIVATIVE_METHOD,
     DEFAULT_COMPRESSION,
     DEFAULT_COMPRESSION_LEVEL,
@@ -48,7 +48,7 @@ from .jackknife_config import (
     get_dataset_description,
 )
 
-from .jackknife_processor import (
+from src.preprocessing.jackknife_processor import (
     JackknifeProcessor,
     extract_configuration_metadata,
 )
@@ -87,7 +87,7 @@ from .jackknife_processor import (
     "-log_dir",
     "--log_directory",
     default=None,
-    callback=filesystem_utilities.validate_script_log_file_directory,
+    type=click.Path(),
     help="Directory for log files. Default: output directory",
 )
 @click.option(
