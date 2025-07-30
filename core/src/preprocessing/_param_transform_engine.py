@@ -336,10 +336,10 @@ class HDF5ParameterProcessor:
             DataFrame with HDF5-derived columns added
         """
         self.logger.info("Starting HDF5 parameter processing")
-    
+
         # Handle special vector/spinor columns first
         self._handle_vector_spinor_columns()
-        
+
         for dataset_name, config in HDF5_PROCESSING_RULES.items():
             self._process_hdf5_dataset(dataset_name, config)
 
@@ -349,12 +349,16 @@ class HDF5ParameterProcessor:
     def _handle_vector_spinor_columns(self) -> None:
         """
         Handle Number_of_vectors and Number_of_spinors columns with fallback logic.
-        
+
         This method implements the business logic for these special columns
         that's too complex for configuration-driven processing.
         """
-        main_program_type = self.dataframe.get("Main_program_type", pd.Series()).iloc[0] if len(self.dataframe) > 0 else None
-        
+        main_program_type = (
+            self.dataframe.get("Main_program_type", pd.Series()).iloc[0]
+            if len(self.dataframe) > 0
+            else None
+        )
+
         # Handle Number_of_spinors (only for invert cases)
         if main_program_type == "invert":
             if "Number_of_spinors" not in self.dataframe.columns:
@@ -362,11 +366,13 @@ class HDF5ParameterProcessor:
                 spinor_count = self._deduce_spinor_count_from_hdf5()
                 if spinor_count is not None:
                     self.dataframe["Number_of_spinors"] = spinor_count
-                    self.logger.info(f"Deduced Number_of_spinors = {spinor_count} from HDF5")
+                    self.logger.info(
+                        f"Deduced Number_of_spinors = {spinor_count} from HDF5"
+                    )
                 else:
                     self.dataframe["Number_of_spinors"] = 12  # Default
                     self.logger.info("Using default Number_of_spinors = 12")
-        
+
         # Handle Number_of_vectors
         if "Number_of_vectors" not in self.dataframe.columns:
             if main_program_type != "invert":
@@ -374,7 +380,9 @@ class HDF5ParameterProcessor:
                 vector_count = self._deduce_vector_count_from_hdf5()
                 if vector_count is not None:
                     self.dataframe["Number_of_vectors"] = vector_count
-                    self.logger.info(f"Deduced Number_of_vectors = {vector_count} from HDF5")
+                    self.logger.info(
+                        f"Deduced Number_of_vectors = {vector_count} from HDF5"
+                    )
                 else:
                     self.dataframe["Number_of_vectors"] = 1  # Default
                     self.logger.info("Using default Number_of_vectors = 1")
@@ -385,12 +393,20 @@ class HDF5ParameterProcessor:
 
     def _deduce_spinor_count_from_hdf5(self) -> Optional[int]:
         """Try to deduce spinor count from HDF5 dataset lengths."""
-        test_datasets = ["CG_total_calculation_time_per_spinor", "Total_number_of_CG_iterations_per_spinor"]
-        
+        test_datasets = [
+            "CG_total_calculation_time_per_spinor",
+            "Total_number_of_CG_iterations_per_spinor",
+        ]
+
         for dataset_name in test_datasets:
-            if dataset_name in self.hdf5_analyzer.list_of_output_quantity_names_from_hdf5:
+            if (
+                dataset_name
+                in self.hdf5_analyzer.list_of_output_quantity_names_from_hdf5
+            ):
                 try:
-                    data_values = self.hdf5_analyzer.dataset_values(dataset_name, return_gvar=False)
+                    data_values = self.hdf5_analyzer.dataset_values(
+                        dataset_name, return_gvar=False
+                    )
                     if data_values and len(data_values) > 0:
                         return len(data_values[0])  # Length of first group's data
                 except:
@@ -399,9 +415,14 @@ class HDF5ParameterProcessor:
 
     def _deduce_vector_count_from_hdf5(self) -> Optional[int]:
         """Try to deduce vector count from HDF5 dataset lengths."""
-        if "Calculation_result_per_vector" in self.hdf5_analyzer.list_of_output_quantity_names_from_hdf5:
+        if (
+            "Calculation_result_per_vector"
+            in self.hdf5_analyzer.list_of_output_quantity_names_from_hdf5
+        ):
             try:
-                data_values = self.hdf5_analyzer.dataset_values("Calculation_result_per_vector", return_gvar=False)
+                data_values = self.hdf5_analyzer.dataset_values(
+                    "Calculation_result_per_vector", return_gvar=False
+                )
                 if data_values and len(data_values) > 0:
                     return len(data_values[0])  # Length of first group's data
             except:

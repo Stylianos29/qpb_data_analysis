@@ -117,10 +117,10 @@ class QPBParameterProcessor:
         loaded_dataframe = load_csv(
             self.single_valued_csv_path, encoding="utf-8", apply_categorical=True
         )
-        
+
         if loaded_dataframe is None:
             raise ValueError(f"Failed to load CSV file: {self.single_valued_csv_path}")
-        
+
         self.dataframe = loaded_dataframe
 
         # Initialize DataFrameAnalyzer for systematic data understanding
@@ -156,7 +156,9 @@ class QPBParameterProcessor:
 
         # Ensure dataframe is loaded
         if self.dataframe is None:
-            raise RuntimeError("Cannot validate data compatibility: CSV data not loaded")
+            raise RuntimeError(
+                "Cannot validate data compatibility: CSV data not loaded"
+            )
 
         # Check that CSV has 'Filename' column for HDF5 mapping
         if "Filename" not in self.dataframe.columns:
@@ -173,7 +175,9 @@ class QPBParameterProcessor:
 
         # Create and run transformation engine
         if self.dataframe is None:
-            raise RuntimeError("DataFrame is None before single-valued parameter processing")
+            raise RuntimeError(
+                "DataFrame is None before single-valued parameter processing"
+            )
         transformation_engine = ParameterTransformationEngine(self.dataframe)
         self.dataframe = transformation_engine.apply_all_transformations()
 
@@ -188,7 +192,9 @@ class QPBParameterProcessor:
 
         # Create and run HDF5 processor
         if self.dataframe is None:
-            raise RuntimeError("DataFrame is None before multivalued parameter processing")
+            raise RuntimeError(
+                "DataFrame is None before multivalued parameter processing"
+            )
         hdf5_processor = HDF5ParameterProcessor(self.hdf5_analyzer, self.dataframe)
         self.dataframe = hdf5_processor.process_all_hdf5_parameters()
 
