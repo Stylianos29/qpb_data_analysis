@@ -33,6 +33,10 @@ EXCLUDED_FROM_GROUPING = [
 # Minimum number of gauge configurations required for jackknife analysis
 MIN_GAUGE_CONFIGURATIONS = 2
 
+# HDF5 output compression settings
+DEFAULT_COMPRESSION = "gzip"  # Options: "gzip", "lzf", "szip", None
+DEFAULT_COMPRESSION_LEVEL = 4  # 1-9 for gzip, ignored for other methods
+
 
 # === DATASET NAMING PATTERNS ===
 
@@ -200,9 +204,9 @@ def get_output_dataset_name(correlator_type: str, data_type: str) -> str:
     Get standardized output dataset name.
 
     Args:
-        - correlator_type: Type of correlator ('g5g5', 'g4g5g5',
-          'g4g5g5_derivative')
-        - data_type: Type of data ('samples', 'mean', 'error')
+        correlator_type: Type of correlator ('g5g5', 'g4g5g5',
+        'g4g5g5_derivative') data_type: Type of data ('samples', 'mean',
+        'error')
 
     Returns:
         Standardized dataset name
