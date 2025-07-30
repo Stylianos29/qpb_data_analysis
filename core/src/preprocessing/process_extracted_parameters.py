@@ -7,10 +7,12 @@ using a configuration-driven, modular approach. It replaces the original
 hardcoded transformation logic with systematic, maintainable processing
 classes.
 
-Key improvements: - Configuration-driven transformations - Modular
-processor architecture - Proper use of library classes
-(DataFrameAnalyzer, HDF5Analyzer) - Clear separation of concerns -
-Comprehensive logging and error handling
+Key improvements: 
+    - Configuration-driven transformations 
+    - Modular processor architecture 
+    - Proper use of library classes (DataFrameAnalyzer, HDF5Analyzer) 
+    - Clear separation of concerns 
+    - Comprehensive logging and error handling
 """
 
 import os
