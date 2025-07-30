@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
-Refactored jackknife analysis script for QPB correlator data
-preprocessing.
+Jackknife analysis script for QPB correlator data preprocessing.
 
 This script applies jackknife resampling to correlator data stored in
 HDF5 format, focusing on preprocessing tasks:
-- Jackknife resampling of g5-g5 correlators
-- Jackknife resampling of g4γ5-g5 correlators  
-- Calculation of g4γ5-g5 derivative correlators using finite differences
-- Export of jackknife samples, means, and errors in clean HDF5 format
+    - Jackknife resampling of g5-g5 correlators
+    - Jackknife resampling of g4g5-g5 correlators
+    - Calculation of g4g5-g5 derivative correlators using finite
+      differences
+    - Export of jackknife samples, means, and errors in clean HDF5
+      format
 
 The script uses HDF5Analyzer for modern data handling and maintains the
 same hierarchical structure as the input file.
@@ -16,19 +17,12 @@ same hierarchical structure as the input file.
 Usage:
     python apply_jackknife_analysis.py -i input.h5 -o output.h5
     [options]
-
-Key improvements:
-- Clean, readable code structure with auxiliary modules
-- Use of HDF5Analyzer for data management  
-- Consistent dataset naming conventions
-- Comprehensive error handling and validation
-- Detailed logging and progress reporting
 """
 
 import os
 import sys
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, Optional
 
 import click
 import numpy as np
@@ -281,12 +275,14 @@ def main(
                     continue
 
                 # Stack data into 2D arrays (configs × time)
-                if isinstance(g5g5_data_list, list):
-                    g5g5_data = np.vstack(g5g5_data_list)
-                    g4g5g5_data = np.vstack(g4g5g5_data_list)
-                else:
-                    g5g5_data = g5g5_data_list[np.newaxis, :]
-                    g4g5g5_data = g4g5g5_data_list[np.newaxis, :]
+                # Ensure we always have lists for consistent processing
+                if not isinstance(g5g5_data_list, list):
+                    g5g5_data_list = [g5g5_data_list]
+                if not isinstance(g4g5g5_data_list, list):
+                    g4g5g5_data_list = [g4g5g5_data_list]
+
+                g5g5_data = np.vstack(g5g5_data_list)
+                g4g5g5_data = np.vstack(g4g5g5_data_list)
 
                 # === EXTRACT CONFIGURATION METADATA ===
 
@@ -373,12 +369,18 @@ def main(
 
         # Save processed data using HDF5Analyzer's save method
         try:
-            analyzer.save_transformed_data(
-                output_path=output_path,
-                include_virtual=True,
-                compression=final_compression,
-                compression_opts=compression_opts,
-            )
+            if final_compression is None:
+                analyzer.save_transformed_data(
+                    output_path=output_path,
+                    include_virtual=True,
+                )
+            else:
+                analyzer.save_transformed_data(
+                    output_path=output_path,
+                    include_virtual=True,
+                    compression=final_compression,
+                    compression_opts=compression_opts,  # type: ignore
+                )
 
             logger.info(f"Results saved to: {output_path}")
 
@@ -430,6 +432,7 @@ def _add_dataset_descriptions(hdf5_file: h5py.File, logger) -> None:
     descriptions_added = 0
 
     def add_description(name, obj):
+        nonlocal descriptions_added  # Allow modification of outer variable
         if isinstance(obj, h5py.Dataset):
             # Extract dataset name from full path
             dataset_name = name.split("/")[-1]
