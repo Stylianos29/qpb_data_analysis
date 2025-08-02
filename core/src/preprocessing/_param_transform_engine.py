@@ -6,12 +6,12 @@ configured transformations systematically to parameter data.
 """
 
 import logging
+from typing import Dict, Optional
+
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Any, Optional, Union, Tuple, Callable
-from pathlib import Path
 
-from ._param_transform_config import (
+from src.preprocessing._param_transform_config import (
     STRING_TRANSFORMATIONS,
     MATH_TRANSFORMATIONS,
     EXTRACTION_RULES,
@@ -348,10 +348,11 @@ class HDF5ParameterProcessor:
 
     def _handle_vector_spinor_columns(self) -> None:
         """
-        Handle Number_of_vectors and Number_of_spinors columns with fallback logic.
+        Handle Number_of_vectors and Number_of_spinors columns with
+        fallback logic.
 
-        This method implements the business logic for these special columns
-        that's too complex for configuration-driven processing.
+        This method implements the business logic for these special
+        columns that's too complex for configuration-driven processing.
         """
         main_program_type = (
             self.dataframe.get("Main_program_type", pd.Series()).iloc[0]
