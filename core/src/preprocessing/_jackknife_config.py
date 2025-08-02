@@ -6,7 +6,7 @@ patterns, and processing parameters used in the jackknife analysis
 script.
 """
 
-from typing import Dict, List, Tuple
+from typing import Dict
 from enum import Enum
 
 
