@@ -7,8 +7,9 @@ transformation rules.
 """
 
 import ast
+from typing import List, Union, Any
+
 import numpy as np
-from typing import Dict, List, Union, Callable, Any
 
 
 # =============================================================================
