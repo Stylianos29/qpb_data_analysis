@@ -37,7 +37,7 @@ from library import (
 )
 
 # Import our auxiliary modules
-from src.preprocessing.jackknife_config import (
+from src.preprocessing._jackknife_config import (
     DEFAULT_DERIVATIVE_METHOD,
     DEFAULT_COMPRESSION,
     DEFAULT_COMPRESSION_LEVEL,
@@ -48,7 +48,7 @@ from src.preprocessing.jackknife_config import (
     get_dataset_description,
 )
 
-from src.preprocessing.jackknife_processor import (
+from src.preprocessing._jackknife_processor import (
     JackknifeProcessor,
     extract_configuration_metadata,
 )
