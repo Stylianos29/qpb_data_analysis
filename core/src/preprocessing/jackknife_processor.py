@@ -8,10 +8,11 @@ This module provides functions for:
     - Data validation and error handling
 """
 
+import logging
+from typing import Dict, List, Tuple, Optional, Any
+
 import numpy as np
 import gvar as gv
-from typing import Dict, List, Tuple, Optional, Any
-import logging
 
 from src.preprocessing.jackknife_config import (
     DerivativeMethod,
@@ -296,18 +297,31 @@ def extract_configuration_metadata(
         - configuration_column: Name of configuration label column
 
     Returns:
-        Dictionary with configuration labels and related metadata
+        Dictionary with configuration labels and related metadata arrays
     """
     metadata = {}
 
+    # Extract configuration labels
     if configuration_column in group_df.columns:
         metadata["configuration_labels"] = group_df[configuration_column].tolist()
 
-    # Extract QPB filenames if available
+    # Extract QPB filenames
     if "Filename" in group_df.columns:
         metadata["qpb_filenames"] = group_df["Filename"].tolist()
     elif "qpb_log_filename" in group_df.columns:
         metadata["qpb_filenames"] = group_df["qpb_log_filename"].tolist()
+    else:
+        # Create default filenames if not available
+        n_configs = len(metadata.get("configuration_labels", []))
+        metadata["qpb_filenames"] = [f"unknown_{i}.txt" for i in range(n_configs)]
+
+    # Extract MPI geometry
+    if "MPI_geometry" in group_df.columns:
+        metadata["mpi_geometries"] = group_df["MPI_geometry"].tolist()
+    else:
+        # Create default MPI geometry if not available
+        n_configs = len(metadata.get("configuration_labels", []))
+        metadata["mpi_geometries"] = ["unknown" for _ in range(n_configs)]
 
     return metadata
 
