@@ -387,11 +387,11 @@ def main(
             fit_params, _ = curve_fit(power_law, x, y)
 
         # Calculate corresponding values to the reference levels set by the user
-        adjusted_average_core_hours_reference_value_for_constant_bare_mass = (
-            power_law(REFERENCE_BARE_MASS, *fit_params)
+        adjusted_average_core_hours_reference_value_for_constant_bare_mass = power_law(
+            REFERENCE_BARE_MASS, *fit_params
         )
-        adjusted_average_core_hours_reference_value_for_constant_PCAC_mass = (
-            power_law(np.abs(bare_mass_reference_value), *fit_params)
+        adjusted_average_core_hours_reference_value_for_constant_PCAC_mass = power_law(
+            np.abs(bare_mass_reference_value), *fit_params
         )
 
         # FIT ON CORE-HOURS VS NUMBER OF MV MULTIPLICATIONS DATA
@@ -704,7 +704,7 @@ def main(
             fig.savefig(plot_path)
             plt.close()
 
-##########################################################################################
+            ##########################################################################################
             # PLOT CORE-HOURS VS BARE MASS
 
             x = bare_mass_values_array
@@ -726,7 +726,7 @@ def main(
                 xlabel=constants.AXES_LABELS_DICTIONARY["Bare_mass"],
                 ylabel=constants.AXES_LABELS_DICTIONARY[
                     "Adjusted_average_core_hours_per_spinor_per_configuration"
-                    ],
+                ],
             )
             # fig.subplots_adjust(left=0.14)
 

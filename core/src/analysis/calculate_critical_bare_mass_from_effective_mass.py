@@ -200,7 +200,7 @@ def main(
     tunable_multivalued_parameters_list = (
         analyzer.list_of_multivalued_tunable_parameter_names
     )
-        
+
     # TODO: Rethink this strategy of excluding "MPI_geometry" manually
     tunable_multivalued_parameters_list = [
         item for item in tunable_multivalued_parameters_list if item != "MPI_geometry"

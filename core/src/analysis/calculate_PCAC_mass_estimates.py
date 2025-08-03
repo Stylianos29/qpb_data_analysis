@@ -439,9 +439,11 @@ def main(
 
             for sigma_threshold in sigma_thresholds:
                 try:
-                    plateau_start, plateau_final, _ = jackknife_analysis.detect_plateau_region(
-                        jackknife_average_correlators_jackknife_array, 
-                        sigma_threshold=sigma_threshold
+                    plateau_start, plateau_final, _ = (
+                        jackknife_analysis.detect_plateau_region(
+                            jackknife_average_correlators_jackknife_array,
+                            sigma_threshold=sigma_threshold,
+                        )
                     )
                     plateau_found = True
                     break
@@ -449,7 +451,10 @@ def main(
                     continue
 
             if not plateau_found:
-                logger.critical("Could not detect plateau region with any sigma threshold", to_console=True)
+                logger.critical(
+                    "Could not detect plateau region with any sigma threshold",
+                    to_console=True,
+                )
                 sys.exit(1)
 
             sigma_criterion_factor = 1.5

@@ -759,7 +759,7 @@ def main(
             if plot_effective_mass_correlators:
                 initial_shift = 2
                 y = jackknife_average_effective_mass_correlator[initial_shift:]
-                x = np.arange(initial_shift, len(y)+initial_shift)
+                x = np.arange(initial_shift, len(y) + initial_shift)
 
                 fig, ax = plt.subplots()
                 ax.grid(color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
@@ -811,7 +811,7 @@ def main(
                 ax.hlines(
                     y=pion_effective_mass_estimate.mean,
                     xmin=x[plateau_indices_list[0]],
-                    xmax=x[plateau_indices_list[-1]-1],
+                    xmax=x[plateau_indices_list[-1] - 1],
                     color="r",
                     linestyle="--",
                     label=label_string,

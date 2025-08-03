@@ -227,7 +227,7 @@ def main(
     analyzer = data_processing.DataFrameAnalyzer(effective_mass_estimates_dataframe)
 
     single_valued_fields_dictionary = analyzer.unique_value_columns_dictionary
-    
+
     tunable_multivalued_parameters_list = (
         analyzer.list_of_multivalued_tunable_parameter_names
     )
