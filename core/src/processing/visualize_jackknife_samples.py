@@ -45,7 +45,7 @@ from library import (
 )
 
 # Import configuration
-from src.analysis._jackknife_visualization_config import (
+from src.processing._jackknife_visualization_config import (
     JACKKNIFE_DATASETS_TO_PLOT,
     JACKKNIFE_PLOTS_BASE_DIRECTORY,
     SAMPLE_PLOT_STYLE,

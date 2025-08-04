@@ -14,7 +14,7 @@ from typing import Dict, List, Tuple, Optional, Any
 import numpy as np
 import gvar as gv
 
-from src.preprocessing._jackknife_config import (
+from src.processing._jackknife_config import (
     DerivativeMethod,
     get_finite_difference_config,
     MIN_GAUGE_CONFIGURATIONS,

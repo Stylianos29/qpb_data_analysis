@@ -11,7 +11,7 @@ from typing import Dict, Optional
 import numpy as np
 import pandas as pd
 
-from src.preprocessing._param_transform_config import (
+from src.processing._param_transform_config import (
     STRING_TRANSFORMATIONS,
     MATH_TRANSFORMATIONS,
     EXTRACTION_RULES,
