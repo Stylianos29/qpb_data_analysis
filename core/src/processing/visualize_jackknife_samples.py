@@ -617,9 +617,11 @@ def create_sample_plot(
     y_scale = dataset_config.get("y_scale", "linear")
     ax.set_yscale(y_scale)
 
-    # Set axis labels
-    ax.set_xlabel("Time Index", fontsize=DEFAULT_FONT_SIZE)
-    ax.set_ylabel("Correlator Value", fontsize=DEFAULT_FONT_SIZE)
+    # Set axis labels using dataset-specific LaTeX notation
+    x_label = dataset_config.get("x_label", r"$t/a$")
+    y_label = dataset_config.get("y_label", "Correlator Value")
+    ax.set_xlabel(x_label, fontsize=DEFAULT_FONT_SIZE)
+    ax.set_ylabel(y_label, fontsize=DEFAULT_FONT_SIZE)
 
     # Add title
     title = generate_sample_plot_title(

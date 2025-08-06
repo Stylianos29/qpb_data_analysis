@@ -45,18 +45,21 @@ DATASET_PLOT_CONFIGS = {
         "x_start_index": 1,  # Start from time index 1 (skip t=0)
         "x_end_offset": 0,  # Include all points up to the end
         "description": "g5-g5 correlator with log scale starting from t=1",
+        "y_label": r"$C_{\gamma_5\text{-}\gamma_5}(t)$",
     },
     "g4g5g5_jackknife_samples": {
         "y_scale": "linear",  # Use linear y-axis
         "x_start_index": 2,  # Start from time index 2
         "x_end_offset": 2,  # Exclude last 2 time points
         "description": "g4g5-g5 correlator with reduced time range",
+        "y_label": r"$C_{\gamma_4\gamma_5\text{-}\gamma_5}(t)$",
     },
     "g4g5g5_derivative_jackknife_samples": {
         "y_scale": "linear",  # Use linear y-axis
         "x_start_index": 2,  # Start from time index 2
         "x_end_offset": 2,  # Exclude last 2 time points
         "description": "g4g5-g5 derivative correlator with reduced time range",
+        "y_label": r"$\partial_t C_{\gamma_4\gamma_5\text{-}\gamma_5}(t)$",
     },
 }
 
