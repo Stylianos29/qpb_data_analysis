@@ -53,6 +53,7 @@ from src.processing._jackknife_visualization_config import (
     AVERAGE_PLOT_STYLE,
     DEFAULT_FIGURE_SIZE,
     DEFAULT_FONT_SIZE,
+    get_dataset_plot_config,
 )
 
 
@@ -491,30 +492,16 @@ def create_individual_sample_plots(
 ) -> int:
     """
     Create individual plots for each jackknife sample.
-
-    Args:
-        - jackknife_data: 2D array of jackknife samples
-        - mean_values: Array of mean values
-        - error_values: Array of error values
-        - config_labels: List of gauge configuration labels
-        - dataset_name: Name of the dataset
-        - group_name: Name of the group
-        - group_path: Path to the HDF5 group
-        - analyzer: HDF5Analyzer instance
-        - file_manager: PlotFileManager instance
-        - layout_manager: PlotLayoutManager instance
-        - style_manager: PlotStyleManager instance
-        - filename_builder: PlotFilenameBuilder instance
-        - title_builder: PlotTitleBuilder instance
-        - group_plots_dir: Directory for group plots
-        - logger: Logger instance
-        - verbose: Whether to show verbose output
-
-    Returns:
-        Number of plots created
+    Enhanced to support dataset-specific configurations.
     """
     n_samples, n_time_points = jackknife_data.shape
     plots_created = 0
+
+    # Get dataset configuration for logging
+    dataset_config = get_dataset_plot_config(dataset_name)
+    if verbose:
+        config_desc = dataset_config.get("description", "Default configuration")
+        click.echo(f"      Using config: {config_desc}")
 
     # Ensure we have enough configuration labels
     if len(config_labels) < n_samples:
@@ -538,8 +525,8 @@ def create_individual_sample_plots(
             # Create time index
             time_index = np.arange(n_time_points)
 
-            # Create the plot
-            fig, ax = create_sample_plot(
+            # Create the plot with enhanced configuration support
+            fig, _ = create_sample_plot(
                 time_index=time_index,
                 sample_data=sample_data,
                 mean_values=mean_values,
@@ -594,57 +581,45 @@ def create_sample_plot(
 ) -> Tuple[Figure, Axes]:
     """
     Create a single sample plot with both sample and average data.
-
-    Args:
-        - time_index: Array of time indices
-        - sample_data: Individual sample time series
-        - mean_values: Array of mean values
-        - error_values: Array of error values
-        - sample_label: Label for the sample
-        - dataset_name: Name of the dataset
-        - group_metadata: Metadata for the group
-        - layout_manager: PlotLayoutManager instance
-        - style_manager: PlotStyleManager instance
-        - title_builder: PlotTitleBuilder instance
-
-    Returns:
-        Tuple of (figure, axes)
+    Enhanced to support dataset-specific axis configurations.
     """
-    # Create figure and axes
-    fig, ax = layout_manager.create_figure(DEFAULT_FIGURE_SIZE)
+    # Get dataset-specific configuration
+    dataset_config = get_dataset_plot_config(dataset_name)
 
-    # Configure axes
-    layout_manager.configure_existing_axes(
-        ax=ax,
-        x_variable="time_index",
-        y_variable=dataset_name,
-        font_size=DEFAULT_FONT_SIZE,
+    # Apply dataset-specific slicing
+    sliced_time, sliced_sample, sliced_mean, sliced_error = apply_dataset_slicing(
+        time_index, sample_data, mean_values, error_values, dataset_config
     )
 
-    # Generate colors for sample and average
-    colors = ["#1f77b4", "#ff7f0e"]  # Blue for sample, orange for average
+    # Create figure and axis
+    fig, ax = plt.subplots(figsize=DEFAULT_FIGURE_SIZE)
 
-    # Plot sample data
+    # Plot sample data with dataset-specific slicing
     sample_style = SAMPLE_PLOT_STYLE.copy()
-    sample_style["color"] = colors[0]
-    sample_style["label"] = f"{sample_label}{sample_style.pop('label_suffix')}"
+    sample_label_full = f"{sample_label}{sample_style.pop('label_suffix', '')}"
 
-    ax.plot(time_index, sample_data, **sample_style)
+    ax.plot(sliced_time, sliced_sample, label=sample_label_full, **sample_style)
 
-    # Plot average with error bars
-    average_style = AVERAGE_PLOT_STYLE.copy()
-    average_style["color"] = colors[1]
-    average_style["label"] = f"Average{average_style.pop('label_suffix')}"
+    # Plot average data with error bars if available
+    if sliced_mean is not None and sliced_error is not None:
+        average_style = AVERAGE_PLOT_STYLE.copy()
+        avg_label_full = f"{dataset_name}{average_style.pop('label_suffix', '')}"
 
-    ax.errorbar(time_index, mean_values, yerr=error_values, **average_style)
+        ax.errorbar(
+            sliced_time,
+            sliced_mean,
+            yerr=sliced_error,
+            label=avg_label_full,
+            **average_style,
+        )
 
-    # Add legend
-    style_manager.configure_legend(
-        ax=ax,
-        include_legend=True,
-        legend_location="upper right",
-        font_size=DEFAULT_FONT_SIZE - 1,
-    )
+    # Apply dataset-specific y-axis scale
+    y_scale = dataset_config.get("y_scale", "linear")
+    ax.set_yscale(y_scale)
+
+    # Set axis labels
+    ax.set_xlabel("Time Index", fontsize=DEFAULT_FONT_SIZE)
+    ax.set_ylabel("Correlator Value", fontsize=DEFAULT_FONT_SIZE)
 
     # Add title
     title = generate_sample_plot_title(
@@ -655,7 +630,63 @@ def create_sample_plot(
     )
     ax.set_title(title, fontsize=DEFAULT_FONT_SIZE + 2)
 
+    # Add legend
+    ax.legend(fontsize=DEFAULT_FONT_SIZE - 1)
+
+    # Grid for better readability
+    ax.grid(True, alpha=0.3)
+
+    # Tight layout
+    plt.tight_layout()
+
     return fig, ax
+
+
+def apply_dataset_slicing(
+    time_index: np.ndarray,
+    sample_data: np.ndarray,
+    mean_values: np.ndarray,
+    error_values: np.ndarray,
+    dataset_config: dict,
+) -> Tuple[ndarray, ndarray, Optional[ndarray], Optional[ndarray]]:
+    """
+    Apply dataset-specific slicing to time index and data arrays.
+
+    Args:
+        time_index: Array of time indices
+        sample_data: Sample data array
+        mean_values: Mean values array
+        error_values: Error values array
+        dataset_config: Configuration dict with x_start_index and x_end_offset
+
+    Returns:
+        Tuple of sliced (time_index, sample_data, mean_values, error_values)
+    """
+    start_idx = dataset_config.get("x_start_index", 0)
+    end_offset = dataset_config.get("x_end_offset", 0)
+
+    # Calculate end index
+    if end_offset > 0:
+        end_idx = len(time_index) - end_offset
+    else:
+        end_idx = len(time_index)
+
+    # Apply slicing
+    sliced_time_index = time_index[start_idx:end_idx]
+    sliced_sample_data = sample_data[start_idx:end_idx]
+    sliced_mean_values = (
+        mean_values[start_idx:end_idx] if mean_values is not None else None
+    )
+    sliced_error_values = (
+        error_values[start_idx:end_idx] if error_values is not None else None
+    )
+
+    return (
+        sliced_time_index,
+        sliced_sample_data,
+        sliced_mean_values,
+        sliced_error_values,
+    )
 
 
 def get_group_metadata(analyzer: HDF5Analyzer, group_path: str) -> Dict:

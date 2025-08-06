@@ -37,3 +37,46 @@ AVERAGE_PLOT_STYLE = {
 # Default plot appearance
 DEFAULT_FIGURE_SIZE = (10, 6)
 DEFAULT_FONT_SIZE = 12
+
+# Dataset-specific plotting configurations
+DATASET_PLOT_CONFIGS = {
+    "g5g5_jackknife_samples": {
+        "y_scale": "log",  # Use logarithmic y-axis
+        "x_start_index": 1,  # Start from time index 1 (skip t=0)
+        "x_end_offset": 0,  # Include all points up to the end
+        "description": "g5-g5 correlator with log scale starting from t=1",
+    },
+    "g4g5g5_jackknife_samples": {
+        "y_scale": "linear",  # Use linear y-axis
+        "x_start_index": 2,  # Start from time index 2
+        "x_end_offset": 2,  # Exclude last 2 time points
+        "description": "g4g5-g5 correlator with reduced time range",
+    },
+    "g4g5g5_derivative_jackknife_samples": {
+        "y_scale": "linear",  # Use linear y-axis
+        "x_start_index": 2,  # Start from time index 2
+        "x_end_offset": 2,  # Exclude last 2 time points
+        "description": "g4g5-g5 derivative correlator with reduced time range",
+    },
+}
+
+# Default configuration for datasets not explicitly specified
+DEFAULT_DATASET_PLOT_CONFIG = {
+    "y_scale": "linear",
+    "x_start_index": 0,
+    "x_end_offset": 0,
+    "description": "Default linear scale with full time range",
+}
+
+
+def get_dataset_plot_config(dataset_name: str) -> dict:
+    """
+    Get the plot configuration for a specific dataset.
+
+    Args:
+        dataset_name: Name of the dataset
+
+    Returns:
+        Dictionary with plotting configuration parameters
+    """
+    return DATASET_PLOT_CONFIGS.get(dataset_name, DEFAULT_DATASET_PLOT_CONFIG)
