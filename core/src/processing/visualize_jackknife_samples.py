@@ -25,7 +25,8 @@ from numpy import ndarray
 
 # Configure matplotlib to use non-interactive backend
 import matplotlib
-matplotlib.use('Agg')
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
@@ -453,7 +454,12 @@ def load_gauge_configuration_labels(
 
         # Convert to list of strings
         if isinstance(labels, np.ndarray):
-            return [str(label) for label in labels.flatten()]
+            # Flattens the labels array and returns a list of strings,
+            # decoding each label from bytes to UTF-8 if necessary.
+            return [
+                label.decode("utf-8") if isinstance(label, bytes) else str(label)
+                for label in labels.flatten()
+            ]
         elif isinstance(labels, list):
             return [str(label) for label in labels]
         else:
