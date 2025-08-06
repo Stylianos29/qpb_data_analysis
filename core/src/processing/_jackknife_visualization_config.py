@@ -19,18 +19,19 @@ JACKKNIFE_PLOTS_BASE_DIRECTORY = "Jackknife_samples_visualization"
 # Plot styling configuration
 SAMPLE_PLOT_STYLE = {
     "marker": "o",
-    "markersize": 4,
-    "alpha": 0.7,
+    "markersize": 8,        # Increase from 4 to 8
+    "alpha": 1.0,          # Increase from 0.7 to 1.0 (fully opaque)
     "linestyle": "none",
-    "label_suffix": " (Sample)",
+    "label_suffix": " (Sample)"
 }
 
 AVERAGE_PLOT_STYLE = {
-    "marker": "s",
+    "marker": "s", 
     "markersize": 6,
     "alpha": 0.9,
-    "capsize": 3,
-    "label_suffix": " (Average ± Error)",
+    "capsize": 10,  # Increase from 3 to 10
+    "capthick": 2,  # Add thickness
+    "label_suffix": " (Average ± Error)"
 }
 
 # Default plot appearance
