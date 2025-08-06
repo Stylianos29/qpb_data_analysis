@@ -556,6 +556,7 @@ def create_individual_sample_plots(
             filename = generate_sample_plot_filename(
                 config_label=config_label,
                 dataset_name=dataset_name,
+                group_name=group_name,
                 group_metadata=group_metadata,
                 filename_builder=filename_builder,
             )
@@ -721,6 +722,7 @@ def generate_sample_plot_title(
 def generate_sample_plot_filename(
     config_label: str,
     dataset_name: str,
+    group_name: str,
     group_metadata: Dict,
     filename_builder: PlotFilenameBuilder,
 ) -> str:
@@ -730,6 +732,7 @@ def generate_sample_plot_filename(
     Args:
         - config_label: Gauge configuration label
         - dataset_name: Name of the dataset
+        - group_name: Name of the group
         - group_metadata: Metadata for the group
         - filename_builder: PlotFilenameBuilder instance
 
@@ -739,8 +742,8 @@ def generate_sample_plot_filename(
     # Clean dataset name for filename
     clean_dataset_name = dataset_name.replace("_jackknife_samples", "")
 
-    # Base filename
-    base_name = f"{clean_dataset_name}_sample_{config_label}"
+    # Base filename - include group name for uniqueness
+    base_name = f"{clean_dataset_name}_{group_name}_sample_{config_label}"
 
     # Add metadata if available
     if group_metadata:
