@@ -3,7 +3,7 @@
 Jackknife analysis script for QPB correlator data preprocessing.
 
 This script applies jackknife resampling to correlator data stored in
-HDF5 format, focusing on preprocessing tasks:
+HDF5 format, focusing on processing tasks:
     - Jackknife resampling of g5-g5 correlators
     - Jackknife resampling of g4g5-g5 correlators
     - Calculation of g4g5-g5 derivative correlators using finite
@@ -232,8 +232,10 @@ def main(
                 else:
                     continue
 
-                # === ENSURE DETERMINISTIC ORDERING === Sort group paths
-                # by configuration label for consistent ordering
+                # === ENSURE DETERMINISTIC ORDERING ===
+
+                # Sort group paths by configuration label for consistent
+                # ordering
                 sorted_group_paths = sorted(group_paths)
 
                 if verbose:
@@ -462,11 +464,6 @@ def _create_custom_hdf5_output(
                 n_configs = jackknife_results.get("n_gauge_configurations")
                 if n_configs:
                     jackknife_group.attrs["Number_of_gauge_configurations"] = n_configs
-
-                # Add derivative method
-                deriv_method = jackknife_results.get("derivative_method")
-                if deriv_method:
-                    jackknife_group.attrs["derivative_method"] = deriv_method
 
                 # Store jackknife results as datasets
                 jackknife_results = results["jackknife_results"]
