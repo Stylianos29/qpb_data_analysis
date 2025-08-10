@@ -748,68 +748,6 @@ def _create_descriptive_group_name(param_values, multivalued_params, max_length=
     return group_name
 
 
-def _add_dataset_descriptions(hdf5_file: h5py.File, logger) -> None:
-    """
-    Add comprehensive descriptions to all datasets in the HDF5 file.
-
-    Args:
-        - hdf5_file: Open HDF5 file handle
-        - logger: Logger instance
-    """
-    descriptions_added = 0
-
-    def add_description(name, obj):
-        nonlocal descriptions_added  # Allow modification of outer variable
-        if isinstance(obj, h5py.Dataset):
-            # Extract dataset name from full path
-            dataset_name = name.split("/")[-1]
-
-            # Get description for this dataset
-            description = get_dataset_description(dataset_name)
-
-            # Add description as attribute
-            try:
-                obj.attrs["Description"] = description
-                descriptions_added += 1
-            except Exception as e:
-                logger.warning(f"Could not add description to {name}: {e}")
-
-    # Visit all datasets in the file
-    hdf5_file.visititems(add_description)
-
-    logger.info(f"Added descriptions to {descriptions_added} datasets")
-
-
-def _validate_file_paths(input_path: str, output_path: str) -> None:
-    """
-    Validate input and output file paths.
-
-    Args:
-        - input_path: Path to input file
-        - output_path: Path to output file
-
-    Raises:
-        click.ClickException: If validation fails
-    """
-    # Check input file exists and is readable
-    if not os.path.exists(input_path):
-        raise click.ClickException(f"Input file not found: {input_path}")
-
-    if not os.access(input_path, os.R_OK):
-        raise click.ClickException(f"Input file not readable: {input_path}")
-
-    # Check output directory is writable
-    output_dir = os.path.dirname(output_path)
-    if output_dir and not os.access(output_dir, os.W_OK):
-        raise click.ClickException(f"Output directory not writable: {output_dir}")
-
-    # Warn if output file exists
-    if os.path.exists(output_path):
-        click.echo(
-            f"Warning: Output file exists and will be overwritten: {output_path}"
-        )
-
-
 def _extract_ordered_configuration_metadata(
     analyzer: HDF5Analyzer, sorted_group_paths: List[str], dataset_name: str
 ) -> Dict[str, List]:
