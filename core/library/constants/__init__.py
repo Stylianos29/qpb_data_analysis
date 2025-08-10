@@ -40,6 +40,7 @@ __all__ = [
     "TITLE_LABELS_BY_COLUMN_NAME",
     "MAIN_PROGRAM_TYPE_AXES_LABEL",
     "FIT_LABEL_POSITIONS",
+    "PARAMETER_LABELS",
     # Visualization
     "MARKER_STYLES",
     "DEFAULT_COLORS",

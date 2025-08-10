@@ -25,7 +25,7 @@ TITLE_LABELS_DICTIONARY = {
     "Minimum_eigenvalue_squared": "$\\lambda_{min}^2$",
     "Maximum_eigenvalue_squared": "$\\lambda_{max}^2$",
     "Number_of_gauge_configurations": "# of configs",
-    "Threads_per_process": "$n_{\\text{OMP}}$"
+    "Threads_per_process": "$n_{\\text{OMP}}$",
 }
 
 AXES_LABELS_DICTIONARY = {
@@ -93,6 +93,27 @@ FILENAME_LABELS_BY_COLUMN_NAME = {
     "KL_scaling_factor": "mu",
     "MPI_geometry": "MPI",
     "Threads_per_process": "OMP",
+}
+
+PARAMETER_LABELS = {
+    "QCD_beta_value": "beta",
+    "Bare_mass": "m",
+    "Rho_value": "rho",
+    "Delta_Min": "dMin",
+    "Delta_Max": "dMax",
+    "KL_diagonal_order": "n",
+    "KL_scaling_factor": "mu",
+    "Number_of_Chebyshev_terms": "N",
+    "Configuration_label": "config",
+    "Number_of_vectors": "NVecs",
+    "APE_iterations": "APEiters",
+    "Kappa_value": "kappa",
+    "Clover_coefficient": "cSW",
+    "Lanczos_epsilon": "EpsLanczos",
+    "CG_epsilon": "EpsCG",
+    "MSCG_epsilon": "EpsMSCG",
+    # Note: Overlap_operator_method and Kernel_operator_type have NO labels
+    # They will use their values directly (e.g., "Brillouin", "Wilson")
 }
 
 AXES_LABELS_BY_COLUMN_NAME = {
