@@ -411,20 +411,15 @@ def _create_descriptive_group_name(param_values, multivalued_params, max_length=
     if not isinstance(param_values, (tuple, list)):
         param_values = [param_values]
 
-    # Handle the mismatch by filtering out Configuration_label
-    # param_values contains: (Bare_mass, KL_diagonal_order, Kernel_operator_type)
-    # multivalued_params may include Configuration_label which isn't in param_values
-    if len(param_values) == 3 and len(multivalued_params) == 4:
-        # Remove Configuration_label from multivalued_params since it's not in param_values
-        filtered_params = [p for p in multivalued_params if p != "Configuration_label"]
-        actual_params = filtered_params
-    elif len(param_values) != len(multivalued_params):
-        # Fallback for other mismatches
+    # Always remove Configuration_label if it exists (it's not used in group names)
+    actual_params = [p for p in multivalued_params if p != "Configuration_label"]
+
+    # Check if lengths match after filtering
+    if len(param_values) != len(actual_params):
+        # Fallback for mismatches
         param_str = str(param_values) + str(multivalued_params)
         hash_suffix = abs(hash(param_str)) % 10000
         return f"jackknife_analysis_mismatch_{hash_suffix:04d}"
-    else:
-        actual_params = multivalued_params
 
     name_parts = []
     for param_name, param_value in zip(actual_params, param_values):
