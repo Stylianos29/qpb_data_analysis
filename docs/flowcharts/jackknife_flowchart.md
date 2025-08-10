@@ -10,7 +10,7 @@ HDF5 structure for downstream analysis.
 ```mermaid
 flowchart TD
     %% START
-    Start([Start Jackknife Analysis]) --> CLIValidation[Validate CLI Arguments:<br/>Input HDF5 file exists<br/>Output directory writable<br/>Derivative method valid]
+    Start([Start Jackknife Analysis]) --> CLIValidation[Validate CLI Arguments:<br/>Input HDF5 file exists<br/>Output directory writable<br/>Min configurations valid]
     
     %% SETUP
     CLIValidation --> SetupLogging[Initialize Logging:<br/>filesystem_utilities.LoggingWrapper]
@@ -28,11 +28,13 @@ flowchart TD
     
     %% MAIN PROCESSING LOOP
     InitProcessor --> ProcessLoop[For Each Parameter Group...]
-    ProcessLoop --> LoadGroupData[Load Correlator Data:<br/>analyzer.dataset_values for g5-g5 & g4γ5-g5<br/>Stack into 2D arrays configs×time]
+    ProcessLoop --> CreateGroupName[Create Descriptive Group Name:<br/>_create_descriptive_group_name<br/>e.g. 'jackknife_analysis_m0p06_n6_Brillouin']
+    
+    CreateGroupName --> LoadGroupData[Load Correlator Data:<br/>analyzer.dataset_values for g5-g5 & g4γ5-g5<br/>Stack into 2D arrays configs×time]
     
     LoadGroupData --> ValidateGroupData{Group Data Valid?}
     ValidateGroupData -- Invalid --> LogSkip[Log: Skipping group<br/>Continue to next group]
-    ValidateGroupData -- Valid --> ExtractMetadata[Extract Configuration Metadata:<br/>Configuration labels & QPB filenames]
+    ValidateGroupData -- Valid --> ExtractMetadata[Extract Configuration Metadata:<br/>_extract_ordered_configuration_metadata<br/>Configuration labels & QPB filenames]
     
     %% JACKKNIFE PROCESSING (from _jackknife_processor.py)
     ExtractMetadata --> JackknifeCore[Apply Jackknife Processing:<br/>processor.process_correlator_group]
@@ -43,11 +45,11 @@ flowchart TD
     
     GenerateSamples --> CalcStatistics[calculate_jackknife_statistics:<br/>Compute mean & error estimates<br/>For g5-g5 and g4γ5-g5]
     CalcStatistics --> CalcDerivatives[calculate_finite_difference_derivative:<br/>Apply 4th-order centered difference<br/>Handle boundary conditions]
-    CalcDerivatives --> PackageResults[Package Results:<br/>Samples, means, errors<br/>Metadata & statistics]
+    CalcDerivatives --> PackageResults[Package Results:<br/>Samples, means, errors<br/>Clean dataset names: g5g5, g4g5g5 variants]
     
-    %% VIRTUAL DATASETS
-    PackageResults --> CreateVirtual[Create Virtual Datasets:<br/>analyzer.transform_dataset<br/>Add all jackknife results]
-    CreateVirtual --> LogSuccess[Log: Group processed successfully]
+    %% CONTINUE PROCESSING
+    PackageResults --> StoreResults[Store Group Results:<br/>Add to all_processing_results<br/>Include metadata & config data]
+    StoreResults --> LogSuccess[Log: Group processed successfully]
     LogSuccess --> CheckMoreGroups{More Groups<br/>to Process?}
     
     CheckMoreGroups -- Yes --> ProcessLoop
@@ -55,11 +57,10 @@ flowchart TD
     
     %% RESULTS HANDLING
     ValidateResults -- None --> ProcessingFailed[Log: No groups processed<br/>Exit with error]
-    ValidateResults -- Some/All --> SaveResults[Save Results:<br/>analyzer.save_transformed_data<br/>Maintain HDF5 structure<br/>Include virtual datasets]
+    ValidateResults -- Some/All --> CreateHDF5Output[Create HDF5 Output:<br/>_hdf5_output.create_jackknife_hdf5_output<br/>Descriptive group names + attributes]
     
     %% FINAL STEPS
-    SaveResults --> AddDescriptions[Add Dataset Descriptions:<br/>_add_dataset_descriptions<br/>Comprehensive metadata]
-    AddDescriptions --> Cleanup[Cleanup:<br/>Close analyzer<br/>Terminate logging]
+    CreateHDF5Output --> Cleanup[Cleanup:<br/>Close analyzer<br/>Terminate logging]
     Cleanup --> Success[Log: Analysis completed<br/>Report processed groups]
     
     %% ERROR PATHS
@@ -76,32 +77,56 @@ flowchart TD
     classDef config fill:#fce4ec
     classDef exit fill:#ffebee
     classDef success fill:#e8f8f5
+    classDef hdf5 fill:#f0f4ff
     
-    class LoadHDF5,SaveResults,AddDescriptions inputOutput
-    class CLIValidation,SetupLogging,LoadGroupData,ExtractMetadata,CreateVirtual,Cleanup process
+    class LoadHDF5,CreateHDF5Output inputOutput
+    class CLIValidation,SetupLogging,LoadGroupData,ExtractMetadata,CreateGroupName,StoreResults,Cleanup process
     class ValidateDatasets,CheckGroups,ValidateGroupData,ValidateResults,CheckMoreGroups decision
     class JackknifeCore,ValidateInput,GenerateSamples,CalcStatistics,CalcDerivatives,PackageResults jackknife
-    class ConfigModule,ProcessorModule config
+    class InitProcessor config
     class EarlyExit,ProcessingFailed,LogSkip exit
     class Success success
+    class CreateHDF5Output hdf5
 ```
 
 ## Auxiliary Modules Detail
 
-### _config.py Configuration Module
-- **Dataset Naming Patterns**: Clean names like `g5g5_mean_values`
+### _jackknife_config.py Configuration Module
+- **Dataset Naming Patterns**: Clean names like g5g5_mean_values,
+  g4g5g5_derivative_jackknife_samples
 - **Finite Difference Methods**: 2nd & 4th order stencils with
-  coefficients
-- **Processing Parameters**: Exclusion lists, minimum configurations
-- **Dataset Descriptions**: Comprehensive documentation for all outputs
+  coefficients and boundary handling
+- **Processing Parameters**: Exclusion lists, minimum configurations,
+  validation rules
+- **Dataset Descriptions**: Comprehensive documentation for all output
+  datasets
+- **Constants**: Default derivative method (4th order), compression
+  settings, required datasets
 
 ### _jackknife_processor.py Processing Module
-- **JackknifeProcessor Class**: Main processing orchestration
-- **validate_input_data**: Data quality checks and validation
-- **generate_jackknife_samples**: Statistical resampling implementation
-- **calculate_jackknife_statistics**: Mean & error computation
+- **JackknifeProcessor Class**: Main orchestration of statistical
+  analysis
+- **validate_input_data**: Shape checking, NaN detection, minimum sample
+  size validation
+- **generate_jackknife_samples**: Statistical resampling with systematic
+  exclusion
+- **calculate_jackknife_statistics**: Mean & error computation using
+  jackknife formulas
 - **calculate_finite_difference_derivative**: Numerical derivatives with
-  boundary handling
+  proper boundary handling
+- **extract_configuration_metadata**: Extract configuration labels and
+  QPB filenames
+
+### _hdf5_output.py Output Module
+- **create_jackknife_hdf5_output**: Main function for HDF5 file creation
+- **_get_input_directory_structure**: Preserve original directory
+  hierarchy
+- **_store_jackknife_datasets**: Store all jackknife analysis results
+  with descriptions
+- **_store_metadata_arrays**: Store configuration metadata (labels,
+  filenames, geometries)
+- **Compression handling**: Configurable compression with appropriate
+  settings
 
 ## Key Components
 
@@ -109,32 +134,26 @@ flowchart TD
 - **CLI Interface**: Click-based command line with comprehensive options
 - **HDF5Analyzer Integration**: Modern data loading and management
 - **Parameter Grouping**: Automatic grouping by tunable parameters
-- **Virtual Dataset Creation**: Clean integration of results back into HDF5
+  (excluding Configuration_label)
+- **Descriptive Group Naming**: Creates meaningful names like
+  `jackknife_analysis_m0p06_n6_Brillouin`
 - **Error Handling**: Robust validation and graceful failure handling
-
-### Configuration Module (_config.py)
-- **Dataset Naming**: Clean, consistent naming patterns (`g5g5_mean_values` vs old verbose names)
-- **Finite Difference Methods**: Configurable 2nd and 4th order stencils
-- **Processing Parameters**: Min configurations, exclusion lists, validation rules
-- **Dataset Descriptions**: Comprehensive documentation for all output datasets
-
-### Jackknife Processor (_jackknife_processor.py)
-- **JackknifeProcessor Class**: Main orchestration of statistical analysis
-- **Data Validation**: Shape checking, NaN detection, minimum sample size
-- **Jackknife Sampling**: Statistical resampling with systematic exclusion
-- **Error Estimation**: Jackknife-based uncertainty quantification
-- **Derivative Calculation**: Finite difference with proper boundary handling
 
 ### Key Processing Steps
 
-1. **Data Loading**: Use HDF5Analyzer to load correlator data efficiently
-2. **Parameter Grouping**: Group by all tunable parameters except Configuration_label
-3. **Validation**: Ensure sufficient data quality and quantity
-4. **Jackknife Resampling**: Create N samples, each excluding one configuration
-5. **Statistical Analysis**: Compute means and errors for all quantities
-6. **Derivative Calculation**: Apply finite differences with boundary management
-7. **Virtual Dataset Creation**: Add results back to HDF5Analyzer as virtual datasets
-8. **Export**: Use save_transformed_data() to maintain hierarchical structure
+1. **Data Loading**: Use HDF5Analyzer to load correlator data
+   efficiently
+2. **Parameter Grouping**: Group by all tunable parameters except
+   Configuration_label
+3. **Descriptive Naming**: Generate meaningful group names from
+   parameter values
+4. **Validation**: Ensure sufficient data quality and quantity
+5. **Jackknife Resampling**: Create N samples, each excluding one
+   configuration
+6. **Statistical Analysis**: Compute means and errors for all quantities
+7. **Derivative Calculation**: Apply finite differences with boundary
+   management
+8. **HDF5 Output**: Custom structured output with proper metadata
 
 ### Data Flow
 
@@ -145,9 +164,12 @@ Configuration_label)
 ↓  
 **Processing**: Apply jackknife analysis to each group independently  
 ↓  
+**Naming**: Create descriptive group names from parameter values  
+↓  
 **Results**: Clean dataset names with comprehensive descriptions  
 ↓  
-**Output**: HDF5 file with same structure + jackknife analysis results
+**Output**: HDF5 file with hierarchical structure + descriptive group
+names
 
 ### Error Handling Strategy
 
@@ -160,23 +182,42 @@ Configuration_label)
 ## Improvements Over Original
 
 ### Code Organization
-- **Modular Design**: Three focused files instead of monolithic script
-- **Separation of Concerns**: Config, processing, and orchestration separated
-- **Reusable Components**: Processor class can be used independently
+- **Modular Design**: Four focused files instead of monolithic script
+- **Separation of Concerns**: Config, processing, output, and
+  orchestration separated
+- **Reusable Components**: Processor and output modules can be used
+  independently
 
 ### Data Handling
 - **HDF5Analyzer Integration**: Modern, efficient data management
-- **Clean Dataset Names**: Short, consistent naming convention
-- **Automatic Gvar Recognition**: Mean/error pairs automatically detected
-- **Hierarchical Structure**: Maintains input file organization
+- **Clean Dataset Names**: Short, consistent naming convention (g5g5
+  series, g4g5g5 series)
+- **Descriptive Group Names**: Self-documenting group names with
+  parameter values
+- **Hierarchical Structure**: Maintains input file organization with
+  improvements
 
-### Processing Focus
-- **Pure Preprocessing**: Removed PCAC mass calculation (moved to analysis)
-- **Configurable Methods**: Support for multiple finite difference orders
-- **Robust Validation**: Comprehensive data quality checks
-- **Better Error Handling**: Continue processing despite individual failures
+### Processing Features
+- **Parameter-Based Naming**: Groups named by actual parameter values,
+  not indices
+- **Robust Parameter Filtering**: Always filters Configuration_label
+  correctly
+- **Configurable Methods**: Support for multiple finite difference
+  orders
+- **Better Error Handling**: Continue processing despite individual
+  failures
+
+### Output Quality
+- **Comprehensive Descriptions**: Every dataset thoroughly documented
+- **Proper Metadata Storage**: Configuration labels, filenames,
+  geometries as datasets
+- **Attribute Organization**: Parameters stored as group attributes for
+  easy access
+- **Compression Support**: Configurable compression for efficient
+  storage
 
 ### Documentation
-- **Comprehensive Descriptions**: Every dataset thoroughly documented
-- **Clear Configuration**: All parameters explicitly defined
+- **Clear Configuration**: All parameters explicitly defined in config
+  module
 - **Detailed Logging**: Track processing decisions and outcomes
+- **Modular Documentation**: Each module has clear responsibilities
