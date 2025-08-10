@@ -70,19 +70,23 @@ def _create_custom_hdf5_output(
                 multivalued_params = (
                     analyzer.reduced_multivalued_tunable_parameter_names_list
                 )
+
+                # Always remove Configuration_label if it exists (it's handled separately)
+                actual_params = [
+                    p for p in multivalued_params if p != "Configuration_label"
+                ]
+
                 if isinstance(param_values, (tuple, list)) and len(param_values) == len(
-                    multivalued_params
+                    actual_params
                 ):
-                    for param_name, param_value in zip(
-                        multivalued_params, param_values
-                    ):
+                    for param_name, param_value in zip(actual_params, param_values):
                         jackknife_group.attrs[param_name] = param_value
                 elif (
                     not isinstance(param_values, (tuple, list))
-                    and len(multivalued_params) == 1
+                    and len(actual_params) == 1
                 ):
                     # Handle single parameter case
-                    jackknife_group.attrs[multivalued_params[0]] = param_values
+                    jackknife_group.attrs[actual_params[0]] = param_values
 
                 # Add number of gauge configurations
                 jackknife_results = results["jackknife_results"]
