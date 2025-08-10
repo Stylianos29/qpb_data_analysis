@@ -27,6 +27,7 @@ from typing import Dict, Optional, List
 import click
 import numpy as np
 import h5py
+import re
 
 # Import library components
 from library.data.hdf5_analyzer import HDF5Analyzer
@@ -35,6 +36,7 @@ from library import (
     validate_input_script_log_filename,
     filesystem_utilities,
 )
+from library.constants import PARAMETERS_WITH_EXPONENTIAL_FORMAT, PARAMETER_LABELS
 
 # Import our auxiliary modules
 from src.processing._jackknife_config import (
@@ -208,7 +210,9 @@ def main(
         processed_groups = 0
 
         for group_index, (param_values, group_paths) in enumerate(grouped_data.items()):
-            group_name = f"jackknife_analysis_{group_index}"
+            group_name = _create_descriptive_group_name(
+                param_values, analyzer.reduced_multivalued_tunable_parameter_names_list
+            )
 
             if verbose:
                 click.echo(
@@ -641,6 +645,107 @@ def _store_metadata_arrays(
             logger.warning(
                 f"Missing key {source_key} in config_metadata, skipping dataset {dataset_name}"
             )
+
+
+def _format_parameter_value(param_name, value):
+    """
+    Format parameter value according to established rules.
+
+    Args:
+        param_name: Name of the parameter
+        value: Value to format
+
+    Returns:
+        str: Formatted value suitable for group naming
+    """
+    if param_name in PARAMETERS_WITH_EXPONENTIAL_FORMAT:
+        # Use exponential format for specified parameters
+        if isinstance(value, (float, np.floating)):
+            return f"{value:.0e}".replace("+", "")
+        else:
+            return str(value)
+    elif isinstance(value, (float, np.floating)):
+        # Format floats with consistent precision, replace decimal with 'p'
+        formatted = f"{value:.6g}".replace(".", "p")
+        return formatted
+    elif isinstance(value, (int, np.integer)):
+        return str(int(value))
+    else:
+        # Handle strings and other types
+        clean_value = str(value).replace(" ", "").replace("_", "")
+        # Apply specific transformations for kernel types
+        if param_name == "Kernel_operator_type":
+            # Convert Standard -> Wilson as per the patterns
+            if clean_value.lower() == "standard":
+                return "Wilson"
+            else:
+                return clean_value  # Keep original case (Brillouin)
+        return clean_value  # Keep original case
+
+
+def _create_descriptive_group_name(param_values, multivalued_params, max_length=100):
+    """
+    Create a descriptive group name using parameter names and values.
+
+    Args:
+        param_values: Values of the multivalued parameters (tuple/list or single value)
+        multivalued_params: List of parameter names
+        max_length: Maximum length for the group name (default: 100)
+
+    Returns:
+        str: Descriptive group name like "jackknife_analysis_m0p06_n6_Brillouin"
+    """
+    if not multivalued_params:
+        return "jackknife_analysis_default_group"
+
+    # Handle single parameter case - convert to list
+    if not isinstance(param_values, (tuple, list)):
+        param_values = [param_values]
+
+    # Handle the mismatch by filtering out Configuration_label
+    # param_values contains: (Bare_mass, KL_diagonal_order, Kernel_operator_type)
+    # multivalued_params may include Configuration_label which isn't in param_values
+    if len(param_values) == 3 and len(multivalued_params) == 4:
+        # Remove Configuration_label from multivalued_params since it's not in param_values
+        filtered_params = [p for p in multivalued_params if p != "Configuration_label"]
+        actual_params = filtered_params
+    elif len(param_values) != len(multivalued_params):
+        # Fallback for other mismatches
+        param_str = str(param_values) + str(multivalued_params)
+        hash_suffix = abs(hash(param_str)) % 10000
+        return f"jackknife_analysis_mismatch_{hash_suffix:04d}"
+    else:
+        actual_params = multivalued_params
+
+    name_parts = []
+    for param_name, param_value in zip(actual_params, param_values):
+        # Check if this parameter has a label or should use value directly
+        if param_name in PARAMETER_LABELS:
+            # Use label + formatted value (no underscore between them)
+            label = PARAMETER_LABELS[param_name]
+            formatted_value = _format_parameter_value(param_name, param_value)
+            name_parts.append(f"{label}{formatted_value}")
+        else:
+            # Parameters without labels (Overlap_operator_method, Kernel_operator_type)
+            # Use the value directly
+            formatted_value = _format_parameter_value(param_name, param_value)
+            name_parts.append(formatted_value)
+
+    # Join with underscores between pairs only
+    group_name_suffix = "_".join(name_parts)
+    group_name = f"jackknife_analysis_{group_name_suffix}"
+
+    # Ensure HDF5 compatibility (remove problematic characters except minus)
+    group_name = re.sub(r"[^a-zA-Z0-9_.-]", "", group_name)
+
+    # Truncate if too long but maintain uniqueness
+    if len(group_name) > max_length:
+        # Keep the first part and add a hash for uniqueness
+        truncated = group_name[: max_length - 10]
+        hash_suffix = abs(hash(str(param_values))) % 10000
+        group_name = f"{truncated}_{hash_suffix:04d}"
+
+    return group_name
 
 
 def _add_dataset_descriptions(hdf5_file: h5py.File, logger) -> None:
