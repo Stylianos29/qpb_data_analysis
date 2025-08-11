@@ -30,12 +30,13 @@ import re
 
 # Import library components
 from library.data.hdf5_analyzer import HDF5Analyzer
-from library import (
-    validate_input_directory,
-    validate_input_script_log_filename,
-    filesystem_utilities,
-)
 from library.constants import PARAMETERS_WITH_EXPONENTIAL_FORMAT, PARAMETER_LABELS
+from library.validation.click_validators import (
+    hdf5_file,
+    directory,
+    validate_log_filename,
+)
+from library import filesystem_utilities
 
 # Import from auxiliary modules
 from src.processing._jackknife_config import (
@@ -47,12 +48,10 @@ from src.processing._jackknife_config import (
     REQUIRED_INPUT_DATASETS,
     MIN_GAUGE_CONFIGURATIONS,
 )
-
 from src.processing._jackknife_processor import (
     JackknifeProcessor,
     extract_configuration_metadata,
 )
-
 from src.processing._hdf5_output import _create_custom_hdf5_output
 
 
@@ -61,21 +60,21 @@ from src.processing._hdf5_output import _create_custom_hdf5_output
     "-i",
     "--input_hdf5_file",
     required=True,
-    type=click.Path(exists=True, readable=True),
+    callback=hdf5_file.input,
     help="Path to input HDF5 file containing correlator data and parameters.",
 )
 @click.option(
     "-o",
     "--output_hdf5_file",
     required=True,
-    type=click.Path(),
+    callback=hdf5_file.output,
     help="Path for output HDF5 file with jackknife analysis results.",
 )
 @click.option(
     "-out_dir",
     "--output_directory",
     default=None,
-    callback=validate_input_directory,
+    callback=directory.must_exist,
     help="Directory for output files. If not specified, uses input file directory.",
 )
 @click.option(
@@ -89,14 +88,14 @@ from src.processing._hdf5_output import _create_custom_hdf5_output
     "-log_dir",
     "--log_directory",
     default=None,
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, writable=True),
+    callback=directory.must_exist,
     help="Directory for log files. Default: output directory",
 )
 @click.option(
     "-log_name",
     "--log_filename",
     default=None,
-    callback=validate_input_script_log_filename,
+    callback=validate_log_filename,
     help="Custom name for log file. Default: auto-generated",
 )
 @click.option(
@@ -142,7 +141,9 @@ def main(
     if output_directory is None:
         output_directory = os.path.dirname(input_hdf5_file)
 
-    # Ensure output file is in the specified directory
+    # Ensure output file is in the specified directory. This way, we
+    # avoid potential issues with relative paths and make the output
+    # location clear.
     output_path = Path(output_directory) / Path(output_hdf5_file).name
 
     # Get configuration values from config file
@@ -171,7 +172,8 @@ def main(
         if verbose:
             click.echo(f"Found {len(analyzer.active_groups)} groups")
             click.echo(
-                f"Available datasets: {analyzer.list_of_output_quantity_names_from_hdf5[:5]}..."
+                "Available datasets: "
+                f"{analyzer.list_of_output_quantity_names_from_hdf5[:5]}..."
             )
 
         # Validate required datasets are present
