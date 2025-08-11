@@ -88,7 +88,7 @@ from src.processing._hdf5_output import _create_custom_hdf5_output
     "-log_dir",
     "--log_directory",
     default=None,
-    callback=directory.must_exist,
+    callback=directory.can_create,
     help="Directory for log files. Default: output directory",
 )
 @click.option(
