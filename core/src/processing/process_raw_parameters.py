@@ -22,18 +22,16 @@ from typing import Optional
 import click
 import pandas as pd
 
-from library import (
-    filesystem_utilities,
-    validate_input_directory,
-    validate_input_script_log_filename,
-)
 from library.data import DataFrameAnalyzer, HDF5Analyzer, load_csv
 from src.processing._param_transform_engine import (
     ParameterTransformationEngine,
     HDF5ParameterProcessor,
     AnalysisCaseProcessor,
 )
-
+from library.validation.click_validators import (
+    hdf5_file, csv_file, directory, validate_log_filename,
+)
+from library import filesystem_utilities
 
 class QPBParameterProcessor:
     """
@@ -296,66 +294,59 @@ class QPBParameterProcessor:
 @click.option(
     "-in_param_csv",
     "--input_single_valued_csv_file_path",
-    "input_single_valued_csv_file_path",
     required=True,
-    callback=filesystem_utilities.validate_input_csv_file,
+    callback=csv_file.input,
     help="Path to .csv file containing extracted single-valued parameter values from qpb log files.",
 )
 @click.option(
     "-in_param_hdf5",
     "--input_multivalued_hdf5_file_path",
-    "input_multivalued_hdf5_file_path",
     required=True,
-    callback=filesystem_utilities.validate_input_HDF5_file,
+    callback=hdf5_file.input,
     help="Path to .hdf5 file containing extracted multivalued parameter values from qpb log files.",
 )
 @click.option(
     "-out_dir",
-    "--output_files_directory",
-    "output_files_directory",
+    "--output_directory",
     default=None,
-    callback=validate_input_directory,
-    help="Path to directory where all output files will be stored.",
+    callback=directory.must_exist,
+    help="Directory for output files. If not specified, uses input file directory.",
 )
 @click.option(
     "-out_csv_name",
     "--output_csv_filename",
-    "output_csv_filename",
     default="processed_qpb_log_files_extracted_values.csv",
-    callback=filesystem_utilities.validate_output_csv_filename,
+    callback=csv_file.output,
     help="Specific name for the output .csv file containing processed values.",
 )
 @click.option(
     "-log_on",
     "--enable_logging",
-    "enable_logging",
     is_flag=True,
     default=False,
-    help="Enable logging.",
+    help="Enable detailed logging to file.",
 )
 @click.option(
-    "-log_file_dir",
-    "--log_file_directory",
-    "log_file_directory",
+    "-log_dir",
+    "--log_directory",
     default=None,
-    callback=filesystem_utilities.validate_script_log_file_directory,
-    help="Directory where the script's log file will be stored.",
+    callback=directory.can_create,
+    help="Directory for log files. Default: output directory",
 )
 @click.option(
     "-log_name",
     "--log_filename",
-    "log_filename",
     default=None,
-    callback=validate_input_script_log_filename,
+    callback=validate_log_filename,
     help="Specific name for the script's log file.",
 )
 def main(
     input_single_valued_csv_file_path: str,
     input_multivalued_hdf5_file_path: str,
-    output_files_directory: Optional[str],
+    output_directory: Optional[str],
     output_csv_filename: str,
     enable_logging: bool,
-    log_file_directory: Optional[str],
+    log_directory: Optional[str],
     log_filename: Optional[str],
 ) -> None:
     """
@@ -367,12 +358,12 @@ def main(
     """
 
     # Handle default output directory
-    if output_files_directory is None:
-        output_files_directory = os.path.dirname(input_single_valued_csv_file_path)
+    if output_directory is None:
+        output_directory = os.path.dirname(input_single_valued_csv_file_path)
 
     # Setup logging
     logger_wrapper = filesystem_utilities.LoggingWrapper(
-        log_file_directory, log_filename, enable_logging
+        log_directory, log_filename, enable_logging
     )
     logger_wrapper.initiate_script_logging()
 
@@ -381,7 +372,7 @@ def main(
         processor = QPBParameterProcessor(
             single_valued_csv_path=input_single_valued_csv_file_path,
             multivalued_hdf5_path=input_multivalued_hdf5_file_path,
-            output_directory=output_files_directory,
+            output_directory=output_directory,
             output_filename=output_csv_filename,
         )
 
@@ -392,7 +383,7 @@ def main(
             "✓ Processing extracted values from QPB log files completed successfully."
         )
         click.echo(
-            f"✓ Results saved to: {os.path.join(output_files_directory, output_csv_filename)}"
+            f"✓ Results saved to: {os.path.join(output_directory, output_csv_filename)}"
         )
         click.echo(
             f"✓ Final dataset: {result_dataframe.shape[0]} rows, "
