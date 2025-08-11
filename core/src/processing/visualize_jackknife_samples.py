@@ -41,8 +41,11 @@ from library.visualization.builders.title_builder import PlotTitleBuilder
 from library import (
     constants,
     filesystem_utilities,
-    validate_input_directory,
-    validate_input_script_log_filename,
+)
+from library.validation.click_validators import (
+    hdf5_file,
+    directory,
+    validate_log_filename,
 )
 
 # Import configuration
@@ -62,14 +65,14 @@ from src.processing._jackknife_visualization_config import (
     "-i",
     "--input_hdf5_file",
     required=True,
-    type=click.Path(exists=True, readable=True),
+    callback=hdf5_file.input,
     help="Path to input HDF5 file containing jackknife analysis results.",
 )
 @click.option(
     "-o",
     "--output_directory",
     required=True,
-    callback=validate_input_directory,
+    callback=directory.must_exist,
     help="Directory for output plots.",
 )
 @click.option(
@@ -89,14 +92,14 @@ from src.processing._jackknife_visualization_config import (
     "-log_dir",
     "--log_directory",
     default=None,
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, writable=True),
+    callback=directory.can_create,
     help="Directory for log files. Default: output directory",
 )
 @click.option(
     "-log_name",
     "--log_filename",
     default=None,
-    callback=validate_input_script_log_filename,
+    callback=validate_log_filename,
     help="Custom name for log file. Default: auto-generated",
 )
 @click.option(
