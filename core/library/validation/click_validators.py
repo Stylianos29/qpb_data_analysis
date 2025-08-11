@@ -1,239 +1,72 @@
 """
-A minimal set of configurable Click validation callbacks for command-line
-arguments.
+Flexible Click validation callbacks for qpb_data_analysis
 
-This module provides exactly 4 validator functions that can be customized for
-specific use cases through parameters. The validators handle both full file
-paths and filename-only inputs, with appropriate validation behavior for each
-case.
+This module provides a clean, minimal API for Click option validation
+with both convenience functions and configurable validators.
 
-Usage Patterns:
+Philosophy:
+    - Only 4 core validator functions (input/output x file/directory)
+    - Convenience layer for common use cases
+    - Highly configurable for custom needs
+    - Clear separation of concerns
 
-1. Basic validation (any file/directory):
-    @click.option("--input_file", callback=validate_input_file)
+Usage:
+    # 1. Use convenience validators (recommended for most cases)
+    from library.validation.click_validators import csv_file, hdf5_file
+        @click.option("--input", callback=csv_file.input)
+        @click.option("--output", callback=csv_file.output)
     
-2. Extension-specific validation:
+    # 2. Use configurable validators for custom needs
+    from library.validation.click_validators import validate_input_file
     from functools import partial
-    validate_csv = partial(validate_input_file, extensions=['.csv'])
-    @click.option("--csv_file", callback=validate_csv)
-    
-3. Format validation with custom checker:
-    def check_hdf5(filepath):
-        import h5py
-        with h5py.File(filepath, 'r') as f: pass
-    
-    validate_hdf5 = partial(
-                        validate_input_file,
-                        extensions=['.h5'],
-                        format_checker=check_hdf5
-                        )
-    @click.option("--hdf5_file", callback=validate_hdf5)
-
-4. Filename-only validation (no existence check):
-    # Will only check extensions, not file existence
-    @click.option(
-        "--output_name",
-        callback=partial(validate_output_file, extensions=['.csv'])
-        )
-
-Key Features:
-- Minimal API surface: Only 4 core functions to learn and maintain
-- Configurable validation: Use functools.partial to create specialized
-  validators
-- Path flexibility: Handles both full paths and filename-only inputs
-- Consistent error messages: All validation errors follow Click conventions
-- No external dependencies: Uses only Click and standard library
-
-Design Philosophy:
-- Functions accept both full paths and filenames
-- Full paths undergo complete validation (existence, format, etc.)
-- Filenames undergo only structural validation (extensions)
-- Output validators never create directories automatically (user responsibility)
-- All functions are highly configurable through parameters
+    custom_validator = partial(validate_input_file, extensions=['.custom'])
 """
 
 import os
+import sys
+from functools import partial
+
 import click
 
 
-def validate_input_directory(ctx, param, value, must_exist=True, readable=True):
-    """
-    Validate input directory path.
-
-    Parameters:
-        ctx: Click context
-        param: Click parameter
-        value: Directory path to validate
-        must_exist: Whether directory must already exist (default: True)
-        readable: Whether directory must be readable (default: True)
-
-    Returns:
-        str: Validated directory path
-
-    Raises:
-        click.BadParameter: If validation fails
-    """
-    if value is None:
-        return None
-
-    # Ensure value is a string (handle Click passing Option objects)
-    if not isinstance(value, str):
-        raise click.BadParameter(f"Expected string value, got {type(value).__name__}")
-
-    # Custom validation with clear error messages
-    if not os.path.exists(value):
-        if must_exist:
-            raise click.BadParameter(
-                f"Input directory '{value}' does not exist. "
-                "Please check the path and try again."
-            )
-    elif not os.path.isdir(value):
-        raise click.BadParameter(
-            f"Path '{value}' exists but is not a directory. "
-            "Please provide a valid directory path."
-        )
-    elif readable and not os.access(value, os.R_OK):
-        raise click.BadParameter(
-            f"Directory '{value}' exists but is not readable. "
-            "Please check permissions."
-        )
-
-    return os.path.abspath(value)
-
-
-def validate_output_directory(ctx, param, value, check_parent_exists=False):
-    """
-    Validate output directory path (doesn't need to exist yet).
-
-    Parameters:
-        - ctx: Click context
-        - param: Click parameter
-        - value: Directory path to validate
-        - check_parent_exists: Whether to verify parent directory exists
-          (default: False)
-
-    Returns:
-        str: Validated directory path
-
-    Raises:
-        click.BadParameter: If validation fails or parent doesn't exist when
-        required
-
-    Note:
-        This function never creates directories. Use check_parent_exists=True to
-        ensure the parent directory exists, allowing the user to create it if
-        needed.
-    """
-    if value is None:
-        return None
-
-    # Ensure value is a string (handle Click passing Option objects)
-    if not isinstance(value, str):
-        raise click.BadParameter(f"Expected string value, got {type(value).__name__}")
-
-    # Check if path already exists and is not a directory
-    if os.path.exists(value) and not os.path.isdir(value):
-        raise click.BadParameter(
-            f"Output path '{value}' already exists but is not a directory. "
-            "Please choose a different path."
-        )
-
-    # Check if parent directory exists when required
-    if check_parent_exists:
-        parent_dir = os.path.dirname(value)
-        if parent_dir and not os.path.exists(parent_dir):
-            raise click.BadParameter(
-                f"Parent directory '{parent_dir}' does not exist. "
-                "Please create it first:\n"
-                f"  mkdir -p '{parent_dir}'"
-            )
-        elif parent_dir and not os.path.isdir(parent_dir):
-            raise click.BadParameter(
-                f"Parent path '{parent_dir}' exists but is not a directory."
-            )
-
-    return os.path.abspath(value)
+# ============================================================================
+# CORE VALIDATION FUNCTIONS (4 total - minimal API surface)
+# ============================================================================
 
 
 def validate_input_file(
     ctx, param, value, extensions=None, format_checker=None, readable=True
 ):
     """
-    Validate input file path or filename with optional extension and format
+    Validate input file path with optional extension and format
     checking.
 
-    Parameters:
-        - ctx: Click context
-        - param: Click parameter
-        - value: File path or filename to validate
-        - extensions: List of allowed extensions (e.g., ['.csv', '.h5']) or None
-        - format_checker: Function to test file format, should raise exception
-          if invalid
-        - readable: Whether file must be readable when it's a full path
-          (default: True)
-
-    Returns:
-        str: Validated file path or filename
-
-    Raises:
-        click.BadParameter: If validation fails
-
-    Behavior:
-        - Full paths (containing '/' or '\\') undergo complete validation
-        - Filenames (no path separators) undergo only extension validation
-        - Format checking only applies to full paths that exist
-
-    Example:
-        # Basic file validation
-        callback=validate_input_file
-
-        # CSV files only
-        from functools import partial
-        callback=partial(validate_input_file, extensions=['.csv'])
-
-        # HDF5 with format checking
-        def check_hdf5(filepath):
-            import h5py
-            with h5py.File(filepath, 'r') as f:
-                pass
-
-        callback=partial(
-            validate_input_file,
-            extensions=['.h5'],
-            format_checker=check_hdf5
-            )
+    Args:
+        - extensions: List of allowed extensions (e.g., ['.csv', '.h5'])
+        - format_checker: Function to validate file format
+        - readable: Whether file must be readable
     """
     if value is None:
         return None
 
-    # Ensure value is a string (handle Click passing Option objects)
     if not isinstance(value, str):
-        raise click.BadParameter(f"Expected string value, got {type(value).__name__}")
+        raise click.BadParameter(f"Expected string, got {type(value).__name__}")
 
-    # Determine if this is a full path or just a filename
+    # Check if it's a full path or just filename
     is_full_path = os.sep in value or ("\\" in value and os.name == "nt")
 
     if is_full_path:
-        # Full path validation - check existence, readability, format
+        # Full path validation
         if not os.path.exists(value):
-            raise click.BadParameter(
-                f"Input file '{value}' does not exist. "
-                "Please check the path and try again."
-            )
-        elif not os.path.isfile(value):
-            raise click.BadParameter(
-                f"Path '{value}' exists but is not a file. "
-                "Please provide a valid file path."
-            )
-        elif readable and not os.access(value, os.R_OK):
-            raise click.BadParameter(
-                f"File '{value}' exists but is not readable. "
-                "Please check permissions."
-            )
+            raise click.BadParameter(f"File '{value}' does not exist")
+        if not os.path.isfile(value):
+            raise click.BadParameter(f"Path '{value}' is not a file")
+        if readable and not os.access(value, os.R_OK):
+            raise click.BadParameter(f"File '{value}' is not readable")
 
         validated_path = os.path.abspath(value)
 
-        # Format validation (only for existing files)
+        # Format validation for existing files
         if format_checker:
             try:
                 format_checker(validated_path)
@@ -241,19 +74,14 @@ def validate_input_file(
                 file_type = "file"
                 if extensions:
                     file_type = f"{extensions[0].replace('.', '').upper()} file"
-                raise click.BadParameter(
-                    f"File '{os.path.basename(validated_path)}' is not "
-                    f"a valid {file_type}: {e}"
-                )
+                raise click.BadParameter(f"Invalid {file_type}: {e}")
     else:
-        # Filename only - just basic validation, no existence check
+        # Filename only - just validate structure
         if not value.strip():
-            raise click.BadParameter(
-                "Filename cannot be empty or contain only whitespace."
-            )
+            raise click.BadParameter("Filename cannot be empty")
         validated_path = value.strip()
 
-    # Extension validation (applies to both paths and filenames)
+    # Extension validation
     if extensions:
         if not any(validated_path.lower().endswith(ext.lower()) for ext in extensions):
             ext_list = ", ".join(extensions)
@@ -261,100 +89,49 @@ def validate_input_file(
                 os.path.basename(validated_path) if is_full_path else validated_path
             )
             raise click.BadParameter(
-                f"File '{filename}' must have one of these extensions: {ext_list}"
+                f"File '{filename}' must have extension: {ext_list}"
             )
 
     return validated_path
 
 
-def validate_output_file(ctx, param, value, extensions=None, check_parent_exists=False):
+def validate_output_file(ctx, param, value, extensions=None, check_parent_exists=True):
     """
-    Validate output file path or filename (doesn't need to exist yet).
+    Validate output file path (doesn't need to exist yet).
 
-    Parameters:
-
-        - ctx: Click context
-        - param: Click parameter
-        - value: File path or filename to validate
-        - extensions: List of allowed extensions (e.g., ['.csv', '.h5']) or None
-        - check_parent_exists: Whether to verify parent directory exists for
-          full paths
-
-    Returns:
-        str: Validated file path or filename
-
-    Raises:
-        click.BadParameter: If validation fails or parent directory doesn't
-        exist when required
-
-    Behavior:
-
-        - Full paths (containing '/' or '\\') undergo path validation
-        - Filenames (no path separators) undergo only extension validation
-        - Never creates directories automatically
-
-    Note:
-        This function never creates directories. Use check_parent_exists=True to
-        ensure the parent directory exists for full paths, allowing the user to
-        create it if needed.
-
-    Example:
-        # Basic output file
-        callback=validate_output_file
-
-        # Must be CSV
-        from functools import partial
-        callback=partial(validate_output_file, extensions=['.csv'])
-
-        # HDF5 with parent directory check
-        callback=partial(
-            validate_output_file,
-            extensions=['.h5'],
-            check_parent_exists=True
-            )
+    Args:
+        - extensions: List of allowed extensions
+        - check_parent_exists: Whether parent directory must exist
     """
     if value is None:
         return None
 
-    # Ensure value is a string (handle Click passing Option objects)
     if not isinstance(value, str):
-        raise click.BadParameter(f"Expected string value, got {type(value).__name__}")
+        raise click.BadParameter(f"Expected string, got {type(value).__name__}")
 
-    # Determine if this is a full path or just a filename
     is_full_path = os.sep in value or ("\\" in value and os.name == "nt")
 
     if is_full_path:
-        # Full path validation
+        # Check if path exists and is not a file
         if os.path.exists(value) and not os.path.isfile(value):
-            raise click.BadParameter(
-                f"Output path '{value}' already exists but is not a file. "
-                "Please choose a different path."
-            )
+            raise click.BadParameter(f"Path '{value}' exists but is not a file")
 
-        validated_path = os.path.abspath(value)
-
-        # Check if parent directory exists (but don't create it)
+        # Check parent directory
         if check_parent_exists:
-            parent_dir = os.path.dirname(validated_path)
+            parent_dir = os.path.dirname(value)
             if parent_dir and not os.path.exists(parent_dir):
                 raise click.BadParameter(
                     f"Parent directory '{parent_dir}' does not exist. "
-                    "Please create it first:\n"
-                    f"  mkdir -p '{parent_dir}'"
+                    f"Create it with: mkdir -p '{parent_dir}'"
                 )
-            elif parent_dir and not os.path.isdir(parent_dir):
-                raise click.BadParameter(
-                    f"Parent path '{parent_dir}' exists but is not a directory."
-                )
+        validated_path = os.path.abspath(value)
     else:
-        # Filename only - just basic validation
+        # Filename only
         if not value.strip():
-            raise click.BadParameter(
-                "Output filename cannot be empty or contain only whitespace."
-            )
+            raise click.BadParameter("Filename cannot be empty")
         validated_path = value.strip()
 
-    # Extension validation (applies to both paths and filenames)
+    # Extension validation
     if extensions:
         if not any(validated_path.lower().endswith(ext.lower()) for ext in extensions):
             ext_list = ", ".join(extensions)
@@ -362,8 +139,182 @@ def validate_output_file(ctx, param, value, extensions=None, check_parent_exists
                 os.path.basename(validated_path) if is_full_path else validated_path
             )
             raise click.BadParameter(
-                f"Output filename '{filename}' must have one of "
-                f"these extensions: {ext_list}"
+                f"File '{filename}' must have extension: {ext_list}"
             )
 
     return validated_path
+
+
+def validate_input_directory(
+    ctx, param, value, must_exist=True, readable=True, not_empty=False
+):
+    """
+    Validate input directory path.
+
+    Args:
+        - must_exist: Whether directory must exist
+        - readable: Whether directory must be readable
+        - not_empty: Whether directory must contain files
+    """
+    if value is None:
+        return None
+
+    if not isinstance(value, str):
+        raise click.BadParameter(f"Expected string, got {type(value).__name__}")
+
+    if must_exist:
+        if not os.path.exists(value):
+            raise click.BadParameter(f"Directory '{value}' does not exist")
+        if not os.path.isdir(value):
+            raise click.BadParameter(f"Path '{value}' is not a directory")
+        if readable and not os.access(value, os.R_OK):
+            raise click.BadParameter(f"Directory '{value}' is not readable")
+        if not_empty and not os.listdir(value):
+            raise click.BadParameter(f"Directory '{value}' is empty")
+
+    return os.path.abspath(value)
+
+
+def validate_output_directory(ctx, param, value, check_parent_exists=True):
+    """
+    Validate output directory path (doesn't need to exist yet).
+
+    Args:
+        check_parent_exists: Whether parent directory must exist
+    """
+    if value is None:
+        return None
+
+    if not isinstance(value, str):
+        raise click.BadParameter(f"Expected string, got {type(value).__name__}")
+
+    # Check if path exists and is not a directory
+    if os.path.exists(value) and not os.path.isdir(value):
+        raise click.BadParameter(f"Path '{value}' exists but is not a directory")
+
+    # Check parent directory
+    if check_parent_exists:
+        parent_dir = os.path.dirname(value)
+        if parent_dir and not os.path.exists(parent_dir):
+            raise click.BadParameter(
+                f"Parent directory '{parent_dir}' does not exist. "
+                f"Create it with: mkdir -p '{parent_dir}'"
+            )
+
+    return os.path.abspath(value)
+
+
+# ============================================================================
+# FORMAT CHECKERS (reusable validation functions)
+# ============================================================================
+
+
+def check_hdf5_format(filepath):
+    """Validate HDF5 file format"""
+    try:
+        import h5py
+
+        with h5py.File(filepath, "r") as f:
+            pass  # Just test if it opens
+    except Exception as e:
+        raise ValueError(f"Invalid HDF5 format: {e}")
+
+
+def check_csv_format(filepath):
+    """Validate CSV file format (basic check)"""
+    try:
+        import pandas as pd
+
+        pd.read_csv(filepath, nrows=1)  # Just read first row
+    except Exception as e:
+        raise ValueError(f"Invalid CSV format: {e}")
+
+
+# ============================================================================
+# CONVENIENCE LAYER (90% of use cases)
+# ============================================================================
+
+
+class FileValidator:
+    """
+    Factory for creating file validators with consistent behavior
+
+    Example:
+        csv = FileValidator(['.csv'], check_csv_format)
+        @click.option("--file", callback=csv.input)
+    """
+
+    def __init__(self, extensions, format_checker=None):
+        self.extensions = extensions
+        self.format_checker = format_checker
+
+    @property
+    def input(self):
+        """Input file validator"""
+        return partial(
+            validate_input_file,
+            extensions=self.extensions,
+            format_checker=self.format_checker,
+        )
+
+    @property
+    def output(self):
+        """Output file validator"""
+        return partial(validate_output_file, extensions=self.extensions)
+
+
+class DirectoryValidator:
+    """Factory for creating directory validators with clear semantics"""
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    @property
+    def must_exist(self):
+        """Directory must already exist (for input directories)"""
+        return partial(validate_input_directory, **self.kwargs)
+
+    @property
+    def can_create(self):
+        """Directory can be created if it doesn't exist (for output directories)"""
+        return partial(validate_output_directory)
+
+
+# ============================================================================
+# PRE-CONFIGURED VALIDATORS (for your specific use cases)
+# ============================================================================
+
+# File validators
+csv_file = FileValidator([".csv"], check_csv_format)
+hdf5_file = FileValidator([".hdf5", ".h5"], check_hdf5_format)
+
+# Directory validators
+data_directory = DirectoryValidator(not_empty=True)
+directory = DirectoryValidator()  # General purpose
+
+
+# ============================================================================
+# Specialized validators for specific use cases
+# ============================================================================
+
+
+def validate_log_filename(ctx, param, value):
+    """Generate default log filename or validate provided one"""
+    # If no log filename is provided, generate a default name
+    if value is None:
+        # Get the name of the script being executed (entry point)
+        script_name = os.path.basename(sys.argv[0])
+        return script_name.replace(".py", "_python_script.log")
+
+    # Validate the provided log filename (e.g., ensure it's a valid
+    # string)
+    if not value.strip():  # Ensure it's not empty or just spaces
+        raise click.BadParameter("Log filename cannot be an empty string.")
+
+    if not value.lower().endswith(".log"):
+        raise click.BadParameter(
+            f"The file name '{value}' is invalid. Current script's log file "
+            "names must end with '.log'."
+        )
+
+    return value
