@@ -25,8 +25,17 @@ Usage:
 import os
 import sys
 from functools import partial
+from typing import Optional, List, Callable, Any
 
 import click
+
+
+# ============================================================================
+# TYPE ALIASES (for better readability)
+# ============================================================================
+
+ClickCallback = Callable[[click.Context, click.Parameter, Optional[str]], Optional[str]]
+FormatChecker = Callable[[str], None]
 
 
 # ============================================================================
@@ -35,16 +44,30 @@ import click
 
 
 def validate_input_file(
-    ctx, param, value, extensions=None, format_checker=None, readable=True
-):
+    ctx: click.Context,
+    param: click.Parameter,
+    value: Optional[str],
+    extensions: Optional[List[str]] = None,
+    format_checker: Optional[FormatChecker] = None,
+    readable: bool = True,
+) -> Optional[str]:
     """
     Validate input file path with optional extension and format
     checking.
 
     Args:
+        - ctx: Click context
+        - param: Click parameter
+        - value: File path or filename to validate
         - extensions: List of allowed extensions (e.g., ['.csv', '.h5'])
         - format_checker: Function to validate file format
         - readable: Whether file must be readable
+
+    Returns:
+        Validated file path or None if value is None
+
+    Raises:
+        click.BadParameter: If validation fails
     """
     if value is None:
         return None
@@ -95,13 +118,28 @@ def validate_input_file(
     return validated_path
 
 
-def validate_output_file(ctx, param, value, extensions=None, check_parent_exists=True):
+def validate_output_file(
+    ctx: click.Context,
+    param: click.Parameter,
+    value: Optional[str],
+    extensions: Optional[List[str]] = None,
+    check_parent_exists: bool = True,
+) -> Optional[str]:
     """
     Validate output file path (doesn't need to exist yet).
 
     Args:
+        - ctx: Click context
+        - param: Click parameter
+        - value: File path or filename to validate
         - extensions: List of allowed extensions
         - check_parent_exists: Whether parent directory must exist
+
+    Returns:
+        Validated file path or None if value is None
+
+    Raises:
+        click.BadParameter: If validation fails
     """
     if value is None:
         return None
@@ -146,15 +184,29 @@ def validate_output_file(ctx, param, value, extensions=None, check_parent_exists
 
 
 def validate_input_directory(
-    ctx, param, value, must_exist=True, readable=True, not_empty=False
-):
+    ctx: click.Context,
+    param: click.Parameter,
+    value: Optional[str],
+    must_exist: bool = True,
+    readable: bool = True,
+    not_empty: bool = False,
+) -> Optional[str]:
     """
     Validate input directory path.
 
     Args:
+        - ctx: Click context
+        - param: Click parameter
+        - value: Directory path to validate
         - must_exist: Whether directory must exist
         - readable: Whether directory must be readable
         - not_empty: Whether directory must contain files
+
+    Returns:
+        Validated directory path or None if value is None
+
+    Raises:
+        click.BadParameter: If validation fails
     """
     if value is None:
         return None
@@ -175,12 +227,26 @@ def validate_input_directory(
     return os.path.abspath(value)
 
 
-def validate_output_directory(ctx, param, value, check_parent_exists=True):
+def validate_output_directory(
+    ctx: click.Context,
+    param: click.Parameter,
+    value: Optional[str],
+    check_parent_exists: bool = True,
+) -> Optional[str]:
     """
     Validate output directory path (doesn't need to exist yet).
 
     Args:
-        check_parent_exists: Whether parent directory must exist
+        - ctx: Click context
+        - param: Click parameter
+        - value: Directory path to validate
+        - check_parent_exists: Whether parent directory must exist
+
+    Returns:
+        Validated directory path or None if value is None
+
+    Raises:
+        click.BadParameter: If validation fails
     """
     if value is None:
         return None
@@ -209,8 +275,16 @@ def validate_output_directory(ctx, param, value, check_parent_exists=True):
 # ============================================================================
 
 
-def check_hdf5_format(filepath):
-    """Validate HDF5 file format"""
+def check_hdf5_format(filepath: str) -> None:
+    """
+    Validate HDF5 file format.
+
+    Args:
+        filepath: Path to HDF5 file
+
+    Raises:
+        ValueError: If file is not a valid HDF5 file
+    """
     try:
         import h5py
 
@@ -220,8 +294,16 @@ def check_hdf5_format(filepath):
         raise ValueError(f"Invalid HDF5 format: {e}")
 
 
-def check_csv_format(filepath):
-    """Validate CSV file format (basic check)"""
+def check_csv_format(filepath: str) -> None:
+    """
+    Validate CSV file format (basic check).
+
+    Args:
+        filepath: Path to CSV file
+
+    Raises:
+        ValueError: If file is not a valid CSV file
+    """
     try:
         import pandas as pd
 
@@ -237,20 +319,31 @@ def check_csv_format(filepath):
 
 class FileValidator:
     """
-    Factory for creating file validators with consistent behavior
+    Factory for creating file validators with consistent behavior.
 
     Example:
         csv = FileValidator(['.csv'], check_csv_format)
         @click.option("--file", callback=csv.input)
     """
 
-    def __init__(self, extensions, format_checker=None):
+    def __init__(
+        self,
+        extensions: List[str],
+        format_checker: Optional[FormatChecker] = None,
+    ) -> None:
+        """
+        Initialize file validator.
+
+        Args:
+            - extensions: List of allowed file extensions
+            - format_checker: Optional function to validate file format
+        """
         self.extensions = extensions
         self.format_checker = format_checker
 
     @property
-    def input(self):
-        """Input file validator"""
+    def input(self) -> ClickCallback:
+        """Input file validator (file must exist)."""
         return partial(
             validate_input_file,
             extensions=self.extensions,
@@ -258,25 +351,33 @@ class FileValidator:
         )
 
     @property
-    def output(self):
-        """Output file validator"""
+    def output(self) -> ClickCallback:
+        """Output file validator (file doesn't need to exist yet)."""
         return partial(validate_output_file, extensions=self.extensions)
 
 
 class DirectoryValidator:
-    """Factory for creating directory validators with clear semantics"""
+    """Factory for creating directory validators with clear
+    semantics."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
+        """
+        Initialize directory validator.
+
+        Args:
+            **kwargs: Arguments to pass to validation functions
+        """
         self.kwargs = kwargs
 
     @property
-    def must_exist(self):
-        """Directory must already exist (for input directories)"""
+    def must_exist(self) -> ClickCallback:
+        """Directory must already exist (for input directories)."""
         return partial(validate_input_directory, **self.kwargs)
 
     @property
-    def can_create(self):
-        """Directory can be created if it doesn't exist (for output directories)"""
+    def can_create(self) -> ClickCallback:
+        """Directory can be created if it doesn't exist (for output
+        directories)."""
         return partial(validate_output_directory)
 
 
@@ -285,12 +386,12 @@ class DirectoryValidator:
 # ============================================================================
 
 # File validators
-csv_file = FileValidator([".csv"], check_csv_format)
-hdf5_file = FileValidator([".hdf5", ".h5"], check_hdf5_format)
+csv_file: FileValidator = FileValidator([".csv"], check_csv_format)
+hdf5_file: FileValidator = FileValidator([".hdf5", ".h5"], check_hdf5_format)
 
 # Directory validators
-data_directory = DirectoryValidator(not_empty=True)
-directory = DirectoryValidator()  # General purpose
+data_directory: DirectoryValidator = DirectoryValidator(not_empty=True)
+directory: DirectoryValidator = DirectoryValidator()  # General purpose
 
 
 # ============================================================================
@@ -298,8 +399,25 @@ directory = DirectoryValidator()  # General purpose
 # ============================================================================
 
 
-def validate_log_filename(ctx, param, value):
-    """Generate default log filename or validate provided one"""
+def validate_log_filename(
+    ctx: click.Context,
+    param: click.Parameter,
+    value: Optional[str],
+) -> str:
+    """
+    Generate default log filename or validate provided one.
+
+    Args:
+        - ctx: Click context
+        - param: Click parameter
+        - value: Log filename to validate or None for auto-generation
+
+    Returns:
+        Validated log filename (never None - always generates a default)
+
+    Raises:
+        click.BadParameter: If provided filename is invalid
+    """
     # If no log filename is provided, generate a default name
     if value is None:
         # Get the name of the script being executed (entry point)
