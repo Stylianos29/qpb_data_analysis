@@ -49,7 +49,7 @@ from .validation import (
 # Import 
 from .validation.filesystem import is_valid_directory, is_valid_file
 
-from .filesystem_utilities import LoggingWrapper
+from .utils import LoggingWrapper
 
 
 # Define public API
