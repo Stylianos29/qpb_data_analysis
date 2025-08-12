@@ -40,7 +40,7 @@ from library.visualization.builders.filename_builder import PlotFilenameBuilder
 from library.visualization.builders.title_builder import PlotTitleBuilder
 from library import (
     constants,
-    filesystem_utilities,
+    LoggingWrapper,
 )
 from library.validation.click_validators import (
     hdf5_file,
@@ -115,7 +115,7 @@ def main(
     clear_existing: bool,
     enable_logging: bool,
     log_directory: Optional[str],
-    log_filename: Optional[str],
+    log_filename: str,
     verbose: bool,
 ) -> None:
     """
@@ -128,7 +128,7 @@ def main(
     # === SETUP AND VALIDATION ===
 
     # Setup logging
-    logger = filesystem_utilities.LoggingWrapper(
+    logger = LoggingWrapper(
         log_directory or output_directory, log_filename, enable_logging
     )
     logger.initiate_script_logging()
