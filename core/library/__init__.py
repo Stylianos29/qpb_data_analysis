@@ -49,7 +49,7 @@ from .validation import (
 # Import 
 from .validation.filesystem import is_valid_directory, is_valid_file
 
-from .utils import LoggingWrapper
+from .utils import LoggingWrapper, QPBLogger
 
 
 # Define public API
@@ -85,4 +85,5 @@ __all__ = [
     "validate_output_file",
     # Logging system
     "LoggingWrapper",
+    "QPBLogger",
 ]

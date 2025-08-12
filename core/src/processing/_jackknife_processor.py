@@ -9,10 +9,12 @@ This module provides functions for:
 """
 
 import logging
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Dict, List, Tuple, Optional, Any, Union
 
 import numpy as np
 import gvar as gv
+
+from library import QPBLogger
 
 from src.processing._jackknife_config import (
     DerivativeMethod,
@@ -36,7 +38,7 @@ class JackknifeProcessor:
     def __init__(
         self,
         derivative_method: DerivativeMethod = DerivativeMethod.FOURTH_ORDER,
-        logger: Optional[logging.Logger] = None,
+        logger: Optional[Union[logging.Logger, QPBLogger]] = None,
     ):
         """
         Initialize the jackknife processor.

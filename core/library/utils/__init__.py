@@ -1,5 +1,6 @@
-from .logging_utilities import LoggingWrapper
+from .logging_utilities import LoggingWrapper, QPBLogger
 
 __all__ = [
     "LoggingWrapper",
+    "QPBLogger",
 ]
