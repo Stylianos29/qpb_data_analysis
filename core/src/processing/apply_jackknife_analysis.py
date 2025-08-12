@@ -36,7 +36,7 @@ from library.validation.click_validators import (
     directory,
     validate_log_filename,
 )
-from library import filesystem_utilities
+from library import LoggingWrapper
 
 # Import from auxiliary modules
 from src.processing._jackknife_config import (
@@ -120,7 +120,7 @@ def main(
     output_directory: Optional[str],
     enable_logging: bool,
     log_directory: Optional[str],
-    log_filename: Optional[str],
+    log_filename: str,
     min_configurations: int,
     verbose: bool,
 ) -> None:
@@ -152,7 +152,7 @@ def main(
     compression_level = DEFAULT_COMPRESSION_LEVEL
 
     # Setup logging
-    logger = filesystem_utilities.LoggingWrapper(
+    logger = LoggingWrapper(
         log_directory or output_directory, log_filename, enable_logging
     )
     logger.initiate_script_logging()
