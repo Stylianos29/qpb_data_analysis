@@ -85,7 +85,7 @@ def analyze_and_plot_correlators(hdf5_file_path):
         for group_path in group_paths:
             try:
                 # Get all parameters for this specific group to find KL_diagonal_order
-                full_params = analyzer._parameters_for_group(group_path)
+                full_params = analyzer.parameters_for_group(group_path)
                 kl_value = full_params.get('KL_diagonal_order')
                 
                 if kl_value is not None:

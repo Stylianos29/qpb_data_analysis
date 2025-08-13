@@ -876,7 +876,7 @@ def load_gauge_configuration_labels(
 def get_group_metadata(analyzer, group_path):
     """Extract metadata from a group for titles and filenames."""
     try:
-        metadata = analyzer._parameters_for_group(group_path)
+        metadata = analyzer.parameters_for_group(group_path)
         return metadata
     except Exception:
         return {}

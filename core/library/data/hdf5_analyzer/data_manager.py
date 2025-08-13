@@ -77,7 +77,7 @@ class _HDF5DataManager(_HDF5Inspector):
         # Find parameters that still have multiple values in active groups
         param_values = defaultdict(list)  # Use list instead of set
         for group_path in self.active_groups:
-            params = self._parameters_for_group(group_path)
+            params = self.parameters_for_group(group_path)
             for param_name, value in params.items():
                 # Convert to hashable type if needed
                 if isinstance(value, np.ndarray):
@@ -112,16 +112,20 @@ class _HDF5DataManager(_HDF5Inspector):
             ]
         )
 
-    def _parameters_for_group(self, group_path: str) -> Dict[str, Any]:
+    def parameters_for_group(self, group_path: str) -> Dict[str, Any]:
         """
-        Get all parameters (single and multi-valued) for a specific
-        group.
+        Get all parameters (single and multi-valued) for a specific group.
 
         Args:
             group_path: Path to the deepest level group
 
         Returns:
             Dictionary of all parameters affecting this group
+
+        Example:
+            >>> analyzer = HDF5Analyzer('data.h5')
+            >>> params = analyzer.parameters_for_group('/study/run_001/config_042')
+            >>> print(params['Bare_mass'])
         """
         all_params = {}
 
@@ -166,7 +170,7 @@ class _HDF5DataManager(_HDF5Inspector):
         filtered_groups = set()
 
         for group_path in candidate_groups:
-            params = self._parameters_for_group(group_path)
+            params = self.parameters_for_group(group_path)
 
             # Apply filtering
             include_group = False
@@ -389,7 +393,7 @@ class _HDF5DataManager(_HDF5Inspector):
         for group_path in sorted(self.active_groups):
             # Get parameters for this group
             if include_parameters:
-                group_params = self._parameters_for_group(group_path)
+                group_params = self.parameters_for_group(group_path)
             else:
                 group_params = {}
 
@@ -471,7 +475,7 @@ class _HDF5DataManager(_HDF5Inspector):
         grouped = defaultdict(list)
 
         for group_path in self.active_groups:
-            params = self._parameters_for_group(group_path)
+            params = self.parameters_for_group(group_path)
 
             # Extract grouping parameter values
             group_key = tuple(params.get(p) for p in grouping_params)

@@ -240,7 +240,7 @@ def main(
                 # Get group metadata
                 if group_paths:
                     first_group_path = list(group_paths)[0]
-                    group_metadata = analyzer._parameters_for_group(first_group_path)
+                    group_metadata = analyzer.parameters_for_group(first_group_path)
                     group_metadata["group_name"] = group_name
                     group_metadata["param_values"] = param_values
                 else:
