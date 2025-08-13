@@ -161,7 +161,7 @@ def main(
     )
 
     # Script lifecycle logging
-    logger.log_script_start("Jackknife analysis preprocessing")
+    logger.log_script_start("Jackknife analysis processing")
 
     # Log configuration details (always to file, optionally to console
     # if verbose)
