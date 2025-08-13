@@ -31,12 +31,16 @@ AVERAGE_PLOT_STYLE = {
     "alpha": 0.9,
     "capsize": 10,  # Increase from 3 to 10
     "capthick": 2,  # Add thickness
-    "label_suffix": " (Average ± Error)",
+    "label": "Jackknife average",
 }
 
 # Default plot appearance
-DEFAULT_FIGURE_SIZE = (10, 6)
+# DEFAULT_FIGURE_SIZE = (10, 6)
+DEFAULT_FIGURE_SIZE = (8, 6)
 DEFAULT_FONT_SIZE = 12
+
+# Multi-sample plotting configuration
+SAMPLES_PER_PLOT = 10  # Number of jackknife samples to include in each plot
 
 # Dataset-specific plotting configurations
 DATASET_PLOT_CONFIGS = {
@@ -44,22 +48,25 @@ DATASET_PLOT_CONFIGS = {
         "y_scale": "log",  # Use logarithmic y-axis
         "x_start_index": 1,  # Start from time index 1 (skip t=0)
         "x_end_offset": 0,  # Include all points up to the end
+        "x_label": r"$t/a$",  # LaTeX x-axis label
+        "y_label": r"$C_{\gamma_5\text{-}\gamma_5}(t)$",  # LaTeX y-axis label
         "description": "g5-g5 correlator with log scale starting from t=1",
-        "y_label": r"$C_{\gamma_5\text{-}\gamma_5}(t)$",
     },
     "g4g5g5_jackknife_samples": {
         "y_scale": "linear",  # Use linear y-axis
         "x_start_index": 2,  # Start from time index 2
         "x_end_offset": 2,  # Exclude last 2 time points
+        "x_label": r"$t/a$",  # LaTeX x-axis label
+        "y_label": r"$C_{\gamma_4\gamma_5\text{-}\gamma_5}(t)$",  # LaTeX y-axis label
         "description": "g4g5-g5 correlator with reduced time range",
-        "y_label": r"$C_{\gamma_4\gamma_5\text{-}\gamma_5}(t)$",
     },
     "g4g5g5_derivative_jackknife_samples": {
         "y_scale": "linear",  # Use linear y-axis
         "x_start_index": 2,  # Start from time index 2
         "x_end_offset": 2,  # Exclude last 2 time points
+        "x_label": r"$t/a$",  # LaTeX x-axis label
+        "y_label": r"$\partial_t C_{\gamma_4\gamma_5\text{-}\gamma_5}(t)$",  # LaTeX y-axis label
         "description": "g4g5-g5 derivative correlator with reduced time range",
-        "y_label": r"$\partial_t C_{\gamma_4\gamma_5\text{-}\gamma_5}(t)$",
     },
 }
 
@@ -68,6 +75,8 @@ DEFAULT_DATASET_PLOT_CONFIG = {
     "y_scale": "linear",
     "x_start_index": 0,
     "x_end_offset": 0,
+    "x_label": r"$t/a$",  # Default LaTeX x-axis label
+    "y_label": "Correlator Value",  # Default y-axis label
     "description": "Default linear scale with full time range",
 }
 

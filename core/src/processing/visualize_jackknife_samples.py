@@ -56,6 +56,7 @@ from src.processing._jackknife_visualization_config import (
     AVERAGE_PLOT_STYLE,
     DEFAULT_FIGURE_SIZE,
     DEFAULT_FONT_SIZE,
+    SAMPLES_PER_PLOT,
     get_dataset_plot_config,
 )
 
@@ -295,7 +296,8 @@ def process_group_jackknife_data(
     verbose: bool,
 ) -> int:
     """
-    Process jackknife data for a specific group and dataset.
+    Process jackknife data for a specific group and dataset. Updated to
+    create multi-sample plots instead of individual plots.
 
     Args:
         - analyzer: HDF5Analyzer instance
@@ -362,19 +364,13 @@ def process_group_jackknife_data(
                 error_values = np.concatenate(error_values)  # Multiple arrays case
                 logger.info(f"Concatenated {len(error_values)} error value arrays")
 
-        if mean_values is None or error_values is None:
-            logger.warning(
-                f"Could not load corresponding mean/error data for {dataset_name} in {group_path}"
-            )
-            return 0
-
         # Load gauge configuration labels
         config_labels = load_gauge_configuration_labels(
             analyzer, group_path, jackknife_data.shape[0], logger
         )
 
-        # Create individual plots for each sample
-        plots_created = create_individual_sample_plots(
+        # Create multi-sample plots instead of individual plots
+        plots_created = create_multi_sample_plots(
             jackknife_data=jackknife_data,
             mean_values=mean_values,
             error_values=error_values,
@@ -400,79 +396,126 @@ def process_group_jackknife_data(
         return 0
 
 
-def load_corresponding_gvar_data(
-    analyzer: HDF5Analyzer, dataset_name: str, group_path: str, logger
-) -> Tuple[Union[ndarray, List[ndarray], None], Union[ndarray, List[ndarray], None]]:
+def create_multi_sample_plots(
+    jackknife_data: np.ndarray,
+    mean_values: np.ndarray,
+    error_values: np.ndarray,
+    config_labels: List[str],
+    dataset_name: str,
+    group_name: str,
+    group_path: str,
+    analyzer: HDF5Analyzer,
+    file_manager: PlotFileManager,
+    layout_manager: PlotLayoutManager,
+    style_manager: PlotStyleManager,
+    filename_builder: PlotFilenameBuilder,
+    title_builder: PlotTitleBuilder,
+    group_plots_dir: str,
+    logger,
+    verbose: bool,
+) -> int:
     """
-    Load corresponding mean and error values for the jackknife dataset.
+    Create multi-sample plots for jackknife data.
 
     Args:
-        - analyzer: HDF5Analyzer instance
-        - dataset_name: Name of the jackknife dataset
+        - jackknife_data: 2D array of jackknife samples (n_samples,
+        n_time)
+        - mean_values: Array of mean values
+        - error_values: Array of error values
+        - config_labels: List of gauge configuration labels
+        - dataset_name: Name of the dataset
+        - group_name: Name of the group
         - group_path: Path to the HDF5 group
+        - analyzer: HDF5Analyzer instance
+        - file_manager: PlotFileManager instance
+        - layout_manager: PlotLayoutManager instance
+        - style_manager: PlotStyleManager instance
+        - filename_builder: PlotFilenameBuilder instance
+        - title_builder: PlotTitleBuilder instance
+        - group_plots_dir: Directory for group plots
         - logger: Logger instance
+        - verbose: Whether to show verbose output
 
     Returns:
-        Tuple of (mean_values, error_values) or (None, None) if not
-        found
+        Number of plots created
     """
-    # Derive mean and error dataset names
-    base_name = dataset_name.replace("_jackknife_samples", "")
-    mean_dataset = f"{base_name}_mean_values"
-    error_dataset = f"{base_name}_error_values"
+    n_samples, n_time_points = jackknife_data.shape
+    plots_created = 0
 
-    try:
-        mean_values = analyzer.dataset_values(
-            mean_dataset, return_gvar=False, group_path=group_path
+    # Get dataset configuration for logging
+    dataset_config = get_dataset_plot_config(dataset_name)
+    if verbose:
+        config_desc = dataset_config.get("description", "Default configuration")
+        click.echo(f"      Using config: {config_desc}")
+        click.echo(f"      Samples per plot: {SAMPLES_PER_PLOT}")
+
+    # Ensure we have enough configuration labels
+    if len(config_labels) < n_samples:
+        logger.warning(
+            f"Insufficient config labels ({len(config_labels)}) for samples ({n_samples})"
         )
-        error_values = analyzer.dataset_values(
-            error_dataset, return_gvar=False, group_path=group_path
-        )
-
-        return mean_values, error_values
-
-    except Exception as e:
-        logger.warning(f"Could not load gvar data {mean_dataset}/{error_dataset}: {e}")
-        return None, None
-
-
-def load_gauge_configuration_labels(
-    analyzer: HDF5Analyzer, group_path: str, n_samples: int, logger
-) -> List[str]:
-    """
-    Load gauge configuration labels for sample identification.
-
-    Args:
-        - analyzer: HDF5Analyzer instance
-        - group_path: Path to the HDF5 group
-        - n_samples: Number of samples (for creating defaults)
-        - logger: Logger instance
-
-    Returns:
-        List of configuration labels
-    """
-    try:
-        labels = analyzer.dataset_values(
-            "gauge_configuration_labels", return_gvar=False, group_path=group_path
+        # Extend with defaults
+        config_labels.extend(
+            [f"config_{i}" for i in range(len(config_labels), n_samples)]
         )
 
-        # Convert to list of strings
-        if isinstance(labels, np.ndarray):
-            # Flattens the labels array and returns a list of strings,
-            # decoding each label from bytes to UTF-8 if necessary.
-            return [
-                label.decode("utf-8") if isinstance(label, bytes) else str(label)
-                for label in labels.flatten()
-            ]
-        elif isinstance(labels, list):
-            return [str(label) for label in labels]
-        else:
-            raise ValueError("Unexpected format for gauge configuration labels")
+    # Create time index
+    time_index = np.arange(n_time_points)
 
-    except Exception as e:
-        logger.warning(f"Could not load gauge configuration labels: {e}")
-        # Create default labels
-        return [f"config_{i}" for i in range(n_samples)]
+    # Calculate number of plots needed
+    n_plots = (n_samples + SAMPLES_PER_PLOT - 1) // SAMPLES_PER_PLOT  # Ceiling division
+
+    if verbose:
+        click.echo(f"      Creating {n_plots} plots for {n_samples} samples")
+
+    for plot_idx in range(n_plots):
+        try:
+            # Calculate sample range for this plot
+            start_sample = plot_idx * SAMPLES_PER_PLOT
+            end_sample = min(start_sample + SAMPLES_PER_PLOT, n_samples)
+
+            # Extract samples for this plot
+            plot_samples = jackknife_data[start_sample:end_sample, :]
+            plot_labels = config_labels[start_sample:end_sample]
+
+            # Create the plot
+            fig, ax = create_multi_sample_plot(
+                time_index=time_index,
+                samples_data=plot_samples,
+                sample_labels=plot_labels,
+                mean_values=mean_values,
+                error_values=error_values,
+                dataset_name=dataset_name,
+                group_name=group_name,
+                group_metadata=get_group_metadata(
+                    analyzer, group_path
+                ),  # Get the metadata
+                sample_indices=(start_sample, end_sample - 1),
+                title_builder=title_builder,  # Pass the title builder
+            )
+
+            # Generate filename
+            filename = generate_multi_sample_plot_filename(
+                group_name=group_name, sample_indices=(start_sample, end_sample - 1)
+            )
+
+            # Save plot
+            full_path = file_manager.plot_path(group_plots_dir, filename)
+            fig.savefig(full_path, dpi=150, bbox_inches="tight")
+            plt.close(fig)
+
+            plots_created += 1
+
+            if verbose:
+                click.echo(f"      Created plot {plot_idx + 1}/{n_plots}: {filename}")
+
+        except Exception as e:
+            logger.error(
+                f"Error creating plot {plot_idx} for samples {start_sample}-{end_sample-1}: {e}"
+            )
+            continue
+
+    return plots_created
 
 
 def create_individual_sample_plots(
@@ -494,8 +537,8 @@ def create_individual_sample_plots(
     verbose: bool,
 ) -> int:
     """
-    Create individual plots for each jackknife sample.
-    Enhanced to support dataset-specific configurations.
+    Create individual plots for each jackknife sample. Enhanced to
+    support dataset-specific configurations.
     """
     n_samples, n_time_points = jackknife_data.shape
     plots_created = 0
@@ -568,6 +611,114 @@ def create_individual_sample_plots(
             continue
 
     return plots_created
+
+
+def create_multi_sample_plot(
+    time_index: np.ndarray,
+    samples_data: np.ndarray,  # 2D array: (n_samples_in_plot, n_time)
+    sample_labels: List[str],
+    mean_values: np.ndarray,
+    error_values: np.ndarray,
+    dataset_name: str,
+    group_name: str,
+    group_metadata: Dict,  # Add this parameter
+    sample_indices: Tuple[int, int],  # (start_idx, end_idx) for filename
+    title_builder: PlotTitleBuilder,  # Add this parameter
+) -> Tuple[Figure, Axes]:
+    """
+    Create a plot with multiple jackknife samples and their average.
+
+    Args:
+        - time_index: Array of time indices
+        - samples_data: 2D array with sample data (n_samples_in_plot,
+          n_time)
+        - sample_labels: List of labels for each sample
+        - mean_values: Mean values array
+        - error_values: Error values array
+        - dataset_name: Name of the dataset
+        - group_name: Name of the group
+        - sample_indices: Tuple of (start_idx, end_idx) for this plot
+
+    Returns:
+        Tuple of (figure, axes)
+    """
+    # Get dataset-specific configuration
+    dataset_config = get_dataset_plot_config(dataset_name)
+
+    # Apply dataset-specific slicing to all data
+    sliced_time, sliced_samples, sliced_mean, sliced_error = apply_dataset_slicing(
+        time_index, samples_data, mean_values, error_values, dataset_config
+    )
+
+    # Create figure and axis
+    fig, ax = plt.subplots(figsize=DEFAULT_FIGURE_SIZE)
+
+    # Plot each sample with its own label
+    sample_style = SAMPLE_PLOT_STYLE.copy()
+    # Remove any non-matplotlib parameters
+    sample_style.pop("label_suffix", None)  # Remove if it exists
+
+    for i, (sample_data, sample_label) in enumerate(zip(sliced_samples, sample_labels)):
+        ax.plot(
+            sliced_time,
+            sample_data,
+            label=sample_label,  # Use the actual config label
+            **sample_style,
+        )
+
+    # Plot average data with error bars if available
+    if sliced_mean is not None and sliced_error is not None:
+        average_style = AVERAGE_PLOT_STYLE.copy()
+        # Extract and remove non-matplotlib parameters
+        avg_label = average_style.pop("label", "Jackknife average")
+        average_style.pop("label_suffix", None)  # Remove if it exists
+
+        ax.errorbar(
+            sliced_time,
+            sliced_mean,
+            yerr=sliced_error,
+            label=avg_label,
+            **average_style,
+        )
+
+    # Apply dataset-specific y-axis scale
+    y_scale = dataset_config.get("y_scale", "linear")
+    ax.set_yscale(y_scale)
+
+    # Set axis labels using dataset-specific LaTeX notation
+    x_label = dataset_config.get("x_label", r"$t/a$")
+    y_label = dataset_config.get("y_label", "Correlator Value")
+    ax.set_xlabel(x_label, fontsize=DEFAULT_FONT_SIZE)
+    ax.set_ylabel(y_label, fontsize=DEFAULT_FONT_SIZE)
+
+    # Use the proper title builder system with the existing
+    # generate_sample_plot_title function
+    try:
+        # Use the existing function that properly handles the title
+        # builder
+        sample_label = f"Samples {sample_indices[0]}-{sample_indices[1]}"
+        plot_title = generate_sample_plot_title(
+            sample_label=sample_label,
+            dataset_name=dataset_name,
+            group_metadata=group_metadata,
+            title_builder=title_builder,
+        )
+    except Exception as e:
+        # Fallback title if title building fails
+        plot_title = f"{dataset_name} - Samples {sample_indices[0]}-{sample_indices[1]}"
+
+    ax.set_title(plot_title, fontsize=DEFAULT_FONT_SIZE + 2)
+
+    # Add legend
+    ax.legend(fontsize=DEFAULT_FONT_SIZE - 2, loc="best")
+
+    # Grid for better readability
+    ax.grid(True, alpha=0.3)
+
+    # Tight layout
+    plt.tight_layout()
+
+    return fig, ax
 
 
 def create_sample_plot(
@@ -647,66 +798,86 @@ def create_sample_plot(
     return fig, ax
 
 
-def apply_dataset_slicing(
-    time_index: np.ndarray,
-    sample_data: np.ndarray,
-    mean_values: np.ndarray,
-    error_values: np.ndarray,
-    dataset_config: dict,
-) -> Tuple[ndarray, ndarray, Optional[ndarray], Optional[ndarray]]:
+def load_corresponding_gvar_data(
+    analyzer: HDF5Analyzer, dataset_name: str, group_path: str, logger
+) -> Tuple[
+    Union[np.ndarray, List[np.ndarray], None], Union[np.ndarray, List[np.ndarray], None]
+]:
     """
-    Apply dataset-specific slicing to time index and data arrays.
+    Load corresponding mean and error values for the jackknife dataset.
 
     Args:
-        time_index: Array of time indices
-        sample_data: Sample data array
-        mean_values: Mean values array
-        error_values: Error values array
-        dataset_config: Configuration dict with x_start_index and x_end_offset
+        - analyzer: HDF5Analyzer instance
+        - dataset_name: Name of the jackknife dataset
+        - group_path: Path to the HDF5 group
+        - logger: Logger instance
 
     Returns:
-        Tuple of sliced (time_index, sample_data, mean_values, error_values)
+        Tuple of (mean_values, error_values) or (None, None) if not
+        found
     """
-    start_idx = dataset_config.get("x_start_index", 0)
-    end_offset = dataset_config.get("x_end_offset", 0)
+    # Derive mean and error dataset names
+    base_name = dataset_name.replace("_jackknife_samples", "")
+    mean_dataset = f"{base_name}_mean_values"
+    error_dataset = f"{base_name}_error_values"
 
-    # Calculate end index
-    if end_offset > 0:
-        end_idx = len(time_index) - end_offset
-    else:
-        end_idx = len(time_index)
+    try:
+        mean_values = analyzer.dataset_values(
+            mean_dataset, return_gvar=False, group_path=group_path
+        )
+        error_values = analyzer.dataset_values(
+            error_dataset, return_gvar=False, group_path=group_path
+        )
 
-    # Apply slicing
-    sliced_time_index = time_index[start_idx:end_idx]
-    sliced_sample_data = sample_data[start_idx:end_idx]
-    sliced_mean_values = (
-        mean_values[start_idx:end_idx] if mean_values is not None else None
-    )
-    sliced_error_values = (
-        error_values[start_idx:end_idx] if error_values is not None else None
-    )
+        return mean_values, error_values
 
-    return (
-        sliced_time_index,
-        sliced_sample_data,
-        sliced_mean_values,
-        sliced_error_values,
-    )
+    except Exception as e:
+        logger.warning(f"Could not load gvar data {mean_dataset}/{error_dataset}: {e}")
+        return None, None
 
 
-def get_group_metadata(analyzer: HDF5Analyzer, group_path: str) -> Dict:
+def load_gauge_configuration_labels(
+    analyzer: HDF5Analyzer, group_path: str, n_samples: int, logger
+) -> List[str]:
     """
-    Extract metadata from a group for titles and filenames.
+    Load gauge configuration labels for sample identification.
 
     Args:
         - analyzer: HDF5Analyzer instance
         - group_path: Path to the HDF5 group
+        - n_samples: Number of samples (for creating defaults)
+        - logger: Logger instance
 
     Returns:
-        Dictionary of metadata
+        List of configuration labels
     """
     try:
-        # Get parameters for this group
+        labels = analyzer.dataset_values(
+            "gauge_configuration_labels", return_gvar=False, group_path=group_path
+        )
+
+        # Convert to list of strings
+        if isinstance(labels, np.ndarray):
+            # Flattens the labels array and returns a list of strings,
+            # decoding each label from bytes to UTF-8 if necessary.
+            return [
+                label.decode("utf-8") if isinstance(label, bytes) else str(label)
+                for label in labels.flatten()
+            ]
+        elif isinstance(labels, list):
+            return [str(label) for label in labels]
+        else:
+            raise ValueError("Unexpected format for gauge configuration labels")
+
+    except Exception as e:
+        logger.warning(f"Could not load gauge configuration labels: {e}")
+        # Create default labels
+        return [f"config_{i}" for i in range(n_samples)]
+
+
+def get_group_metadata(analyzer, group_path):
+    """Extract metadata from a group for titles and filenames."""
+    try:
         metadata = analyzer._parameters_for_group(group_path)
         return metadata
     except Exception:
@@ -714,30 +885,19 @@ def get_group_metadata(analyzer: HDF5Analyzer, group_path: str) -> Dict:
 
 
 def generate_sample_plot_title(
-    sample_label: str,
-    dataset_name: str,
-    group_metadata: Dict,
-    title_builder: PlotTitleBuilder,
-) -> str:
-    """
-    Generate a descriptive title for the sample plot.
-
-    Args:
-        - sample_label: Label for the sample
-        - dataset_name: Name of the dataset
-        - group_metadata: Metadata for the group
-        - title_builder: PlotTitleBuilder instance
-
-    Returns:
-        Generated title string
-    """
+    sample_label, dataset_name, group_metadata, title_builder
+):
+    """Generate a descriptive title for the sample plot using the title
+    builder."""
     # Clean dataset name for title
     clean_dataset_name = (
         dataset_name.replace("_jackknife_samples", "").replace("_", " ").title()
     )
 
     # Base title
-    base_title = f"{clean_dataset_name} - Sample: {sample_label}"
+    base_title = (
+        f"{clean_dataset_name} - {sample_label}"  # Modified to use samples range
+    )
 
     # Add metadata if available
     if group_metadata:
@@ -745,8 +905,8 @@ def generate_sample_plot_title(
             metadata_title = title_builder.build(
                 metadata_dict=group_metadata,
                 tunable_params=list(group_metadata.keys()),
-                leading_substring=base_title,
-                wrapping_length=100,
+                # leading_substring=base_title,
+                wrapping_length=80,
             )
             return metadata_title
         except Exception:
@@ -801,6 +961,78 @@ def generate_sample_plot_filename(
             return base_name
 
     return base_name
+
+
+def generate_multi_sample_plot_filename(
+    group_name: str, sample_indices: Tuple[int, int]
+) -> str:
+    """
+    Generate filename for multi-sample plot.
+
+    Args:
+        group_name: Name of the group sample_indices: Tuple of
+        (start_idx, end_idx) for this plot
+
+    Returns:
+        Generated filename (without extension - file manager adds it)
+    """
+    start_idx, end_idx = sample_indices
+    return f"{group_name}_{start_idx}-{end_idx}"  # No .png extension here
+
+
+def apply_dataset_slicing(
+    time_index: np.ndarray,
+    sample_data: np.ndarray,
+    mean_values: np.ndarray,
+    error_values: np.ndarray,
+    dataset_config: dict,
+) -> Tuple[ndarray, ndarray, Optional[ndarray], Optional[ndarray]]:
+    """
+    Apply dataset-specific slicing to time index and data arrays.
+
+    Args:
+        - time_index: Array of time indices
+        - sample_data: Sample data array (can be 1D or 2D)
+        - mean_values: Mean values array
+        - error_values: Error values array
+        - dataset_config: Configuration dict with x_start_index and
+          x_end_offset
+
+    Returns:
+        Tuple of sliced (time_index, sample_data, mean_values,
+        error_values)
+    """
+    start_idx = dataset_config.get("x_start_index", 0)
+    end_offset = dataset_config.get("x_end_offset", 0)
+
+    # Calculate end index
+    if end_offset > 0:
+        end_idx = len(time_index) - end_offset
+    else:
+        end_idx = len(time_index)
+
+    # Apply slicing
+    sliced_time_index = time_index[start_idx:end_idx]
+
+    # Handle both 1D and 2D sample data
+    if sample_data.ndim == 1:
+        sliced_sample_data = sample_data[start_idx:end_idx]
+    else:  # 2D case (multiple samples)
+        sliced_sample_data = sample_data[:, start_idx:end_idx]
+
+    sliced_mean_values = (
+        mean_values[start_idx:end_idx] if mean_values is not None else None
+    )
+    sliced_error_values = (
+        error_values[start_idx:end_idx] if error_values is not None else None
+    )
+
+    return (
+        sliced_time_index,
+        sliced_sample_data,
+        sliced_mean_values,
+        sliced_error_values,
+    )
 
 
 if __name__ == "__main__":
