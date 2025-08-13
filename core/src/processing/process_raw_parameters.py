@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Refactored QPB log file parameter processing script.
+QPB log file parameter processing script.
 
 This script processes extracted parameter values from QPB log files
 using a configuration-driven, modular approach. It replaces the original
@@ -27,7 +27,7 @@ from library.validation.click_validators import (
     directory,
     validate_log_filename,
 )
-from library import filesystem_utilities
+from library.utils.logging_utilities import create_script_logger
 
 # Import from auxiliary module
 from src.processing._qpb_parameter_processor import QPBParameterProcessor
@@ -105,10 +105,15 @@ def main(
         output_directory = os.path.dirname(input_single_valued_csv_file_path)
 
     # Setup logging
-    logger_wrapper = filesystem_utilities.LoggingWrapper(
-        log_directory, log_filename, enable_logging
+    logger = create_script_logger(
+        log_directory=log_directory,
+        log_filename=log_filename,
+        enable_file_logging=enable_logging,
+        enable_console_logging=False,  # Keep console output separate via click.echo
+        verbose=False,
     )
-    logger_wrapper.initiate_script_logging()
+
+    logger.log_script_start("QPB parameter processing")
 
     try:
         # Create and run processor
@@ -119,8 +124,17 @@ def main(
             output_filename=output_csv_filename,
         )
 
+        logger.info(f"Initialized processor for {input_single_valued_csv_file_path}")
+        logger.info(
+            f"Output target: {os.path.join(output_directory, output_csv_filename)}"
+        )
+
         # Execute processing pipeline
+        logger.info("Starting parameter processing pipeline")
         result_dataframe = processor.process_all_parameters()
+        logger.info(
+            f"Processing completed: {result_dataframe.shape[0]} rows, {result_dataframe.shape[1]} columns"
+        )
 
         click.echo(
             "✓ Processing extracted values from QPB log files completed successfully."
@@ -134,12 +148,14 @@ def main(
         )
 
     except Exception as e:
+        logger.log_script_error(e)
         click.echo(f"✗ Processing failed: {e}")
         raise
 
     finally:
-        # Terminate logging
-        logger_wrapper.terminate_script_logging()
+        # Proper logging cleanup
+        logger.log_script_end("QPB parameter processing completed")
+        logger.close()
 
 
 if __name__ == "__main__":
