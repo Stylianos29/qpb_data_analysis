@@ -36,7 +36,7 @@ from library.validation.click_validators import (
     directory,
     validate_log_filename,
 )
-from library import LoggingWrapper
+from library.utils.logging_utilities import create_script_logger
 
 # Import from auxiliary modules
 from src.processing._jackknife_config import (
@@ -152,29 +152,33 @@ def main(
     compression_level = DEFAULT_COMPRESSION_LEVEL
 
     # Setup logging
-    logger = LoggingWrapper(
-        log_directory or output_directory, log_filename, enable_logging
+    logger = create_script_logger(
+        log_directory=log_directory or output_directory,
+        log_filename=log_filename,
+        enable_file_logging=enable_logging,
+        enable_console_logging=verbose,  # Console logging follows verbose flag
+        verbose=False,  # Don't use DEBUG level console output
     )
-    logger.initiate_script_logging()
 
-    if verbose:
-        click.echo(f"Input file: {input_hdf5_file}")
-        click.echo(f"Output file: {output_path}")
-        click.echo(f"Derivative method: {deriv_method.value}")
+    # Script lifecycle logging
+    logger.log_script_start("Jackknife analysis preprocessing")
+
+    # Log configuration details (always to file, optionally to console
+    # if verbose)
+    logger.info(f"Input file: {input_hdf5_file}")
+    logger.info(f"Output file: {output_path}")
+    logger.info(f"Derivative method: {deriv_method.value}")
+    logger.info(f"Minimum configurations: {min_configurations}")
 
     # === LOAD AND ANALYZE INPUT DATA ===
 
     try:
         # Load HDF5 data using analyzer
         analyzer = HDF5Analyzer(input_hdf5_file)
-        logger.info(f"Loaded HDF5 file: {input_hdf5_file}")
-
-        if verbose:
-            click.echo(f"Found {len(analyzer.active_groups)} groups")
-            click.echo(
-                "Available datasets: "
-                f"{analyzer.list_of_output_quantity_names_from_hdf5[:5]}..."
-            )
+        logger.info(f"Loaded HDF5 file with {len(analyzer.active_groups)} groups")
+        logger.debug(
+            f"Available datasets: {analyzer.list_of_output_quantity_names_from_hdf5}"
+        )
 
         # Validate required datasets are present
         missing_datasets = []
@@ -184,28 +188,32 @@ def main(
 
         if missing_datasets:
             error_msg = f"Missing required datasets: {missing_datasets}"
-            logger.critical(error_msg, to_console=True)
+            logger.critical(error_msg)
+            # Use click.echo for immediate console feedback on critical
+            # errors
+            click.echo(f"ERROR: {error_msg}")
             sys.exit(1)
 
         # === GROUP DATA BY PARAMETERS ===
 
         # Group by tunable parameters, excluding configuration labels
+        logger.info("Grouping data by tunable parameters")
         grouped_data = analyzer.group_by_multivalued_tunable_parameters(
             filter_out_parameters_list=EXCLUDED_FROM_GROUPING, verbose=verbose
         )
 
         if not grouped_data:
-            logger.critical("No valid parameter groupings found!", to_console=True)
+            error_msg = "No valid parameter groupings found"
+            logger.critical(error_msg)
+            click.echo(f"ERROR: {error_msg}")
             sys.exit(1)
 
-        logger.info(f"Found {len(grouped_data)} parameter groupings for analysis")
+        logger.info(f"Found {len(grouped_data)} parameter groups for processing")
 
         # === PROCESS EACH GROUP ===
 
         # Initialize jackknife processor
-        processor = JackknifeProcessor(
-            derivative_method=deriv_method, logger=logger.logger
-        )
+        processor = JackknifeProcessor(derivative_method=deriv_method, logger=logger)
 
         # Store all processing results for custom HDF5 creation
         all_processing_results = {}
@@ -216,10 +224,10 @@ def main(
                 param_values, analyzer.reduced_multivalued_tunable_parameter_names_list
             )
 
-            if verbose:
-                click.echo(
-                    f"\nProcessing group {group_index + 1}/{len(grouped_data)}: {param_values}"
-                )
+            logger.info(
+                f"Processing group {group_index + 1}/{len(grouped_data)}: {group_name}"
+            )
+            logger.debug(f"Group parameters: {param_values}")
 
             # === LOAD CORRELATOR DATA FOR THIS GROUP ===
 
@@ -236,6 +244,7 @@ def main(
                     group_metadata["group_name"] = group_name
                     group_metadata["param_values"] = param_values
                 else:
+                    logger.warning(f"No group paths found for {group_name}")
                     continue
 
                 # === ENSURE DETERMINISTIC ORDERING ===
@@ -244,10 +253,9 @@ def main(
                 # ordering
                 sorted_group_paths = sorted(group_paths)
 
-                if verbose:
-                    click.echo(
-                        f"Processing {len(sorted_group_paths)} configurations in sorted order"
-                    )
+                logger.info(
+                    f"Processing {len(sorted_group_paths)} configurations in sorted order"
+                )
 
                 # Load correlator datasets in deterministic order
                 g5g5_data_list = []
@@ -291,6 +299,11 @@ def main(
                 g5g5_data = np.vstack(g5g5_data_list)
                 g4g5g5_data = np.vstack(g4g5g5_data_list)
 
+                logger.debug(
+                    f"Loaded data shapes: g5g5={g5g5_data.shape}, "
+                    f"g4g5g5={g4g5g5_data.shape}"
+                )
+
                 # === EXTRACT CONFIGURATION METADATA ===
 
                 # Get configuration labels and filenames IN SORTED ORDER
@@ -304,12 +317,11 @@ def main(
                         analyzer, sorted_group_paths, INPUT_CORRELATOR_DATASETS["g5g5"]
                     )
 
-                    if verbose:
-                        click.echo(
-                            "Extracted metadata for "
-                            f"{len(config_metadata.get('configuration_labels', []))} "
-                            "configurations"
-                        )
+                    logger.info(
+                        "Extracted metadata for "
+                        f"{len(config_metadata.get('configuration_labels', []))} "
+                        "configurations"
+                    )
 
                 except Exception as e:
                     logger.warning(f"Could not extract configuration metadata: {e}")
@@ -323,10 +335,9 @@ def main(
                         "mpi_geometries": ["unknown" for _ in range(n_configs)],
                     }
 
-                    if verbose:
-                        click.echo(
-                            f"Using default config metadata for {n_configs} configurations"
-                        )
+                    logger.info(
+                        f"Using default config metadata for {n_configs} configurations"
+                    )
 
                 # === APPLY JACKKNIFE PROCESSING ===
 
@@ -350,18 +361,26 @@ def main(
                 }
 
                 processed_groups += 1
+                logger.info(f"Successfully processed group {group_name}")
 
-        # === SAVE RESULTS ===
+        # === VALIDATE RESULTS ===
 
         if processed_groups == 0:
-            logger.critical("No groups were successfully processed!", to_console=True)
+            error_msg = "No groups were successfully processed"
+            logger.critical(error_msg)
+            click.echo(
+                f"ERROR: {error_msg}"
+            )  # Keep immediate console feedback for critical errors
             sys.exit(1)
 
-        logger.info(f"Successfully processed {processed_groups} groups")
+        logger.info(
+            f"Successfully processed {processed_groups}/{len(grouped_data)} groups"
+        )
 
         # === CREATE CUSTOM HDF5 OUTPUT ===
 
         # Create custom HDF5 file with proper structure
+        logger.info(f"Creating output HDF5 file: {output_path}")
         _create_custom_hdf5_output(
             output_path=output_path,
             all_processing_results=all_processing_results,
@@ -371,27 +390,29 @@ def main(
             logger=logger,
         )
 
-        if verbose:
-            click.echo(f"\n✓ Analysis complete!")
-            click.echo(f"✓ Processed {processed_groups} parameter groups")
+        # Script completion with summary
+        logger.log_script_end(
+            f"Processed {processed_groups} groups, saved to {output_path.name}"
+        )
+
+        # Success summary (console output for immediate feedback)
+        if verbose or not enable_logging:
+            click.echo(f"✓ Jackknife analysis completed successfully")
+            click.echo(
+                f"✓ Processed {processed_groups}/{len(grouped_data)} parameter groups"
+            )
             click.echo(f"✓ Results saved to: {output_path}")
 
     except Exception as e:
-        logger.error(f"Critical error during processing: {e}")
-        if verbose:
-            import traceback
-
-            traceback.print_exc()
+        logger.log_script_error(e)  # Use the enhanced error logging
+        click.echo(f"ERROR: Critical failure during processing: {e}")
         sys.exit(1)
 
     finally:
-        # Clean up
+        # Clean up resources
         if "analyzer" in locals():
             analyzer.close()
-        logger.terminate_script_logging()
-
-        if verbose:
-            click.echo("✓ Jackknife analysis completed successfully")
+        logger.close()  # Proper logging cleanup
 
 
 def _create_descriptive_group_name(param_values, multivalued_params, max_length=100):
@@ -399,12 +420,14 @@ def _create_descriptive_group_name(param_values, multivalued_params, max_length=
     Create a descriptive group name using parameter names and values.
 
     Args:
-        param_values: Values of the multivalued parameters (tuple/list or single value)
-        multivalued_params: List of parameter names
-        max_length: Maximum length for the group name (default: 100)
+        - param_values: Values of the multivalued parameters (tuple/list
+        or single value)
+        - multivalued_params: List of parameter names
+        - max_length: Maximum length for the group name (default: 100)
 
     Returns:
-        str: Descriptive group name like "jackknife_analysis_m0p06_n6_Brillouin"
+        str: Descriptive group name like
+        "jackknife_analysis_m0p06_n6_Brillouin"
     """
     if not multivalued_params:
         return "jackknife_analysis_default_group"
@@ -413,7 +436,8 @@ def _create_descriptive_group_name(param_values, multivalued_params, max_length=
     if not isinstance(param_values, (tuple, list)):
         param_values = [param_values]
 
-    # Always remove Configuration_label if it exists (it's not used in group names)
+    # Always remove Configuration_label if it exists (it's not used in
+    # group names)
     actual_params = [p for p in multivalued_params if p != "Configuration_label"]
 
     # Check if lengths match after filtering
@@ -425,15 +449,16 @@ def _create_descriptive_group_name(param_values, multivalued_params, max_length=
 
     name_parts = []
     for param_name, param_value in zip(actual_params, param_values):
-        # Check if this parameter has a label or should use value directly
+        # Check if this parameter has a label or should use value
+        # directly
         if param_name in PARAMETER_LABELS:
             # Use label + formatted value (no underscore between them)
             label = PARAMETER_LABELS[param_name]
             formatted_value = _format_parameter_value(param_name, param_value)
             name_parts.append(f"{label}{formatted_value}")
         else:
-            # Parameters without labels (Overlap_operator_method, Kernel_operator_type)
-            # Use the value directly
+            # Parameters without labels (Overlap_operator_method,
+            # Kernel_operator_type) Use the value directly
             formatted_value = _format_parameter_value(param_name, param_value)
             name_parts.append(formatted_value)
 
@@ -441,7 +466,8 @@ def _create_descriptive_group_name(param_values, multivalued_params, max_length=
     group_name_suffix = "_".join(name_parts)
     group_name = f"jackknife_analysis_{group_name_suffix}"
 
-    # Ensure HDF5 compatibility (remove problematic characters except minus)
+    # Ensure HDF5 compatibility (remove problematic characters except
+    # minus)
     group_name = re.sub(r"[^a-zA-Z0-9_.-]", "", group_name)
 
     # Truncate if too long but maintain uniqueness
@@ -459,8 +485,7 @@ def _format_parameter_value(param_name, value):
     Format parameter value according to established rules.
 
     Args:
-        param_name: Name of the parameter
-        value: Value to format
+        param_name: Name of the parameter value: Value to format
 
     Returns:
         str: Formatted value suitable for group naming
@@ -472,7 +497,8 @@ def _format_parameter_value(param_name, value):
         else:
             return str(value)
     elif isinstance(value, (float, np.floating)):
-        # Format floats with consistent precision, replace decimal with 'p'
+        # Format floats with consistent precision, replace decimal with
+        # 'p'
         formatted = f"{value:.6g}".replace(".", "p")
         return formatted
     elif isinstance(value, (int, np.integer)):
