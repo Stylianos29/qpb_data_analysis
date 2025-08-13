@@ -278,7 +278,7 @@ class _HDF5Inspector:
     def _categorize_columns(self):
         """Categorize all parameters and datasets into appropriate lists."""
         from ...constants import TUNABLE_PARAMETER_NAMES_LIST
-        
+
         # Get all parameter names from HDF5 attributes
         all_param_names = set()
         for params in self._parameters_by_group.values():
@@ -291,10 +291,9 @@ class _HDF5Inspector:
 
         # FIXED: Proper categorization logic
         # Tunable parameters = attributes that ARE in TUNABLE_PARAMETER_NAMES_LIST
-        self.list_of_tunable_parameter_names_from_hdf5 = sorted([
-            name for name in all_param_names 
-            if name in TUNABLE_PARAMETER_NAMES_LIST
-        ])
+        self.list_of_tunable_parameter_names_from_hdf5 = sorted(
+            [name for name in all_param_names if name in TUNABLE_PARAMETER_NAMES_LIST]
+        )
 
         # Output quantities = ALL datasets + attributes that are NOT tunable parameters
         tunable_param_names = set(self.list_of_tunable_parameter_names_from_hdf5)
@@ -326,7 +325,7 @@ class _HDF5Inspector:
             name for name in self.list_of_multivalued_column_names if name in param_set
         ]
 
-        # Categorized output quantity lists  
+        # Categorized output quantity lists
         output_set = set(self.list_of_output_quantity_names_from_hdf5)
         self.list_of_single_valued_output_quantity_names = [
             name
@@ -336,7 +335,7 @@ class _HDF5Inspector:
         self.list_of_multivalued_output_quantity_names = [
             name for name in self.list_of_multivalued_column_names if name in output_set
         ]
-        
+
     def column_unique_values(self, column_name: str) -> List[Any]:
         """
         Return sorted list of unique values for the specified column.
