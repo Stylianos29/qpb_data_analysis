@@ -235,7 +235,7 @@ def main(
             with analyzer:  # Use context manager to restore state after
                 # Filter to just the groups in this parameter
                 # combination
-                analyzer._active_groups = set(group_paths)
+                analyzer.active_groups = set(group_paths)
 
                 # Get group metadata
                 if group_paths:
@@ -264,7 +264,7 @@ def main(
                 for group_path in sorted_group_paths:
                     try:
                         # Temporarily restrict to single group
-                        analyzer._active_groups = {group_path}
+                        analyzer.active_groups = {group_path}
 
                         g5g5_single = analyzer.dataset_values(
                             INPUT_CORRELATOR_DATASETS["g5g5"], return_gvar=False
@@ -286,7 +286,7 @@ def main(
                         continue
 
                 # Reset to full group set for metadata extraction
-                analyzer._active_groups = set(sorted_group_paths)
+                analyzer.active_groups = set(sorted_group_paths)
 
                 if not g5g5_data_list or not g4g5g5_data_list:
                     logger.warning(
@@ -539,7 +539,7 @@ def _extract_ordered_configuration_metadata(
 
     for group_path in sorted_group_paths:
         # Temporarily restrict to single group
-        analyzer._active_groups = {group_path}
+        analyzer.active_groups = {group_path}
 
         try:
             # Create DataFrame for this single group

@@ -97,7 +97,7 @@ class TestHDF5DataManagerBasics:
 
     def test_initialization(self, manager):
         """Test that manager initializes with correct state."""
-        assert manager._active_groups is None  # All groups active by default
+        assert manager.active_groups is None  # All groups active by default
         assert len(manager._virtual_datasets) == 0
         assert len(manager._data_cache) == 0
         assert len(manager._restriction_stack) == 0
@@ -172,7 +172,7 @@ class TestDataRestriction:
 
         manager.restore_original_data()
         assert len(manager.active_groups) == initial_count
-        assert manager._active_groups is None
+        assert manager.active_groups is None
 
 
 class TestContextManager:

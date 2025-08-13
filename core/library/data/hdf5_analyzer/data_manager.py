@@ -24,11 +24,11 @@ class _HDF5DataManager(_HDF5Inspector):
     inspection.
 
     This class extends _HDF5Inspector to provide:
-    - Data filtering/restriction based on parameter values
-    - Virtual dataset transformations
-    - Gvar array handling (automatic merging of mean/error pairs)
-    - DataFrame generation from filtered data
-    - Context manager support for temporary restrictions
+        - Data filtering/restriction based on parameter values
+        - Virtual dataset transformations
+        - Gvar array handling (automatic merging of mean/error pairs)
+        - DataFrame generation from filtered data
+        - Context manager support for temporary restrictions
 
     The HDF5 file remains read-only; all operations work on virtual
     views.
@@ -64,10 +64,24 @@ class _HDF5DataManager(_HDF5Inspector):
             return self._all_deepest_groups.copy()
         return self._active_groups.copy()
 
+    @active_groups.setter
+    def active_groups(self, group_paths: Optional[Set[str]]) -> None:
+        """Set currently active groups.
+
+        Args:
+            group_paths: Set of group paths to make active, or None for
+            all groups
+        """
+        if group_paths is None:
+            self._active_groups = None
+        else:
+            self._active_groups = set(group_paths)  # Ensure it's a set copy
+
     @property
     def reduced_multivalued_tunable_parameter_names_list(self) -> List[str]:
         """
-        Get list of multivalued parameters after considering active groups.
+        Get list of multivalued parameters after considering active
+        groups.
 
         This property matches DataFrameAnalyzer's API.
         """
@@ -114,7 +128,8 @@ class _HDF5DataManager(_HDF5Inspector):
 
     def parameters_for_group(self, group_path: str) -> Dict[str, Any]:
         """
-        Get all parameters (single and multi-valued) for a specific group.
+        Get all parameters (single and multi-valued) for a specific
+        group.
 
         Args:
             group_path: Path to the deepest level group
@@ -412,7 +427,8 @@ class _HDF5DataManager(_HDF5Inspector):
             if flatten_arrays and any(
                 isinstance(v, np.ndarray) and v.size > 1 for v in group_data.values()
             ):
-                # Find the length of arrays (assuming all are same length)
+                # Find the length of arrays (assuming all are same
+                # length)
                 array_length = None
                 for val in group_data.values():
                     if isinstance(val, np.ndarray) and val.size > 1:
