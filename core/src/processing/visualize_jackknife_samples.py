@@ -38,10 +38,8 @@ from library.visualization.managers.layout_manager import PlotLayoutManager
 from library.visualization.managers.style_manager import PlotStyleManager
 from library.visualization.builders.filename_builder import PlotFilenameBuilder
 from library.visualization.builders.title_builder import PlotTitleBuilder
-from library import (
-    constants,
-    LoggingWrapper,
-)
+from library import constants
+from library.utils.logging_utilities import create_script_logger
 from library.validation.click_validators import (
     hdf5_file,
     directory,
@@ -129,23 +127,25 @@ def main(
     # === SETUP AND VALIDATION ===
 
     # Setup logging
-    logger = LoggingWrapper(
-        log_directory or output_directory, log_filename, enable_logging
+    logger = create_script_logger(
+        log_directory=log_directory or output_directory,
+        log_filename=log_filename,
+        enable_file_logging=enable_logging,
+        enable_console_logging=verbose,  # Console logging follows verbose flag
+        verbose=False,
     )
-    logger.initiate_script_logging()
 
-    if verbose:
-        click.echo(f"Input file: {input_hdf5_file}")
-        click.echo(f"Output directory: {output_directory}")
-        click.echo(f"Datasets to process: {JACKKNIFE_DATASETS_TO_PLOT}")
+    logger.log_script_start("Jackknife samples visualization")
+
+    logger.info(f"Input file: {input_hdf5_file}")
+    logger.info(f"Output directory: {output_directory}")
+    logger.info(f"Datasets to process: {JACKKNIFE_DATASETS_TO_PLOT}")
 
     try:
         # === LOAD HDF5 DATA ===
         analyzer = HDF5Analyzer(input_hdf5_file)
         logger.info(f"Loaded HDF5 file: {input_hdf5_file}")
-
-        if verbose:
-            click.echo(f"Found {len(analyzer.active_groups)} groups in HDF5 file")
+        logger.info(f"Found {len(analyzer.active_groups)} groups in HDF5 file")
 
         # === SETUP VISUALIZATION MANAGERS ===
         file_manager = PlotFileManager(output_directory)
@@ -159,8 +159,7 @@ def main(
             JACKKNIFE_PLOTS_BASE_DIRECTORY, clear_existing=clear_existing
         )
 
-        if verbose:
-            click.echo(f"Base plots directory: {base_plots_dir}")
+        logger.info(f"Base plots directory: {base_plots_dir}")
 
         # === PROCESS ALL DATASETS ===
         total_plots_created = process_jackknife_datasets(
@@ -175,28 +174,27 @@ def main(
             verbose=verbose,
         )
 
-        if verbose:
-            click.echo(f"\n✓ Visualization complete!")
-            click.echo(f"✓ Created {total_plots_created} plots")
-            click.echo(f"✓ Results saved to: {base_plots_dir}")
-
         logger.info(
             f"Successfully created {total_plots_created} jackknife sample plots"
         )
 
-    except Exception as e:
-        logger.error(f"Critical error during processing: {e}")
-        if verbose:
-            import traceback
+        # Success summary (console output for immediate feedback)
+        if verbose or not enable_logging:
+            click.echo(f"✓ Visualization complete!")
+            click.echo(f"✓ Created {total_plots_created} plots")
+            click.echo(f"✓ Results saved to: {base_plots_dir}")
 
-            traceback.print_exc()
+    except Exception as e:
+        logger.log_script_error(e)
+        click.echo(f"ERROR: Critical failure during processing: {e}")
         sys.exit(1)
 
     finally:
         # Clean up
         if "analyzer" in locals():
             analyzer.close()
-        logger.terminate_script_logging()
+        logger.log_script_end(f"Created {total_plots_created} plots successfully")
+        logger.close()
 
 
 def process_jackknife_datasets(
