@@ -42,7 +42,7 @@ class LoggingConfig:
         enable_console_logging: bool = False,
         console_log_level: LogLevel = LogLevel.INFO,
         # Formatting options
-        file_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        file_format: str = "%(asctime)s - %(levelname)s - %(message)s",
         console_format: str = "%(levelname)s: %(message)s",
         wrap_width: int = 80,
         # Behavior options
@@ -318,8 +318,6 @@ class QPBLogger:
 
 
 # Convenience functions for common use cases
-
-
 def create_script_logger(
     log_directory: Optional[str] = None,
     log_filename: Optional[str] = None,
@@ -340,15 +338,22 @@ def create_script_logger(
     Returns:
         Configured QPBLogger instance
     """
+
+    # Detect the actual calling script (not this function)
+    caller_frame = inspect.stack()[1]
+    script_name = os.path.basename(caller_frame.filename)
+
     config = LoggingConfig(
         enable_file_logging=enable_file_logging,
         log_directory=log_directory,
         log_filename=log_filename,
         enable_console_logging=enable_console_logging or verbose,
         console_log_level=LogLevel.DEBUG if verbose else LogLevel.INFO,
+        file_format="%(asctime)s - %(levelname)s - %(message)s",
+        console_format="%(levelname)s: %(message)s",
     )
 
-    return QPBLogger(config)
+    return QPBLogger(config, name=script_name)
 
 
 def create_jupyter_logger(
