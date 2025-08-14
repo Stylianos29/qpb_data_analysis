@@ -718,7 +718,7 @@ def apply_dataset_slicing(
 
     # Calculate end index for data slicing
     if end_offset > 0:
-        end_idx = len(time_index) - end_offset 
+        end_idx = len(time_index) - end_offset
     else:
         end_idx = len(time_index)
 
