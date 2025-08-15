@@ -86,6 +86,13 @@ from src.analysis._plateau_fitting_methods import (
     help="Directory for output files.",
 )
 @click.option(
+    "-p",
+    "--plots_directory",
+    required=True,
+    callback=directory.must_exist,
+    help="Directory for output plots.",
+)
+@click.option(
     "-out_csv",
     "--output_csv_filename",
     default=OUTPUT_CSV_CONFIG["default_filename"],
@@ -134,6 +141,7 @@ from src.analysis._plateau_fitting_methods import (
 def main(
     input_hdf5_file: str,
     output_directory: str,
+    plots_directory: str,
     output_csv_filename: str,
     enable_plotting: bool,
     clear_existing_plots: bool,
@@ -172,10 +180,11 @@ def main(
         # Log input parameters
         logger.info(f"Input HDF5 file: {input_hdf5_file}")
         logger.info(f"Output directory: {output_directory}")
+        logger.info(f"Plots directory: {plots_directory}")
         logger.info(f"Plotting enabled: {enable_plotting}")
 
         file_manager = _prepare_output_directories(
-            output_directory, enable_plotting, clear_existing_plots, logger
+            plots_directory, enable_plotting, clear_existing_plots, logger
         )
 
         # Process PCAC mass data
