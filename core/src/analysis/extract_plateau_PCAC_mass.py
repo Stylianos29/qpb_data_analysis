@@ -5,9 +5,9 @@ PCAC Mass Plateau Extraction Script
 This script extracts plateau PCAC mass values from PCAC mass time series
 using jackknife analysis and robust plateau detection methods.
 
-The script processes HDF5 files from calculate_PCAC_mass.py, detects plateau
-regions in individual time series, and estimates jackknife averaged plateau
-values for each parameter group.
+The script processes HDF5 files from calculate_PCAC_mass.py, detects
+plateau regions in individual time series, and estimates jackknife
+averaged plateau values for each parameter group.
 
 Key features:
     - Robust plateau detection with multiple sigma thresholds
@@ -16,11 +16,12 @@ Key features:
     - CSV export with comprehensive diagnostics
     - Configurable estimation methods and quality control
 
-Place this file as: qpb_data_analysis/core/src/analysis/extract_plateau_PCAC_mass.py
+Place this file as:
+qpb_data_analysis/core/src/analysis/extract_plateau_PCAC_mass.py
 
 Usage:
-    python extract_plateau_PCAC_mass.py -i pcac_mass_analysis.h5 -o output_dir
-    [options]
+    python extract_plateau_PCAC_mass.py -i pcac_mass_analysis.h5 -o
+    output_dir [options]
 """
 
 import os
@@ -141,10 +142,12 @@ def main(
     verbose: bool,
 ) -> None:
     """
-    Extract plateau PCAC mass values from PCAC mass time series analysis.
+    Extract plateau PCAC mass values from PCAC mass time series
+    analysis.
 
-    This script processes PCAC mass jackknife samples, detects plateau regions,
-    and extracts plateau values with uncertainties for each parameter group.
+    This script processes PCAC mass jackknife samples, detects plateau
+    regions, and extracts plateau values with uncertainties for each
+    parameter group.
     """
     # Validate configuration
     if not validate_config():
@@ -323,12 +326,29 @@ def _process_single_group(
         Dictionary containing extraction results
     """
     group = hdf5_file[group_path]
+    # Check that group is an HDF5 group
+    if not isinstance(group, h5py.Group):
+        raise ValueError(f"'{group_path}' is not an HDF5 group")
+
     group_name = os.path.basename(group_path)
 
+    # Check that required datasets are HDF5 datasets
+    jackknife_samples_dataset = group[INPUT_DATASETS["jackknife_samples"]]
+    if not isinstance(jackknife_samples_dataset, h5py.Dataset):
+        raise ValueError(
+            f"'{INPUT_DATASETS["jackknife_samples"]}' is not an HDF5 dataset"
+        )
+    jackknife_mean_dataset = group[INPUT_DATASETS["mean_values"]]
+    if not isinstance(jackknife_mean_dataset, h5py.Dataset):
+        raise ValueError(f"'{INPUT_DATASETS["mean_values"]}' is not an HDF5 dataset")
+    jackknife_error_dataset = group[INPUT_DATASETS["error_values"]]
+    if not isinstance(jackknife_error_dataset, h5py.Dataset):
+        raise ValueError(f"'{INPUT_DATASETS["error_values"]}' is not an HDF5 dataset")
+
     # Load PCAC mass data
-    jackknife_samples = group[INPUT_DATASETS["jackknife_samples"]][()]
-    pcac_mean = group[INPUT_DATASETS["mean_values"]][()]
-    pcac_error = group[INPUT_DATASETS["error_values"]][()]
+    jackknife_samples = jackknife_samples_dataset[()]
+    pcac_mean = jackknife_mean_dataset[()]
+    pcac_error = jackknife_error_dataset[()]
 
     # Load configuration labels
     config_labels = _load_configuration_labels(
@@ -396,9 +416,13 @@ def _load_configuration_labels(group: h5py.Group, n_samples: int, logger) -> Lis
     """
     try:
         if "gauge_configuration_labels" in group:
+            config_labels_dataset = group["gauge_configuration_labels"]
+            if not isinstance(config_labels_dataset, h5py.Dataset):
+                raise ValueError("'gauge_configuration_labels' is not an HDF5 dataset")
+
             config_labels = [
                 label.decode() if isinstance(label, bytes) else str(label)
-                for label in group["gauge_configuration_labels"][()]
+                for label in config_labels_dataset[()]
             ]
         else:
             config_labels = [f"config_{i:03d}" for i in range(n_samples)]
@@ -500,7 +524,8 @@ def _create_plateau_extraction_plots(
     logger,
 ) -> None:
     """
-    Create multi-panel plots showing plateau extraction for individual samples.
+    Create multi-panel plots showing plateau extraction for individual
+    samples.
     """
     plot_config = get_plotting_config()
     samples_per_plot = plot_config["config"]["samples_per_plot"]
@@ -634,8 +659,8 @@ def _create_single_multi_panel_plot(
         full_sample_data = jackknife_samples[sample_idx, :]
         plot_sample_data = full_sample_data[trim_start:plot_end_idx]
 
-        # Plot time series data
-        # Clean style dict for individual samples (no error bars)
+        # Plot time series data Clean style dict for individual samples
+        # (no error bars)
         plot_style = time_series_style.copy()
         plot_style.pop("capsize", None)  # Remove capsize since yerr=None
 
@@ -725,7 +750,8 @@ def _create_single_multi_panel_plot(
     # X-axis label on bottom panel
     axes[-1].set_xlabel(labels["x_label"], fontsize=subplot_style["font_size"])
 
-    # Save plot with correct filename format (matching visualize_jackknife_samples.py)
+    # Save plot with correct filename format (matching
+    # visualize_jackknife_samples.py)
     filename = f"{group_name}_{start_sample_idx}-{end_sample_idx}.{plot_config['output']['file_format']}"
     output_path = os.path.join(plots_dir, filename)
 
