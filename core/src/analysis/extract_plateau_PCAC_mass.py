@@ -480,10 +480,6 @@ def _extract_group_metadata(
             if attr_name not in metadata:  # Don't override group-specific attributes
                 metadata[attr_name] = attr_value
 
-    # Add group identification
-    metadata["group_name"] = os.path.basename(group_path)
-    metadata["group_path"] = group_path
-
     logger.debug(
         f"Extracted {len(metadata)} metadata parameters for group {group_path}"
     )
