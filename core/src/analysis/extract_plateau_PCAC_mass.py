@@ -47,6 +47,7 @@ import gvar as gv
 # Import library components
 from library.utils.logging_utilities import create_script_logger
 from library.visualization.builders.title_builder import PlotTitleBuilder
+from library.visualization.managers.file_manager import PlotFileManager
 from library import constants
 from library.validation.click_validators import (
     hdf5_file,
@@ -173,14 +174,13 @@ def main(
         logger.info(f"Output directory: {output_directory}")
         logger.info(f"Plotting enabled: {enable_plotting}")
 
-        # Prepare output directories
-        plots_dir = _prepare_output_directories(
+        file_manager = _prepare_output_directories(
             output_directory, enable_plotting, clear_existing_plots, logger
         )
 
         # Process PCAC mass data
         extraction_results = _process_all_groups(
-            input_hdf5_file, plots_dir, enable_plotting, logger, verbose
+            input_hdf5_file, file_manager, enable_plotting, logger, verbose
         )
 
         # Export results to CSV
@@ -202,36 +202,39 @@ def main(
 
 def _prepare_output_directories(
     output_directory: str, enable_plotting: bool, clear_existing_plots: bool, logger
-) -> Optional[str]:
+) -> Optional[PlotFileManager]:  # Return PlotFileManager instead of str
     """
-    Prepare output directories for plots and other files.
-
-    Returns:
-        Path to plots directory if plotting enabled, None otherwise
+    Prepare output directories for plots and other files. Returns:
+        PlotFileManager instance if plotting enabled, None otherwise
     """
-    plots_dir = None
+    if not enable_plotting:
+        return None
 
-    if enable_plotting:
-        plot_config = get_plotting_config()
-        plots_dir = os.path.join(
-            output_directory, plot_config["output"]["base_directory"]
-        )
+    plot_config = get_plotting_config()
+    base_plots_dir = os.path.join(
+        output_directory, plot_config["output"]["base_directory"]
+    )
 
-        if clear_existing_plots and os.path.exists(plots_dir):
-            logger.info(f"Clearing existing plots directory: {plots_dir}")
-            import shutil
+    # Initialize PlotFileManager with the BASE plots directory, not
+    # output_directory
+    file_manager = PlotFileManager(base_plots_dir)
 
-            shutil.rmtree(plots_dir)
+    # Clear if requested
+    if clear_existing_plots and os.path.exists(base_plots_dir):
+        import shutil
 
-        os.makedirs(plots_dir, exist_ok=True)
-        logger.info(f"Plots directory: {plots_dir}")
+        shutil.rmtree(base_plots_dir)
 
-    return plots_dir
+    # Ensure base directory exists
+    os.makedirs(base_plots_dir, exist_ok=True)
+
+    logger.info(f"Plots directory: {base_plots_dir}")
+    return file_manager
 
 
 def _process_all_groups(
     input_hdf5_file: str,
-    plots_dir: Optional[str],
+    file_manager: Optional[PlotFileManager],  # CHANGED: was plots_dir: Optional[str]
     enable_plotting: bool,
     logger,
     verbose: bool,
@@ -245,6 +248,8 @@ def _process_all_groups(
     extraction_results = []
 
     with h5py.File(input_hdf5_file, "r") as hdf5_file:
+        # for group_path in sorted(hdf5_file.keys()):
+
         # Find all groups containing PCAC mass data
         pcac_groups = _find_pcac_mass_groups(hdf5_file, logger)
 
@@ -264,10 +269,10 @@ def _process_all_groups(
                 result = _process_single_group(
                     hdf5_file,
                     group_path,
-                    plots_dir,
+                    file_manager,
                     enable_plotting,
                     logger,
-                    # , verbose
+                    verbose,
                 )
                 extraction_results.append(result)
 
@@ -315,9 +320,10 @@ def _find_pcac_mass_groups(hdf5_file: h5py.File, logger) -> List[str]:
 def _process_single_group(
     hdf5_file: h5py.File,
     group_path: str,
-    plots_dir: Optional[str],
+    file_manager: Optional[PlotFileManager],
     enable_plotting: bool,
     logger,
+    verbose: bool,
 ) -> Dict[str, Any]:
     """
     Process a single group for plateau extraction.
@@ -325,6 +331,13 @@ def _process_single_group(
     Returns:
         Dictionary containing extraction results
     """
+    # Create group-specific subdirectory for plots
+    group_plots_dir = None
+    if enable_plotting and file_manager:
+        group_name = os.path.basename(group_path)
+        group_plots_dir = file_manager.prepare_subdirectory(group_name)
+        logger.debug(f"Created group plots directory: {group_plots_dir}")
+
     group = hdf5_file[group_path]
     # Check that group is an HDF5 group
     if not isinstance(group, h5py.Group):
@@ -388,7 +401,7 @@ def _process_single_group(
         extraction_result["summary"] = extraction_result.get("error_message", "Failed")
 
     # Create plots if enabled and extraction was successful
-    if enable_plotting and extraction_result["success"] and plots_dir:
+    if enable_plotting and extraction_result["success"] and group_plots_dir:
         try:
             _create_plateau_extraction_plots(
                 jackknife_samples,
@@ -397,8 +410,8 @@ def _process_single_group(
                 config_labels,
                 extraction_result,
                 group_name,
-                group_metadata,  # THIS WAS MISSING - FIXED!
-                plots_dir,
+                group_metadata,
+                group_plots_dir,
                 logger,
             )
         except Exception as e:
