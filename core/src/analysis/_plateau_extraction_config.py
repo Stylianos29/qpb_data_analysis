@@ -1,10 +1,12 @@
 """
 Configuration for PCAC mass plateau extraction script.
 
-This module contains all configuration parameters for extracting plateau PCAC mass
-values from PCAC mass time series using jackknife analysis methods.
+This module contains all configuration parameters for extracting plateau
+PCAC mass values from PCAC mass time series using jackknife analysis
+methods.
 
-Place this file as: qpb_data_analysis/core/src/analysis/_plateau_extraction_config.py
+Place this file as:
+qpb_data_analysis/core/src/analysis/_plateau_extraction_config.py
 """
 
 from typing import List, Dict, Any, Optional
@@ -44,14 +46,14 @@ PLATEAU_DETECTION_SIGMA_THRESHOLDS = [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
 # Minimum plateau size (number of consecutive points)
 MIN_PLATEAU_SIZE = 5
 
-# Plateau detection test method
-# Options: 'weighted_range', 'chi_squared', 'range_based'
+# Plateau detection test method Options: 'weighted_range',
+# 'chi_squared', 'range_based'
 PLATEAU_DETECTION_METHOD = "weighted_range"
 
 # Time range constraints for plateau search
 PLATEAU_SEARCH_CONFIG = {
     "min_start_time": 2,  # Don't search for plateaus before t=2
-    "max_end_time": -3,  # Don't include last 3 time points
+    "max_end_time": -1,  # Don't include last time point
     "prefer_central_region": True,  # Prefer plateaus in central time region
 }
 
@@ -59,9 +61,9 @@ PLATEAU_SEARCH_CONFIG = {
 # PLATEAU ESTIMATION CONFIGURATION
 # =============================================================================
 
-# Plateau estimation method
-# Options: 'simple', 'median', 'covariance_quadrature'
-PLATEAU_ESTIMATION_METHOD = "covariance_quadrature"
+# Plateau estimation method Options: 'simple', 'median',
+# 'covariance_quadrature'
+PLATEAU_ESTIMATION_METHOD = "simple"
 
 # Weighting scheme for plateau points
 USE_INVERSE_VARIANCE_WEIGHTING = True
@@ -77,14 +79,15 @@ FALLBACK_ESTIMATION_METHODS = [
 # ERROR HANDLING CONFIGURATION
 # =============================================================================
 
-# Minimum number of successful samples required per group for reliable jackknife
+# Minimum number of successful samples required per group for reliable
+# jackknife
 MIN_SAMPLE_SIZE = 3
 
 # Maximum number of failed samples allowed per group (fraction of total)
 MAX_FAILED_SAMPLE_FRACTION = 0.5  # Allow up to 50% failures
 
-# Action when group fails completely
-# Options: 'exclude' (don't include in CSV), 'include_nan' (include with NaN values)
+# Action when group fails completely Options: 'exclude' (don't include
+# in CSV), 'include_nan' (include with NaN values)
 FAILED_GROUP_ACTION = "exclude"
 
 # Logging configuration for failed extractions
@@ -103,7 +106,7 @@ PLOTTING_CONFIG = {
     "enabled": True,
     "samples_per_plot": 5,  # Number of samples in each multi-panel plot
     "figure_size": (12, 14),  # Width, height for 5-panel plot
-    "subplot_spacing": 0.15,  # Vertical spacing between subplots
+    "subplot_spacing": 0.06,  # Vertical spacing between subplots
     "share_x_axis": True,  # Share x-axis across panels
     "show_individual_titles": False,  # Don't show titles on individual panels
 }
@@ -111,7 +114,7 @@ PLOTTING_CONFIG = {
 # Data trimming for better visibility (like visualize_PCAC_mass.py)
 PLOTTING_DATA_RANGE = {
     "trim_start_points": 3,  # Remove first N points from display
-    "trim_end_points": 2,  # Remove last N points from display
+    "trim_end_points": 0,  # Remove last N points from display
     "apply_trimming": True,  # Enable/disable data trimming
 }
 
@@ -146,9 +149,15 @@ PLATEAU_FIT_STYLE = {
 # Plot labeling and formatting
 PLOT_LABELS = {
     "x_label": r"$t/a$",
-    "y_label": r"$am_{\text{PCAC}}$",  # Corrected: a times m_PCAC
+    "y_label": r"a$m_{\text{PCAC}}$",  # Corrected: a times m_PCAC
     "legend_title_template": "Sample: {config_label}",
-    "fit_info_template": r"$m_{{\text{{PCAC}}}}^{{\text{{plateau}}}} = {value:.4f} \pm {error:.4f}$",
+    # "fit_info_template": r"$m_{{\text{{PCAC}}}}^{{\text{{plateau}}}} =
+    # {value:.4f} \pm {error:.4f}$",
+    "fit_info_template": r"$m_{{\text{{PCAC}}}}^{{\text{{plateau}}}} = {value:.4f} \pm {error:.4f}$"
+    + "\n"
+    + r"σ threshold = {sigma_threshold}"
+    + "\n"
+    + r"Fit points: {n_fit_points}",
 }
 
 # Plot output configuration

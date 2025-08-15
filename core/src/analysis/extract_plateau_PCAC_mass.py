@@ -70,6 +70,65 @@ from src.analysis._plateau_fitting_methods import (
 )
 
 
+def _symmetrize_array(values_array: np.ndarray) -> np.ndarray:
+    """
+    Symmetrize a 1D array using the same method as
+    momentum_correlator.symmetrization().
+
+    Args:
+        values_array: 1D numpy array to symmetrize
+
+    Returns:
+        Symmetrized 1D array of the same length
+    """
+    reverse = values_array[::-1]
+    return 0.5 * (values_array + np.roll(reverse, shift=+1))
+
+
+def _apply_symmetrization_and_truncation(
+    jackknife_samples: np.ndarray, pcac_mean: np.ndarray, pcac_error: np.ndarray, logger
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Apply symmetrization and truncation to PCAC mass datasets.
+
+    Symmetrizes the data and then keeps only the first half: t <
+    original_length / 2
+
+    Args:
+        jackknife_samples: 2D array (n_samples, n_time_points)
+        pcac_mean: 1D array (n_time_points,) pcac_error: 1D array
+        (n_time_points,) logger: Logger instance
+
+    Returns:
+        Tuple of (symmetrized_and_truncated_jackknife_samples,
+                  symmetrized_and_truncated_pcac_mean,
+                  symmetrized_and_truncated_pcac_error)
+    """
+    original_length = jackknife_samples.shape[1]
+    upper_index_cut = original_length // 2 + 1
+
+    logger.debug(
+        f"Original data length: {original_length}, truncating at index: {upper_index_cut}"
+    )
+
+    # Symmetrize and truncate jackknife samples (2D array)
+    symmetrized_jackknife_samples = np.array(
+        [_symmetrize_array(sample)[:upper_index_cut] for sample in jackknife_samples]
+    )
+
+    # Symmetrize and truncate mean values (1D array)
+    symmetrized_pcac_mean = _symmetrize_array(pcac_mean)[:upper_index_cut]
+
+    # Symmetrize and truncate error values (1D array)
+    symmetrized_pcac_error = _symmetrize_array(pcac_error)[:upper_index_cut]
+
+    logger.info(
+        f"Applied symmetrization and truncation: {original_length} -> {upper_index_cut} time points"
+    )
+
+    return symmetrized_jackknife_samples, symmetrized_pcac_mean, symmetrized_pcac_error
+
+
 @click.command()
 @click.option(
     "-i",
@@ -372,6 +431,11 @@ def _process_single_group(
     pcac_mean = jackknife_mean_dataset[()]
     pcac_error = jackknife_error_dataset[()]
 
+    # Apply symmetrization and truncation to PCAC mass data
+    jackknife_samples, pcac_mean, pcac_error = _apply_symmetrization_and_truncation(
+        jackknife_samples, pcac_mean, pcac_error, logger
+    )
+
     # Load configuration labels
     config_labels = _load_configuration_labels(
         group, jackknife_samples.shape[0], logger
@@ -641,7 +705,7 @@ def _create_single_multi_panel_plot(
         plot_title = f"PCAC Mass Plateau Extraction - {group_name}"
 
     # Set main title on the figure
-    fig.suptitle(plot_title, fontsize=subplot_style["font_size"] + 2, y=0.92)
+    fig.suptitle(plot_title, fontsize=subplot_style["font_size"] + 2, y=0.91)
 
     plateau_start, plateau_end = plateau_bounds
 
@@ -746,17 +810,26 @@ def _create_single_multi_panel_plot(
         # Y-axis label
         ax.set_ylabel(labels["y_label"], fontsize=subplot_style["font_size"])
 
-        # Fit info text
+        # Fit info text (multi-line with plateau mass, sigma, and fit
+        # points)
+        sigma_threshold = extraction.get("diagnostics", {}).get(
+            "sigma_threshold_used", "N/A"
+        )
+        # sigma_threshold = extraction.get("sigma_threshold", "N/A")
+        n_fit_points = plateau_end - plateau_start + 1
         fit_info = labels["fit_info_template"].format(
-            value=plateau_value.mean, error=plateau_value.sdev
+            value=plateau_value.mean,
+            error=plateau_value.sdev,
+            sigma_threshold=sigma_threshold,
+            n_fit_points=n_fit_points,
         )
         ax.text(
             0.02,
-            0.98,
+            0.10,
             fit_info,
             transform=ax.transAxes,
             fontsize=subplot_style["font_size"] - 1,
-            verticalalignment="top",
+            verticalalignment="bottom",
             bbox=dict(boxstyle="round", facecolor="white", alpha=0.8),
         )
 
@@ -772,6 +845,14 @@ def _create_single_multi_panel_plot(
     # visualize_jackknife_samples.py)
     filename = f"{group_name}_{start_sample_idx}-{end_sample_idx}.{plot_config['output']['file_format']}"
     output_path = os.path.join(plots_dir, filename)
+
+    # Force integer ticks on x-axis for all panels
+    from matplotlib.ticker import MaxNLocator
+
+    for ax in axes:
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+
+    ax.set_xlim(xmin=0)
 
     fig.savefig(
         output_path,
