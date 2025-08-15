@@ -632,7 +632,7 @@ def _create_single_multi_panel_plot(
         plot_title = f"PCAC Mass Plateau Extraction - {group_name}"
 
     # Set main title on the figure
-    fig.suptitle(plot_title, fontsize=subplot_style["font_size"] + 2, y=0.98)
+    fig.suptitle(plot_title, fontsize=subplot_style["font_size"] + 2, y=0.92)
 
     plateau_start, plateau_end = plateau_bounds
 
