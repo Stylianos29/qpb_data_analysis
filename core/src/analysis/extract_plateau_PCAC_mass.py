@@ -873,8 +873,8 @@ def _export_results_to_csv(
     # Create DataFrame and export
     df = pd.DataFrame(csv_records)
 
-    # Sort by group name for consistency
-    df = df.sort_values("group_name", ignore_index=True)
+    # Sort by Kernel_operator_type for consistency
+    df = df.sort_values("Kernel_operator_type", ignore_index=True)
 
     # Round floating point values
     float_cols = df.select_dtypes(include=[np.floating]).columns
