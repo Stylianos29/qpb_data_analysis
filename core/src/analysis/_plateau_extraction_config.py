@@ -110,8 +110,8 @@ PLOTTING_CONFIG = {
 
 # Data trimming for better visibility (like visualize_PCAC_mass.py)
 PLOTTING_DATA_RANGE = {
-    "trim_start_points": 1,  # Remove first N points from display
-    "trim_end_points": 1,  # Remove last N points from display
+    "trim_start_points": 3,  # Remove first N points from display
+    "trim_end_points": 2,  # Remove last N points from display
     "apply_trimming": True,  # Enable/disable data trimming
 }
 
