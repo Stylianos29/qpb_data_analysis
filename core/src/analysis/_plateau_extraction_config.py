@@ -153,7 +153,7 @@ PLOT_LABELS = {
 
 # Plot output configuration
 PLOT_OUTPUT = {
-    "base_directory": "plateau_extraction_plots",
+    "base_directory": "Plateau_extraction_plots",
     "file_format": "png",
     "dpi": 150,
     "bbox_inches": "tight",
