@@ -404,20 +404,21 @@ def _create_critical_mass_plot(
     # Create figure
     fig, ax = plt.subplots(figsize=main_config["default_figure_size"])
 
-    # Plot all data points
-    ax.errorbar(
-        x_all,
-        y_all,
-        yerr=yerr_all,
-        fmt="o",
-        color="lightblue",
-        alpha=0.5,
-        markersize=main_config["marker_size"],
-        capsize=main_config["capsize"],
-        label="All data points",
-    )
+    # Plot all data points (if different from fitted)
+    if len(x_all) > len(x_fitted):
+        ax.errorbar(
+            x_all,
+            y_all,
+            yerr=yerr_all,
+            fmt="o",
+            color="lightblue",
+            alpha=0.5,
+            markersize=main_config["marker_size"],
+            capsize=main_config["capsize"],
+            label="Excluded data points",
+        )
 
-    # Highlight fitted data points
+    # Plot fitted data points
     fitted_mask = np.isin(x_all, x_fitted)
     ax.errorbar(
         x_all[fitted_mask],
@@ -486,8 +487,11 @@ def _create_critical_mass_plot(
     )
 
     # Configure axes
-    ax.set_xlabel("Bare mass (lattice units)", fontsize=main_config["font_size"])
-    ax.set_ylabel("PCAC mass (lattice units)", fontsize=main_config["font_size"])
+    ax.set_xlabel(
+        constants.AXES_LABELS_BY_COLUMN_NAME["Bare_mass"],
+        fontsize=main_config["font_size"],
+    )
+    ax.set_ylabel(r"a$m_{\text{PCAC}}$", fontsize=main_config["font_size"])
 
     if content_config["include_grid"]:
         ax.grid(True, alpha=0.3)

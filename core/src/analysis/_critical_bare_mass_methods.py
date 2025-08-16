@@ -92,6 +92,13 @@ def load_and_validate_pcac_data(csv_file_path: str, logger) -> pd.DataFrame:
         logger.warning(f"Found {n_invalid} rows with invalid data - will be excluded")
         df = df[~invalid_rows].copy()
 
+    # Ensure exponential-format parameters are stored as float for proper formatting
+    from library.constants.data_types import PARAMETERS_WITH_EXPONENTIAL_FORMAT
+
+    for param in PARAMETERS_WITH_EXPONENTIAL_FORMAT:
+        if param in df.columns:
+            df[param] = df[param].astype(float)
+
     logger.info(f"Data validation completed. {len(df)} valid rows remain")
     return df
 
