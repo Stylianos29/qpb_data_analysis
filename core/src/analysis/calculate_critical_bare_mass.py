@@ -385,16 +385,16 @@ def _create_critical_mass_plot(
     pcac_error_col = INPUT_CSV_COLUMNS["pcac_mass_error"]
 
     # Get all data points (not just fitted ones)
-    x_all = group_df[bare_mass_col].values
-    y_all = group_df[pcac_mean_col].values
-    yerr_all = group_df[pcac_error_col].values
+    x_all = group_df[bare_mass_col].to_numpy()
+    y_all = group_df[pcac_mean_col].to_numpy()
+    yerr_all = group_df[pcac_error_col].to_numpy()
 
     # Apply filtering to identify fitted points
     from src.analysis._critical_bare_mass_methods import filter_data_for_fitting
 
     filtered_df, _ = filter_data_for_fitting(group_df, logger)
-    x_fitted = filtered_df[bare_mass_col].values
-    y_fitted = filtered_df[pcac_mean_col].values
+    x_fitted = filtered_df[bare_mass_col].to_numpy()
+    y_fitted = filtered_df[pcac_mean_col].to_numpy()
 
     # Get fit parameters
     slope = result["slope"]
