@@ -2,18 +2,16 @@
 """
 Critical Bare Mass Calculation Script
 
-This script calculates critical bare mass values from plateau PCAC mass
-estimates using linear extrapolation to the chiral limit (PCAC mass =
-0).
+This script calculates critical bare mass values from plateau PCAC mass 
+estimates using linear extrapolation to the chiral limit (PCAC mass = 0).
 
 The script processes CSV files containing plateau PCAC mass estimates,
-groups data by lattice parameters, performs linear fits, and
-extrapolates to find the critical bare mass where PCAC mass vanishes.
+groups data by lattice parameters, performs linear fits, and extrapolates
+to find the critical bare mass where PCAC mass vanishes.
 
 Key features:
     - Linear extrapolation to chiral limit using robust fitting methods
-    - Comprehensive fit quality validation and physical reasonableness
-      checks
+    - Comprehensive fit quality validation and physical reasonableness checks
     - Configurable data filtering and fitting parameters
     - Multi-panel visualization with fit diagnostics
     - CSV export with comprehensive metadata and diagnostics
@@ -22,7 +20,7 @@ Place this file as:
 qpb_data_analysis/core/src/analysis/calculate_critical_bare_mass.py
 
 Usage:
-    python calculate_critical_bare_mass.py -i plateau_pcac_mass.csv -o
+    python calculate_critical_bare_mass.py -i plateau_pcac_mass.csv -o 
     output_dir [options]
 """
 
@@ -62,6 +60,7 @@ from library.validation.click_validators import (
 from src.analysis._critical_bare_mass_config import (
     INPUT_CSV_COLUMNS,
     GROUPING_PARAMETERS,
+    FILENAME_EXCLUDED_PARAMETERS,
     OUTPUT_CSV_CONFIG,
     DATA_FILTERING,
     get_plotting_config,
@@ -162,9 +161,9 @@ def main(
     Calculate critical bare mass values from plateau PCAC mass estimates
     using linear extrapolation to the chiral limit.
 
-    This script processes PCAC mass plateau estimates, groups data by
-    lattice parameters, and performs linear fits to extrapolate to the
-    critical bare mass where PCAC mass = 0.
+    This script processes PCAC mass plateau estimates, groups data by lattice
+    parameters, and performs linear fits to extrapolate to the critical bare
+    mass where PCAC mass = 0.
     """
     # Validate configuration
     if not validate_config():
@@ -234,15 +233,14 @@ def _prepare_output_directories(
     Prepare output directories for plots and other files.
 
     Args:
-        - plots_directory: User-specified plots directory
-        - output_directory: Main output directory enable_plotting:
-          Whether
-        - plotting is enabled clear_existing_plots: Whether to clear
-        - existing plots logger: Logger instance
+        plots_directory: User-specified plots directory
+        output_directory: Main output directory
+        enable_plotting: Whether plotting is enabled
+        clear_existing_plots: Whether to clear existing plots
+        logger: Logger instance
 
     Returns:
-        Tuple of (PlotFileManager, subdirectory_path) if plotting
-        enabled, None otherwise
+        Tuple of (PlotFileManager, subdirectory_path) if plotting enabled, None otherwise
     """
     if not enable_plotting:
         logger.info("Plotting disabled - no plot directories will be created")
@@ -286,12 +284,11 @@ def _process_all_groups(
     Process all parameter groups for critical bare mass calculation.
 
     Args:
-        - input_csv_file: Path to input CSV file
-        - file_manager_info: Tuple of (file_manager, subdirectory_path)
-          if plotting enabled
-        - enable_plotting: Whether to generate plots
-        - logger: Logger instance
-        - verbose: Whether to show progress
+        input_csv_file: Path to input CSV file
+        file_manager_info: Tuple of (file_manager, subdirectory_path) if plotting enabled
+        enable_plotting: Whether to generate plots
+        logger: Logger instance
+        verbose: Whether to show progress
 
     Returns:
         List of results from all processed groups
@@ -323,7 +320,7 @@ def _process_all_groups(
             try:
                 file_manager, plot_subdir = file_manager_info
                 _create_critical_mass_plot(
-                    result, group_df, file_manager, plot_subdir, logger
+                    result, group_df, file_manager, plot_subdir, logger, df
                 )
             except Exception as e:
                 logger.warning(f"Failed to create plot for group {group_id}: {e}")
@@ -338,22 +335,44 @@ def _process_all_groups(
     return all_results
 
 
+def _determine_multivalued_parameters(df: pd.DataFrame) -> List[str]:
+    """
+    Determine which grouping parameters actually have multiple values in the dataset.
+
+    Args:
+        df: DataFrame containing all data
+
+    Returns:
+        List of parameter names that have multiple unique values
+    """
+    multivalued_params = []
+
+    for param in GROUPING_PARAMETERS:
+        if param in df.columns and param not in FILENAME_EXCLUDED_PARAMETERS:
+            unique_values = df[param].nunique()
+            if unique_values > 1:
+                multivalued_params.append(param)
+
+    return multivalued_params
+
+
 def _create_critical_mass_plot(
     result: Dict[str, Any],
     group_df: pd.DataFrame,
     file_manager: PlotFileManager,
     plot_subdir: str,
     logger,
+    all_df: pd.DataFrame,  # Add reference to full dataset
 ) -> None:
     """
     Create critical bare mass extrapolation plot for a parameter group.
 
     Args:
-        - result: Processing results for this group
-        - group_df: Original data for this group
-        - file_manager: Plot file manager
-        - plot_subdir: Subdirectory path for plots
-        - logger: Logger instance
+        result: Processing results for this group
+        group_df: Original data for this group
+        file_manager: Plot file manager
+        plot_subdir: Subdirectory path for plots
+        logger: Logger instance
     """
     plotting_config = get_plotting_config()
     style_config = plotting_config["style"]
@@ -366,9 +385,9 @@ def _create_critical_mass_plot(
     pcac_error_col = INPUT_CSV_COLUMNS["pcac_mass_error"]
 
     # Get all data points (not just fitted ones)
-    x_all = group_df[bare_mass_col].to_numpy()
-    y_all = group_df[pcac_mean_col].to_numpy()
-    yerr_all = group_df[pcac_error_col].to_numpy()
+    x_all = group_df[bare_mass_col].values
+    y_all = group_df[pcac_mean_col].values
+    yerr_all = group_df[pcac_error_col].values
 
     # Apply filtering to identify fitted points
     from src.analysis._critical_bare_mass_methods import filter_data_for_fitting
@@ -384,12 +403,6 @@ def _create_critical_mass_plot(
 
     # Create figure
     fig, ax = plt.subplots(figsize=main_config["default_figure_size"])
-
-    # Convert arrays to numpy for plotting compatibility
-    x_all = np.asarray(x_all)
-    y_all = np.asarray(y_all)
-    yerr_all = np.asarray(yerr_all)
-    x_fitted = np.asarray(x_fitted)
 
     # Plot all data points
     ax.errorbar(
@@ -527,10 +540,8 @@ def _create_critical_mass_plot(
 
     # Generate filename and save
     filename_builder = PlotFilenameBuilder(constants.FILENAME_LABELS_BY_COLUMN_NAME)
-    # Get multivalued parameters from grouping parameters
-    multivalued_params = [
-        col for col in GROUPING_PARAMETERS if col in result["group_metadata"]
-    ]
+    # Get multivalued parameters from the full dataset, not just grouping parameters
+    multivalued_params = _determine_multivalued_parameters(all_df)
     plot_filename = filename_builder.build(
         metadata_dict=result["group_metadata"],
         base_name=get_plotting_config()["output"]["base_filename"],
@@ -558,10 +569,10 @@ def _export_results_to_csv(
     Export critical bare mass calculation results to CSV file.
 
     Args:
-        - calculation_results: List of results from all parameter groups
-        - output_directory: Output directory path
-        - output_csv_filename: Name for output CSV file
-        - logger: Logger instance
+        calculation_results: List of results from all parameter groups
+        output_directory: Output directory path
+        output_csv_filename: Name for output CSV file
+        logger: Logger instance
 
     Returns:
         Path to the created CSV file
@@ -649,7 +660,8 @@ def _report_final_statistics(
 
     Args:
         calculation_results: List of results from all parameter groups
-        csv_file_path: Path to exported CSV file logger: Logger instance
+        csv_file_path: Path to exported CSV file
+        logger: Logger instance
     """
     logger.info("Generating final statistics")
 

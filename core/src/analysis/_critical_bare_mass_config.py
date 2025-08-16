@@ -36,6 +36,16 @@ GROUPING_PARAMETERS = [
     "Rho_value",
 ]
 
+# Parameters to exclude from filenames (typically single-valued or not useful for identification)
+FILENAME_EXCLUDED_PARAMETERS = [
+    "Number_of_gauge_configurations",  # Not useful for filename identification
+    "CG_epsilon",  # Typically single-valued
+    "MSCG_epsilon",  # Typically single-valued
+    "Clover_coefficient",  # Typically single-valued
+    "KL_scaling_factor",  # Typically single-valued
+    "Rho_value",  # Typically single-valued
+]
+
 # Additional metadata columns to preserve in output
 METADATA_COLUMNS = [
     "plateau_start_time",
