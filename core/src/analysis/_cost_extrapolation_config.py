@@ -1,9 +1,10 @@
 """
-Configuration for computational cost estimation using DataPlotter integration.
+Configuration for computational cost estimation using DataPlotter
+integration.
 
-This module contains all configuration parameters for analyzing computational
-costs (core-hours per spinor per configuration) using the DataPlotter class
-for automatic grouping, fitting, and visualization.
+This module contains all configuration parameters for analyzing
+computational costs (core-hours per spinor per configuration) using the
+DataPlotter class for automatic grouping, fitting, and visualization.
 
 Place this file as:
 qpb_data_analysis/core/src/analysis/_cost_estimation_config.py
@@ -69,7 +70,8 @@ DATAPLOTTER_CONFIG = {
     "font_size": 12,
     # Plot titles
     "include_plot_title": True,
-    # "custom_plot_title": None,  # Let DataPlotter auto-generate from parameters
+    # "custom_plot_title": None,  # Let DataPlotter auto-generate from
+    # parameters
     "title_from_columns": None,  # Auto-detect from grouping parameters
     "title_size": 14,
     "bold_title": False,

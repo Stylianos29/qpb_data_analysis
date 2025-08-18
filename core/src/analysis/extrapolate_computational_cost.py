@@ -42,7 +42,6 @@ from library.validation.click_validators import (
     directory,
     validate_log_filename,
 )
-from library import constants
 
 # Import our modules
 from src.analysis._cost_estimation_config import (
@@ -133,11 +132,13 @@ def main(
     verbose,
 ):
     """
-    Analyze computational costs using DataPlotter for automatic grouping and fitting.
+    Analyze computational costs using DataPlotter for automatic grouping
+    and fitting.
 
-    This script leverages the DataPlotter class to automatically detect multivalued
-    parameters for grouping, apply sophisticated curve fitting with the shifted
-    power law function a/(x-b)+c, and generate professional visualizations.
+    This script leverages the DataPlotter class to automatically detect
+    multivalued parameters for grouping, apply sophisticated curve
+    fitting with the shifted power law function a/(x-b)+c, and generate
+    professional visualizations.
     """
 
     # Get reference PCAC mass from config
@@ -165,9 +166,6 @@ def main(
         plots_directory.mkdir(parents=True, exist_ok=True)
     if log_directory:
         log_directory.mkdir(parents=True, exist_ok=True)
-
-    # Get script name for reference
-    script_name = Path(__file__).stem
 
     # Setup logging
     logger = create_script_logger(
