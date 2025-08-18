@@ -863,11 +863,12 @@ class DataPlotter(DataFrameAnalyzer):
         excluded.update(
             [
                 "Main_program_type",
-                "MPI_geometry",
                 "Maximum_Lanczos_iterations",
+                "MPI_geometry",
                 "Number_of_spinors",
-                "Outer_solver_epsilon",
                 "Number_of_vectors",
+                "Outer_solver_epsilon",
+                "Threads_per_process",
             ]
         )
         if grouping_variable:
