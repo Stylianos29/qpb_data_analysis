@@ -63,7 +63,7 @@ REFERENCE_CONFIG = {
 DATAPLOTTER_CONFIG = {
     # Plot variables
     "x_variable": "Bare_mass",
-    "y_variable": "Average_core_hours_per_spinor_per_configuration_with_errors",  # With error bars
+    "y_variable": "Average_core_hours_per_spinor_per_configuration",  # With error bars
     # Figure settings
     "figure_size": (7, 5),
     "font_size": 12,

@@ -36,59 +36,73 @@ from src.analysis._cost_estimation_config import (
 # =============================================================================
 
 
-# def load_and_prepare_data(processed_csv_path: str, logger) -> pd.DataFrame:
-#     """
-#     Load and prepare processed parameters data for analysis.
+def load_and_prepare_data(processed_csv_path: str, logger) -> pd.DataFrame:
+    """
+    Load and prepare processed parameters data for analysis.
 
-#     This function:
-#     1. Loads the raw data
-#     2. Applies data filtering
-#     3. Creates derived column: Average_core_hours_per_spinor_per_configuration
-#     4. Returns DataFrame ready for DataPlotter analysis
+    This function:
+    1. Loads the raw data
+    2. Applies data filtering
+    3. Creates a DataFrameAnalyzer for automatic parameter detection
+    4. Creates derived column: Average_core_hours_per_spinor_per_configuration
+    5. Returns DataFrame ready for DataPlotter analysis
 
-#     Parameters
-#     ----------
-#     processed_csv_path : str
-#         Path to processed parameter values CSV file
-#     logger : Logger
-#         Logger instance for progress reporting
+    Parameters
+    ----------
+    processed_csv_path : str
+        Path to processed parameter values CSV file
+    logger : Logger
+        Logger instance for progress reporting
 
-#     Returns
-#     -------
-#     pd.DataFrame
-#         Prepared DataFrame with derived per-configuration averages
+    Returns
+    -------
+    pd.DataFrame
+        Prepared DataFrame with derived per-configuration averages
 
-#     Raises
-#     ------
-#     ValueError
-#         If required columns are missing or data validation fails
-#     """
-#     logger.info("Loading and preparing processed parameters data...")
+    Raises
+    ------
+    ValueError
+        If required columns are missing or data validation fails
+    """
+    logger.info("Loading and preparing processed parameters data...")
 
-#     # Load CSV with apply_categorical=False to preserve raw values
-#     try:
-#         df = load_csv(processed_csv_path, apply_categorical=False)
-#         logger.info(f"Loaded {len(df)} rows from processed parameters CSV")
-#     except Exception as e:
-#         raise ValueError(f"Failed to load processed parameters CSV: {e}")
+    # Load CSV with apply_categorical=False to preserve raw values
+    try:
+        df = load_csv(processed_csv_path, apply_categorical=False)
+        logger.info(f"Loaded {len(df)} rows from processed parameters CSV")
+    except Exception as e:
+        raise ValueError(f"Failed to load processed parameters CSV: {e}")
 
-#     # Validate required columns
-#     required_cols = set(PROCESSED_PARAMS_CSV_COLUMNS.values())
-#     missing_cols = required_cols - set(df.columns)
-#     if missing_cols:
-#         raise ValueError(f"Missing required columns: {missing_cols}")
+    # Validate required columns
+    required_cols = set(PROCESSED_PARAMS_CSV_COLUMNS.values())
+    missing_cols = required_cols - set(df.columns)
+    if missing_cols:
+        raise ValueError(f"Missing required columns: {missing_cols}")
 
-#     # Apply data filtering to raw data
-#     filtering_config = get_data_filtering_config()
-#     df_filtered = apply_data_filtering(df, filtering_config, logger)
+    # Apply data filtering to raw data
+    filtering_config = get_data_filtering_config()
+    df_filtered = apply_data_filtering(df, filtering_config, logger)
 
-#     # Create derived dataset with per-configuration averages
-#     df_derived = create_per_configuration_averages(df_filtered, logger)
+    # Create DataFrameAnalyzer for automatic parameter detection and grouping
+    logger.info("Creating DataFrameAnalyzer for automatic parameter grouping...")
+    analyzer = DataFrameAnalyzer(df_filtered)
 
-#     logger.info(
-#         f"Data preparation completed. {len(df_derived)} configuration-averaged data points ready for analysis."
-#     )
-#     return df_derived
+    # Log detected parameter structure
+    logger.info(
+        f"Detected multivalued tunable parameters: {analyzer.list_of_multivalued_tunable_parameter_names}"
+    )
+    logger.info(
+        f"Detected single-valued tunable parameters: {analyzer.list_of_single_valued_tunable_parameter_names}"
+    )
+    logger.info(f"Total data points for grouping: {len(analyzer.dataframe)}")
+
+    # Create derived dataset with per-configuration averages using automatic grouping
+    df_derived = create_per_configuration_averages(analyzer, logger)
+
+    logger.info(
+        f"Data preparation completed. {len(df_derived)} configuration-averaged data points ready for analysis."
+    )
+    return df_derived
 
 
 def apply_data_filtering(
@@ -190,7 +204,6 @@ def create_per_configuration_averages(
     df = analyzer.dataframe
 
     # Get column names
-    config_col = PROCESSED_PARAMS_CSV_COLUMNS["configuration_label"]
     core_hours_col = PROCESSED_PARAMS_CSV_COLUMNS["core_hours_per_spinor"]
 
     # Use analyzer's automatic grouping, excluding Configuration_label and MPI_geometry
@@ -225,13 +238,14 @@ def create_per_configuration_averages(
         grouping_param_names = analyzer.reduced_multivalued_tunable_parameter_names_list
         result_row = dict(zip(grouping_param_names, group_keys))
 
-        # Add statistical results
+        # Add statistical results. Add "_mean", "_std", "_error"
+        # suffixes to avoid conflict with tuple column
         result_row.update(
             {
-                "Average_core_hours_per_spinor_per_configuration": stats["mean"],
-                "Std_core_hours_per_spinor_per_configuration": stats["std"],
+                "Average_core_hours_per_spinor_per_configuration_mean": stats["mean"],
+                "Average_core_hours_per_spinor_per_configuration_std": stats["std"],
                 "Number_of_configurations": int(stats["count"]),
-                "Error_core_hours_per_spinor_per_configuration": (
+                "Average_core_hours_per_spinor_per_configuration_error": (
                     stats["sem"] if pd.notna(stats["sem"]) else 0.0
                 ),
             }
@@ -263,84 +277,15 @@ def create_per_configuration_averages(
         )
 
     # Create error-bar ready column for DataPlotter (value, error) tuples
-    grouped["Average_core_hours_per_spinor_per_configuration_with_errors"] = [
+    grouped["Average_core_hours_per_spinor_per_configuration"] = [
         (mean_val, error_val)
         for mean_val, error_val in zip(
-            grouped["Average_core_hours_per_spinor_per_configuration"],
-            grouped["Error_core_hours_per_spinor_per_configuration"],
+            grouped["Average_core_hours_per_spinor_per_configuration_mean"],
+            grouped["Average_core_hours_per_spinor_per_configuration_error"],
         )
     ]
 
     return grouped
-
-
-def load_and_prepare_data(processed_csv_path: str, logger) -> pd.DataFrame:
-    """
-    Load and prepare processed parameters data for analysis.
-
-    This function:
-    1. Loads the raw data
-    2. Applies data filtering
-    3. Creates a DataFrameAnalyzer for automatic parameter detection
-    4. Creates derived column: Average_core_hours_per_spinor_per_configuration
-    5. Returns DataFrame ready for DataPlotter analysis
-
-    Parameters
-    ----------
-    processed_csv_path : str
-        Path to processed parameter values CSV file
-    logger : Logger
-        Logger instance for progress reporting
-
-    Returns
-    -------
-    pd.DataFrame
-        Prepared DataFrame with derived per-configuration averages
-
-    Raises
-    ------
-    ValueError
-        If required columns are missing or data validation fails
-    """
-    logger.info("Loading and preparing processed parameters data...")
-
-    # Load CSV with apply_categorical=False to preserve raw values
-    try:
-        df = load_csv(processed_csv_path, apply_categorical=False)
-        logger.info(f"Loaded {len(df)} rows from processed parameters CSV")
-    except Exception as e:
-        raise ValueError(f"Failed to load processed parameters CSV: {e}")
-
-    # Validate required columns
-    required_cols = set(PROCESSED_PARAMS_CSV_COLUMNS.values())
-    missing_cols = required_cols - set(df.columns)
-    if missing_cols:
-        raise ValueError(f"Missing required columns: {missing_cols}")
-
-    # Apply data filtering to raw data
-    filtering_config = get_data_filtering_config()
-    df_filtered = apply_data_filtering(df, filtering_config, logger)
-
-    # Create DataFrameAnalyzer for automatic parameter detection and grouping
-    logger.info("Creating DataFrameAnalyzer for automatic parameter grouping...")
-    analyzer = DataFrameAnalyzer(df_filtered)
-
-    # Log detected parameter structure
-    logger.info(
-        f"Detected multivalued tunable parameters: {analyzer.list_of_multivalued_tunable_parameter_names}"
-    )
-    logger.info(
-        f"Detected single-valued tunable parameters: {analyzer.list_of_single_valued_tunable_parameter_names}"
-    )
-    logger.info(f"Total data points for grouping: {len(analyzer.dataframe)}")
-
-    # Create derived dataset with per-configuration averages using automatic grouping
-    df_derived = create_per_configuration_averages(analyzer, logger)
-
-    logger.info(
-        f"Data preparation completed. {len(df_derived)} configuration-averaged data points ready for analysis."
-    )
-    return df_derived
 
 
 # =============================================================================
@@ -653,10 +598,10 @@ def compile_group_result(
 
     # Basic statistics
     core_hours_col = (
-        "Average_core_hours_per_spinor_per_configuration"  # Use derived column
+        "Average_core_hours_per_spinor_per_configuration_mean"  # Use derived column
     )
     core_hours_error_col = (
-        "Error_core_hours_per_spinor_per_configuration"  # Error column
+        "Average_core_hours_per_spinor_per_configuration_error"  # Error column
     )
     bare_mass_col = PROCESSED_PARAMS_CSV_COLUMNS["bare_mass"]
 
