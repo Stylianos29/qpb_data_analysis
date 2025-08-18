@@ -1,10 +1,10 @@
 """
-Private methods for computational cost estimation using DataPlotter
+Methods for computational cost extrapolation using DataPlotter
 integration.
 
-This module contains simplified analysis functions that leverage the
-DataPlotter class for automatic grouping, curve fitting, and
-visualization of computational cost data.
+This module contains functions that leverage the DataFrameAnalyzer for
+automatic parameter detection and grouping, and the DataPlotter class
+for curve fitting and visualization of computational cost data.
 """
 
 import numpy as np
@@ -19,200 +19,119 @@ from library.data.analyzer import DataFrameAnalyzer
 
 # Import configuration
 from src.analysis._cost_extrapolation_config import (
-    PROCESSED_PARAMS_CSV_COLUMNS,
-    OUTPUT_CSV_CONFIG,
-    REFERENCE_CONFIG,
-    DATA_FILTERING_CONFIG,
-    get_dataplotter_config,
-    get_data_filtering_config,
-    get_fit_validation_config,
-    get_result_compilation_config,
+    CONFIG,
+    get_input_column,
+    get_averaging_config,
+    get_cost_column_names,
+    get_validation_config,
+    get_plotting_config,
+    get_extrapolation_config,
+    get_validation_thresholds,
 )
+
 
 # =============================================================================
 # DATA LOADING AND PREPARATION
 # =============================================================================
 
 
-def load_and_prepare_data(processed_csv_path: str, logger) -> pd.DataFrame:
+def load_and_prepare_data(csv_path: str, logger) -> pd.DataFrame:
     """
-    Load and prepare processed parameters data for analysis.
+    Load and prepare processed parameters data for cost extrapolation.
 
     This function:
-        1. Loads the raw data
-        2. Applies data filtering
-        3. Creates a DataFrameAnalyzer for automatic parameter detection
-        4. Creates derived column:
-           Average_core_hours_per_spinor_per_configuration
-        5. Returns DataFrame ready for DataPlotter analysis
+        1. Loads the raw CSV data using library.load_csv()
+        2. Creates a DataFrameAnalyzer for automatic parameter detection
+        3. Averages across configurations using DataFrameAnalyzer.group_by_multivalued_tunable_parameters()
+        4. Creates error-bar ready columns for DataPlotter
 
     Parameters
     ----------
-    processed_csv_path : str
-        Path to processed parameter values CSV file
+    csv_path : str
+        Path to the processed parameters CSV file
     logger : Logger
-        Logger instance for progress reporting
+        Logger instance for reporting
 
     Returns
     -------
     pd.DataFrame
-        Prepared DataFrame with derived per-configuration averages
-
-    Raises
-    ------
-    ValueError
-        If required columns are missing or data validation fails
+        Prepared DataFrame ready for DataPlotter extrapolation
     """
-    logger.info("Loading and preparing processed parameters data...")
+    logger.info(f"Loading data from: {csv_path}")
 
-    # Load CSV with apply_categorical=False to preserve raw values
+    # Load CSV data - load_csv handles missing and empty cells
     try:
-        df = load_csv(processed_csv_path, apply_categorical=False)
-        logger.info(f"Loaded {len(df)} rows from processed parameters CSV")
+        df = load_csv(csv_path)
+        logger.info(f"Loaded {len(df)} rows from CSV")
     except Exception as e:
-        raise ValueError(f"Failed to load processed parameters CSV: {e}")
+        logger.error(f"Failed to load CSV file: {e}")
+        raise
 
-    # Validate required columns
-    required_cols = set(PROCESSED_PARAMS_CSV_COLUMNS.values())
-    missing_cols = required_cols - set(df.columns)
-    if missing_cols:
-        raise ValueError(f"Missing required columns: {missing_cols}")
+    # Validate required columns exist
+    required_columns = [
+        get_input_column("bare_mass"),
+        get_input_column("configuration_label"),
+        get_input_column("core_hours_per_spinor"),
+    ]
 
-    # Apply data filtering to raw data
-    filtering_config = get_data_filtering_config()
-    df_filtered = apply_data_filtering(df, filtering_config, logger)
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
 
-    # Create DataFrameAnalyzer for automatic parameter detection and grouping
-    logger.info("Creating DataFrameAnalyzer for automatic parameter grouping...")
-    analyzer = DataFrameAnalyzer(df_filtered)
-
-    # Log detected parameter structure
-    logger.info(
-        f"Detected multivalued tunable parameters: {analyzer.list_of_multivalued_tunable_parameter_names}"
-    )
-    logger.info(
-        f"Detected single-valued tunable parameters: {analyzer.list_of_single_valued_tunable_parameter_names}"
-    )
-    logger.info(f"Total data points for grouping: {len(analyzer.dataframe)}")
-
-    # Create derived dataset with per-configuration averages using automatic grouping
-    df_derived = create_per_configuration_averages(analyzer, logger)
+    # Average across configurations using DataFrameAnalyzer
+    df_averaged = _average_across_configurations(df, logger)
 
     logger.info(
-        f"Data preparation completed. {len(df_derived)} configuration-averaged data points ready for analysis."
+        f"Data preparation complete: {len(df_averaged)} groups ready for extrapolation"
     )
-    return df_derived
+    return df_averaged
 
 
-def apply_data_filtering(
-    df: pd.DataFrame, filtering_config: Dict[str, Any], logger
-) -> pd.DataFrame:
+def _average_across_configurations(df: pd.DataFrame, logger) -> pd.DataFrame:
     """
-    Apply data filtering based on configuration.
+    Average computational costs across configurations using DataFrameAnalyzer.
 
     Parameters
     ----------
     df : pd.DataFrame
-        Input DataFrame
-    filtering_config : Dict[str, Any]
-        Data filtering configuration
+        Raw DataFrame with individual configuration data
     logger : Logger
         Logger instance
 
     Returns
     -------
     pd.DataFrame
-        Filtered DataFrame
-    """
-    initial_count = len(df)
-    bare_mass_col = PROCESSED_PARAMS_CSV_COLUMNS["bare_mass"]
-    core_hours_col = PROCESSED_PARAMS_CSV_COLUMNS["core_hours_per_spinor"]
-
-    # Filter by bare mass range
-    min_mass = filtering_config["min_bare_mass_for_analysis"]
-    max_mass = filtering_config["max_bare_mass_for_analysis"]
-
-    mass_mask = (df[bare_mass_col] >= min_mass) & (df[bare_mass_col] <= max_mass)
-    df = df[mass_mask]
-
-    logger.info(f"Bare mass filtering: {initial_count} → {len(df)} rows")
-
-    # Remove rows with invalid core hours
-    valid_hours_mask = (
-        df[core_hours_col].notna()
-        & (df[core_hours_col] > 0)
-        & (df[core_hours_col] < filtering_config.get("max_reasonable_cost", 1000.0))
-    )
-    df = df[valid_hours_mask]
-
-    logger.info(f"Valid core-hours filtering: → {len(df)} rows")
-
-    # Outlier removal if enabled
-    if filtering_config.get("remove_outliers", False):
-        df = remove_outliers(
-            df, core_hours_col, filtering_config["outlier_threshold"], logger
-        )
-
-    return df
-
-
-def remove_outliers(
-    df: pd.DataFrame, column: str, threshold: float, logger
-) -> pd.DataFrame:
-    """Remove outliers based on standard deviation threshold."""
-    initial_count = len(df)
-
-    mean_val = df[column].mean()
-    std_val = df[column].std()
-
-    outlier_mask = np.abs(df[column] - mean_val) <= (threshold * std_val)
-    df_clean = df[outlier_mask]
-
-    removed_count = initial_count - len(df_clean)
-    logger.info(f"Outlier removal: removed {removed_count} outliers (>{threshold}σ)")
-
-    return df_clean
-
-
-def create_per_configuration_averages(
-    analyzer: DataFrameAnalyzer, logger
-) -> pd.DataFrame:
-    """
-    Create derived dataset with per-configuration averages using
-    automatic parameter grouping.
-
-    This function uses the DataFrameAnalyzer's automatic parameter
-    detection and grouping to create configuration-averaged data without
-    hardcoding grouping parameters.
-
-    Parameters
-    ----------
-    analyzer : DataFrameAnalyzer
-        Analyzer object containing the filtered raw data
-    logger : Logger
-        Logger instance
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame with per-configuration averages and proper grouping
+        DataFrame with (mean, error) tuples for cost data
     """
     logger.info(
         "Creating per-configuration averages using automatic parameter grouping..."
     )
 
-    # Get the DataFrame from analyzer
-    df = analyzer.dataframe
+    # Create DataFrameAnalyzer for automatic parameter detection
+    analyzer = DataFrameAnalyzer(df)
+
+    # Get configuration
+    averaging_config = get_averaging_config()
+    validation_config = get_validation_config()
 
     # Get column names
-    core_hours_col = PROCESSED_PARAMS_CSV_COLUMNS["core_hours_per_spinor"]
+    core_hours_col = get_input_column("core_hours_per_spinor")
 
-    # Use analyzer's automatic grouping, excluding Configuration_label and MPI_geometry
-    # Configuration_label: We want to average across configurations
-    # MPI_geometry: Usually not a physics parameter, more of a computational detail
+    # Get minimum data points threshold from config
+    min_count = validation_config["min_data_points_for_averaging"]
+
+    # Determine which parameters to filter out (only if they exist in DataFrame)
+    potential_filter_params = averaging_config["filter_out_parameters"]
+    actual_filter_params = [
+        param for param in potential_filter_params if param in df.columns
+    ]
+
+    logger.info(f"Filtering out parameters: {actual_filter_params}")
+
+    # Use analyzer's automatic grouping
     groups = analyzer.group_by_multivalued_tunable_parameters(
-        filter_out_parameters_list=["Configuration_label"],
-        verbose=True,  # Log which parameters are being used for grouping
+        filter_out_parameters_list=actual_filter_params,
+        verbose=False,
     )
 
     logger.info(
@@ -226,67 +145,36 @@ def create_per_configuration_averages(
         # Extract statistics for core hours
         core_hours_series = group_df[core_hours_col]
 
-        # Calculate aggregation statistics
-        stats = {
-            "mean": core_hours_series.mean(),
-            "std": core_hours_series.std(),
-            "count": core_hours_series.count(),
-            "sem": core_hours_series.sem(),  # Standard error of the mean
-        }
+        # Check count early - skip groups with insufficient data
+        count = core_hours_series.count()
+        if count < min_count:
+            logger.warning(
+                f"Skipping group {group_keys}: insufficient data points ({count} < {min_count})"
+            )
+            continue
 
-        # Create result row starting with group parameters
-        # Get parameter names that were used for grouping
+        # Calculate aggregation statistics
+        mean_val = core_hours_series.mean()
+        sem_val = core_hours_series.sem()
+        error_val = sem_val if pd.notna(sem_val) else 0.0
+
+        # Create result row with group parameters
         grouping_param_names = analyzer.reduced_multivalued_tunable_parameter_names_list
         result_row = dict(zip(grouping_param_names, group_keys))
 
-        # Add statistical results. Add "_mean", "_std", "_error"
-        # suffixes to avoid conflict with tuple column
-        result_row.update(
-            {
-                "Average_core_hours_per_spinor_per_configuration_mean": stats["mean"],
-                "Average_core_hours_per_spinor_per_configuration_std": stats["std"],
-                "Number_of_configurations": int(stats["count"]),
-                "Average_core_hours_per_spinor_per_configuration_error": (
-                    stats["sem"] if pd.notna(stats["sem"]) else 0.0
-                ),
-            }
-        )
+        # Add single-valued parameters
+        result_row.update(analyzer.unique_value_columns_dictionary)
 
-        # Add any single-valued parameters that might be relevant
-        for param in analyzer.list_of_single_valued_tunable_parameter_names:
-            if param in group_df.columns and param not in result_row:
-                result_row[param] = group_df[param].iloc[0]
+        # Add the main output: (mean, error) tuple
+        result_row["Average_core_hours_per_spinor_per_configuration"] = (
+            mean_val,
+            error_val,
+        )
+        result_row["Number_of_configurations"] = int(count)
 
         result_rows.append(result_row)
 
-    # Create result DataFrame
-    grouped = pd.DataFrame(result_rows)
-
-    # Log statistics
-    initial_rows = len(df)
-    final_rows = len(grouped)
-    avg_configs_per_group = grouped["Number_of_configurations"].mean()
-
-    logger.info(f"Configuration averaging: {initial_rows} → {final_rows} data points")
-    logger.info(f"Average configurations per group: {avg_configs_per_group:.1f}")
-
-    # Log groups with single configurations
-    single_config_groups = (grouped["Number_of_configurations"] == 1).sum()
-    if single_config_groups > 0:
-        logger.warning(
-            f"{single_config_groups} groups have only 1 configuration (no averaging possible)"
-        )
-
-    # Create error-bar ready column for DataPlotter (value, error) tuples
-    grouped["Average_core_hours_per_spinor_per_configuration"] = [
-        (mean_val, error_val)
-        for mean_val, error_val in zip(
-            grouped["Average_core_hours_per_spinor_per_configuration_mean"],
-            grouped["Average_core_hours_per_spinor_per_configuration_error"],
-        )
-    ]
-
-    return grouped
+    return pd.DataFrame(result_rows)
 
 
 # =============================================================================
@@ -296,12 +184,12 @@ def create_per_configuration_averages(
 
 def create_cost_plotter(df: pd.DataFrame, plots_directory: Path, logger) -> DataPlotter:
     """
-    Create and configure DataPlotter for cost analysis.
+    Create and configure DataPlotter for cost extrapolation.
 
     Parameters
     ----------
     df : pd.DataFrame
-        Prepared data for analysis
+        Prepared data for extrapolation
     plots_directory : Path
         Directory for saving plots
     logger : Logger
@@ -312,470 +200,311 @@ def create_cost_plotter(df: pd.DataFrame, plots_directory: Path, logger) -> Data
     DataPlotter
         Configured DataPlotter instance
     """
-    logger.info("Creating DataPlotter for cost analysis...")
+    logger.info("Creating DataPlotter for cost extrapolation...")
 
     # Create DataPlotter instance
     plotter = DataPlotter(df, str(plots_directory))
 
-    # Set plot variables
-    dataplotter_config = get_dataplotter_config()
-    x_var = dataplotter_config["x_variable"]
-    y_var = dataplotter_config["y_variable"]
+    # Set plot variables from configuration
+    plotting_config = get_plotting_config()
+    x_var = plotting_config["x_variable"]
+    y_var = plotting_config["y_variable"]
 
     plotter.set_plot_variables(x_var, y_var)
 
     logger.info(f"DataPlotter configured: {x_var} vs {y_var}")
     logger.info(
-        f"Multivalued parameters detected: {plotter.list_of_multivalued_tunable_parameter_names}"
+        f"Multivalued parameters: {plotter.list_of_multivalued_tunable_parameter_names}"
+    )
+    logger.info(
+        f"Single-valued parameters: {plotter.list_of_single_valued_tunable_parameter_names}"
     )
 
     return plotter
 
 
-def perform_cost_analysis(
-    plotter: DataPlotter, logger
-) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+def perform_cost_extrapolation(
+    plotter: DataPlotter, enable_plotting: bool, logger
+) -> Dict[str, Any]:
     """
-    Perform cost analysis using DataPlotter.
+    Perform cost extrapolation using DataPlotter.
 
     Parameters
     ----------
     plotter : DataPlotter
         Configured DataPlotter instance
+    enable_plotting : bool
+        Whether to generate plots
     logger : Logger
         Logger instance
 
     Returns
     -------
-    Tuple[Dict[str, Any], List[Dict[str, Any]]]
-        Analysis results and individual group results
+    Dict[str, Any]
+        Extrapolation results including fit parameters and statistics
     """
-    logger.info("Performing cost analysis with automatic grouping and fitting...")
+    logger.info("Performing cost extrapolation with automatic grouping and fitting...")
 
     # Get configuration
-    dataplotter_config = get_dataplotter_config()
-    filtering_config = get_data_filtering_config()
+    plotting_config = get_plotting_config()
+    validation_config = get_validation_config()
 
     # Check if we have sufficient data for fitting
-    min_points = filtering_config["min_data_points_for_fitting"]
+    min_points = validation_config["min_data_points_for_fitting"]
     if len(plotter.dataframe) < min_points:
         raise ValueError(
             f"Insufficient data points: {len(plotter.dataframe)} < {min_points}"
         )
 
-    # Perform plotting with automatic grouping and fitting
-    plotter.plot(
-        # Grouping (automatic based on multivalued parameters)
-        grouping_variable=None,  # Auto-detect
-        # Figure settings
-        figure_size=dataplotter_config["figure_size"],
-        font_size=dataplotter_config["font_size"],
-        top_margin_adjustment=dataplotter_config["top_margin_adjustment"],
-        left_margin_adjustment=dataplotter_config["left_margin_adjustment"],
-        # Plot titles
-        include_plot_title=dataplotter_config["include_plot_title"],
-        # custom_plot_title=dataplotter_config["custom_plot_title"],
-        title_from_columns=dataplotter_config["title_from_columns"],
-        title_size=dataplotter_config["title_size"],
-        bold_title=dataplotter_config["bold_title"],
-        title_wrapping_length=dataplotter_config["title_wrapping_length"],
-        # Curve fitting
-        fit_function=dataplotter_config["fit_function"],
-        show_fit_parameters_on_plot=dataplotter_config["show_fit_parameters_on_plot"],
-        fit_label_location=dataplotter_config["fit_label_location"],
-        fit_label_format=dataplotter_config["fit_label_format"],
-        fit_curve_range=dataplotter_config["fit_curve_range"],
-        # Styling
-        marker_size=dataplotter_config["marker_size"],
-        capsize=dataplotter_config["capsize"],
-        empty_markers=dataplotter_config["empty_markers"],
-        include_legend=dataplotter_config["include_legend"],
-        legend_location=dataplotter_config["legend_location"],
-        # Axis settings
-        xaxis_log_scale=dataplotter_config["xaxis_log_scale"],
-        yaxis_log_scale=dataplotter_config["yaxis_log_scale"],
-        # File output
-        save_figure=dataplotter_config["save_figure"],
-        file_format=dataplotter_config["file_format"],
-        # Additional options
-        verbose=True,
-    )
+    # Perform extrapolation with or without plotting
+    if enable_plotting:
+        logger.info("Generating plots with curve fitting...")
+        results = _perform_extrapolation_with_plotting(plotter, plotting_config, logger)
+    else:
+        logger.info("Performing statistical extrapolation without plotting...")
+        results = _perform_extrapolation_without_plotting(plotter, logger)
 
-    logger.info("DataPlotter analysis completed successfully")
-
-    # Extract results from DataPlotter
-    analysis_results = extract_analysis_results(plotter, logger)
-    group_results = extract_group_results(plotter, logger)
-
-    return analysis_results, group_results
-
-
-def extract_analysis_results(plotter: DataPlotter, logger) -> Dict[str, Any]:
-    """
-    Extract overall analysis results from DataPlotter.
-
-    Parameters
-    ----------
-    plotter : DataPlotter
-        DataPlotter instance after analysis
-    logger : Logger
-        Logger instance
-
-    Returns
-    -------
-    Dict[str, Any]
-        Overall analysis results
-    """
-    results = {
-        "total_data_points": len(plotter.dataframe),
-        "multivalued_parameters": plotter.list_of_multivalued_tunable_parameter_names,
-        "single_valued_parameters": plotter.list_of_single_valued_tunable_parameter_names,
-        "output_quantities": plotter.list_of_output_quantity_names_from_dataframe,
-        "reference_pcac_mass": REFERENCE_CONFIG["default_reference_pcac_mass"],
-    }
-
-    # Add basic statistics
-    core_hours_col = (
-        "Average_core_hours_per_spinor_per_configuration"  # Use derived column
-    )
-    bare_mass_col = PROCESSED_PARAMS_CSV_COLUMNS["bare_mass"]
-
-    results["cost_statistics"] = {
-        "mean": float(plotter.dataframe[core_hours_col].mean()),
-        "std": float(plotter.dataframe[core_hours_col].std()),
-        "min": float(plotter.dataframe[core_hours_col].min()),
-        "max": float(plotter.dataframe[core_hours_col].max()),
-        "median": float(plotter.dataframe[core_hours_col].median()),
-    }
-
-    results["bare_mass_range"] = {
-        "min": float(plotter.dataframe[bare_mass_col].min()),
-        "max": float(plotter.dataframe[bare_mass_col].max()),
-        "mean": float(plotter.dataframe[bare_mass_col].mean()),
-    }
+    # Validate results
+    if get_extrapolation_config()["validate_results"]:
+        _validate_extrapolation_results(results, logger)
 
     return results
 
 
-def extract_group_results(plotter: DataPlotter, logger) -> List[Dict[str, Any]]:
-    """
-    Extract individual group results from DataPlotter.
+def _perform_extrapolation_with_plotting(
+    plotter: DataPlotter, plotting_config: Dict, logger
+) -> Dict[str, Any]:
+    """Perform extrapolation with DataPlotter plotting and fitting."""
 
-    Parameters
-    ----------
-    plotter : DataPlotter
-        DataPlotter instance after analysis
-    logger : Logger
-        Logger instance
+    # Perform plotting (this also does the curve fitting)
+    plotter.plot(
+        figure_size=plotting_config["figure_size"],
+        marker_size=plotting_config["marker_size"],
+        capsize=plotting_config["capsize"],
+        include_legend=plotting_config["include_legend"],
+        legend_location=plotting_config["legend_location"],
+        fit_function=plotting_config["fit_function"],
+        show_fit_parameters_on_plot=plotting_config["show_fit_parameters"],
+        fit_label_location=plotting_config["fit_label_location"],
+        save_figure=True,
+        verbose=True,
+        include_plot_title=True,
+        top_margin_adjustment=plotting_config["top_margin_adjustment"],
+    )
 
-    Returns
-    -------
-    List[Dict[str, Any]]
-        List of results for each parameter group
-    """
-    logger.info("Extracting individual group results...")
+    # Extract results from plotter
+    results = _extract_results_from_plotter(plotter, logger)
 
+    return results
+
+
+def _perform_extrapolation_without_plotting(
+    plotter: DataPlotter, logger
+) -> Dict[str, Any]:
+    """Perform statistical extrapolation without plotting."""
+
+    # Extract basic statistics from the data
+    cost_cols = get_cost_column_names()
+    df = plotter.dataframe
+
+    # Group-level statistics
     group_results = []
 
-    # Get grouped data using DataPlotter's grouping
-    grouped = plotter.group_by_multivalued_tunable_parameters(verbose=False)
+    # If we have multivalued parameters, extrapolate by group
+    if plotter.list_of_multivalued_tunable_parameter_names:
+        grouping_params = plotter.list_of_multivalued_tunable_parameter_names
+        for group_values, group_df in df.groupby(grouping_params):
+            if not isinstance(group_values, tuple):
+                group_values = (group_values,)
 
-    # Access fit results if available (this would need to be implemented in DataPlotter)
-    # For now, we'll extract basic group statistics
-
-    for group_keys, group_df in grouped:
-        group_result = compile_group_result(group_keys, group_df, plotter, logger)
+            group_result = _extrapolate_group(
+                group_values, group_df, grouping_params, logger
+            )
+            group_results.append(group_result)
+    else:
+        # Extrapolate entire dataset as one group
+        group_result = _extrapolate_group(("all_data",), df, ["dataset"], logger)
         group_results.append(group_result)
 
-    # If no multivalued parameters detected, treat entire dataset as one group
-    if len(group_results) == 0:
-        logger.info(
-            "No multivalued parameters detected - treating entire dataset as one group"
-        )
-
-        # Create a single group result using the entire dataset
-        single_group_result = compile_single_group_result(
-            plotter.dataframe, plotter, logger
-        )
-        group_results.append(single_group_result)
-
-    logger.info(f"Extracted results for {len(group_results)} parameter groups")
-    return group_results
-
-
-def compile_single_group_result(
-    group_df: pd.DataFrame, plotter: DataPlotter, logger
-) -> Dict[str, Any]:
-    """
-    Compile results when there's only one parameter group (no multivalued parameters).
-
-    Parameters
-    ----------
-    group_df : pd.DataFrame
-        Data for the single group
-    plotter : DataPlotter
-        DataPlotter instance
-    logger : Logger
-        Logger instance
-
-    Returns
-    -------
-    Dict[str, Any]
-        Compiled results for this group
-    """
-    # Single-valued parameters
-    single_valued_params = {}
-    for param in plotter.list_of_single_valued_tunable_parameter_names:
-        if param in group_df.columns:
-            single_valued_params[param] = group_df[param].iloc[0]
-
-    # Basic statistics
-    core_hours_col = (
-        "Average_core_hours_per_spinor_per_configuration"  # Use derived column
-    )
-    core_hours_error_col = (
-        "Error_core_hours_per_spinor_per_configuration"  # Error column
-    )
-    bare_mass_col = PROCESSED_PARAMS_CSV_COLUMNS["bare_mass"]
-
-    result = {
-        **single_valued_params,
-        "parameter_group": "single_group",
-        "n_data_points": len(group_df),
-        "avg_core_hours_per_configuration": float(group_df[core_hours_col].mean()),
-        "std_core_hours_per_configuration": float(group_df[core_hours_col].std()),
-        "min_core_hours_per_configuration": float(group_df[core_hours_col].min()),
-        "max_core_hours_per_configuration": float(group_df[core_hours_col].max()),
-        "avg_core_hours_error": (
-            float(group_df[core_hours_error_col].mean())
-            if core_hours_error_col in group_df.columns
-            else 0.0
-        ),
-        "bare_mass_range_min": float(group_df[bare_mass_col].min()),
-        "bare_mass_range_max": float(group_df[bare_mass_col].max()),
-        "avg_bare_mass": float(group_df[bare_mass_col].mean()),
-        "total_configurations": (
-            int(group_df["Number_of_configurations"].sum())
-            if "Number_of_configurations" in group_df.columns
-            else len(group_df)
-        ),
+    # Overall statistics
+    overall_stats = {
+        "total_data_points": len(df),
+        "total_groups": len(group_results),
+        "avg_cost": float(df[cost_cols["mean"]].mean()),
+        "std_cost": float(df[cost_cols["mean"]].std()),
+        "min_cost": float(df[cost_cols["mean"]].min()),
+        "max_cost": float(df[cost_cols["mean"]].max()),
     }
 
-    # Add cost predictions if configuration requests it
-    compilation_config = get_result_compilation_config()
-    if compilation_config["include_cost_predictions"]:
-        result["cost_predictions"] = calculate_cost_predictions(
-            group_df, compilation_config["cost_prediction_points"]
-        )
-
-    return result
+    return {
+        "group_results": group_results,
+        "overall_statistics": overall_stats,
+        "extrapolation_type": "statistical_only",
+    }
 
 
-def compile_group_result(
-    group_keys: Tuple, group_df: pd.DataFrame, plotter: DataPlotter, logger
+def _extrapolate_group(
+    group_values: Tuple, group_df: pd.DataFrame, param_names: List[str], logger
 ) -> Dict[str, Any]:
-    """
-    Compile results for a single parameter group.
+    """Extrapolate a single parameter group."""
 
-    Parameters
-    ----------
-    group_keys : Tuple
-        Parameter values defining the group
-    group_df : pd.DataFrame
-        Data for this group
-    plotter : DataPlotter
-        DataPlotter instance
-    logger : Logger
-        Logger instance
+    cost_cols = get_cost_column_names()
 
-    Returns
-    -------
-    Dict[str, Any]
-        Compiled results for this group
-    """
-    # Group parameter values
-    param_names = plotter.list_of_multivalued_tunable_parameter_names
-    group_params = dict(zip(param_names, group_keys))
+    # Basic group information
+    group_params = dict(zip(param_names, group_values))
 
-    # Basic statistics
-    core_hours_col = (
-        "Average_core_hours_per_spinor_per_configuration_mean"  # Use derived column
-    )
-    core_hours_error_col = (
-        "Average_core_hours_per_spinor_per_configuration_error"  # Error column
-    )
-    bare_mass_col = PROCESSED_PARAMS_CSV_COLUMNS["bare_mass"]
-
+    # Statistics
     result = {
         **group_params,
         "n_data_points": len(group_df),
-        "avg_core_hours_per_configuration": float(group_df[core_hours_col].mean()),
-        "std_core_hours_per_configuration": float(group_df[core_hours_col].std()),
-        "min_core_hours_per_configuration": float(group_df[core_hours_col].min()),
-        "max_core_hours_per_configuration": float(group_df[core_hours_col].max()),
-        "avg_core_hours_error": (
-            float(group_df[core_hours_error_col].mean())
-            if core_hours_error_col in group_df.columns
-            else 0.0
-        ),
-        "bare_mass_range_min": float(group_df[bare_mass_col].min()),
-        "bare_mass_range_max": float(group_df[bare_mass_col].max()),
-        "avg_bare_mass": float(group_df[bare_mass_col].mean()),
+        "avg_cost": float(group_df[cost_cols["mean"]].mean()),
+        "std_cost": float(group_df[cost_cols["mean"]].std()),
+        "min_cost": float(group_df[cost_cols["mean"]].min()),
+        "max_cost": float(group_df[cost_cols["mean"]].max()),
         "total_configurations": (
-            int(group_df["Number_of_configurations"].sum())
-            if "Number_of_configurations" in group_df.columns
+            int(group_df[cost_cols["count"]].sum())
+            if cost_cols["count"] in group_df.columns
             else len(group_df)
         ),
     }
 
-    # Add cost predictions if configuration requests it
-    compilation_config = get_result_compilation_config()
-    if compilation_config["include_cost_predictions"]:
-        result["cost_predictions"] = calculate_cost_predictions(
-            group_df, compilation_config["cost_prediction_points"]
+    # Add bare mass range if available
+    bare_mass_col = get_input_column("bare_mass")
+    if f"{bare_mass_col}_min" in group_df.columns:
+        result.update(
+            {
+                "bare_mass_min": float(group_df[f"{bare_mass_col}_min"].min()),
+                "bare_mass_max": float(group_df[f"{bare_mass_col}_max"].max()),
+                "bare_mass_avg": float(group_df[f"{bare_mass_col}_mean"].mean()),
+            }
+        )
+    elif bare_mass_col in group_df.columns:
+        result.update(
+            {
+                "bare_mass_min": float(group_df[bare_mass_col].min()),
+                "bare_mass_max": float(group_df[bare_mass_col].max()),
+                "bare_mass_avg": float(group_df[bare_mass_col].mean()),
+            }
         )
 
     return result
 
 
-def calculate_cost_predictions(
-    group_df: pd.DataFrame, prediction_points: List[float]
-) -> Dict[str, float]:
-    """
-    Calculate cost predictions at specific bare mass values.
+def _extract_results_from_plotter(plotter: DataPlotter, logger) -> Dict[str, Any]:
+    """Extract results from DataPlotter after fitting (placeholder)."""
+    # This would need to be implemented based on how DataPlotter stores fit results
+    # For now, return basic structure
 
-    Parameters
-    ----------
-    group_df : pd.DataFrame
-        Group data
-    prediction_points : List[float]
-        Bare mass values for prediction
+    logger.info("Extracting fit results from DataPlotter...")
 
-    Returns
-    -------
-    Dict[str, float]
-        Predicted costs at each point
-    """
-    # Simple linear interpolation for now
-    # In the future, this could use the actual fit results from DataPlotter
+    # This is a placeholder - would need to access actual fit results from DataPlotter
+    return {
+        "group_results": [],  # Would contain fit parameters for each group
+        "overall_statistics": {},
+        "extrapolation_type": "with_fitting",
+        "fit_function": get_plotting_config()["fit_function"],
+    }
 
-    bare_mass_col = PROCESSED_PARAMS_CSV_COLUMNS["bare_mass"]
-    core_hours_col = (
-        "Average_core_hours_per_spinor_per_configuration"  # Use derived column
-    )
 
-    x_data = group_df[bare_mass_col].to_numpy()
-    y_data = group_df[core_hours_col].to_numpy()
+def _validate_extrapolation_results(results: Dict[str, Any], logger) -> None:
+    """Validate extrapolation results against quality thresholds."""
 
-    predictions = {}
-    for point in prediction_points:
-        # Simple linear interpolation
-        if np.min(x_data) <= point <= np.max(x_data):
-            predicted_cost = np.interp(point, x_data, y_data)
-            predictions[f"cost_at_bare_mass_{point:.3f}"] = float(predicted_cost)
-        else:
-            predictions[f"cost_at_bare_mass_{point:.3f}"] = None
+    thresholds = get_validation_thresholds()
+    group_results = results.get("group_results", [])
 
-    return predictions
+    if not group_results:
+        logger.warning("No group results to validate")
+        return
+
+    # Check for reasonable cost values
+    invalid_groups = 0
+    for group in group_results:
+        avg_cost = group.get("avg_cost", 0)
+        if avg_cost < thresholds["min_cost"] or avg_cost > thresholds["max_cost"]:
+            invalid_groups += 1
+
+    # Check for sufficient data points
+    insufficient_data_groups = 0
+    for group in group_results:
+        n_points = group.get("n_data_points", 0)
+        if n_points < thresholds["min_data_points"]:
+            insufficient_data_groups += 1
+
+    # Calculate success rate
+    total_groups = len(group_results)
+    success_rate = 1 - (invalid_groups + insufficient_data_groups) / total_groups
+
+    logger.info(f"Validation results:")
+    logger.info(f"  • Total groups: {total_groups}")
+    logger.info(f"  • Invalid cost values: {invalid_groups}")
+    logger.info(f"  • Insufficient data: {insufficient_data_groups}")
+    logger.info(f"  • Success rate: {success_rate:.1%}")
+
+    if success_rate < thresholds["min_success_rate"]:
+        logger.warning(
+            f"Success rate {success_rate:.1%} below threshold {thresholds['min_success_rate']:.1%}"
+        )
 
 
 # =============================================================================
-# RESULT COMPILATION AND EXPORT
+# RESULT EXPORT
 # =============================================================================
 
 
-def compile_final_results(
-    analysis_results: Dict[str, Any], group_results: List[Dict[str, Any]], logger
+def export_results(
+    results: Dict[str, Any], output_directory: Path, csv_filename: str, logger
 ) -> pd.DataFrame:
     """
-    Compile final results into a DataFrame for export.
+    Export extrapolation results to CSV file.
 
     Parameters
     ----------
-    analysis_results : Dict[str, Any]
-        Overall analysis results
-    group_results : List[Dict[str, Any]]
-        Individual group results
+    results : Dict[str, Any]
+        Extrapolation results from perform_cost_extrapolation
+    output_directory : Path
+        Output directory
+    csv_filename : str
+        Name of output CSV file
     logger : Logger
         Logger instance
 
     Returns
     -------
     pd.DataFrame
-        Final results ready for CSV export
+        Exported results DataFrame
     """
-    logger.info("Compiling final results for export...")
+    logger.info("Exporting extrapolation results...")
 
+    group_results = results.get("group_results", [])
     if not group_results:
-        logger.warning("No group results to compile")
+        logger.warning("No group results to export")
         return pd.DataFrame()
 
-    # Convert group results to DataFrame
+    # Convert to DataFrame
     results_df = pd.DataFrame(group_results)
 
     # Add overall statistics as additional columns
-    for key, value in analysis_results["cost_statistics"].items():
+    overall_stats = results.get("overall_statistics", {})
+    for key, value in overall_stats.items():
         results_df[f"overall_{key}"] = value
 
-    # Add metadata
-    results_df["total_data_points_analyzed"] = analysis_results["total_data_points"]
-    results_df["reference_pcac_mass"] = analysis_results["reference_pcac_mass"]
+    # Add extrapolation metadata
+    results_df["extrapolation_type"] = results.get("extrapolation_type", "unknown")
+    if "fit_function" in results:
+        results_df["fit_function"] = results["fit_function"]
 
     # Round floating point values
-    float_precision = OUTPUT_CSV_CONFIG["float_precision"]
+    float_precision = CONFIG["output"]["float_precision"]
     numeric_columns = results_df.select_dtypes(include=[np.number]).columns
     results_df[numeric_columns] = results_df[numeric_columns].round(float_precision)
 
-    logger.info(f"Compiled {len(results_df)} group results for export")
+    # Export to CSV
+    csv_path = output_directory / csv_filename
+    try:
+        results_df.to_csv(csv_path, index=False)
+        logger.info(f"Exported {len(results_df)} results to {csv_path}")
+    except Exception as e:
+        logger.error(f"Failed to export results: {e}")
+        raise
+
     return results_df
-
-
-def validate_results(results_df: pd.DataFrame, logger) -> bool:
-    """
-    Validate analysis results against quality thresholds.
-
-    Parameters
-    ----------
-    results_df : pd.DataFrame
-        Results DataFrame
-    logger : Logger
-        Logger instance
-
-    Returns
-    -------
-    bool
-        Whether results pass validation
-    """
-    if results_df.empty:
-        logger.error("Results DataFrame is empty")
-        return False
-
-    validation_config = get_fit_validation_config()
-
-    # Check for reasonable cost values
-    max_cost = validation_config["max_reasonable_cost"]
-    min_cost = validation_config["min_reasonable_cost"]
-
-    cost_col = "avg_core_hours_per_configuration"  # Updated column name
-    invalid_costs = (
-        (results_df[cost_col] > max_cost) | (results_df[cost_col] < min_cost)
-    ).sum()
-
-    if invalid_costs > 0:
-        logger.warning(f"Found {invalid_costs} groups with unreasonable cost values")
-
-    # Check data point counts
-    min_points = DATA_FILTERING_CONFIG["min_data_points_for_fitting"]
-    insufficient_data = (results_df["n_data_points"] < min_points).sum()
-
-    if insufficient_data > 0:
-        logger.warning(
-            f"Found {insufficient_data} groups with insufficient data points"
-        )
-
-    success_rate = 1 - (invalid_costs + insufficient_data) / len(results_df)
-    logger.info(
-        f"Result validation: {success_rate:.1%} of groups passed quality checks"
-    )
-
-    return success_rate > 0.5  # Require at least 50% success rate
