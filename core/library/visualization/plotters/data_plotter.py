@@ -861,7 +861,14 @@ class DataPlotter(DataFrameAnalyzer):
         # Prepare exclusion list
         excluded = set(excluded_from_title_list or [])
         excluded.update(
-            ["Main_program_type", "MPI_geometry", "Maximum_Lanczos_iterations"]
+            [
+                "Main_program_type",
+                "MPI_geometry",
+                "Maximum_Lanczos_iterations",
+                "Number_of_spinors",
+                "Outer_solver_epsilon",
+                "Number_of_vectors",
+            ]
         )
         if grouping_variable:
             if isinstance(grouping_variable, str):
