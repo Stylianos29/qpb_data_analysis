@@ -11,6 +11,23 @@ qpb_data_analysis/core/src/analysis/_cost_estimation_config.py
 
 from typing import List, Dict, Any, Optional
 
+
+# Configuration for automatic parameter grouping
+AUTOMATIC_GROUPING_CONFIG = {
+    "exclude_from_grouping": [
+        "Configuration_label",  # Always exclude - we average across configs
+        "MPI_geometry",  # Usually computational detail, not physics
+    ],
+    "always_include_single_valued": True,  # Include single-valued params in output
+    "verbose_grouping": True,  # Log which parameters are used for grouping
+}
+
+
+def get_automatic_grouping_config():
+    """Get configuration for automatic parameter grouping."""
+    return AUTOMATIC_GROUPING_CONFIG.copy()
+
+
 # =============================================================================
 # INPUT/OUTPUT CONFIGURATION
 # =============================================================================
@@ -48,14 +65,14 @@ DATAPLOTTER_CONFIG = {
     "x_variable": "Bare_mass",
     "y_variable": "Average_core_hours_per_spinor_per_configuration_with_errors",  # With error bars
     # Figure settings
-    "figure_size": (12, 8),
+    "figure_size": (7, 5),
     "font_size": 12,
     # Plot titles
     "include_plot_title": True,
     # "custom_plot_title": None,  # Let DataPlotter auto-generate from parameters
     "title_from_columns": None,  # Auto-detect from grouping parameters
     "title_size": 14,
-    "bold_title": True,
+    "bold_title": False,
     "title_wrapping_length": 80,
     # Curve fitting settings
     "fit_function": "shifted_power_law",  # a/(x-b) + c - perfect for cost analysis

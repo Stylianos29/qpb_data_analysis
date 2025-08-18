@@ -23,13 +23,11 @@ Usage:
         -o output_dir [options]
 """
 
-import os
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, Any
 
 import click
-import numpy as np
 import pandas as pd
 
 # Configure matplotlib to use non-interactive backend
