@@ -2,10 +2,11 @@
 """
 Computational Cost Analysis Script using DataPlotter Integration
 
-This script analyzes computational costs (core-hours per spinor per configuration)
-using the DataPlotter class for automatic grouping, curve fitting, and visualization.
-The DataPlotter automatically detects multivalued parameters for grouping and applies
-sophisticated curve fitting with the shifted power law function a/(x-b)+c.
+This script analyzes computational costs (core-hours per spinor per
+configuration) using the DataPlotter class for automatic grouping, curve
+fitting, and visualization. The DataPlotter automatically detects
+multivalued parameters for grouping and applies sophisticated curve
+fitting with the shifted power law function a/(x-b)+c.
 
 Key features:
     - Automatic parameter detection and grouping via DataPlotter
@@ -14,11 +15,8 @@ Key features:
     - Comprehensive statistical analysis and validation
     - CSV export with detailed results and metadata
 
-Place this file as:
-qpb_data_analysis/core/src/analysis/estimate_computational_cost_at_target_bare_mass.py
-
 Usage:
-    python estimate_computational_cost_at_target_bare_mass.py \
+    python extrapolate_computational_cost.py \
         -i_proc processed_parameter_values.csv \
         -o output_dir [options]
 """
@@ -43,14 +41,13 @@ from library.validation.click_validators import (
     validate_log_filename,
 )
 
-# Import our modules
-from src.analysis._cost_estimation_config import (
-    PROCESSED_PARAMS_CSV_COLUMNS,
+# Import from auxiliary modules
+from src.analysis._cost_extrapolation_config import (
     OUTPUT_CSV_CONFIG,
     REFERENCE_CONFIG,
     validate_config,
 )
-from src.analysis._cost_estimation_methods import (
+from src.analysis._cost_extrapolation_methods import (
     load_and_prepare_data,
     create_cost_plotter,
     perform_cost_analysis,
@@ -176,7 +173,7 @@ def main(
         verbose=verbose,
     )
 
-    logger.log_script_start("Computational cost analysis using DataPlotter")
+    logger.log_script_start("Computational cost extrapolation")
     logger.info(f"Input processed CSV: {input_processed_csv}")
     logger.info(f"Reference PCAC mass: {reference_pcac_mass}")
     logger.info(f"Output directory: {output_directory}")
@@ -281,7 +278,7 @@ def perform_statistical_analysis_only(cost_plotter, logger):
     logger.info("Performing statistical analysis without plotting...")
 
     # Extract analysis results without plotting
-    from src.analysis._cost_estimation_methods import (
+    from src.analysis._cost_extrapolation_methods import (
         extract_analysis_results,
         extract_group_results,
     )
