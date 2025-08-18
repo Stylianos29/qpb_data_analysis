@@ -1,12 +1,10 @@
 """
-Private methods for computational cost estimation using DataPlotter integration.
+Private methods for computational cost estimation using DataPlotter
+integration.
 
-This module contains simplified analysis functions that leverage the DataPlotter
-class for automatic grouping, curve fitting, and visualization of computational
-cost data.
-
-Place this file as:
-qpb_data_analysis/core/src/analysis/_cost_estimation_methods.py
+This module contains simplified analysis functions that leverage the
+DataPlotter class for automatic grouping, curve fitting, and
+visualization of computational cost data.
 """
 
 import numpy as np
@@ -20,7 +18,7 @@ from library.visualization.plotters.data_plotter import DataPlotter
 from library.data.analyzer import DataFrameAnalyzer
 
 # Import configuration
-from src.analysis._cost_estimation_config import (
+from src.analysis._cost_extrapolation_config import (
     PROCESSED_PARAMS_CSV_COLUMNS,
     OUTPUT_CSV_CONFIG,
     REFERENCE_CONFIG,
@@ -41,11 +39,12 @@ def load_and_prepare_data(processed_csv_path: str, logger) -> pd.DataFrame:
     Load and prepare processed parameters data for analysis.
 
     This function:
-    1. Loads the raw data
-    2. Applies data filtering
-    3. Creates a DataFrameAnalyzer for automatic parameter detection
-    4. Creates derived column: Average_core_hours_per_spinor_per_configuration
-    5. Returns DataFrame ready for DataPlotter analysis
+        1. Loads the raw data
+        2. Applies data filtering
+        3. Creates a DataFrameAnalyzer for automatic parameter detection
+        4. Creates derived column:
+           Average_core_hours_per_spinor_per_configuration
+        5. Returns DataFrame ready for DataPlotter analysis
 
     Parameters
     ----------
@@ -179,10 +178,12 @@ def create_per_configuration_averages(
     analyzer: DataFrameAnalyzer, logger
 ) -> pd.DataFrame:
     """
-    Create derived dataset with per-configuration averages using automatic parameter grouping.
+    Create derived dataset with per-configuration averages using
+    automatic parameter grouping.
 
-    This function uses the DataFrameAnalyzer's automatic parameter detection and grouping
-    to create configuration-averaged data without hardcoding grouping parameters.
+    This function uses the DataFrameAnalyzer's automatic parameter
+    detection and grouping to create configuration-averaged data without
+    hardcoding grouping parameters.
 
     Parameters
     ----------
@@ -369,6 +370,8 @@ def perform_cost_analysis(
         # Figure settings
         figure_size=dataplotter_config["figure_size"],
         font_size=dataplotter_config["font_size"],
+        top_margin_adjustment=dataplotter_config["top_margin_adjustment"],
+        left_margin_adjustment=dataplotter_config["left_margin_adjustment"],
         # Plot titles
         include_plot_title=dataplotter_config["include_plot_title"],
         # custom_plot_title=dataplotter_config["custom_plot_title"],
@@ -396,8 +399,6 @@ def perform_cost_analysis(
         file_format=dataplotter_config["file_format"],
         # Additional options
         verbose=True,
-        top_margin_adjustment=0.88,
-        left_margin_adjustment=0.12,
     )
 
     logger.info("DataPlotter analysis completed successfully")

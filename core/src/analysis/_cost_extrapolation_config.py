@@ -68,6 +68,8 @@ DATAPLOTTER_CONFIG = {
     # Figure settings
     "figure_size": (7, 5),
     "font_size": 12,
+    "top_margin_adjustment": 0.88,  # Adjust for title and legend
+    "left_margin_adjustment": 0.12,  # Adjust for y-axis label
     # Plot titles
     "include_plot_title": True,
     # "custom_plot_title": None,  # Let DataPlotter auto-generate from
@@ -75,7 +77,7 @@ DATAPLOTTER_CONFIG = {
     "title_from_columns": None,  # Auto-detect from grouping parameters
     "title_size": 14,
     "bold_title": False,
-    "title_wrapping_length": 80,
+    "title_wrapping_length": 75,
     # Curve fitting settings
     "fit_function": "shifted_power_law",  # a/(x-b) + c - perfect for cost analysis
     "show_fit_parameters_on_plot": True,
