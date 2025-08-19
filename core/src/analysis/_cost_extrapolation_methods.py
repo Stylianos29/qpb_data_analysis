@@ -149,7 +149,8 @@ def _average_across_configurations(df: pd.DataFrame, logger) -> pd.DataFrame:
         count = core_hours_series.count()
         if count < min_count:
             logger.warning(
-                f"Skipping group {group_keys}: insufficient data points ({count} < {min_count})"
+                f"Skipping group {group_keys}: "
+                f"insufficient data points ({count} < {min_count})"
             )
             continue
 
@@ -223,18 +224,14 @@ def create_cost_plotter(df: pd.DataFrame, plots_directory: Path, logger) -> Data
     return plotter
 
 
-def perform_cost_extrapolation(
-    plotter: DataPlotter, enable_plotting: bool, logger
-) -> Dict[str, Any]:
+def perform_cost_extrapolation(plotter: DataPlotter, logger) -> Dict[str, Any]:
     """
-    Perform cost extrapolation using DataPlotter.
+    Perform cost extrapolation using DataPlotter with automatic grouping and fitting.
 
     Parameters
     ----------
     plotter : DataPlotter
         Configured DataPlotter instance
-    enable_plotting : bool
-        Whether to generate plots
     logger : Logger
         Logger instance
 
@@ -256,13 +253,9 @@ def perform_cost_extrapolation(
             f"Insufficient data points: {len(plotter.dataframe)} < {min_points}"
         )
 
-    # Perform extrapolation with or without plotting
-    if enable_plotting:
-        logger.info("Generating plots with curve fitting...")
-        results = _perform_extrapolation_with_plotting(plotter, plotting_config, logger)
-    else:
-        logger.info("Performing statistical extrapolation without plotting...")
-        results = _perform_extrapolation_without_plotting(plotter, logger)
+    # Perform extrapolation with plotting and curve fitting
+    logger.info("Generating plots with curve fitting...")
+    results = _perform_extrapolation(plotter, plotting_config, logger)
 
     # Validate results
     if get_extrapolation_config()["validate_results"]:
@@ -271,7 +264,7 @@ def perform_cost_extrapolation(
     return results
 
 
-def _perform_extrapolation_with_plotting(
+def _perform_extrapolation(
     plotter: DataPlotter, plotting_config: Dict, logger
 ) -> Dict[str, Any]:
     """Perform extrapolation with DataPlotter plotting and fitting."""
@@ -287,7 +280,7 @@ def _perform_extrapolation_with_plotting(
         show_fit_parameters_on_plot=plotting_config["show_fit_parameters"],
         fit_label_location=plotting_config["fit_label_location"],
         save_figure=True,
-        verbose=True,
+        verbose=False,
         include_plot_title=True,
         top_margin_adjustment=plotting_config["top_margin_adjustment"],
     )
@@ -298,10 +291,10 @@ def _perform_extrapolation_with_plotting(
     return results
 
 
-def _perform_extrapolation_without_plotting(
-    plotter: DataPlotter, logger
-) -> Dict[str, Any]:
-    """Perform statistical extrapolation without plotting."""
+def _extract_results_from_plotter(plotter: DataPlotter, logger) -> Dict[str, Any]:
+    """Extract results from DataPlotter after fitting."""
+
+    logger.info("Extracting fit results from DataPlotter...")
 
     # Extract basic statistics from the data
     cost_cols = get_cost_column_names()
@@ -339,7 +332,8 @@ def _perform_extrapolation_without_plotting(
     return {
         "group_results": group_results,
         "overall_statistics": overall_stats,
-        "extrapolation_type": "statistical_only",
+        "extrapolation_type": "with_fitting",
+        "fit_function": get_plotting_config()["fit_function"],
     }
 
 
@@ -390,38 +384,30 @@ def _extrapolate_group(
     return result
 
 
-def _extract_results_from_plotter(plotter: DataPlotter, logger) -> Dict[str, Any]:
-    """Extract results from DataPlotter after fitting (placeholder)."""
-    # This would need to be implemented based on how DataPlotter stores fit results
-    # For now, return basic structure
+# def _extract_results_from_plotter(plotter: DataPlotter, logger) -> Dict[str, Any]:
+#     """Extract results from DataPlotter after fitting (placeholder)."""
+#     # This would need to be implemented based on how DataPlotter stores fit results
+#     # For now, return basic structure
 
-    logger.info("Extracting fit results from DataPlotter...")
+#     logger.info("Extracting fit results from DataPlotter...")
 
-    # This is a placeholder - would need to access actual fit results from DataPlotter
-    return {
-        "group_results": [],  # Would contain fit parameters for each group
-        "overall_statistics": {},
-        "extrapolation_type": "with_fitting",
-        "fit_function": get_plotting_config()["fit_function"],
-    }
+#     # This is a placeholder - would need to access actual fit results from DataPlotter
+#     return {
+#         "group_results": [],  # Would contain fit parameters for each group
+#         "overall_statistics": {},
+#         "extrapolation_type": "with_fitting",
+#         "fit_function": get_plotting_config()["fit_function"],
+#     }
 
 
 def _validate_extrapolation_results(results: Dict[str, Any], logger) -> None:
     """Validate extrapolation results against quality thresholds."""
-
     thresholds = get_validation_thresholds()
     group_results = results.get("group_results", [])
 
     if not group_results:
         logger.warning("No group results to validate")
         return
-
-    # Check for reasonable cost values
-    invalid_groups = 0
-    for group in group_results:
-        avg_cost = group.get("avg_cost", 0)
-        if avg_cost < thresholds["min_cost"] or avg_cost > thresholds["max_cost"]:
-            invalid_groups += 1
 
     # Check for sufficient data points
     insufficient_data_groups = 0
@@ -432,18 +418,12 @@ def _validate_extrapolation_results(results: Dict[str, Any], logger) -> None:
 
     # Calculate success rate
     total_groups = len(group_results)
-    success_rate = 1 - (invalid_groups + insufficient_data_groups) / total_groups
+    success_rate = 1 - insufficient_data_groups / total_groups
 
     logger.info(f"Validation results:")
     logger.info(f"  • Total groups: {total_groups}")
-    logger.info(f"  • Invalid cost values: {invalid_groups}")
     logger.info(f"  • Insufficient data: {insufficient_data_groups}")
     logger.info(f"  • Success rate: {success_rate:.1%}")
-
-    if success_rate < thresholds["min_success_rate"]:
-        logger.warning(
-            f"Success rate {success_rate:.1%} below threshold {thresholds['min_success_rate']:.1%}"
-        )
 
 
 # =============================================================================

@@ -78,12 +78,6 @@ from src.analysis._cost_extrapolation_methods import (
     help=f"Output CSV filename (default: {CONFIG['output']['csv_filename']}).",
 )
 @click.option(
-    "--enable_plotting",
-    is_flag=True,
-    default=True,
-    help="Enable generation of diagnostic plots.",
-)
-@click.option(
     "-log_on",
     "--enable_logging",
     is_flag=True,
@@ -116,7 +110,6 @@ def main(
     output_directory,
     plots_directory,
     output_csv_filename,
-    enable_plotting,
     enable_logging,
     log_directory,
     log_filename,
@@ -148,9 +141,8 @@ def main(
     else:
         log_directory = Path(log_directory) if log_directory else None
 
-    # Create directories if needed
-    if enable_plotting:
-        plots_directory.mkdir(parents=True, exist_ok=True)
+    # Create directories
+    plots_directory.mkdir(parents=True, exist_ok=True)
     if log_directory:
         log_directory.mkdir(parents=True, exist_ok=True)
 
@@ -167,7 +159,6 @@ def main(
     logger.info(f"Input processed CSV: {input_processed_csv}")
     logger.info(f"Output directory: {output_directory}")
     logger.info(f"Plots directory: {plots_directory}")
-    logger.info(f"Enable plotting: {enable_plotting}")
 
     try:
         # Phase 1: Data Loading and Preparation
@@ -198,9 +189,7 @@ def main(
 
         # Phase 3: Cost Extrapolation and Fitting
         logger.info("=== PHASE 3: Cost Extrapolation and Fitting ===")
-        extrapolation_results = perform_cost_extrapolation(
-            cost_plotter, enable_plotting=enable_plotting, logger=logger
-        )
+        extrapolation_results = perform_cost_extrapolation(cost_plotter, logger)
 
         if not extrapolation_results:
             logger.error("Extrapolation failed to produce results. Exiting.")
@@ -221,8 +210,7 @@ def main(
         )
         success_msg += f"\n  • Analyzed {len(results_df)} parameter groups"
         success_msg += f"\n  • Total data points: {len(prepared_df)}"
-        if enable_plotting:
-            success_msg += f"\n  • Plots saved to: {plots_directory}"
+        success_msg += f"\n  • Plots saved to: {plots_directory}"
 
         click.echo(success_msg)
 
