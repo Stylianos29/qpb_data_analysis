@@ -766,7 +766,9 @@ class DataPlotter(DataFrameAnalyzer):
 
         # Apply curve fitting if requested
         if kwargs.get("fit_function"):
-            self._apply_curve_fitting(ax, group_df, color, kwargs)
+            fit_result = self._apply_curve_fitting(ax, group_df, color, kwargs)
+            if fit_result:
+                self.stored_fit_results['individual'] = fit_result
 
         # Plot the data
         self._plot_single_group(
