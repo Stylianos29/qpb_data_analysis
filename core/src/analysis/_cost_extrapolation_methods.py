@@ -7,10 +7,9 @@ automatic parameter detection and grouping, and the DataPlotter class
 for curve fitting and visualization of computational cost data.
 """
 
-from matplotlib.axes import Axes
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Optional, Tuple, Any, Union
+from typing import Dict, Any
 from pathlib import Path
 
 # Import library components
@@ -26,7 +25,6 @@ from src.analysis._cost_extrapolation_config import (
     get_validation_config,
     get_plotting_config,
     get_output_config,
-    get_validation_thresholds,
 )
 
 
@@ -271,39 +269,8 @@ def perform_cost_extrapolation(plotter: DataPlotter, logger) -> Dict[str, Any]:
         post_plot_customization_function=add_extrapolation_lines,
     )
 
-    # Extract and validate results
-    results = plotter.get_fit_results()
-
-    # if get_extrapolation_config()["validate_results"]:
-    #     _validate_extrapolation_results(results, logger)
-
-    return results
-
-
-def _validate_extrapolation_results(results: Dict[str, Any], logger) -> None:
-    """Validate extrapolation results against quality thresholds."""
-    thresholds = get_validation_thresholds()
-    group_results = results.get("group_results", [])
-
-    if not group_results:
-        logger.warning("No group results to validate")
-        return
-
-    # Check for sufficient data points
-    insufficient_data_groups = 0
-    for group in group_results:
-        n_points = group.get("n_data_points", 0)
-        if n_points < thresholds["min_data_points"]:
-            insufficient_data_groups += 1
-
-    # Calculate success rate
-    total_groups = len(group_results)
-    success_rate = 1 - insufficient_data_groups / total_groups
-
-    logger.info(f"Validation results:")
-    logger.info(f"  • Total groups: {total_groups}")
-    logger.info(f"  • Insufficient data: {insufficient_data_groups}")
-    logger.info(f"  • Success rate: {success_rate:.1%}")
+    # Extract results
+    return plotter.get_fit_results()
 
 
 def extrapolate_individual(ax, plot_data=None, fit_results=None, **kwargs):
