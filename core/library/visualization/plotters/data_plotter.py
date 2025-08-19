@@ -383,6 +383,7 @@ class DataPlotter(DataFrameAnalyzer):
                 self._create_individual_plot(
                     ax=ax,
                     group_df=group_df,
+                    group_keys=group_keys,
                     styling_variable=styling_variable,
                     marker_color_map=marker_color_map,
                     color_index_shift=color_index_shift,
@@ -748,7 +749,7 @@ class DataPlotter(DataFrameAnalyzer):
             )
 
     def _create_individual_plot(
-        self, ax: Axes, group_df: pd.DataFrame, **kwargs
+        self, ax: Axes, group_df: pd.DataFrame, group_keys: Tuple[Any, ...], **kwargs
     ) -> None:
         """Create a plot with a single data series."""
         # Determine style
@@ -768,7 +769,7 @@ class DataPlotter(DataFrameAnalyzer):
         if kwargs.get("fit_function"):
             fit_result = self._apply_curve_fitting(ax, group_df, color, kwargs)
             if fit_result:
-                self.stored_fit_results['individual'] = fit_result
+                self.stored_fit_results[group_keys] = fit_result
 
         # Plot the data
         self._plot_single_group(
