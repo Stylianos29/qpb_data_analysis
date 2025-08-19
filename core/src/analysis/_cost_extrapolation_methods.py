@@ -7,9 +7,10 @@ automatic parameter detection and grouping, and the DataPlotter class
 for curve fitting and visualization of computational cost data.
 """
 
+from matplotlib.axes import Axes
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any, Union
 from pathlib import Path
 
 # Import library components
@@ -138,7 +139,8 @@ def _average_across_configurations(df: pd.DataFrame, logger) -> pd.DataFrame:
     )
 
     logger.info(
-        f"Grouping parameters: {analyzer.reduced_multivalued_tunable_parameter_names_list}"
+        "Grouping parameters: "
+        f"{analyzer.reduced_multivalued_tunable_parameter_names_list}"
     )
 
     # Build result rows by iterating through groups
@@ -255,108 +257,16 @@ def perform_cost_extrapolation(plotter: DataPlotter, logger) -> Dict[str, Any]:
         verbose=False,
         include_plot_title=True,
         top_margin_adjustment=plotting_config["top_margin_adjustment"],
+        post_plot_customization_function=add_extrapolation_lines,
     )
 
     # Extract and validate results
-    results = _extract_results_from_plotter(plotter, logger)
+    results = plotter.get_fit_results()
 
-    if get_extrapolation_config()["validate_results"]:
-        _validate_extrapolation_results(results, logger)
+    # if get_extrapolation_config()["validate_results"]:
+    #     _validate_extrapolation_results(results, logger)
 
     return results
-
-
-def _extract_results_from_plotter(plotter: DataPlotter, logger) -> Dict[str, Any]:
-    """Extract results from DataPlotter after fitting."""
-
-    logger.info("Extracting fit results from DataPlotter...")
-
-    # Extract basic statistics from the data
-    cost_cols = get_cost_column_names()
-    df = plotter.dataframe
-
-    # Group-level statistics
-    group_results = []
-
-    # If we have multivalued parameters, extrapolate by group
-    if plotter.list_of_multivalued_tunable_parameter_names:
-        grouping_params = plotter.list_of_multivalued_tunable_parameter_names
-        for group_values, group_df in df.groupby(grouping_params):
-            if not isinstance(group_values, tuple):
-                group_values = (group_values,)
-
-            group_result = _extrapolate_group(
-                group_values, group_df, grouping_params, logger
-            )
-            group_results.append(group_result)
-    else:
-        # Extrapolate entire dataset as one group
-        group_result = _extrapolate_group(("all_data",), df, ["dataset"], logger)
-        group_results.append(group_result)
-
-    # Overall statistics
-    overall_stats = {
-        "total_data_points": len(df),
-        "total_groups": len(group_results),
-        "avg_cost": float(df[cost_cols["mean"]].mean()),
-        "std_cost": float(df[cost_cols["mean"]].std()),
-        "min_cost": float(df[cost_cols["mean"]].min()),
-        "max_cost": float(df[cost_cols["mean"]].max()),
-    }
-
-    return {
-        "group_results": group_results,
-        "overall_statistics": overall_stats,
-        "extrapolation_type": "with_fitting",
-        "fit_function": get_plotting_config()["fit_function"],
-    }
-
-
-def _extrapolate_group(
-    group_values: Tuple, group_df: pd.DataFrame, param_names: List[str], logger
-) -> Dict[str, Any]:
-    """Extrapolate a single parameter group."""
-
-    cost_cols = get_cost_column_names()
-
-    # Basic group information
-    group_params = dict(zip(param_names, group_values))
-
-    # Statistics
-    result = {
-        **group_params,
-        "n_data_points": len(group_df),
-        "avg_cost": float(group_df[cost_cols["mean"]].mean()),
-        "std_cost": float(group_df[cost_cols["mean"]].std()),
-        "min_cost": float(group_df[cost_cols["mean"]].min()),
-        "max_cost": float(group_df[cost_cols["mean"]].max()),
-        "total_configurations": (
-            int(group_df[cost_cols["count"]].sum())
-            if cost_cols["count"] in group_df.columns
-            else len(group_df)
-        ),
-    }
-
-    # Add bare mass range if available
-    bare_mass_col = get_input_column("bare_mass")
-    if f"{bare_mass_col}_min" in group_df.columns:
-        result.update(
-            {
-                "bare_mass_min": float(group_df[f"{bare_mass_col}_min"].min()),
-                "bare_mass_max": float(group_df[f"{bare_mass_col}_max"].max()),
-                "bare_mass_avg": float(group_df[f"{bare_mass_col}_mean"].mean()),
-            }
-        )
-    elif bare_mass_col in group_df.columns:
-        result.update(
-            {
-                "bare_mass_min": float(group_df[bare_mass_col].min()),
-                "bare_mass_max": float(group_df[bare_mass_col].max()),
-                "bare_mass_avg": float(group_df[bare_mass_col].mean()),
-            }
-        )
-
-    return result
 
 
 def _validate_extrapolation_results(results: Dict[str, Any], logger) -> None:
@@ -385,13 +295,198 @@ def _validate_extrapolation_results(results: Dict[str, Any], logger) -> None:
     logger.info(f"  • Success rate: {success_rate:.1%}")
 
 
+def extrapolate_individual(ax, plot_data=None, fit_results=None, **kwargs):
+    add_extrapolation_lines(
+        ax=ax,
+        fit_results=fit_results,
+        # plot_type='individual',
+        x_target=0.005,
+        line_style={"color": "blue", "linestyle": ":", "alpha": 0.8},
+        **kwargs,
+    )
+
+
+def add_extrapolation_lines(
+    ax,
+    plot_data=None,
+    fit_results=None,
+    group_info=None,
+    plot_type="grouped",
+    x_target=0.005,
+    line_style=None,
+    **kwargs,
+):
+    """
+    Add vertical and horizontal lines showing extrapolation at target
+    x-value.
+
+    Parameters:
+    -----------
+    ax : matplotlib.axes.Axes
+        The axes object to draw on
+    plot_data : dict
+        Plot data (not used in this function, but part of signature)
+    fit_results : dict
+        Dictionary mapping group values to fit result dictionaries
+    group_info : dict
+        Group information (not used in this function, but part of
+        signature)
+    plot_type : str
+        Type of plot ('grouped' or 'individual')
+    x_target : float
+        X-value where to draw extrapolation lines (default: 100)
+    line_style : dict, optional
+        Style parameters for the lines
+    **kwargs : dict
+        Additional context parameters
+    """
+
+    # print(f"DEBUG: plot_type={plot_type}, fit_results={fit_results}")
+
+    if not fit_results:
+        print("No fit results available for extrapolation.")
+        return
+
+    # Default line style
+    default_style = {
+        "color": "green",
+        "linestyle": "--",
+        "alpha": 0.7,
+        "linewidth": 1.5,
+    }
+    if line_style:
+        default_style.update(line_style)
+
+    # Draw vertical line at x_target
+    ax.axvline(x_target, label=f"x = {x_target}", **default_style)
+
+    # Handle different plot types
+    if plot_type == "grouped":
+        # fit_results is a dictionary mapping group_value -> fit_result
+        for group_value, fit_result in fit_results.items():
+            if fit_result is None:
+                continue
+
+            y_extrap = _calculate_extrapolation(fit_result, x_target)
+            if y_extrap is not None:
+                # Draw horizontal line at extrapolated y-value
+                ax.axhline(
+                    y_extrap,
+                    label=f"{group_value}: y = {y_extrap:.2f}",
+                    **default_style,
+                )
+    else:
+        # plot_type == 'individual', fit_results is a single fit_result
+        # dict
+        if fit_results is not None:
+            y_extrap = _calculate_extrapolation(fit_results, x_target)
+            if y_extrap is not None:
+                ax.axhline(y_extrap, label=f"y = {y_extrap:.2f}", **default_style)
+
+    # Update legend to include new lines
+    ax.legend()
+
+
+def _calculate_extrapolation(fit_result, x_target):
+    """
+    Calculate extrapolated y-value for a given x_target using fit
+    results. Handles both scipy (float) and gvar (uncertainty)
+    parameters.
+
+    Parameters:
+    -----------
+    fit_result : dict
+        Fit result dictionary containing 'parameters' and 'function'
+        keys
+    x_target : float
+        X-value to extrapolate at
+
+    Returns:
+    --------
+    float or None
+        Extrapolated y-value, or None if function type is unsupported
+    """
+    if not fit_result:
+        return None
+
+    params = fit_result["parameters"]
+    function_type = fit_result["function"]
+    method = fit_result.get("method", "scipy")
+
+    # Handle gvar objects - extract mean values for calculation
+    if method == "gvar":
+        try:
+            import gvar
+
+            # Convert gvar objects to their mean values for
+            # extrapolation
+            if hasattr(params, "__iter__"):
+                # Array of gvar objects
+                param_values = [float(gvar.mean(p)) for p in params]
+            else:
+                # Single gvar object
+                param_values = [float(gvar.mean(params))]
+        except ImportError:
+            print("Warning: gvar not available, cannot extract parameter values")
+            return None
+        except Exception as e:
+            print(f"Warning: Could not extract gvar values: {e}")
+            return None
+    else:
+        # scipy case - parameters are already floats
+        param_values = params
+
+    try:
+        if function_type == "linear":
+            # y = a*x + b
+            return param_values[0] * x_target + param_values[1]
+
+        elif function_type == "exponential":
+            # y = a*exp(-b*x) + c
+            import numpy as np
+
+            return (
+                param_values[0] * np.exp(-param_values[1] * x_target) + param_values[2]
+            )
+
+        elif function_type == "power_law":
+            # y = a*x^b
+            if x_target <= 0:
+                print(
+                    f"Warning: Cannot extrapolate power law for x_target={x_target} <= 0"
+                )
+                return None
+            return param_values[0] * (x_target ** param_values[1])
+
+        elif function_type == "shifted_power_law":
+            # y = a/(x-b) + c
+            denominator = x_target - param_values[1]
+            if abs(denominator) < 1e-10:  # Now abs() works on float
+                print(
+                    f"Warning: Cannot extrapolate shifted power law for x_target={x_target} "
+                    f"(too close to singularity at x={param_values[1]:.3f})"
+                )
+                return None
+            return param_values[0] / denominator + param_values[2]
+
+        else:
+            print(
+                f"Warning: Extrapolation not supported for function type '{function_type}'"
+            )
+            return None
+
+    except (IndexError, ValueError, ZeroDivisionError) as e:
+        print(f"Error calculating extrapolation for {function_type}: {e}")
+        return None
+
+
 # =============================================================================
 # RESULT EXPORT
 # =============================================================================
 
 
 def export_results(
-    results: Dict[str, Any], output_directory: Path, csv_filename: str, logger
+    fit_results: Dict[str, Any], output_directory: Path, csv_filename: str, logger
 ) -> pd.DataFrame:
     """
     Export extrapolation results to CSV file.
@@ -412,38 +507,60 @@ def export_results(
     pd.DataFrame
         Exported results DataFrame
     """
-    logger.info("Exporting extrapolation results...")
+    # logger.info("Exporting extrapolation results...")
 
-    group_results = results.get("group_results", [])
-    if not group_results:
-        logger.warning("No group results to export")
-        return pd.DataFrame()
+    # group_results = results.get("group_results", []) if not
+    # group_results: logger.warning("No group results to export") return
+    #     pd.DataFrame()
 
-    # Convert to DataFrame
-    results_df = pd.DataFrame(group_results)
+    # # Convert to DataFrame
+    # results_df = pd.DataFrame(group_results)
 
-    # Add overall statistics as additional columns
-    overall_stats = results.get("overall_statistics", {})
-    for key, value in overall_stats.items():
-        results_df[f"overall_{key}"] = value
+    # # Add overall statistics as additional columns
+    # overall_stats = results.get("overall_statistics", {}) for key,
+    # value in overall_stats.items(): results_df[f"overall_{key}"] =
+    #     value
 
-    # Add extrapolation metadata
-    results_df["extrapolation_type"] = results.get("extrapolation_type", "unknown")
-    if "fit_function" in results:
-        results_df["fit_function"] = results["fit_function"]
+    # # Add extrapolation metadata
+    # results_df["extrapolation_type"] =
+    # results.get("extrapolation_type", "unknown") if "fit_function" in
+    #     results: results_df["fit_function"] = results["fit_function"]
 
-    # Round floating point values
-    float_precision = CONFIG["output"]["float_precision"]
-    numeric_columns = results_df.select_dtypes(include=[np.number]).columns
-    results_df[numeric_columns] = results_df[numeric_columns].round(float_precision)
+    # # Round floating point values
+    # float_precision = CONFIG["output"]["float_precision"]
+    # numeric_columns =
+    # results_df.select_dtypes(include=[np.number]).columns
+    # results_df[numeric_columns] =
+    # results_df[numeric_columns].round(float_precision)
 
-    # Export to CSV
-    csv_path = output_directory / csv_filename
-    try:
-        results_df.to_csv(csv_path, index=False)
-        logger.info(f"Exported {len(results_df)} results to {csv_path}")
-    except Exception as e:
-        logger.error(f"Failed to export results: {e}")
-        raise
+    # # Export to CSV
+    # csv_path = output_directory / csv_filename try:
+    # results_df.to_csv(csv_path, index=False) logger.info(f"Exported
+    #     {len(results_df)} results to {csv_path}") except Exception as
+    #     e: logger.error(f"Failed to export results: {e}") raise
 
+    # return results_df
+
+    results_data = []
+    for group_key, fit_data in fit_results.items():
+        if fit_data:
+            if fit_data["method"] == "gvar":
+                import gvar
+
+                params = [float(gvar.mean(p)) for p in fit_data["parameters"]]
+            else:
+                params = fit_data["parameters"]
+
+            results_data.append(
+                {
+                    "group": group_key,
+                    "function": fit_data["function"],
+                    "a": params[0],
+                    "b": params[1],
+                    "c": params[2],
+                    "method": fit_data["method"],
+                }
+            )
+
+    results_df = pd.DataFrame(results_data)
     return results_df
