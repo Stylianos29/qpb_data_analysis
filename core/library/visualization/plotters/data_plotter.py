@@ -200,6 +200,7 @@ class DataPlotter(DataFrameAnalyzer):
         fit_on_values: Optional[Union[Any, Tuple[Any, ...]]] = None,
         fit_label_in_legend: bool = False,
         fit_curve_range: Optional[Tuple[float, float]] = None,
+        fit_min_data_points: Optional[int] = None,
         # Annotations
         annotation_variable: Optional[str] = None,
         annotation_label: str = "",
@@ -243,6 +244,9 @@ class DataPlotter(DataFrameAnalyzer):
         show_yaxis_label : bool, optional
             Whether to display the y-axis label. Default is True.
             Useful for insets where axis labels might be redundant.
+        fit_min_data_points : int, optional
+            Minimum number of data points required for curve fitting.
+            If None, uses function-specific defaults from CurveFitter.
 
         Returns:
         --------
@@ -824,6 +828,7 @@ class DataPlotter(DataFrameAnalyzer):
             index_range=kwargs.get("fit_index_range"),
             curve_range=kwargs.get("fit_curve_range"),
             series_color=color,
+            min_data_points=kwargs.get("fit_min_data_points"),
         )
 
     def _construct_plot_title(
