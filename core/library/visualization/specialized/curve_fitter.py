@@ -61,6 +61,14 @@ class CurveFitter:
             "shifted_power_law": [1.0, 0.0, 0.0],
         }
 
+        # Minimum data points required for each fit function
+        self.min_data_points_defaults = {
+            "linear": 2,
+            "exponential": 3,
+            "power_law": 3,
+            "shifted_power_law": 4,
+        }
+
         # Fit label positions
         self.label_positions = {
             "top left": ((0.05, 0.95), ("left", "top")),
@@ -84,6 +92,7 @@ class CurveFitter:
         curve_range: Optional[Tuple[float, float]] = None,
         num_points: int = 200,
         series_color: Optional[str] = None,
+        min_data_points: Optional[int] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Apply curve fitting to data and display results.
@@ -128,6 +137,31 @@ class CurveFitter:
             if index_range is not None:
                 x_data = x_data[index_range]
                 y_data = y_data[index_range]
+
+            # Determine minimum data points required
+            min_required = min_data_points or self.min_data_points_defaults.get(
+                fit_function, 2
+            )
+
+            # Remove NaN values to get the actual usable data count
+            if self._has_uncertainties(y_data):
+                # For uncertainty data, extract values for validation
+                y_values = np.array(
+                    [val[0] if isinstance(val, tuple) else val for val in y_data]
+                )
+                valid_mask = ~np.isnan(x_data) & ~np.isnan(y_values)
+            else:
+                valid_mask = ~np.isnan(x_data) & ~np.isnan(y_data)
+
+            valid_data_count = np.sum(valid_mask)
+
+            if valid_data_count < min_required:
+                warnings.warn(
+                    f"Insufficient data for {fit_function} fit: "
+                    f"{valid_data_count} points provided, "
+                    f"minimum {min_required} required"
+                )
+                return None
 
             # Check if we have uncertainty data (tuples)
             has_uncertainties = self._has_uncertainties(y_data)
