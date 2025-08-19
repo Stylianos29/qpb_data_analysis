@@ -208,17 +208,29 @@ def create_cost_plotter(df: pd.DataFrame, plots_directory: Path, logger) -> Data
     """
     logger.info("Creating DataPlotter for cost extrapolation...")
 
-    # Create DataPlotter instance
-    plotter = DataPlotter(df, str(plots_directory))
+    # Get plotting configuration
+    plotting_config = get_plotting_config()
+
+    # Create base subdirectory for cost extrapolation
+    base_subdir = plotting_config.get(
+        "base_subdirectory", "Computational_cost_extrapolation"
+    )
+    cost_plots_directory = plots_directory / base_subdir
+    cost_plots_directory.mkdir(parents=True, exist_ok=True)
+
+    logger.info(f"Created base plots directory: {cost_plots_directory}")
+
+    # Create DataPlotter instance with enhanced directory
+    plotter = DataPlotter(df, str(cost_plots_directory))
 
     # Set plot variables from configuration
-    plotting_config = get_plotting_config()
     x_var = plotting_config["x_variable"]
     y_var = plotting_config["y_variable"]
 
     plotter.set_plot_variables(x_var, y_var)
 
     logger.info(f"DataPlotter configured: {x_var} vs {y_var}")
+    logger.info(f"Base directory: {cost_plots_directory}")
     logger.info(
         f"Multivalued parameters: {plotter.list_of_multivalued_tunable_parameter_names}"
     )

@@ -45,6 +45,8 @@ CONFIG = {
     },
     # DataPlotter settings
     "plotting": {
+        # Directory organization
+        "base_subdirectory": "Computational_cost_extrapolation",
         # Plot variables
         "x_variable": "Bare_mass",
         "y_variable": "Average_core_hours_per_spinor_per_configuration",

@@ -47,6 +47,7 @@ from src.analysis._cost_extrapolation_methods import (
     create_cost_plotter,
     perform_cost_extrapolation,
     export_results,
+    get_plotting_config,
 )
 
 
@@ -203,6 +204,9 @@ def main(
 
         logger.log_script_end("Computational cost extrapolation completed successfully")
 
+        # Get plotting configuration
+        plotting_config = get_plotting_config()
+
         # Final success message
         success_msg = "✓ Computational cost extrapolation completed successfully!"
         success_msg += (
@@ -210,7 +214,11 @@ def main(
         )
         success_msg += f"\n  • Analyzed {len(results_df)} parameter groups"
         success_msg += f"\n  • Total data points: {len(prepared_df)}"
-        success_msg += f"\n  • Plots saved to: {plots_directory}"
+        success_msg += (
+            "\n  • Plots saved to: "
+            f"{plots_directory / plotting_config.get(
+                'base_subdirectory', 'Computational_cost_extrapolation')}"
+        )
 
         click.echo(success_msg)
 
