@@ -31,7 +31,7 @@ CONFIG = {
     },
     # Data validation
     "data_validation": {
-        "min_data_points_for_fitting": 3,
+        "min_data_points_for_fitting": 4,
         "min_data_points_for_averaging": 3,  # Minimum configurations to average
         "max_reasonable_cost": 10000.0,  # core-hours
         "min_reasonable_cost": 0.1,  # core-hours

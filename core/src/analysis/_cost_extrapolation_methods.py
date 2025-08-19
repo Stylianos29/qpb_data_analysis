@@ -42,7 +42,8 @@ def load_and_prepare_data(csv_path: str, logger) -> pd.DataFrame:
     This function:
         1. Loads the raw CSV data using library.load_csv()
         2. Creates a DataFrameAnalyzer for automatic parameter detection
-        3. Averages across configurations using DataFrameAnalyzer.group_by_multivalued_tunable_parameters()
+        3. Averages across configurations using
+           DataFrameAnalyzer.group_by_multivalued_tunable_parameters()
         4. Creates error-bar ready columns for DataPlotter
 
     Parameters
@@ -89,7 +90,8 @@ def load_and_prepare_data(csv_path: str, logger) -> pd.DataFrame:
 
 def _average_across_configurations(df: pd.DataFrame, logger) -> pd.DataFrame:
     """
-    Average computational costs across configurations using DataFrameAnalyzer.
+    Average computational costs across configurations using
+    DataFrameAnalyzer.
 
     Parameters
     ----------
@@ -120,7 +122,8 @@ def _average_across_configurations(df: pd.DataFrame, logger) -> pd.DataFrame:
     # Get minimum data points threshold from config
     min_count = validation_config["min_data_points_for_averaging"]
 
-    # Determine which parameters to filter out (only if they exist in DataFrame)
+    # Determine which parameters to filter out (only if they exist in
+    # DataFrame)
     potential_filter_params = averaging_config["filter_out_parameters"]
     actual_filter_params = [
         param for param in potential_filter_params if param in df.columns
@@ -226,19 +229,8 @@ def create_cost_plotter(df: pd.DataFrame, plots_directory: Path, logger) -> Data
 
 def perform_cost_extrapolation(plotter: DataPlotter, logger) -> Dict[str, Any]:
     """
-    Perform cost extrapolation using DataPlotter with automatic grouping and fitting.
-
-    Parameters
-    ----------
-    plotter : DataPlotter
-        Configured DataPlotter instance
-    logger : Logger
-        Logger instance
-
-    Returns
-    -------
-    Dict[str, Any]
-        Extrapolation results including fit parameters and statistics
+    Perform cost extrapolation using DataPlotter with automatic grouping
+    and fitting.
     """
     logger.info("Performing cost extrapolation with automatic grouping and fitting...")
 
@@ -246,30 +238,9 @@ def perform_cost_extrapolation(plotter: DataPlotter, logger) -> Dict[str, Any]:
     plotting_config = get_plotting_config()
     validation_config = get_validation_config()
 
-    # Check if we have sufficient data for fitting
-    min_points = validation_config["min_data_points_for_fitting"]
-    if len(plotter.dataframe) < min_points:
-        raise ValueError(
-            f"Insufficient data points: {len(plotter.dataframe)} < {min_points}"
-        )
-
-    # Perform extrapolation with plotting and curve fitting
+    # Perform plotting with curve fitting (CurveFitter handles data
+    # validation)
     logger.info("Generating plots with curve fitting...")
-    results = _perform_extrapolation(plotter, plotting_config, logger)
-
-    # Validate results
-    if get_extrapolation_config()["validate_results"]:
-        _validate_extrapolation_results(results, logger)
-
-    return results
-
-
-def _perform_extrapolation(
-    plotter: DataPlotter, plotting_config: Dict, logger
-) -> Dict[str, Any]:
-    """Perform extrapolation with DataPlotter plotting and fitting."""
-
-    # Perform plotting (this also does the curve fitting)
     plotter.plot(
         figure_size=plotting_config["figure_size"],
         marker_size=plotting_config["marker_size"],
@@ -279,14 +250,18 @@ def _perform_extrapolation(
         fit_function=plotting_config["fit_function"],
         show_fit_parameters_on_plot=plotting_config["show_fit_parameters"],
         fit_label_location=plotting_config["fit_label_location"],
+        fit_min_data_points=validation_config["min_data_points_for_fitting"],
         save_figure=True,
         verbose=False,
         include_plot_title=True,
         top_margin_adjustment=plotting_config["top_margin_adjustment"],
     )
 
-    # Extract results from plotter
+    # Extract and validate results
     results = _extract_results_from_plotter(plotter, logger)
+
+    if get_extrapolation_config()["validate_results"]:
+        _validate_extrapolation_results(results, logger)
 
     return results
 
@@ -382,22 +357,6 @@ def _extrapolate_group(
         )
 
     return result
-
-
-# def _extract_results_from_plotter(plotter: DataPlotter, logger) -> Dict[str, Any]:
-#     """Extract results from DataPlotter after fitting (placeholder)."""
-#     # This would need to be implemented based on how DataPlotter stores fit results
-#     # For now, return basic structure
-
-#     logger.info("Extracting fit results from DataPlotter...")
-
-#     # This is a placeholder - would need to access actual fit results from DataPlotter
-#     return {
-#         "group_results": [],  # Would contain fit parameters for each group
-#         "overall_statistics": {},
-#         "extrapolation_type": "with_fitting",
-#         "fit_function": get_plotting_config()["fit_function"],
-#     }
 
 
 def _validate_extrapolation_results(results: Dict[str, Any], logger) -> None:
