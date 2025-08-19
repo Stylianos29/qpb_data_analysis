@@ -23,10 +23,9 @@ from src.analysis._cost_extrapolation_config import (
     CONFIG,
     get_input_column,
     get_averaging_config,
-    get_cost_column_names,
     get_validation_config,
     get_plotting_config,
-    get_extrapolation_config,
+    get_output_config,
     get_validation_thresholds,
 )
 
@@ -505,8 +504,8 @@ def export_results(
 
     Parameters
     ----------
-    results : Dict[str, Any]
-        Extrapolation results from perform_cost_extrapolation
+    fit_results : Dict[str, Any]
+        Fit results from DataPlotter.get_fit_results()
     output_directory : Path
         Output directory
     csv_filename : str
@@ -519,60 +518,75 @@ def export_results(
     pd.DataFrame
         Exported results DataFrame
     """
-    # logger.info("Exporting extrapolation results...")
+    logger.info("Exporting extrapolation results...")
 
-    # group_results = results.get("group_results", []) if not
-    # group_results: logger.warning("No group results to export") return
-    #     pd.DataFrame()
+    if not fit_results:
+        logger.warning("No fit results to export")
+        return pd.DataFrame()
 
-    # # Convert to DataFrame
-    # results_df = pd.DataFrame(group_results)
-
-    # # Add overall statistics as additional columns
-    # overall_stats = results.get("overall_statistics", {}) for key,
-    # value in overall_stats.items(): results_df[f"overall_{key}"] =
-    #     value
-
-    # # Add extrapolation metadata
-    # results_df["extrapolation_type"] =
-    # results.get("extrapolation_type", "unknown") if "fit_function" in
-    #     results: results_df["fit_function"] = results["fit_function"]
-
-    # # Round floating point values
-    # float_precision = CONFIG["output"]["float_precision"]
-    # numeric_columns =
-    # results_df.select_dtypes(include=[np.number]).columns
-    # results_df[numeric_columns] =
-    # results_df[numeric_columns].round(float_precision)
-
-    # # Export to CSV
-    # csv_path = output_directory / csv_filename try:
-    # results_df.to_csv(csv_path, index=False) logger.info(f"Exported
-    #     {len(results_df)} results to {csv_path}") except Exception as
-    #     e: logger.error(f"Failed to export results: {e}") raise
-
-    # return results_df
-
+    # Convert fit results to DataFrame
     results_data = []
     for group_key, fit_data in fit_results.items():
         if fit_data:
-            if fit_data["method"] == "gvar":
-                import gvar
+            # Handle both gvar and scipy results
+            if fit_data.get("method") == "gvar":
+                try:
+                    import gvar
 
-                params = [float(gvar.mean(p)) for p in fit_data["parameters"]]
+                    params = [float(gvar.mean(p)) for p in fit_data["parameters"]]
+                except ImportError:
+                    params = fit_data["parameters"]
             else:
                 params = fit_data["parameters"]
 
-            results_data.append(
+            # Create row with group parameters and fit results
+            row = {}
+
+            # Add group parameters (unpack tuple if needed)
+            if isinstance(group_key, tuple):
+                # Need to get parameter names - this comes from
+                # DataPlotter's grouping For now, use generic names -
+                # can be enhanced later
+                for i, value in enumerate(group_key):
+                    row[f"group_param_{i}"] = value
+            else:
+                row["group_key"] = group_key
+
+            # Add fit information
+            row.update(
                 {
-                    "group": group_key,
-                    "function": fit_data["function"],
-                    "a": params[0],
-                    "b": params[1],
-                    "c": params[2],
-                    "method": fit_data["method"],
+                    "fit_function": fit_data.get("function", "unknown"),
+                    "fit_method": fit_data.get("method", "unknown"),
+                    "r_squared": fit_data.get("r_squared"),
+                    "n_data_points": fit_data.get("n_data_points"),
                 }
             )
 
+            # Add fit parameters (a, b, c for shifted power law)
+            for i, param in enumerate(params[:3]):  # Limit to first 3 parameters
+                row[f"param_{chr(97+i)}"] = param  # a, b, c
+
+            results_data.append(row)
+
+    # Create DataFrame
     results_df = pd.DataFrame(results_data)
+
+    if results_df.empty:
+        logger.warning("No valid fit results to export")
+        return results_df
+
+    # Round numeric values
+    float_precision = get_output_config()["float_precision"]
+    numeric_columns = results_df.select_dtypes(include=[np.number]).columns
+    results_df[numeric_columns] = results_df[numeric_columns].round(float_precision)
+
+    # Export to CSV
+    csv_path = output_directory / csv_filename
+    try:
+        results_df.to_csv(csv_path, index=False)
+        logger.info(f"Exported {len(results_df)} fit results to {csv_path}")
+    except Exception as e:
+        logger.error(f"Failed to export results: {e}")
+        raise
+
     return results_df
