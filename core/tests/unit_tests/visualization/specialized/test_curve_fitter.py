@@ -620,6 +620,91 @@ class TestErrorHandling:
                 assert len(w) == 1
                 assert "Fit failed" in str(w[0].message)
 
+    def test_min_data_points_validation(self, curve_fitter, mock_axes):
+        """Test minimum data points validation."""
+
+        # Test 1: Linear fit with insufficient data (default minimum is 2)
+        x = np.array([1])
+        y = np.array([2])
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = curve_fitter.apply_fit(
+                mock_axes, x, y, "linear", show_parameters=False
+            )
+
+        assert result is None
+        assert len(w) == 1
+        assert (
+            "Insufficient data for linear fit: 1 points provided, minimum 2 required"
+            in str(w[0].message)
+        )
+
+        # Test 2: Linear fit with sufficient data (meets minimum)
+        x = np.array([1, 2])
+        y = np.array([2, 4])
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            result = curve_fitter.apply_fit(
+                mock_axes, x, y, "linear", show_parameters=False
+            )
+
+        assert result is not None  # Should succeed with 2 points for linear
+
+        # Test 3: Exponential fit with insufficient data (default minimum is 3)
+        x = np.array([1, 2])
+        y = np.array([1, 2])
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = curve_fitter.apply_fit(
+                mock_axes, x, y, "exponential", show_parameters=False
+            )
+
+        assert result is None
+        assert len(w) == 1
+        assert (
+            "Insufficient data for exponential fit: 2 points provided, minimum 3 required"
+            in str(w[0].message)
+        )
+
+        # Test 4: Custom minimum data points parameter
+        x = np.array([1, 2, 3])
+        y = np.array([2, 4, 6])
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = curve_fitter.apply_fit(
+                mock_axes, x, y, "linear", min_data_points=5, show_parameters=False
+            )
+
+        assert result is None
+        assert len(w) == 1
+        assert (
+            "Insufficient data for linear fit: 3 points provided, minimum 5 required"
+            in str(w[0].message)
+        )
+
+        # Test 5: Validation works with NaN data filtering
+        x = np.array([1, np.nan, np.nan, 4])
+        y = np.array([2, 4, 6, np.nan])
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = curve_fitter.apply_fit(
+                mock_axes, x, y, "linear", show_parameters=False
+            )
+
+        assert (
+            result is None
+        )  # Should fail because only 1 valid point after NaN removal
+        assert len(w) == 1
+        assert (
+            "Insufficient data for linear fit: 1 points provided, minimum 2 required"
+            in str(w[0].message)
+        )
+
 
 class TestIntegrationWithRealMatplotlib:
     """Integration tests with real matplotlib objects."""
