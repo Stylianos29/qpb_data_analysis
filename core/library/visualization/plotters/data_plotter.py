@@ -455,70 +455,14 @@ class DataPlotter(DataFrameAnalyzer):
 
             # Apply post-plot customization function if provided
             if post_plot_customization_function is not None:
-                # For grouped plots, we need to decide: call once per
-                # group or once per plot? I recommend: once per plot
-                # with access to all group data
-
-                if grouping_variable:
-                    # Grouped plot case - call once with all data
-                    all_plot_data = {}
-                    all_fit_results = {}
-
-                    for group_value in self.stored_fit_results.keys():
-                        # Get group data
-                        if isinstance(grouping_variable, list):
-                            group_mask = (
-                                group_df[grouping_variable] == list(group_value)
-                            ).all(axis=1)
-                        else:
-                            group_mask = group_df[grouping_variable] == group_value
-
-                        group_subset = group_df[group_mask]
-
-                        all_plot_data[group_value] = {
-                            "x_data": group_subset[self.xaxis_variable_name].to_numpy(),
-                            "y_data": group_subset[self.yaxis_variable_name].to_numpy(),
-                            "group_value": group_value,
-                        }
-                        all_fit_results[group_value] = self.stored_fit_results.get(
-                            group_value
-                        )
-
-                    # Call with comprehensive context
-                    post_plot_customization_function(
-                        ax=ax,
-                        plot_data=all_plot_data,  # Dict of {group_value: data}
-                        fit_results=all_fit_results,  # Dict of {group_value: fit_result}
-                        group_info={
-                            "grouping_variable": grouping_variable,
-                            "metadata": metadata,
-                            "num_groups": len(all_plot_data),
-                        },
-                        plot_type="grouped",
-                    )
-                else:
-                    # Individual plot case - simpler
-                    plot_data = {
-                        "x_data": group_df[self.xaxis_variable_name].to_numpy(),
-                        "y_data": group_df[self.yaxis_variable_name].to_numpy(),
-                    }
-
-                    # Get fit results if available (for individual plots, there should be one result)
-                    fit_result = (
-                        self.stored_fit_results.get(
-                            list(self.stored_fit_results.keys())[0]
-                        )
-                        if self.stored_fit_results
-                        else None
-                    )
-
-                    post_plot_customization_function(
-                        ax=ax,
-                        plot_data=plot_data,
-                        fit_results=fit_result,
-                        group_info={"metadata": metadata, "group_keys": group_keys},
-                        plot_type="individual",
-                    )
+                self._apply_post_plot_customization(
+                    post_plot_customization_function=post_plot_customization_function,
+                    ax=ax,
+                    group_df=group_df,
+                    grouping_variable=grouping_variable,
+                    metadata=metadata,
+                    group_keys=group_keys,
+                )
 
             # Save figure - only save main figures
             if save_figure and not is_inset and isinstance(fig, Figure):
@@ -586,6 +530,90 @@ class DataPlotter(DataFrameAnalyzer):
             'r_squared', 'method', etc.
         """
         return self.stored_fit_results.copy()
+
+    def _apply_post_plot_customization(
+        self,
+        post_plot_customization_function: Callable[..., None],
+        ax: Axes,
+        group_df: pd.DataFrame,
+        grouping_variable: Optional[Union[str, List[str]]],
+        metadata: Dict[str, Any],
+        group_keys: Tuple[Any, ...],
+    ) -> None:
+        """
+        Apply post-plot customization function with appropriate context.
+
+        Parameters:
+        -----------
+        post_plot_customization_function : Callable
+            User-provided customization function
+        ax : Axes
+            The matplotlib axes object
+        group_df : pd.DataFrame
+            DataFrame containing the plotted data
+        grouping_variable : str or List[str], optional
+            Variable(s) used for grouping
+        metadata : dict
+            Plot metadata
+        group_keys : tuple
+            Keys identifying the current group
+        """
+        if grouping_variable:
+            # Grouped plot case - call once with all data
+            all_plot_data = {}
+            all_fit_results = {}
+
+            for group_value in self.stored_fit_results.keys():
+                # Get group data
+                if isinstance(grouping_variable, list):
+                    group_mask = (group_df[grouping_variable] == list(group_value)).all(
+                        axis=1
+                    )
+                else:
+                    group_mask = group_df[grouping_variable] == group_value
+
+                group_subset = group_df[group_mask]
+
+                all_plot_data[group_value] = {
+                    "x_data": group_subset[self.xaxis_variable_name].to_numpy(),
+                    "y_data": group_subset[self.yaxis_variable_name].to_numpy(),
+                    "group_value": group_value,
+                }
+                all_fit_results[group_value] = self.stored_fit_results.get(group_value)
+
+            # Call with comprehensive context
+            post_plot_customization_function(
+                ax=ax,
+                plot_data=all_plot_data,  # Dict of {group_value: data}
+                fit_results=all_fit_results,  # Dict of {group_value: fit_result}
+                group_info={
+                    "grouping_variable": grouping_variable,
+                    "metadata": metadata,
+                    "num_groups": len(all_plot_data),
+                },
+                plot_type="grouped",
+            )
+        else:
+            # Individual plot case - simpler
+            plot_data = {
+                "x_data": group_df[self.xaxis_variable_name].to_numpy(),
+                "y_data": group_df[self.yaxis_variable_name].to_numpy(),
+            }
+
+            # Get fit results if available
+            fit_result = (
+                self.stored_fit_results.get(list(self.stored_fit_results.keys())[0])
+                if self.stored_fit_results
+                else None
+            )
+
+            post_plot_customization_function(
+                ax=ax,
+                plot_data=plot_data,
+                fit_results=fit_result,
+                group_info={"metadata": metadata, "group_keys": group_keys},
+                plot_type="individual",
+            )
 
     def _prepare_grouping_configuration(
         self,
