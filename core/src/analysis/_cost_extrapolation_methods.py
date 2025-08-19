@@ -497,7 +497,11 @@ def _calculate_extrapolation(fit_result, x_target):
 
 
 def export_results(
-    fit_results: Dict[str, Any], output_directory: Path, csv_filename: str, logger
+    fit_results: Dict[str, Any],
+    plotter: DataPlotter,
+    output_directory: Path,
+    csv_filename: str,
+    logger,
 ) -> pd.DataFrame:
     """
     Export extrapolation results to CSV file.
@@ -542,15 +546,24 @@ def export_results(
             # Create row with group parameters and fit results
             row = {}
 
-            # Add group parameters (unpack tuple if needed)
+            # Add group parameters with actual parameter names
             if isinstance(group_key, tuple):
-                # Need to get parameter names - this comes from
-                # DataPlotter's grouping For now, use generic names -
-                # can be enhanced later
+                # Get the actual parameter names used for grouping
+                param_names = plotter.reduced_multivalued_tunable_parameter_names_list
                 for i, value in enumerate(group_key):
-                    row[f"group_param_{i}"] = value
+                    if i < len(param_names):
+                        row[param_names[i]] = value
+                    else:
+                        row[f"group_param_{i}"] = value  # Fallback for extra values
             else:
-                row["group_key"] = group_key
+                # Single parameter case
+                param_names = plotter.reduced_multivalued_tunable_parameter_names_list
+                if param_names:
+                    row[param_names[0]] = group_key
+                else:
+                    row["group_key"] = group_key
+
+            row.update(plotter.unique_value_columns_dictionary)
 
             # Add fit information
             row.update(

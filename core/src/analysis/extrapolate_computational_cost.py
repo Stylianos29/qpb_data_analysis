@@ -199,7 +199,11 @@ def main(
         # Phase 4: Result Export
         logger.info("=== PHASE 4: Result Export ===")
         results_df = export_results(
-            extrapolation_results, output_directory, output_csv_filename, logger
+            extrapolation_results,
+            cost_plotter,
+            output_directory,
+            output_csv_filename,
+            logger,
         )
 
         logger.log_script_end("Computational cost extrapolation completed successfully")
