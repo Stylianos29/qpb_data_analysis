@@ -510,6 +510,8 @@ def export_results(
     ----------
     fit_results : Dict[str, Any]
         Fit results from DataPlotter.get_fit_results()
+    plotter : DataPlotter
+        DataPlotter instance for accessing parameter metadata
     output_directory : Path
         Output directory
     csv_filename : str
@@ -528,6 +530,9 @@ def export_results(
         logger.warning("No fit results to export")
         return pd.DataFrame()
 
+    # Get parameter names for proper column naming
+    param_names = plotter.reduced_multivalued_tunable_parameter_names_list
+
     # Convert fit results to DataFrame
     results_data = []
     for group_key, fit_data in fit_results.items():
@@ -543,13 +548,11 @@ def export_results(
             else:
                 params = fit_data["parameters"]
 
-            # Create row with group parameters and fit results
+            # Create row with group parameters
             row = {}
 
             # Add group parameters with actual parameter names
             if isinstance(group_key, tuple):
-                # Get the actual parameter names used for grouping
-                param_names = plotter.reduced_multivalued_tunable_parameter_names_list
                 for i, value in enumerate(group_key):
                     if i < len(param_names):
                         row[param_names[i]] = value
@@ -557,23 +560,33 @@ def export_results(
                         row[f"group_param_{i}"] = value  # Fallback for extra values
             else:
                 # Single parameter case
-                param_names = plotter.reduced_multivalued_tunable_parameter_names_list
                 if param_names:
                     row[param_names[0]] = group_key
                 else:
                     row["group_key"] = group_key
 
+            # Add single-valued parameters
             row.update(plotter.unique_value_columns_dictionary)
 
-            # Add fit information
-            row.update(
-                {
-                    "fit_function": fit_data.get("function", "unknown"),
-                    "fit_method": fit_data.get("method", "unknown"),
-                    "r_squared": fit_data.get("r_squared"),
-                    "n_data_points": fit_data.get("n_data_points"),
-                }
-            )
+            # Calculate n_data_points from original data
+            if isinstance(group_key, tuple):
+                # Create mask for this specific group - initialize as all True Series
+                mask = pd.Series(
+                    [True] * len(plotter.dataframe), index=plotter.dataframe.index
+                )
+                for i, param_name in enumerate(param_names):
+                    if i < len(group_key):
+                        mask &= plotter.dataframe[param_name] == group_key[i]
+                n_data_points = int(mask.sum())
+            else:
+                # Single parameter case or fallback
+                if param_names:
+                    mask = plotter.dataframe[param_names[0]] == group_key
+                    n_data_points = int(mask.sum())
+                else:
+                    n_data_points = len(plotter.dataframe)
+
+            row["n_data_points"] = n_data_points
 
             # Add fit parameters (a, b, c for shifted power law)
             for i, param in enumerate(params[:3]):  # Limit to first 3 parameters
