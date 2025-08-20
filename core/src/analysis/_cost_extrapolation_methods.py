@@ -7,10 +7,12 @@ automatic parameter detection and grouping, and the DataPlotter class
 for curve fitting and visualization of computational cost data.
 """
 
-import numpy as np
-import pandas as pd
 from typing import Dict, Any
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import gvar as gv
 
 # Import library components
 from library import load_csv, DataFrameAnalyzer, DataPlotter
@@ -319,10 +321,8 @@ def add_extrapolation_lines(ax, fit_results=None, **kwargs):
 
     # Create combined horizontal label with uncertainty
     if uncertainty > 0:
-        import gvar
-
         h_label_text = (
-            f"{h_label} = {gvar.gvar(extrapolated_cost, uncertainty)} core-hours"
+            f"{h_label} = {gv.gvar(extrapolated_cost, uncertainty)} core-hours"
         )
     else:
         h_label_text = f"{h_label} = {extrapolated_cost:.2f} core-hours"
@@ -447,9 +447,7 @@ def export_results(
             # Handle both gvar and scipy results
             if fit_data.get("method") == "gvar":
                 try:
-                    import gvar
-
-                    params = [float(gvar.mean(p)) for p in fit_data["parameters"]]
+                    params = [float(gv.mean(p)) for p in fit_data["parameters"]]
                 except ImportError:
                     params = fit_data["parameters"]
             else:
