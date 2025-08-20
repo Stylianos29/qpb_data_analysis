@@ -22,22 +22,24 @@ class CurveFitter:
     Handles curve fitting operations for plot data.
 
     This class provides functionality for:
-    - Fitting various mathematical functions to data
-    - Supporting both scipy and gvar-based fitting
-    - Displaying fit curves on plots
-    - Formatting and displaying fit parameters
-    - Handling fit failures gracefully
+        - Fitting various mathematical functions to data
+        - Supporting both scipy and gvar-based fitting
+        - Displaying fit curves on plots
+        - Formatting and displaying fit parameters
+        - Handling fit failures gracefully
 
     Supports fit functions:
-    - Linear: y = a*x + b
-    - Exponential: y = a*exp(b*x) or y = a*exp(-b*x) + c
-    - Power law: y = a*x^b
-    - Shifted power law: y = a/(x-b) + c
+        - Linear: y = a*x + b
+        - Exponential: y = a*exp(b*x) or y = a*exp(-b*x) + c
+        - Power law: y = a*x^b
+        - Shifted power law: y = a/(x-b) + c
     """
 
-    def __init__(self):
-        """Initialize the curve fitter."""
-        # Available fit functions for scipy
+    def __init__(self, use_adaptive_guesses=True):
+        """Initialize the curve fitter with optional adaptive parameter
+        estimation."""
+        self.use_adaptive_guesses = use_adaptive_guesses
+
         self.scipy_functions = {
             "linear": self._linear_func,
             "exponential": self._exponential_func,
@@ -53,8 +55,8 @@ class CurveFitter:
             "shifted_power_law": self._shifted_power_law_gvar_func,
         }
 
-        # Initial parameter guesses
-        self.initial_params = {
+        # Original hardcoded guesses as fallback
+        self.fallback_params = {
             "linear": [1.0, 0.0],
             "exponential": [1.0, 1.0, 0.0],
             "power_law": [1.0, 1.0],
@@ -163,6 +165,11 @@ class CurveFitter:
                 )
                 return None
 
+            # Get adaptive initial parameters
+            self.initial_guess = self._get_initial_parameters(
+                fit_function, x_data, y_data
+            )
+
             # Check if we have uncertainty data (tuples)
             has_uncertainties = self._has_uncertainties(y_data)
 
@@ -230,8 +237,7 @@ class CurveFitter:
             raise ValueError("Power-law fit requires strictly positive x values.")
 
         # Perform the fit
-        initial_guess = self.initial_params[fit_function]
-        fit_params, covariance = curve_fit(func, x_fit, y_fit, p0=initial_guess)
+        fit_params, covariance = curve_fit(func, x_fit, y_fit, p0=self.initial_guess)
 
         # Generate fit curve
         if curve_range is not None:
@@ -295,11 +301,10 @@ class CurveFitter:
         func = self.gvar_functions[fit_function]
 
         # Perform the fit
-        initial_guess = self.initial_params[fit_function]
         fit_result = lsqfit.nonlinear_fit(
             data=(x_data, y_gv),
             fcn=func,
-            p0=initial_guess,
+            p0=self.initial_guess,
             debug=False,
         )
 
@@ -422,7 +427,7 @@ class CurveFitter:
             fontsize=10,
             verticalalignment=alignment[1],
             horizontalalignment=alignment[0],
-            bbox=dict(boxstyle="round", facecolor="white", alpha=0.7),
+            bbox=dict(boxstyle="round", facecolor="white", alpha=1.0),
         )
 
     def _display_gvar_parameters(
@@ -460,7 +465,7 @@ class CurveFitter:
             fontsize=10,
             verticalalignment=alignment[1],
             horizontalalignment=alignment[0],
-            bbox=dict(boxstyle="round", facecolor="white", alpha=0.7),
+            bbox=dict(boxstyle="round", facecolor="white", alpha=1.0),
         )
 
     def _calculate_r_squared(
@@ -474,6 +479,207 @@ class CurveFitter:
             return 1.0  # Perfect fit case
 
         return 1 - (ss_res / ss_tot)
+
+    def _get_initial_parameters(self, fit_function, x_data, y_data):
+        """
+        Get initial parameters with adaptive estimation and fallback.
+
+        Works for both scipy and gvar fitting since estimation happens
+        before method selection.
+        """
+        if not self.use_adaptive_guesses:
+            return self.fallback_params[fit_function]
+
+        try:
+            # Extract raw values if y_data contains uncertainties
+            if self._has_uncertainties(y_data):
+                y_values = np.array(
+                    [val[0] if isinstance(val, tuple) else val for val in y_data]
+                )
+            else:
+                y_values = y_data.copy()
+
+            # Try adaptive estimation
+            adaptive_guess = self._adaptive_initial_guess(
+                fit_function, x_data, y_values
+            )
+
+            # Validation: check for NaN, inf, or unreasonable values
+            if self._validate_parameters(
+                adaptive_guess, fit_function, x_data, y_values
+            ):
+                return adaptive_guess
+            else:
+                warnings.warn(
+                    f"Adaptive guess validation failed for {fit_function}, using fallback"
+                )
+                return self.fallback_params[fit_function]
+
+        except Exception as e:
+            warnings.warn(f"Adaptive guess estimation failed for {fit_function}: {e}")
+            return self.fallback_params[fit_function]
+
+    def _adaptive_initial_guess(self, fit_function, x_data, y_data):
+        """Generate data-adaptive initial parameter guesses for all
+        functions."""
+
+        # Basic statistics
+        x_min, x_max = np.min(x_data), np.max(x_data)
+        y_min, y_max = np.min(y_data), np.max(y_data)
+        x_range, y_range = x_max - x_min, y_max - y_min
+        x_mean, y_mean = np.mean(x_data), np.mean(y_data)
+
+        if fit_function == "linear":
+            return self._estimate_linear_params(
+                x_data, y_data, x_range, y_range, x_mean, y_mean
+            )
+
+        elif fit_function == "exponential":
+            return self._estimate_exponential_params(x_data, y_data, y_min, y_max)
+
+        elif fit_function == "power_law":
+            return self._estimate_power_law_params(x_data, y_data, x_min, y_min)
+
+        elif fit_function == "shifted_power_law":
+            return self._estimate_shifted_power_law_params(
+                x_data, y_data, x_min, x_range, y_min
+            )
+
+        else:
+            # Fallback for unknown functions
+            return self.fallback_params.get(fit_function, [1.0])
+
+    def _estimate_linear_params(self, x_data, y_data, x_range, y_range, x_mean, y_mean):
+        """Estimate initial parameters for linear function: y = a*x + b"""
+        if x_range > 1e-10:  # Avoid division by zero
+            slope = y_range / x_range * (1 if y_data[-1] > y_data[0] else -1)
+        else:
+            slope = 1.0
+
+        intercept = y_mean - slope * x_mean
+        return [slope, intercept]
+
+    def _estimate_exponential_params(self, x_data, y_data, y_min, y_max):
+        """Estimate initial parameters for exponential: y = a*exp(-b*x) + c"""
+
+        # c: asymptotic value (use minimum for decaying exponential)
+        c_guess = y_min
+
+        # a: amplitude
+        a_guess = y_max - c_guess
+        if a_guess <= 0:
+            a_guess = np.abs(y_max - y_min)
+
+        # b: decay rate from log-linear approximation
+        y_shifted = y_data - c_guess
+        y_positive = np.where(y_shifted > 1e-10, y_shifted, 1e-10)  # Avoid log(0)
+
+        try:
+            # Linear fit to log(y_shifted) vs x
+            coeffs = np.polyfit(x_data, np.log(y_positive), 1)
+            b_guess = -coeffs[0]  # Negative slope becomes positive decay rate
+            if b_guess <= 0:
+                b_guess = 1.0
+        except:
+            b_guess = 1.0  # Fallback
+
+        return [a_guess, b_guess, c_guess]
+
+    def _estimate_power_law_params(self, x_data, y_data, x_min, y_min):
+        """Estimate initial parameters for power law: y = a*x^b"""
+
+        # Avoid log(0) by filtering positive values
+        positive_mask = (x_data > 1e-10) & (y_data > 1e-10)
+        if np.sum(positive_mask) < 2:
+            return [1.0, 1.0]  # Fallback if insufficient positive data
+
+        x_pos = x_data[positive_mask]
+        y_pos = y_data[positive_mask]
+
+        try:
+            # Linear fit to log(y) vs log(x)
+            coeffs = np.polyfit(np.log(x_pos), np.log(y_pos), 1)
+            b_guess = coeffs[0]  # Power exponent
+            a_guess = np.exp(coeffs[1])  # Coefficient
+
+            # Sanity checks
+            if not (0.1 <= abs(b_guess) <= 10):  # Reasonable exponent range
+                b_guess = 1.0
+            if not (1e-10 <= a_guess <= 1e10):  # Reasonable coefficient range
+                a_guess = 1.0
+
+            return [a_guess, b_guess]
+        except:
+            return [1.0, 1.0]  # Fallback
+
+    def _estimate_shifted_power_law_params(self, x_data, y_data, x_min, x_range, y_min):
+        """Estimate initial parameters for shifted power law: y = a/(x-b) + c"""
+
+        # c: asymptotic value (conservative estimate using minimum)
+        c_guess = y_min
+
+        # b: place singularity well outside data range
+        # If data is decreasing (typical 1/x behavior), put singularity to the left
+        if len(y_data) > 1 and y_data[-1] < y_data[0]:
+            b_guess = x_min - 0.5 * x_range  # Left of data range
+        else:
+            b_guess = x_min - 0.2 * x_range  # Conservative placement
+
+        # a: use characteristic point to estimate scaling
+        # Use median point to avoid outliers
+        median_idx = len(x_data) // 2
+        x_char = np.median(x_data)
+        y_char = np.median(y_data)
+
+        denominator = x_char - b_guess
+        if abs(denominator) > 1e-10:
+            a_guess = (y_char - c_guess) * denominator
+        else:
+            a_guess = 1.0  # Fallback if too close to singularity
+
+        # Sanity check: ensure reasonable scaling
+        if abs(a_guess) < 1e-10 or abs(a_guess) > 1e10:
+            a_guess = 1.0
+
+        return [a_guess, b_guess, c_guess]
+
+    def _validate_parameters(self, params, fit_function, x_data, y_data):
+        """Validate that estimated parameters are reasonable."""
+
+        # Check for NaN or inf
+        if not all(np.isfinite(p) for p in params):
+            return False
+
+        # Function-specific validation
+        if fit_function == "shifted_power_law":
+            a, b, c = params
+
+            # Ensure singularity is not too close to data
+            min_distance = np.min(np.abs(x_data - b))
+            if min_distance < 0.01 * (np.max(x_data) - np.min(x_data)):
+                return False
+
+            # Check if function gives reasonable values
+            try:
+                test_y = a / (np.median(x_data) - b) + c
+                if not np.isfinite(test_y):
+                    return False
+            except:
+                return False
+
+        elif fit_function == "exponential":
+            a, b, c = params
+            # Ensure positive amplitude and reasonable decay rate
+            if a <= 0 or b <= 0 or b > 100:
+                return False
+
+        elif fit_function == "power_law":
+            a, b = params
+            # Ensure positive coefficient
+            if a <= 0:
+                return False
+
+        return True
 
     # Scipy fit functions
     def _linear_func(self, x: np.ndarray, a: float, b: float) -> np.ndarray:
@@ -542,7 +748,7 @@ class CurveFitter:
         """
         self.scipy_functions[name] = scipy_func
         self.gvar_functions[name] = gvar_func
-        self.initial_params[name] = initial_params
+        self.initial_params = initial_params
 
     def format_fit_results(
         self, fit_results: Dict[str, Any], include_uncertainties: bool = True
