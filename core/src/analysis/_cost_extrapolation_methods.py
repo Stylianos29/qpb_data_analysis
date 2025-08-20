@@ -257,8 +257,7 @@ def perform_cost_extrapolation(plotter: DataPlotter, logger) -> Dict[str, Any]:
     plotting_config = get_plotting_config()
     validation_config = get_validation_config()
 
-    # Perform plotting with curve fitting (CurveFitter handles data
-    # validation)
+    # Perform plotting with curve fitting
     logger.info("Generating plots with curve fitting...")
     plotter.plot(
         # Figure settings
@@ -285,17 +284,6 @@ def perform_cost_extrapolation(plotter: DataPlotter, logger) -> Dict[str, Any]:
 
     # Extract results
     return plotter.get_fit_results()
-
-
-def extrapolate_individual(ax, plot_data=None, fit_results=None, **kwargs):
-    add_extrapolation_lines(
-        ax=ax,
-        fit_results=fit_results,
-        # plot_type='individual',
-        x_target=0.005,
-        line_style={"color": "blue", "linestyle": ":", "alpha": 0.8},
-        **kwargs,
-    )
 
 
 def add_extrapolation_lines(ax, fit_results=None, **kwargs):
