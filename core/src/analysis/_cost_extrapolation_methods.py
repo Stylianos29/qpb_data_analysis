@@ -7,7 +7,7 @@ automatic parameter detection and grouping, and the DataPlotter class
 for curve fitting and visualization of computational cost data.
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional, Union
 from pathlib import Path
 
 import numpy as np
@@ -404,7 +404,7 @@ def _calculate_extrapolation(fit_result, x_target):
 
 
 def export_results(
-    fit_results: Dict[str, Any],
+    fit_results: Dict[Any, Any],
     plotter: DataPlotter,
     output_directory: Path,
     csv_filename: str,
@@ -412,24 +412,6 @@ def export_results(
 ) -> pd.DataFrame:
     """
     Export extrapolation results to CSV file.
-
-    Parameters
-    ----------
-    fit_results : Dict[str, Any]
-        Fit results from DataPlotter.get_fit_results()
-    plotter : DataPlotter
-        DataPlotter instance for accessing parameter metadata
-    output_directory : Path
-        Output directory
-    csv_filename : str
-        Name of output CSV file
-    logger : Logger
-        Logger instance
-
-    Returns
-    -------
-    pd.DataFrame
-        Exported results DataFrame
     """
     logger.info("Exporting extrapolation results...")
 
@@ -437,102 +419,64 @@ def export_results(
         logger.warning("No fit results to export")
         return pd.DataFrame()
 
-    # Get parameter names for proper column naming
-    param_names = plotter.reduced_multivalued_tunable_parameter_names_list
+    # Get clean summary from DataPlotter
+    summary_df = plotter.get_summary_dataframe(
+        include_fit_results=True, include_data_counts=True
+    )
 
-    # Convert fit results to DataFrame
-    results_data = []
-    for group_key, fit_data in fit_results.items():
+    if summary_df.empty:
+        logger.warning("No summary data to export")
+        return summary_df
+
+    # Remove unwanted columns
+    columns_to_drop = ["fit_function", "fit_method"]
+    summary_df = summary_df.drop(
+        columns=[col for col in columns_to_drop if col in summary_df.columns]
+    )
+
+    # Add domain-specific extrapolation columns
+    target_bare_mass = get_extrapolation_config()["target_bare_mass"]
+    summary_df["target_bare_mass"] = target_bare_mass
+
+    # Calculate extrapolated cost for each row with proper tuple handling
+    extrapolated_costs = []
+    for _, row in summary_df.iterrows():
+        group_keys = tuple(
+            row[param]
+            for param in plotter.reduced_multivalued_tunable_parameter_names_list
+        )
+        if len(group_keys) == 1:
+            group_keys = group_keys[0]
+
+        fit_data = fit_results.get(group_keys)
         if fit_data:
-            # Handle both gvar and scipy results
-            if fit_data.get("method") == "gvar":
-                try:
-                    params = [float(gv.mean(p)) for p in fit_data["parameters"]]
-                except ImportError:
-                    params = fit_data["parameters"]
-            else:
-                params = fit_data["parameters"]
-
-            # Create row with group parameters
-            row = {}
-
-            # Add group parameters with actual parameter names
-            if isinstance(group_key, tuple):
-                for i, value in enumerate(group_key):
-                    if i < len(param_names):
-                        row[param_names[i]] = value
-                    else:
-                        row[f"group_param_{i}"] = value  # Fallback for extra values
-            else:
-                # Single parameter case
-                if param_names:
-                    row[param_names[0]] = group_key
-                else:
-                    row["group_key"] = group_key
-
-            # Add single-valued parameters
-            row.update(plotter.unique_value_columns_dictionary)
-
-            # Calculate n_data_points from original data
-            if isinstance(group_key, tuple):
-                # Create mask for this specific group - initialize as all True Series
-                mask = pd.Series(
-                    [True] * len(plotter.dataframe), index=plotter.dataframe.index
-                )
-                for i, param_name in enumerate(param_names):
-                    if i < len(group_key):
-                        mask &= plotter.dataframe[param_name] == group_key[i]
-                n_data_points = int(mask.sum())
-            else:
-                # Single parameter case or fallback
-                if param_names:
-                    mask = plotter.dataframe[param_names[0]] == group_key
-                    n_data_points = int(mask.sum())
-                else:
-                    n_data_points = len(plotter.dataframe)
-
-            row["n_data_points"] = n_data_points
-
-            # Add fit parameters (a, b, c for shifted power law)
-            for i, param in enumerate(params[:3]):  # Limit to first 3 parameters
-                row[f"param_{chr(97+i)}"] = param  # a, b, c
-
-            # Add extrapolation values
-            target_bare_mass = get_extrapolation_config()["target_bare_mass"]
-            extrapolated_result = _calculate_extrapolation(fit_data, target_bare_mass)
-
-            row["target_bare_mass"] = target_bare_mass
-            if extrapolated_result is not None:
-                if hasattr(extrapolated_result, "mean"):  # gvar object
-                    extrapolated_cost = (
-                        float(extrapolated_result.mean),
-                        float(extrapolated_result.sdev),
-                    )
+            result = _calculate_extrapolation(fit_data, target_bare_mass)
+            if result is not None:
+                if hasattr(result, "mean"):  # gvar object
+                    extrapolated_cost = (float(result.mean), float(result.sdev))
                 else:  # float
-                    extrapolated_cost = float(extrapolated_result)
-                row["extrapolated_cost"] = extrapolated_cost
+                    extrapolated_cost = float(result)
+            else:
+                extrapolated_cost = None
+        else:
+            extrapolated_cost = None
 
-            results_data.append(row)
+        extrapolated_costs.append(extrapolated_cost)
 
-    # Create DataFrame
-    results_df = pd.DataFrame(results_data)
-
-    if results_df.empty:
-        logger.warning("No valid fit results to export")
-        return results_df
+    summary_df["extrapolated_cost"] = extrapolated_costs
 
     # Round numeric values
     float_precision = get_output_config()["float_precision"]
-    numeric_columns = results_df.select_dtypes(include=[np.number]).columns
-    results_df[numeric_columns] = results_df[numeric_columns].round(float_precision)
+    numeric_columns = summary_df.select_dtypes(include=[np.number]).columns
+    summary_df[numeric_columns] = summary_df[numeric_columns].round(float_precision)
 
     # Export to CSV
     csv_path = output_directory / csv_filename
     try:
-        results_df.to_csv(csv_path, index=False)
-        logger.info(f"Exported {len(results_df)} fit results to {csv_path}")
+        summary_df.to_csv(csv_path, index=False)
+        logger.info(f"Exported {len(summary_df)} results to {csv_path}")
     except Exception as e:
         logger.error(f"Failed to export results: {e}")
         raise
 
-    return results_df
+    return summary_df
