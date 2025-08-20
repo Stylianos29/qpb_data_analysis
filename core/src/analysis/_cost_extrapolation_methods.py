@@ -288,17 +288,7 @@ def perform_cost_extrapolation(plotter: DataPlotter, logger) -> Dict[str, Any]:
 
 def add_extrapolation_lines(ax, fit_results=None, **kwargs):
     """
-    Add vertical and horizontal lines showing extrapolation at target
-    bare mass.
-
-    Parameters
-    ----------
-    ax : matplotlib.axes.Axes
-        The axes object to draw on
-    fit_results : dict
-        Fit result dictionary for this individual plot
-    **kwargs : dict
-        Additional context parameters (unused)
+    Add vertical and horizontal lines showing extrapolation with uncertainty bands.
     """
     if not fit_results:
         return
@@ -307,10 +297,18 @@ def add_extrapolation_lines(ax, fit_results=None, **kwargs):
     extrapolation_config = get_extrapolation_config()
     target_bare_mass = extrapolation_config["target_bare_mass"]
 
-    # Calculate extrapolated cost
-    extrapolated_cost = _calculate_extrapolation(fit_results, target_bare_mass)
-    if extrapolated_cost is None:
+    # Calculate extrapolated cost with uncertainty
+    extrapolated_result = _calculate_extrapolation(fit_results, target_bare_mass)
+    if extrapolated_result is None:
         return
+
+    # Extract value and uncertainty
+    if hasattr(extrapolated_result, "mean"):  # gvar object
+        extrapolated_cost = float(extrapolated_result.mean)
+        uncertainty = float(extrapolated_result.sdev)
+    else:  # float
+        extrapolated_cost = float(extrapolated_result)
+        uncertainty = 0.0
 
     # Get line styles from config
     v_style = extrapolation_config["vertical_line_style"]
@@ -323,6 +321,16 @@ def add_extrapolation_lines(ax, fit_results=None, **kwargs):
     ax.axhline(
         extrapolated_cost, label=f"{h_label} = {extrapolated_cost:.2f}", **h_style
     )
+
+    # Add uncertainty band for horizontal line if uncertainty exists
+    if uncertainty > 0:
+        ax.axhspan(
+            extrapolated_cost - uncertainty,
+            extrapolated_cost + uncertainty,
+            alpha=0.2,
+            color=h_style.get("color", "green"),
+            label=f"±{uncertainty:.2f}",
+        )
 
     # Update legend
     ax.legend()
@@ -344,23 +352,30 @@ def _calculate_extrapolation(fit_result, x_target):
     float or None
         Extrapolated y-value, or None if calculation fails
     """
+
+    # Helper function for shifted power law
+    def _safe_shifted_power_law(a, b, c, x_target):
+        """Handle shifted power law with gvar-safe abs()."""
+        # Extract mean value for comparison (works for both float and gvar)
+        b_mean = b.mean if hasattr(b, "mean") else b
+
+        if abs(x_target - b_mean) < 1e-10:
+            return None
+        return a / (x_target - b) + c
+
     if not fit_result:
         return None
 
-    # Extract parameters (handle both gvar and scipy)
+    # Extract parameters
     params = fit_result["parameters"]
-    if fit_result.get("method") == "gvar":
-        import gvar
-
-        params = [float(gvar.mean(p)) for p in params]
 
     # Function dispatch table
     function_map = {
         "linear": lambda a, b, *_: a * x_target + b,
         "exponential": lambda a, b, c, *_: a * np.exp(-b * x_target) + c,
         "power_law": lambda a, b, *_: a * (x_target**b) if x_target > 0 else None,
-        "shifted_power_law": lambda a, b, c, *_: (
-            a / (x_target - b) + c if abs(x_target - b) > 1e-10 else None
+        "shifted_power_law": lambda a, b, c, *_: _safe_shifted_power_law(
+            a, b, c, x_target
         ),
     }
 
@@ -477,12 +492,18 @@ def export_results(
 
             # Add extrapolation values
             target_bare_mass = get_extrapolation_config()["target_bare_mass"]
-            extrapolated_cost = _calculate_extrapolation(fit_data, target_bare_mass)
+            extrapolated_result = _calculate_extrapolation(fit_data, target_bare_mass)
 
             row["target_bare_mass"] = target_bare_mass
-            row["extrapolated_cost"] = (
-                extrapolated_cost if extrapolated_cost is not None else np.nan
-            )
+            if extrapolated_result is not None:
+                if hasattr(extrapolated_result, "mean"):  # gvar object
+                    extrapolated_cost = (
+                        float(extrapolated_result.mean),
+                        float(extrapolated_result.sdev),
+                    )
+                else:  # float
+                    extrapolated_cost = float(extrapolated_result)
+                row["extrapolated_cost"] = extrapolated_cost
 
             results_data.append(row)
 

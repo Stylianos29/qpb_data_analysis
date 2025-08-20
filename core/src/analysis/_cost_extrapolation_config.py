@@ -78,7 +78,7 @@ CONFIG = {
             "linewidth": 1.5,
         },
         "horizontal_line_style": {
-            "color": "green",
+            "color": "red",
             "linestyle": "--",
             "alpha": 0.7,
             "linewidth": 1.5,
