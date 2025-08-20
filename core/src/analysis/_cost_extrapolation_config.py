@@ -50,6 +50,8 @@ CONFIG = {
         "y_variable": "Average_core_hours_per_spinor_per_configuration",
         # Figure settings
         "figure_size": (7, 5),
+        "top_margin_adjustment": 0.88,
+        "left_margin_adjustment": 0.13,
         # Curve fitting
         "fit_function": "shifted_power_law",  # a/(x-b)+c
         "show_fit_parameters": True,
@@ -59,17 +61,10 @@ CONFIG = {
         "capsize": 5,
         "include_legend": True,
         "legend_location": "upper right",
-        # Error bars
-        "left_margin_adjustment": 0.13,
-        "top_margin_adjustment": 0.88,
     },
     # Extrapolation settings
     "extrapolation": {
-        "group_by_multivalued_params": True,
-        "average_across_configurations": True,
-        "include_single_valued_params": True,
-        "validate_results": True,
-        "min_success_rate": 0.5,  # Require 50% of groups to pass validation
+        # "min_success_rate": 0.5,  # Require 50% of groups to pass validation
         "target_bare_mass": 0.005,
         # Fitting range constraints (None = no constraint)
         "fit_range_min_bare_mass": 0.0,

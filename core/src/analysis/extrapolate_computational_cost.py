@@ -25,7 +25,6 @@ import sys
 from pathlib import Path
 
 import click
-import pandas as pd
 
 # Configure matplotlib backend
 import matplotlib
@@ -41,13 +40,16 @@ from library.validation.click_validators import (
 )
 
 # Import from auxiliary modules
-from src.analysis._cost_extrapolation_config import CONFIG, validate_config
+from src.analysis._cost_extrapolation_config import (
+    CONFIG,
+    validate_config,
+    get_plotting_config,
+)
 from src.analysis._cost_extrapolation_methods import (
     load_and_prepare_data,
     create_cost_plotter,
     perform_cost_extrapolation,
     export_results,
-    get_plotting_config,
 )
 
 

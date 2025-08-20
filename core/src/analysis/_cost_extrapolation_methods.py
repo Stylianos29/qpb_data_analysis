@@ -13,13 +13,10 @@ from typing import Dict, Any
 from pathlib import Path
 
 # Import library components
-from library import load_csv
-from library.visualization.plotters.data_plotter import DataPlotter
-from library.data.analyzer import DataFrameAnalyzer
+from library import load_csv, DataFrameAnalyzer, DataPlotter
 
 # Import configuration
 from src.analysis._cost_extrapolation_config import (
-    CONFIG,
     get_input_column,
     get_averaging_config,
     get_validation_config,
