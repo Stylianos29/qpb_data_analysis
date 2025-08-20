@@ -602,11 +602,9 @@ class DataPlotter(DataFrameAnalyzer):
             }
 
             # Get fit results if available
-            fit_result = (
-                self.stored_fit_results.get(list(self.stored_fit_results.keys())[0])
-                if self.stored_fit_results
-                else None
-            )
+            fit_result = self.stored_fit_results.get(
+                group_keys
+            )  # Use actual group_keys!
 
             post_plot_customization_function(
                 ax=ax,
