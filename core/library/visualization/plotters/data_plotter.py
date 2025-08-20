@@ -532,6 +532,73 @@ class DataPlotter(DataFrameAnalyzer):
         """
         return self.stored_fit_results.copy()
 
+    def get_summary_dataframe(self, include_fit_results=True, include_data_counts=True):
+        """
+        Generate summary DataFrame with one row per parameter group.
+        """
+        if self.xaxis_variable_name is None or self.yaxis_variable_name is None:
+            raise ValueError("Plot variables must be set before generating summary")
+
+        summary_rows = []
+
+        # Use the same exclusion logic as DataPlotter uses for plotting
+        excluded = set()
+        for axis_variable in [self.xaxis_variable_name, self.yaxis_variable_name]:
+            if axis_variable in self.list_of_multivalued_tunable_parameter_names:
+                excluded.add(axis_variable)
+
+        # Get grouped data with proper exclusions
+        grouped = self.group_by_multivalued_tunable_parameters(
+            filter_out_parameters_list=list(excluded), verbose=False
+        )
+
+        for group_keys, group_df in grouped:
+            row = {}
+
+            # Ensure group_keys is always a tuple for consistent handling
+            if not isinstance(group_keys, tuple):
+                group_keys = (group_keys,)
+
+            # Add group parameters with proper names
+            for i, param_name in enumerate(
+                self.reduced_multivalued_tunable_parameter_names_list
+            ):
+                if i < len(group_keys):
+                    row[param_name] = group_keys[i]
+
+            # Add single-valued parameters
+            row.update(self.unique_value_columns_dictionary)
+
+            # Optional: Add data counts
+            if include_data_counts:
+                row["n_data_points"] = len(group_df)
+
+            # Optional: Add fit results
+            if include_fit_results and hasattr(self, "stored_fit_results"):
+                fit_data = self.stored_fit_results.get(group_keys)
+                if fit_data:
+                    row["fit_function"] = fit_data.get("function")
+                    row["fit_method"] = fit_data.get("method")
+
+                    # Add fit parameters (extract means for gvar objects)
+                    params = fit_data.get("parameters", [])
+                    if fit_data.get("method") == "gvar":
+                        import gvar
+
+                        param_values = [float(gvar.mean(p)) for p in params]
+                    else:
+                        param_values = params
+
+                    # Add up to 3 parameters (a, b, c)
+                    for i, param_val in enumerate(param_values[:3]):
+                        row[f"param_{chr(97+i)}"] = (
+                            param_val  # param_a, param_b, param_c
+                        )
+
+            summary_rows.append(row)
+
+        return pd.DataFrame(summary_rows)
+
     def _apply_post_plot_customization(
         self,
         post_plot_customization_function: Callable[..., None],
