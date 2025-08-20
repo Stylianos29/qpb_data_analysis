@@ -7,7 +7,7 @@ computational costs (core-hours per spinor per configuration) using the
 DataPlotter class for automatic grouping, fitting, and visualization.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any
 
 
 # =============================================================================
@@ -70,6 +70,22 @@ CONFIG = {
         # Fitting range constraints (None = no constraint)
         "fit_range_min_bare_mass": 0.0,
         "fit_range_max_bare_mass": None,  # No upper limit (yet)
+        # Extrapolation line styling
+        "vertical_line_style": {
+            "color": "green",
+            "linestyle": "--",
+            "alpha": 0.7,
+            "linewidth": 1.5,
+        },
+        "horizontal_line_style": {
+            "color": "green",
+            "linestyle": "--",
+            "alpha": 0.7,
+            "linewidth": 1.5,
+        },
+        # Line labels
+        "vertical_line_label": r"a$m^{\text{ref.}}$",
+        "horizontal_line_label": r"$t^{\text{ref.}}$",
     },
 }
 

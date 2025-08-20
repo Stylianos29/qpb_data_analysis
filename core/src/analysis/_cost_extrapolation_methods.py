@@ -298,84 +298,44 @@ def extrapolate_individual(ax, plot_data=None, fit_results=None, **kwargs):
     )
 
 
-def add_extrapolation_lines(
-    ax,
-    plot_data=None,
-    fit_results=None,
-    group_info=None,
-    plot_type="grouped",
-    x_target=0.005,
-    line_style=None,
-    **kwargs,
-):
+def add_extrapolation_lines(ax, fit_results=None, **kwargs):
     """
-    Add vertical and horizontal lines showing extrapolation at target
-    x-value.
+    Add vertical and horizontal lines showing extrapolation at target bare mass.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     ax : matplotlib.axes.Axes
         The axes object to draw on
-    plot_data : dict
-        Plot data (not used in this function, but part of signature)
     fit_results : dict
-        Dictionary mapping group values to fit result dictionaries
-    group_info : dict
-        Group information (not used in this function, but part of
-        signature)
-    plot_type : str
-        Type of plot ('grouped' or 'individual')
-    x_target : float
-        X-value where to draw extrapolation lines (default: 100)
-    line_style : dict, optional
-        Style parameters for the lines
+        Fit result dictionary for this individual plot
     **kwargs : dict
-        Additional context parameters
+        Additional context parameters (unused)
     """
-
-    # print(f"DEBUG: plot_type={plot_type}, fit_results={fit_results}")
-
     if not fit_results:
-        print("No fit results available for extrapolation.")
         return
 
-    # Default line style
-    default_style = {
-        "color": "green",
-        "linestyle": "--",
-        "alpha": 0.7,
-        "linewidth": 1.5,
-    }
-    if line_style:
-        default_style.update(line_style)
+    # Get configuration
+    extrapolation_config = get_extrapolation_config()
+    target_bare_mass = extrapolation_config["target_bare_mass"]
 
-    # Draw vertical line at x_target
-    ax.axvline(x_target, label=f"x = {x_target}", **default_style)
+    # Calculate extrapolated cost
+    extrapolated_cost = _calculate_extrapolation(fit_results, target_bare_mass)
+    if extrapolated_cost is None:
+        return
 
-    # Handle different plot types
-    if plot_type == "grouped":
-        # fit_results is a dictionary mapping group_value -> fit_result
-        for group_value, fit_result in fit_results.items():
-            if fit_result is None:
-                continue
+    # Get line styles from config
+    v_style = extrapolation_config["vertical_line_style"]
+    h_style = extrapolation_config["horizontal_line_style"]
+    v_label = extrapolation_config["vertical_line_label"]
+    h_label = extrapolation_config["horizontal_line_label"]
 
-            y_extrap = _calculate_extrapolation(fit_result, x_target)
-            if y_extrap is not None:
-                # Draw horizontal line at extrapolated y-value
-                ax.axhline(
-                    y_extrap,
-                    label=f"{group_value}: y = {y_extrap:.2f}",
-                    **default_style,
-                )
-    else:
-        # plot_type == 'individual', fit_results is a single fit_result
-        # dict
-        if fit_results is not None:
-            y_extrap = _calculate_extrapolation(fit_results, x_target)
-            if y_extrap is not None:
-                ax.axhline(y_extrap, label=f"y = {y_extrap:.2f}", **default_style)
+    # Draw extrapolation lines
+    ax.axvline(target_bare_mass, label=f"{v_label} = {target_bare_mass}", **v_style)
+    ax.axhline(
+        extrapolated_cost, label=f"{h_label} = {extrapolated_cost:.2f}", **h_style
+    )
 
-    # Update legend to include new lines
+    # Update legend
     ax.legend()
 
 
