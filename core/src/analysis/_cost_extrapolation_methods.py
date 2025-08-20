@@ -277,8 +277,8 @@ def perform_cost_extrapolation(plotter: DataPlotter, logger) -> Dict[str, Any]:
         fit_label_location=plotting_config["fit_label_location"],
         fit_min_data_points=validation_config["min_data_points_for_fitting"],
         # Output
-        save_figure=True,
-        verbose=False,
+        verbose=plotting_config["verbose"],
+        file_format=plotting_config["file_format"],
         # Advanced
         post_plot_customization_function=add_extrapolation_lines,
     )

@@ -26,8 +26,6 @@ CONFIG = {
     "output": {
         "csv_filename": "computational_cost_extrapolation.csv",
         "float_precision": 6,
-        "include_fit_results": True,
-        "include_metadata": True,
     },
     # Data validation
     "data_validation": {
@@ -61,6 +59,9 @@ CONFIG = {
         "capsize": 5,
         "include_legend": True,
         "legend_location": "upper right",
+        # Output
+        "verbose": False,
+        "file_format": "png",
     },
     # Extrapolation settings
     "extrapolation": {
