@@ -25,7 +25,7 @@ from src.analysis._cost_extrapolation_config import (
     get_validation_config,
     get_plotting_config,
     get_output_config,
-    get_extrapolation_config
+    get_extrapolation_config,
 )
 
 
@@ -107,6 +107,16 @@ def _average_across_configurations(df: pd.DataFrame, logger) -> pd.DataFrame:
     logger.info(
         "Creating per-configuration averages using automatic parameter grouping..."
     )
+
+    # Apply fitting range constraints if specified
+    extrapolation_config = get_extrapolation_config()
+    min_mass = extrapolation_config.get("fit_range_min_bare_mass")
+    max_mass = extrapolation_config.get("fit_range_max_bare_mass")
+
+    if min_mass is not None:
+        df = df[df["Bare_mass"] > min_mass]
+    if max_mass is not None:
+        df = df[df["Bare_mass"] <= max_mass]
 
     # Create DataFrameAnalyzer for automatic parameter detection
     analyzer = DataFrameAnalyzer(df)

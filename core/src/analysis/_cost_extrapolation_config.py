@@ -33,8 +33,6 @@ CONFIG = {
     "data_validation": {
         "min_data_points_for_fitting": 4,
         "min_data_points_for_averaging": 3,  # Minimum configurations to average
-        "max_reasonable_cost": 10000.0,  # core-hours
-        "min_reasonable_cost": 0.1,  # core-hours
     },
     # Configuration averaging settings
     "averaging": {
@@ -77,6 +75,9 @@ CONFIG = {
         "validate_results": True,
         "min_success_rate": 0.5,  # Require 50% of groups to pass validation
         "target_bare_mass": 0.005,
+        # Fitting range constraints (None = no constraint)
+        "fit_range_min_bare_mass": 0.0,
+        "fit_range_max_bare_mass": None,  # No upper limit (yet)
     },
 }
 
@@ -120,13 +121,6 @@ def validate_config() -> bool:
         # Check numeric ranges
         if CONFIG["data_validation"]["min_data_points_for_fitting"] < 2:
             print("min_data_points_for_fitting must be at least 2")
-            return False
-
-        if (
-            CONFIG["data_validation"]["max_reasonable_cost"]
-            <= CONFIG["data_validation"]["min_reasonable_cost"]
-        ):
-            print("max_reasonable_cost must be greater than min_reasonable_cost")
             return False
 
         # Check plot variables are defined
@@ -204,8 +198,6 @@ def get_validation_thresholds() -> Dict[str, float]:
         Dictionary of validation thresholds
     """
     return {
-        # "min_cost": CONFIG["data_validation"]["min_reasonable_cost"],
-        # "max_cost": CONFIG["data_validation"]["max_reasonable_cost"],
         "min_data_points": CONFIG["data_validation"]["min_data_points_for_fitting"],
         # "min_data_points_for_averaging": CONFIG["data_validation"][
         # "min_data_points_for_averaging"
