@@ -25,6 +25,7 @@ from src.analysis._cost_extrapolation_config import (
     get_validation_config,
     get_plotting_config,
     get_output_config,
+    get_extrapolation_config
 )
 
 
@@ -558,6 +559,15 @@ def export_results(
             # Add fit parameters (a, b, c for shifted power law)
             for i, param in enumerate(params[:3]):  # Limit to first 3 parameters
                 row[f"param_{chr(97+i)}"] = param  # a, b, c
+
+            # Add extrapolation values
+            target_bare_mass = get_extrapolation_config()["target_bare_mass"]
+            extrapolated_cost = _calculate_extrapolation(fit_data, target_bare_mass)
+
+            row["target_bare_mass"] = target_bare_mass
+            row["extrapolated_cost"] = (
+                extrapolated_cost if extrapolated_cost is not None else np.nan
+            )
 
             results_data.append(row)
 

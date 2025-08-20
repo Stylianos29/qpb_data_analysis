@@ -76,6 +76,7 @@ CONFIG = {
         "include_single_valued_params": True,
         "validate_results": True,
         "min_success_rate": 0.5,  # Require 50% of groups to pass validation
+        "target_bare_mass": 0.005,
     },
 }
 
