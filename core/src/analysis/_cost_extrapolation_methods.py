@@ -264,19 +264,25 @@ def perform_cost_extrapolation(plotter: DataPlotter, logger) -> Dict[str, Any]:
     # validation)
     logger.info("Generating plots with curve fitting...")
     plotter.plot(
+        # Figure settings
         figure_size=plotting_config["figure_size"],
+        top_margin_adjustment=plotting_config["top_margin_adjustment"],
+        left_margin_adjustment=plotting_config["left_margin_adjustment"],
+        # Styling
         marker_size=plotting_config["marker_size"],
         capsize=plotting_config["capsize"],
         include_legend=plotting_config["include_legend"],
         legend_location=plotting_config["legend_location"],
+        include_plot_title=True,
+        # Curve fitting
         fit_function=plotting_config["fit_function"],
         show_fit_parameters_on_plot=plotting_config["show_fit_parameters"],
         fit_label_location=plotting_config["fit_label_location"],
         fit_min_data_points=validation_config["min_data_points_for_fitting"],
+        # Output
         save_figure=True,
         verbose=False,
-        include_plot_title=True,
-        top_margin_adjustment=plotting_config["top_margin_adjustment"],
+        # Advanced
         post_plot_customization_function=add_extrapolation_lines,
     )
 

@@ -31,7 +31,7 @@ CONFIG = {
     },
     # Data validation
     "data_validation": {
-        "min_data_points_for_fitting": 4,
+        "min_data_points_for_fitting": 4,  # Minimum bare mass values to average
         "min_data_points_for_averaging": 3,  # Minimum configurations to average
     },
     # Configuration averaging settings
@@ -50,8 +50,6 @@ CONFIG = {
         "y_variable": "Average_core_hours_per_spinor_per_configuration",
         # Figure settings
         "figure_size": (7, 5),
-        "font_size": 12,
-        "dpi": 300,
         # Curve fitting
         "fit_function": "shifted_power_law",  # a/(x-b)+c
         "show_fit_parameters": True,
@@ -62,9 +60,7 @@ CONFIG = {
         "include_legend": True,
         "legend_location": "upper right",
         # Error bars
-        "include_error_bars": True,
-        "error_bar_alpha": 0.7,
-        "left_margin_adjustment": 0.08,
+        "left_margin_adjustment": 0.13,
         "top_margin_adjustment": 0.88,
     },
     # Extrapolation settings
