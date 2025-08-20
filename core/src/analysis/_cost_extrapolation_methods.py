@@ -7,7 +7,7 @@ automatic parameter detection and grouping, and the DataPlotter class
 for curve fitting and visualization of computational cost data.
 """
 
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any
 from pathlib import Path
 
 import numpy as np
