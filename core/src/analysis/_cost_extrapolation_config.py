@@ -29,7 +29,7 @@ CONFIG = {
     },
     # Data validation
     "data_validation": {
-        "min_data_points_for_fitting": 4,  # Minimum bare mass values to average
+        "min_data_points_for_fitting": 4,  # Minimum bare masses to average
         "min_data_points_for_averaging": 3,  # Minimum configurations to average
     },
     # Configuration averaging settings
