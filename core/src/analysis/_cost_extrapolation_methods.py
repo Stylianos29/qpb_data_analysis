@@ -310,26 +310,35 @@ def add_extrapolation_lines(ax, fit_results=None, **kwargs):
         extrapolated_cost = float(extrapolated_result)
         uncertainty = 0.0
 
-    # Get line styles from config
+    # Get styles and labels from config
     v_style = extrapolation_config["vertical_line_style"]
     h_style = extrapolation_config["horizontal_line_style"]
+    band_style = extrapolation_config["uncertainty_band_style"]
     v_label = extrapolation_config["vertical_line_label"]
     h_label = extrapolation_config["horizontal_line_label"]
 
+    # Create combined horizontal label with uncertainty
+    if uncertainty > 0:
+        import gvar
+
+        h_label_text = (
+            f"{h_label} = {gvar.gvar(extrapolated_cost, uncertainty)} core-hours"
+        )
+    else:
+        h_label_text = f"{h_label} = {extrapolated_cost:.2f} core-hours"
+
     # Draw extrapolation lines
     ax.axvline(target_bare_mass, label=f"{v_label} = {target_bare_mass}", **v_style)
-    ax.axhline(
-        extrapolated_cost, label=f"{h_label} = {extrapolated_cost:.2f}", **h_style
-    )
+    ax.axhline(extrapolated_cost, label=h_label_text, **h_style)
 
-    # Add uncertainty band for horizontal line if uncertainty exists
+    # Add uncertainty band (no label to avoid legend clutter)
     if uncertainty > 0:
+        band_color = band_style.get("color") or h_style.get("color", "green")
         ax.axhspan(
             extrapolated_cost - uncertainty,
             extrapolated_cost + uncertainty,
-            alpha=0.2,
-            color=h_style.get("color", "green"),
-            label=f"±{uncertainty:.2f}",
+            alpha=band_style["alpha"],
+            color=band_color,
         )
 
     # Update legend

@@ -83,6 +83,10 @@ CONFIG = {
             "alpha": 0.7,
             "linewidth": 1.5,
         },
+        "uncertainty_band_style": {
+            "alpha": 0.2,
+            "color": None,  # or None to inherit from horizontal_line_style
+        },
         # Line labels
         "vertical_line_label": r"a$m^{\text{ref.}}$",
         "horizontal_line_label": r"$t^{\text{ref.}}$",
