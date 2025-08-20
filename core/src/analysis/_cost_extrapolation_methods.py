@@ -288,7 +288,8 @@ def perform_cost_extrapolation(plotter: DataPlotter, logger) -> Dict[str, Any]:
 
 def add_extrapolation_lines(ax, fit_results=None, **kwargs):
     """
-    Add vertical and horizontal lines showing extrapolation at target bare mass.
+    Add vertical and horizontal lines showing extrapolation at target
+    bare mass.
 
     Parameters
     ----------
@@ -329,94 +330,47 @@ def add_extrapolation_lines(ax, fit_results=None, **kwargs):
 
 def _calculate_extrapolation(fit_result, x_target):
     """
-    Calculate extrapolated y-value for a given x_target using fit
-    results. Handles both scipy (float) and gvar (uncertainty)
-    parameters.
+    Calculate extrapolated y-value for given x_target using fit results.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     fit_result : dict
-        Fit result dictionary containing 'parameters' and 'function'
-        keys
+        Fit result with 'parameters', 'function', and 'method' keys
     x_target : float
         X-value to extrapolate at
 
-    Returns:
-    --------
+    Returns
+    -------
     float or None
-        Extrapolated y-value, or None if function type is unsupported
+        Extrapolated y-value, or None if calculation fails
     """
     if not fit_result:
         return None
 
+    # Extract parameters (handle both gvar and scipy)
     params = fit_result["parameters"]
+    if fit_result.get("method") == "gvar":
+        import gvar
+
+        params = [float(gvar.mean(p)) for p in params]
+
+    # Function dispatch table
+    function_map = {
+        "linear": lambda a, b, *_: a * x_target + b,
+        "exponential": lambda a, b, c, *_: a * np.exp(-b * x_target) + c,
+        "power_law": lambda a, b, *_: a * (x_target**b) if x_target > 0 else None,
+        "shifted_power_law": lambda a, b, c, *_: (
+            a / (x_target - b) + c if abs(x_target - b) > 1e-10 else None
+        ),
+    }
+
     function_type = fit_result["function"]
-    method = fit_result.get("method", "scipy")
-
-    # Handle gvar objects - extract mean values for calculation
-    if method == "gvar":
-        try:
-            import gvar
-
-            # Convert gvar objects to their mean values for
-            # extrapolation
-            if hasattr(params, "__iter__"):
-                # Array of gvar objects
-                param_values = [float(gvar.mean(p)) for p in params]
-            else:
-                # Single gvar object
-                param_values = [float(gvar.mean(params))]
-        except ImportError:
-            print("Warning: gvar not available, cannot extract parameter values")
-            return None
-        except Exception as e:
-            print(f"Warning: Could not extract gvar values: {e}")
-            return None
-    else:
-        # scipy case - parameters are already floats
-        param_values = params
+    if function_type not in function_map:
+        return None
 
     try:
-        if function_type == "linear":
-            # y = a*x + b
-            return param_values[0] * x_target + param_values[1]
-
-        elif function_type == "exponential":
-            # y = a*exp(-b*x) + c
-            import numpy as np
-
-            return (
-                param_values[0] * np.exp(-param_values[1] * x_target) + param_values[2]
-            )
-
-        elif function_type == "power_law":
-            # y = a*x^b
-            if x_target <= 0:
-                print(
-                    f"Warning: Cannot extrapolate power law for x_target={x_target} <= 0"
-                )
-                return None
-            return param_values[0] * (x_target ** param_values[1])
-
-        elif function_type == "shifted_power_law":
-            # y = a/(x-b) + c
-            denominator = x_target - param_values[1]
-            if abs(denominator) < 1e-10:  # Now abs() works on float
-                print(
-                    f"Warning: Cannot extrapolate shifted power law for x_target={x_target} "
-                    f"(too close to singularity at x={param_values[1]:.3f})"
-                )
-                return None
-            return param_values[0] / denominator + param_values[2]
-
-        else:
-            print(
-                f"Warning: Extrapolation not supported for function type '{function_type}'"
-            )
-            return None
-
-    except (IndexError, ValueError, ZeroDivisionError) as e:
-        print(f"Error calculating extrapolation for {function_type}: {e}")
+        return function_map[function_type](*params)
+    except (IndexError, ValueError, ZeroDivisionError):
         return None
 
 
