@@ -68,7 +68,7 @@ CONFIG = {
         # "min_success_rate": 0.5,  # Require 50% of groups to pass validation
         "target_bare_mass": 0.005,
         # Fitting range constraints (None = no constraint)
-        "fit_range_min_bare_mass": 0.0,
+        "fit_range_min_bare_mass": None,
         "fit_range_max_bare_mass": None,  # No upper limit (yet)
         # Extrapolation line styling
         "vertical_line_style": {
