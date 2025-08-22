@@ -6,18 +6,33 @@ Extrapolates computational costs (core-hours per spinor per
 configuration) using DataPlotter for automatic grouping, curve fitting,
 and visualization.
 
+Supports both fixed bare mass and fixed PCAC mass extrapolation methods:
+    - Fixed bare mass: Direct extrapolation using configured target bare
+      mass
+    - Fixed PCAC mass: Convert reference PCAC mass to bare mass, then
+      extrapolate cost
+
 Key features:
     - Automatic parameter detection and grouping via DataFrameAnalyzer
     - Configuration averaging using
       DataFrameAnalyzer.group_by_multivalued_tunable_parameters()
-    - Curve fitting with shifted power law function a/(x-b)+c via
-      DataPlotter
-    - Professional visualization with fit diagnostics
+    - Dual extrapolation methods with automatic method dispatch
+    - Curve fitting with linear (PCAC) and shifted power law (cost)
+      functions
+    - Professional visualization with fit diagnostics and uncertainty
+      bands
     - CSV export with detailed results and metadata
 
 Usage:
+    # Fixed bare mass method (default)
     python extrapolate_computational_cost.py \
         -i_proc processed_parameter_values.csv \
+        -o output_dir [options]
+    
+    # Fixed PCAC mass method
+    python extrapolate_computational_cost.py \
+        -i_proc processed_parameter_values.csv \
+        -i_pcac plateau_PCAC_mass_estimates.csv \
         -o output_dir [options]
 """
 
@@ -41,16 +56,13 @@ from library.validation.click_validators import (
 
 # Import from auxiliary modules
 from src.analysis._cost_extrapolation_config import (
-    CONFIG,
     validate_config,
-    get_plotting_config,
+    get_shared_config,
+    get_extrapolation_method,
+    get_reference_pcac_mass,
+    get_target_bare_mass,
 )
-from src.analysis._cost_extrapolation_methods import (
-    load_and_prepare_data,
-    create_cost_plotter,
-    perform_cost_extrapolation,
-    export_results,
-)
+from src.analysis._cost_extrapolation_methods import extrapolate_computational_cost
 
 
 @click.command()
@@ -60,6 +72,13 @@ from src.analysis._cost_extrapolation_methods import (
     required=True,
     callback=csv_file.input,
     help="Path to input CSV file containing processed parameter values.",
+)
+@click.option(
+    "-i_pcac",
+    "--input_pcac_csv",
+    default=None,
+    callback=csv_file.input,
+    help="Path to input CSV file containing PCAC mass data (enables fixed_pcac_mass method).",
 )
 @click.option(
     "-o",
@@ -77,8 +96,8 @@ from src.analysis._cost_extrapolation_methods import (
 )
 @click.option(
     "--output_csv_filename",
-    default=CONFIG["output"]["csv_filename"],
-    help=f"Output CSV filename (default: {CONFIG['output']['csv_filename']}).",
+    default=None,
+    help="Output CSV filename (default: from configuration).",
 )
 @click.option(
     "-log_on",
@@ -110,6 +129,7 @@ from src.analysis._cost_extrapolation_methods import (
 )
 def main(
     input_processed_csv,
+    input_pcac_csv,
     output_directory,
     plots_directory,
     output_csv_filename,
@@ -122,9 +142,10 @@ def main(
     Extrapolate computational costs using DataPlotter for automatic
     grouping and fitting.
 
-    This script leverages the DataFrameAnalyzer for automatic parameter
-    detection and grouping, then uses DataPlotter for curve fitting with
-    the shifted power law function a/(x-b)+c and professional
+    This script supports both fixed bare mass and fixed PCAC mass
+    methods. The method is determined by configuration settings and
+    provided input files. Uses DataFrameAnalyzer for automatic parameter
+    detection and DataPlotter for curve fitting with professional
     visualizations.
     """
     # Validate configuration
@@ -132,8 +153,17 @@ def main(
         click.echo("Configuration validation failed. Exiting.", err=True)
         sys.exit(1)
 
+    # TODO: Change it back to click options.
+    # Get shared configuration
+    shared_config = get_shared_config()
+
+    # Set default output CSV filename from config if not provided
+    if output_csv_filename is None:
+        output_csv_filename = shared_config["output"]["csv_filename"]
+
     # Setup directories
     output_directory = Path(output_directory)
+    # TODO: Make plots_directory required
     if plots_directory is None:
         plots_directory = output_directory / "plots"
     else:
@@ -160,71 +190,76 @@ def main(
 
     logger.log_script_start("Computational cost extrapolation")
     logger.info(f"Input processed CSV: {input_processed_csv}")
+    if input_pcac_csv:
+        logger.info(f"Input PCAC CSV: {input_pcac_csv}")
     logger.info(f"Output directory: {output_directory}")
     logger.info(f"Plots directory: {plots_directory}")
 
     try:
-        # Phase 1: Data Loading and Preparation
-        logger.info("=== PHASE 1: Data Loading and Preparation ===")
-        prepared_df = load_and_prepare_data(input_processed_csv, logger)
+        # Validate method configuration
+        logger.info("=== CONFIGURATION VALIDATION ===")
+        method = get_extrapolation_method()
+        logger.info(f"Extrapolation method: {method}")
 
-        if len(prepared_df) == 0:
-            logger.error("No valid data remaining after preparation. Exiting.")
+        if method == "fixed_bare_mass":
+            target = get_target_bare_mass()
+            logger.info(f"Target bare mass: {target}")
+
+            if input_pcac_csv:
+                logger.warning(
+                    "PCAC data provided but method is 'fixed_bare_mass'. "
+                    "PCAC data will be ignored. "
+                    "Change method to 'fixed_pcac_mass' to use PCAC data."
+                )
+
+        elif method == "fixed_pcac_mass":
+            reference = get_reference_pcac_mass()
+            logger.info(f"Reference PCAC mass: {reference}")
+
+            if input_pcac_csv is None:
+                logger.error(
+                    "Configuration method is 'fixed_pcac_mass' but no PCAC "
+                    "data file provided. Either provide PCAC data file with "
+                    "-i_pcac or change method to 'fixed_bare_mass'."
+                )
+                sys.exit(1)
+        else:
+            logger.error(f"Unknown extrapolation method: {method}")
             sys.exit(1)
 
-        # Phase 2: DataPlotter Initialization
-        logger.info("=== PHASE 2: DataPlotter Initialization ===")
-        cost_plotter = create_cost_plotter(prepared_df, plots_directory, logger)
+        # Phase 1: Computational Cost Extrapolation (Unified)
+        logger.info("=== PHASE 1: Computational Cost Extrapolation ===")
 
-        # Log detected parameters
-        logger.info(
-            f"Detected multivalued parameters: {cost_plotter.list_of_multivalued_tunable_parameter_names}"
+        extrapolation_results = extrapolate_computational_cost(
+            processed_csv_path=str(input_processed_csv),
+            plots_directory=plots_directory,
+            logger=logger,
+            pcac_csv_path=str(input_pcac_csv) if input_pcac_csv else None,
         )
-        logger.info(
-            f"Detected single-valued parameters: {cost_plotter.list_of_single_valued_tunable_parameter_names}"
-        )
-
-        # Check for sufficient grouping parameters
-        if not cost_plotter.list_of_multivalued_tunable_parameter_names:
-            logger.warning(
-                "No multivalued parameters detected - extrapolation will be performed on entire dataset"
-            )
-
-        # Phase 3: Cost Extrapolation and Fitting
-        logger.info("=== PHASE 3: Cost Extrapolation and Fitting ===")
-        extrapolation_results = perform_cost_extrapolation(cost_plotter, logger)
 
         if not extrapolation_results:
             logger.error("Extrapolation failed to produce results. Exiting.")
             sys.exit(1)
 
-        # Phase 4: Result Export
-        logger.info("=== PHASE 4: Result Export ===")
-        results_df = export_results(
-            extrapolation_results,
-            cost_plotter,
-            output_directory,
-            output_csv_filename,
-            logger,
-        )
+        logger.info(f"✓ Generated {len(extrapolation_results)} fit results")
 
         logger.log_script_end("Computational cost extrapolation completed successfully")
 
-        # Get plotting configuration
-        plotting_config = get_plotting_config()
-
         # Final success message
+        base_subdir = shared_config["base_subdirectory"]
         success_msg = "✓ Computational cost extrapolation completed successfully!"
         success_msg += (
             f"\n  • Results saved to: {output_directory / output_csv_filename}"
         )
-        success_msg += f"\n  • Analyzed {len(results_df)} parameter groups"
-        success_msg += f"\n  • Total data points: {len(prepared_df)}"
-        success_msg += (
-            "\n  • Plots saved to: "
-            f"{plots_directory / plotting_config.get(
-                'base_subdirectory', 'Computational_cost_extrapolation')}"
-        )
+        success_msg += f"\n  • Analyzed {len(extrapolation_results)} parameter groups"
+        success_msg += f"\n  • Method used: {method}"
+
+        if method == "fixed_bare_mass":
+            success_msg += f"\n  • Target bare mass: {get_target_bare_mass()}"
+        elif method == "fixed_pcac_mass":
+            success_msg += f"\n  • Reference PCAC mass: {get_reference_pcac_mass()}"
+
+        success_msg += f"\n  • Plots saved to: {plots_directory / base_subdir}"
 
         click.echo(success_msg)
 
