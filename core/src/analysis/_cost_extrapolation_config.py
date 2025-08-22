@@ -82,7 +82,7 @@ CONFIG = {
         "plotting": {
             # Plot variables
             "x_variable": "Bare_mass",
-            "y_variable": "plateau_PCAC_mass",  # Constructed from mean+error
+            "y_variable": "PCAC_mass",  # Constructed from mean+error
             # Figure settings
             "figure_size": (7, 5),
             "top_margin_adjustment": 0.88,
