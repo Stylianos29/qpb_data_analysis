@@ -91,9 +91,9 @@ from src.analysis._cost_extrapolation_methods import (
 @click.option(
     "-p",
     "--plots_directory",
-    default=None,
-    callback=directory.can_create,
-    help="Directory for output plots. If not specified, uses output_directory/plots.",
+    required=True,
+    callback=directory.must_exist,
+    help="Directory for output plots.",
 )
 @click.option(
     "--output_csv_filename",
@@ -164,11 +164,7 @@ def main(
 
     # Setup directories
     output_directory = Path(output_directory)
-    # TODO: Make plots_directory required
-    if plots_directory is None:
-        plots_directory = output_directory / "plots"
-    else:
-        plots_directory = Path(plots_directory)
+    plots_directory = Path(plots_directory)
 
     if log_directory is None and enable_logging:
         log_directory = output_directory
@@ -176,7 +172,6 @@ def main(
         log_directory = Path(log_directory) if log_directory else None
 
     # Create directories
-    plots_directory.mkdir(parents=True, exist_ok=True)
     if log_directory:
         log_directory.mkdir(parents=True, exist_ok=True)
 
@@ -235,6 +230,7 @@ def main(
 
         extrapolation_results = extrapolate_computational_cost(
             processed_csv_path=str(input_processed_csv),
+            output_directory=output_directory,
             plots_directory=plots_directory,
             logger=logger,
             pcac_csv_path=str(input_pcac_csv) if input_pcac_csv else None,

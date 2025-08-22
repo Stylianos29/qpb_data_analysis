@@ -68,6 +68,7 @@ def detect_extrapolation_method(pcac_csv_path: Optional[str] = None) -> str:
 
 def extrapolate_computational_cost(
     processed_csv_path: str,
+    output_directory: Path,
     plots_directory: Path,
     logger,
     pcac_csv_path: Optional[str] = None,
@@ -98,13 +99,15 @@ def extrapolate_computational_cost(
     logger.info(f"Using extrapolation method: {method}")
 
     if method == "fixed_bare_mass":
-        return _extrapolate_fixed_bare_mass(processed_csv_path, plots_directory, logger)
+        return _extrapolate_fixed_bare_mass(
+            processed_csv_path, output_directory, plots_directory, logger
+        )
 
     elif method == "fixed_pcac_mass":
         if pcac_csv_path is None:
             raise ValueError("pcac_csv_path required for fixed_pcac_mass method")
         return _extrapolate_fixed_pcac_mass(
-            processed_csv_path, pcac_csv_path, plots_directory, logger
+            processed_csv_path, pcac_csv_path, output_directory, plots_directory, logger
         )
 
     else:
@@ -117,7 +120,7 @@ def extrapolate_computational_cost(
 
 
 def _extrapolate_fixed_bare_mass(
-    processed_csv_path: str, plots_directory: Path, logger
+    processed_csv_path: str, output_directory: Path, plots_directory: Path, logger
 ) -> Dict[str, Any]:
     """
     Fixed bare mass method (original approach).
@@ -128,12 +131,16 @@ def _extrapolate_fixed_bare_mass(
     logger.info(f"Using configured target bare mass: {target_bare_mass}")
 
     return _perform_cost_analysis_with_target(
-        processed_csv_path, target_bare_mass, plots_directory, logger
+        processed_csv_path, target_bare_mass, output_directory, plots_directory, logger
     )
 
 
 def _extrapolate_fixed_pcac_mass(
-    processed_csv_path: str, pcac_csv_path: str, plots_directory: Path, logger
+    processed_csv_path: str,
+    pcac_csv_path: str,
+    output_directory: Path,
+    plots_directory: Path,
+    logger,
 ) -> Dict[str, Any]:
     """
     Fixed PCAC mass method: Convert reference PCAC mass to bare mass,
@@ -156,7 +163,11 @@ def _extrapolate_fixed_pcac_mass(
     logger.info(f"Target bare mass from PCAC: {target_bare_mass_gvar}")
     # TODO: Change name "_perform_cost_analysis_with_target"
     return _perform_cost_analysis_with_target(
-        processed_csv_path, target_bare_mass_gvar, plots_directory, logger
+        processed_csv_path,
+        target_bare_mass_gvar,
+        output_directory,
+        plots_directory,
+        logger,
     )
 
 
@@ -451,6 +462,7 @@ def _invert_pcac_fit(
 def _perform_cost_analysis_with_target(
     processed_csv_path: str,
     target_bare_mass: Union[float, gvar.GVar],
+    output_directory: Path,
     plots_directory: Path,
     logger,
 ) -> Dict[str, Any]:
@@ -473,7 +485,11 @@ def _perform_cost_analysis_with_target(
 
     # Export results (REUSE existing function with target parameter)
     _export_results_with_target(
-        fit_results, plotter, target_bare_mass, plots_directory, logger
+        fit_results,
+        plotter,
+        target_bare_mass,
+        output_directory,
+        logger,
     )
 
     return fit_results
@@ -605,7 +621,7 @@ def _export_results_with_target(
     fit_results: Dict[Any, Any],
     plotter: DataPlotter,
     target_bare_mass: Union[float, gvar.GVar],
-    plots_directory: Path,
+    output_directory: Path,
     logger,
 ) -> pd.DataFrame:
     """
@@ -618,10 +634,10 @@ def _export_results_with_target(
     return export_results(
         fit_results=fit_results,
         plotter=plotter,
-        output_directory=plots_directory / get_base_subdirectory(),
+        output_directory=output_directory,
         csv_filename=csv_filename,
         logger=logger,
-        target_bare_mass=target_bare_mass,  # Pass custom target
+        target_bare_mass=target_bare_mass,
     )
 
 
