@@ -338,10 +338,7 @@ def _perform_pcac_fitting(pcac_plotter: DataPlotter, logger) -> Dict[str, Any]:
 
 
 def _add_pcac_extrapolation_lines(ax, fit_results=None, **kwargs):
-    """
-    Add extrapolation lines to PCAC plots showing reference PCAC mass
-    and derived bare mass.
-    """
+    """Add extrapolation lines to PCAC plots."""
     if not fit_results:
         return
 
@@ -350,31 +347,33 @@ def _add_pcac_extrapolation_lines(ax, fit_results=None, **kwargs):
     pcac_config = get_pcac_config()
     reference_pcac_mass = get_reference_pcac_mass()
 
-    # Get line styles from shared config
+    # Get line styles
     extrapolation_lines = shared_config["extrapolation_lines"]
     v_style = extrapolation_lines["vertical_line_style"]
     h_style = extrapolation_lines["horizontal_line_style"]
     band_style = extrapolation_lines["uncertainty_band_style"]
 
-    # Get PCAC-specific labels
+    # Get labels
     labels = pcac_config["extrapolation_labels"]
-    v_label = labels["vertical_line_label"]  # Derived bare mass
-    h_label = labels["horizontal_line_label"]  # Reference PCAC mass
+    v_label = labels["vertical_line_label"]
+    h_label = labels["horizontal_line_label"]
 
-    # Calculate derived bare mass from linear fit inversion
+    # Calculate derived bare mass
     try:
-        derived_bare_mass_gvar = _invert_pcac_fit(
-            fit_results, reference_pcac_mass, None
+        # fit_results is now a single fit result, not a dict
+        derived_bare_mass_gvar = _invert_single_pcac_fit(
+            fit_results, reference_pcac_mass
         )
 
-        if hasattr(derived_bare_mass_gvar, "mean"):  # gvar object
+        # Extract values
+        if hasattr(derived_bare_mass_gvar, "mean"):
             derived_bare_mass = float(derived_bare_mass_gvar.mean)
             uncertainty = float(derived_bare_mass_gvar.sdev)
-        else:  # float fallback
+        else:
             derived_bare_mass = float(derived_bare_mass_gvar)
             uncertainty = 0.0
 
-        # Draw extrapolation lines
+        # Draw lines
         ax.axhline(
             reference_pcac_mass, label=f"{h_label} = {reference_pcac_mass}", **h_style
         )
@@ -386,7 +385,7 @@ def _add_pcac_extrapolation_lines(ax, fit_results=None, **kwargs):
 
         ax.axvline(derived_bare_mass, label=v_label_text, **v_style)
 
-        # Add uncertainty band for vertical line if uncertainty exists
+        # Add uncertainty band
         if uncertainty > 0:
             band_color = band_style.get("color") or v_style.get("color", "green")
             ax.axvspan(
@@ -396,12 +395,30 @@ def _add_pcac_extrapolation_lines(ax, fit_results=None, **kwargs):
                 color=band_color,
             )
 
-        # Update legend
         ax.legend()
 
     except Exception as e:
-        # Silently skip extrapolation lines if inversion fails
-        pass
+        # Log the error instead of silently ignoring it
+        print(f"Warning: Could not add PCAC extrapolation lines: {e}")
+
+
+def _invert_single_pcac_fit(fit_data, reference_pcac_mass):
+    """Invert a single PCAC fit result."""
+    if not fit_data or fit_data.get("function") != "linear":
+        raise ValueError("PCAC fit must be linear for inversion")
+
+    params = fit_data["parameters"]
+    method = fit_data.get("method", "scipy")
+
+    if method == "gvar":
+        a, b = params[0], params[1]
+    else:
+        a, b = gvar.gvar(params[0], 0), gvar.gvar(params[1], 0)
+
+    if abs(gvar.mean(a)) < 1e-10:
+        raise ValueError("PCAC fit slope too close to zero")
+
+    return (reference_pcac_mass - b) / a
 
 
 def _invert_pcac_fit(

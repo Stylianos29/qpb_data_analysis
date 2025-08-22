@@ -40,7 +40,7 @@ CONFIG = {
         # Global extrapolation method and targets
         "extrapolation": {
             "target_bare_mass": 0.005,  # Reference bare mass value
-            "reference_pcac_mass": 0.05,  # Reference PCAC mass value
+            "reference_pcac_mass": 0.005,  # Reference PCAC mass value
             # Fitting range constraints (None = no constraint)
             "fit_range_min_bare_mass": None,
             "fit_range_max_bare_mass": None,
