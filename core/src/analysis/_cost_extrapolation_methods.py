@@ -8,7 +8,7 @@ detection and grouping, and DataPlotter for curve fitting and
 visualization of computational cost data.
 
 Supported Methods:
-    - fixed_bare_mass: Direct extrapolation using configured target bare
+    - fixed_bare_mass: Direct extrapolation using configured reference bare
       mass
     - fixed_pcac_mass: Convert reference PCAC mass to bare mass, then
       extrapolate cost
@@ -29,7 +29,7 @@ from src.analysis._cost_extrapolation_config import (
     get_pcac_config,
     get_cost_config,
     get_reference_pcac_mass,
-    get_target_bare_mass,
+    get_reference_bare_mass,
     get_base_subdirectory,
     # Backward compatibility
     get_averaging_config,
@@ -125,13 +125,17 @@ def _extrapolate_fixed_bare_mass(
     """
     Fixed bare mass method (original approach).
 
-    Uses configured target_bare_mass as float value.
+    Uses configured reference_bare_massas float value.
     """
-    target_bare_mass = get_target_bare_mass()  # float from config
-    logger.info(f"Using configured target bare mass: {target_bare_mass}")
+    reference_bare_mass = get_reference_bare_mass()  # float from config
+    logger.info(f"Using configured reference bare mass: {reference_bare_mass}")
 
-    return _perform_cost_analysis_with_target(
-        processed_csv_path, target_bare_mass, output_directory, plots_directory, logger
+    return _perform_cost_analysis(
+        processed_csv_path,
+        reference_bare_mass,
+        output_directory,
+        plots_directory,
+        logger,
     )
 
 
@@ -147,22 +151,21 @@ def _extrapolate_fixed_pcac_mass(
     then extrapolate cost.
 
     Data Flow:
-        1. PCAC data → Linear fit → Invert to get target bare mass (with
+        1. PCAC data → Linear fit → Invert to get reference bare mass (with
            uncertainty)
-        2. Target bare mass → Cost extrapolation (reuse existing
+        2. reference bare mass → Cost extrapolation (reuse existing
            pipeline)
     """
     logger.info("Performing PCAC mass to bare mass conversion...")
 
-    # Step 1: PCAC analysis - get target bare mass with uncertainty
+    # Step 1: PCAC analysis - get reference bare mass with uncertainty
     target_bare_mass_gvar = _pcac_to_bare_mass_conversion(
         pcac_csv_path, plots_directory, logger
     )
 
-    # Step 2: Cost extrapolation using derived target (reuse existing infrastructure)
-    logger.info(f"Target bare mass from PCAC: {target_bare_mass_gvar}")
-    # TODO: Change name "_perform_cost_analysis_with_target"
-    return _perform_cost_analysis_with_target(
+    # Step 2: Cost extrapolation using derived reference (reuse existing infrastructure)
+    logger.info(f"Reference bare mass from PCAC: {target_bare_mass_gvar}")
+    return _perform_cost_analysis(
         processed_csv_path,
         target_bare_mass_gvar,
         output_directory,
@@ -443,33 +446,31 @@ def _invert_pcac_fit(
         raise ValueError("PCAC fit slope too close to zero for reliable inversion")
 
     # Invert: bare_mass = (pcac_mass - b) / a
-    target_bare_mass = (reference_pcac_mass - b) / a
+    reference_bare_mass = (reference_pcac_mass - b) / a
 
     if logger:
         logger.info(
             f"Inversion successful: PCAC mass {reference_pcac_mass} "
-            f"→ bare mass {target_bare_mass}"
+            f"→ bare mass {reference_bare_mass}"
         )
 
-    return target_bare_mass
+    return reference_bare_mass
 
 
 # =============================================================================
-# UNIFIED COST ANALYSIS (ENHANCED EXISTING)
+# UNIFIED COST ANALYSIS
 # =============================================================================
 
 
-def _perform_cost_analysis_with_target(
+def _perform_cost_analysis(
     processed_csv_path: str,
-    target_bare_mass: Union[float, gvar.GVar],
+    reference_bare_mass: Union[float, gvar.GVar],
     output_directory: Path,
     plots_directory: Path,
     logger,
 ) -> Dict[str, Any]:
     """
     Unified cost analysis that works with both float and gvar targets.
-
-    This enhances the existing perform_cost_extrapolation() function.
     Handles uncertainty propagation automatically when target is gvar.
     """
     logger.info("Performing cost analysis with unified target handling...")
@@ -481,13 +482,13 @@ def _perform_cost_analysis_with_target(
     plotter = create_cost_plotter(df, plots_directory, logger)
 
     # Perform cost fitting (REUSE existing infrastructure with custom extrapolation lines)
-    fit_results = _perform_cost_fitting_with_target(plotter, target_bare_mass, logger)
+    fit_results = _perform_cost_fitting(plotter, reference_bare_mass, logger)
 
-    # Export results (REUSE existing function with target parameter)
-    _export_results_with_target(
+    # Export results
+    _export_results(
         fit_results,
         plotter,
-        target_bare_mass,
+        reference_bare_mass,
         output_directory,
         logger,
     )
@@ -495,8 +496,8 @@ def _perform_cost_analysis_with_target(
     return fit_results
 
 
-def _perform_cost_fitting_with_target(
-    plotter: DataPlotter, target_bare_mass: Union[float, gvar.GVar], logger
+def _perform_cost_fitting(
+    plotter: DataPlotter, reference_bare_mass: Union[float, gvar.GVar], logger
 ) -> Dict[str, Any]:
     """
     Perform cost fitting with custom target for extrapolation lines.
@@ -509,10 +510,10 @@ def _perform_cost_fitting_with_target(
     plotting_config = cost_config["plotting"]
     validation_config = shared_config["data_validation"]
 
-    # Create custom extrapolation line function with target
+    # Create custom extrapolation line function
     def add_cost_extrapolation_lines(ax, fit_results=None, **kwargs):
         return _add_cost_extrapolation_lines(
-            ax, fit_results, target_bare_mass, **kwargs
+            ax, fit_results, reference_bare_mass, **kwargs
         )
 
     # Perform plotting with curve fitting
@@ -546,26 +547,26 @@ def _perform_cost_fitting_with_target(
 
 
 def _add_cost_extrapolation_lines(
-    ax, fit_results=None, target_bare_mass=None, **kwargs
+    ax, fit_results=None, reference_bare_mass=None, **kwargs
 ):
     """
-    Add extrapolation lines to cost plots with custom target (enhanced version).
+    Add extrapolation lines to cost plots with custom target.
     """
     if not fit_results:
         return
 
-    # Get target value
-    if target_bare_mass is not None:
-        if hasattr(target_bare_mass, "mean"):  # gvar object
-            target_value = float(target_bare_mass.mean)
+    # Get reference value
+    if reference_bare_mass is not None:
+        if hasattr(reference_bare_mass, "mean"):  # gvar object
+            reference_value = float(reference_bare_mass.mean)
         else:  # float
-            target_value = float(target_bare_mass)
+            reference_value = float(reference_bare_mass)
     else:
         # Fallback to config (backward compatibility)
-        target_value = get_extrapolation_config()["target_bare_mass"]
+        reference_value = get_extrapolation_config()["reference_bare_mass"]
 
     # Calculate extrapolated cost with uncertainty
-    extrapolated_result = _calculate_extrapolation(fit_results, target_value)
+    extrapolated_result = _calculate_extrapolation(fit_results, reference_value)
     if extrapolated_result is None:
         return
 
@@ -587,11 +588,11 @@ def _add_cost_extrapolation_lines(
 
     # Get cost-specific labels
     labels = cost_config["extrapolation_labels"]
-    v_label = labels["vertical_line_label"]  # Target bare mass
+    v_label = labels["vertical_line_label"]  # Reference bare mass
     h_label = labels["horizontal_line_label"]  # Extrapolated cost
 
     # Create combined labels
-    v_label_text = f"{v_label} = {target_value}"
+    v_label_text = f"{v_label} = {reference_value}"
     if uncertainty > 0:
         h_label_text = (
             f"{h_label} = {gvar.gvar(extrapolated_cost, uncertainty)} core-hours"
@@ -600,7 +601,7 @@ def _add_cost_extrapolation_lines(
         h_label_text = f"{h_label} = {extrapolated_cost:.2f} core-hours"
 
     # Draw extrapolation lines
-    ax.axvline(target_value, label=v_label_text, **v_style)
+    ax.axvline(reference_value, label=v_label_text, **v_style)
     ax.axhline(extrapolated_cost, label=h_label_text, **h_style)
 
     # Add uncertainty band for horizontal line if uncertainty exists
@@ -617,15 +618,15 @@ def _add_cost_extrapolation_lines(
     ax.legend()
 
 
-def _export_results_with_target(
+def _export_results(
     fit_results: Dict[Any, Any],
     plotter: DataPlotter,
-    target_bare_mass: Union[float, gvar.GVar],
+    reference_bare_mass: Union[float, gvar.GVar],
     output_directory: Path,
     logger,
 ) -> pd.DataFrame:
     """
-    Export results with custom target bare mass (enhanced version).
+    Export results with custom reference bare mass.
     """
     shared_config = get_shared_config()
     output_config = shared_config["output"]
@@ -637,7 +638,7 @@ def _export_results_with_target(
         output_directory=output_directory,
         csv_filename=csv_filename,
         logger=logger,
-        target_bare_mass=target_bare_mass,
+        reference_bare_mass=reference_bare_mass,
     )
 
 
@@ -790,7 +791,7 @@ def create_cost_plotter(df: pd.DataFrame, plots_directory: Path, logger) -> Data
     return plotter
 
 
-def _calculate_extrapolation(fit_result, x_target):
+def _calculate_extrapolation(fit_result, x_reference):
     """
     Calculate extrapolated y-value with uncertainty propagation.
 
@@ -805,11 +806,11 @@ def _calculate_extrapolation(fit_result, x_target):
 
     # Function dispatch table
     function_map = {
-        "linear": lambda a, b, *_: a * x_target + b,
-        "exponential": lambda a, b, c, *_: a * np.exp(-b * x_target) + c,
-        "power_law": lambda a, b, *_: a * (x_target**b) if x_target > 0 else None,
+        "linear": lambda a, b, *_: a * x_reference + b,
+        "exponential": lambda a, b, c, *_: a * np.exp(-b * x_reference) + c,
+        "power_law": lambda a, b, *_: a * (x_reference**b) if x_reference > 0 else None,
         "shifted_power_law": lambda a, b, c, *_: _safe_shifted_power_law(
-            a, b, c, x_target
+            a, b, c, x_reference
         ),
     }
 
@@ -823,14 +824,14 @@ def _calculate_extrapolation(fit_result, x_target):
         return None
 
 
-def _safe_shifted_power_law(a, b, c, x_target):
+def _safe_shifted_power_law(a, b, c, x_reference):
     """Handle shifted power law with gvar-safe abs()."""
     # Extract mean value for comparison (works for both float and gvar)
     b_mean = b.mean if hasattr(b, "mean") else b
 
-    if abs(x_target - b_mean) < 1e-10:
+    if abs(x_reference - b_mean) < 1e-10:
         return None
-    return a / (x_target - b) + c
+    return a / (x_reference - b) + c
 
 
 def export_results(
@@ -839,13 +840,10 @@ def export_results(
     output_directory: Path,
     csv_filename: str,
     logger,
-    target_bare_mass: Optional[Union[float, gvar.GVar]] = None,  # NEW parameter
+    reference_bare_mass: Optional[Union[float, gvar.GVar]] = None,  # NEW parameter
 ) -> pd.DataFrame:
     """
     Export extrapolation results to CSV file.
-
-    ENHANCED: Added optional target_bare_mass parameter for flexible
-    targeting.
     """
     logger.info("Exporting extrapolation results...")
 
@@ -868,15 +866,17 @@ def export_results(
         columns=[col for col in columns_to_drop if col in summary_df.columns]
     )
 
-    # Get target value
-    if target_bare_mass is not None:
+    # Get reference value
+    if reference_bare_mass is not None:
         # Use getattr() with fallback for type checker compatibility
-        target_value = float(getattr(target_bare_mass, "mean", target_bare_mass))
+        reference_value = float(
+            getattr(reference_bare_mass, "mean", reference_bare_mass)
+        )
     else:
-        target_value = get_extrapolation_config()["target_bare_mass"]
+        reference_value = get_extrapolation_config()["reference_bare_mass"]
 
     # Add domain-specific extrapolation columns
-    summary_df["target_bare_mass"] = target_value
+    summary_df["reference_bare_mass"] = reference_value
 
     # Calculate extrapolated cost for each row with proper tuple handling
     extrapolated_costs = []
@@ -890,7 +890,7 @@ def export_results(
 
         fit_data = fit_results.get(group_keys)
         if fit_data:
-            result = _calculate_extrapolation(fit_data, target_value)
+            result = _calculate_extrapolation(fit_data, reference_value)
             if result is not None:
                 if hasattr(result, "mean"):  # gvar object
                     extrapolated_cost = (float(result.mean), float(result.sdev))

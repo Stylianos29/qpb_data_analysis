@@ -58,7 +58,7 @@ from src.analysis._cost_extrapolation_config import (
     validate_config,
     get_shared_config,
     get_reference_pcac_mass,
-    get_target_bare_mass,
+    get_reference_bare_mass,
 )
 from src.analysis._cost_extrapolation_methods import (
     extrapolate_computational_cost,
@@ -200,7 +200,7 @@ def main(
         logger.info(f"Extrapolation method: {method}")
 
         if method == "fixed_bare_mass":
-            target = get_target_bare_mass()
+            target = get_reference_bare_mass()
             logger.info(f"Target bare mass: {target}")
 
             if input_pcac_csv:
@@ -254,7 +254,7 @@ def main(
         success_msg += f"\n  • Method used: {method}"
 
         if method == "fixed_bare_mass":
-            success_msg += f"\n  • Target bare mass: {get_target_bare_mass()}"
+            success_msg += f"\n  • Target bare mass: {get_reference_bare_mass()}"
         elif method == "fixed_pcac_mass":
             success_msg += f"\n  • Reference PCAC mass: {get_reference_pcac_mass()}"
 

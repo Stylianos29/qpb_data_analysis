@@ -179,7 +179,7 @@ def get_reference_pcac_mass() -> float:
     return CONFIG["shared"]["extrapolation"]["reference_pcac_mass"]
 
 
-def get_target_bare_mass() -> float:
+def get_reference_bare_mass() -> float:
     """Get target bare mass for extrapolation."""
     return CONFIG["shared"]["extrapolation"]["target_bare_mass"]
 
@@ -331,13 +331,13 @@ def _validate_method_specific_config():
     """Validate method-specific configuration requirements."""
     extrapolation = CONFIG["shared"]["extrapolation"]
 
-    # Validate target_bare_mass is present and numeric
+    # Validate reference_bare_massis present and numeric
     if "target_bare_mass" not in extrapolation:
-        raise ValueError("target_bare_mass must be present in configuration")
+        raise ValueError("reference_bare_massmust be present in configuration")
 
     target = extrapolation["target_bare_mass"]
     if not isinstance(target, (int, float)):
-        raise ValueError("target_bare_mass must be a numerical value")
+        raise ValueError("reference_bare_massmust be a numerical value")
 
     # Validate reference_pcac_mass is present and numeric
     if "reference_pcac_mass" not in extrapolation:
