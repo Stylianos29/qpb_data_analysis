@@ -39,9 +39,8 @@ CONFIG = {
         },
         # Global extrapolation method and targets
         "extrapolation": {
-            "method": "fixed_bare_mass",  # Options: "fixed_bare_mass", "fixed_pcac_mass"
             "target_bare_mass": 0.005,  # Reference bare mass value
-            "reference_pcac_mass": 0.14,  # Reference PCAC mass value
+            "reference_pcac_mass": 0.05,  # Reference PCAC mass value
             # Fitting range constraints (None = no constraint)
             "fit_range_min_bare_mass": None,
             "fit_range_max_bare_mass": None,
@@ -82,7 +81,7 @@ CONFIG = {
         "plotting": {
             # Plot variables
             "x_variable": "Bare_mass",
-            "y_variable": "PCAC_mass",  # Constructed from mean+error
+            "y_variable": "PCAC_mass_estimate",  # Constructed from mean+error
             # Figure settings
             "figure_size": (7, 5),
             "top_margin_adjustment": 0.88,
@@ -173,11 +172,6 @@ def get_pcac_config() -> Dict[str, Any]:
 def get_cost_config() -> Dict[str, Any]:
     """Get computational cost analysis configuration."""
     return CONFIG["cost_analysis"]
-
-
-def get_extrapolation_method() -> str:
-    """Get current extrapolation method."""
-    return CONFIG["shared"]["extrapolation"]["method"]
 
 
 def get_reference_pcac_mass() -> float:
@@ -284,14 +278,6 @@ def _validate_shared_config():
         if subsection not in shared:
             raise ValueError(f"Missing required shared subsection: {subsection}")
 
-    # Validate extrapolation method
-    valid_methods = ["fixed_bare_mass", "fixed_pcac_mass"]
-    method = shared["extrapolation"]["method"]
-    if method not in valid_methods:
-        raise ValueError(
-            f"Invalid extrapolation method '{method}'. Must be one of: {valid_methods}"
-        )
-
 
 def _validate_pcac_config():
     """Validate PCAC analysis configuration section."""
@@ -343,23 +329,20 @@ def _validate_cost_config():
 
 def _validate_method_specific_config():
     """Validate method-specific configuration requirements."""
-    method = CONFIG["shared"]["extrapolation"]["method"]
     extrapolation = CONFIG["shared"]["extrapolation"]
 
-    if method == "fixed_bare_mass":
-        if (
-            "target_bare_mass" not in extrapolation
-            or extrapolation["target_bare_mass"] <= 0
-        ):
-            raise ValueError(
-                "target_bare_mass must be positive for fixed_bare_mass method"
-            )
+    # Validate target_bare_mass is present and numeric
+    if "target_bare_mass" not in extrapolation:
+        raise ValueError("target_bare_mass must be present in configuration")
 
-    elif method == "fixed_pcac_mass":
-        if (
-            "reference_pcac_mass" not in extrapolation
-            or extrapolation["reference_pcac_mass"] <= 0
-        ):
-            raise ValueError(
-                "reference_pcac_mass must be positive for fixed_pcac_mass method"
-            )
+    target = extrapolation["target_bare_mass"]
+    if not isinstance(target, (int, float)):
+        raise ValueError("target_bare_mass must be a numerical value")
+
+    # Validate reference_pcac_mass is present and numeric
+    if "reference_pcac_mass" not in extrapolation:
+        raise ValueError("reference_pcac_mass must be present in configuration")
+
+    reference = extrapolation["reference_pcac_mass"]
+    if not isinstance(reference, (int, float)):
+        raise ValueError("reference_pcac_mass must be a numerical value")

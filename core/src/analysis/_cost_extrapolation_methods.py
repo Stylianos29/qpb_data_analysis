@@ -23,12 +23,11 @@ from pathlib import Path
 # Import library components
 from library import load_csv, DataFrameAnalyzer, DataPlotter
 
-# Import configuration (updated hierarchical structure)
+# Import
 from src.analysis._cost_extrapolation_config import (
     get_shared_config,
     get_pcac_config,
     get_cost_config,
-    get_extrapolation_method,
     get_reference_pcac_mass,
     get_target_bare_mass,
     get_base_subdirectory,
@@ -38,6 +37,28 @@ from src.analysis._cost_extrapolation_config import (
     get_output_config,
     get_extrapolation_config,
 )
+
+
+# =============================================================================
+# METHOD DETECTION
+# =============================================================================
+
+
+def detect_extrapolation_method(pcac_csv_path: Optional[str] = None) -> str:
+    """
+    Automatically detect extrapolation method based on input availability.
+
+    Parameters
+    ----------
+    pcac_csv_path : str, optional
+        Path to PCAC mass CSV file
+
+    Returns
+    -------
+    str
+        "fixed_pcac_mass" if PCAC data provided, "fixed_bare_mass" otherwise
+    """
+    return "fixed_pcac_mass" if pcac_csv_path is not None else "fixed_bare_mass"
 
 
 # =============================================================================
@@ -73,7 +94,7 @@ def extrapolate_computational_cost(
     Dict[str, Any]
         Fit results from cost extrapolation
     """
-    method = get_extrapolation_method()
+    method = detect_extrapolation_method(pcac_csv_path)
     logger.info(f"Using extrapolation method: {method}")
 
     if method == "fixed_bare_mass":

@@ -6,17 +6,16 @@ Extrapolates computational costs (core-hours per spinor per
 configuration) using DataPlotter for automatic grouping, curve fitting,
 and visualization.
 
-Supports both fixed bare mass and fixed PCAC mass extrapolation methods:
-    - Fixed bare mass: Direct extrapolation using configured target bare
-      mass
-    - Fixed PCAC mass: Convert reference PCAC mass to bare mass, then
-      extrapolate cost
+Automatically detects and applies the appropriate extrapolation method:
+    - Fixed bare mass: When only processed data is provided (-i_proc)
+    - Fixed PCAC mass: When both processed and PCAC data are provided
+      (-i_proc + -i_pcac)
 
 Key features:
+    - Automatic method detection based on input files
     - Automatic parameter detection and grouping via DataFrameAnalyzer
     - Configuration averaging using
       DataFrameAnalyzer.group_by_multivalued_tunable_parameters()
-    - Dual extrapolation methods with automatic method dispatch
     - Curve fitting with linear (PCAC) and shifted power law (cost)
       functions
     - Professional visualization with fit diagnostics and uncertainty
@@ -24,13 +23,13 @@ Key features:
     - CSV export with detailed results and metadata
 
 Usage:
-    # Fixed bare mass method (default)
-    python extrapolate_computational_cost.py \
+    # Fixed bare mass method (automatic) python
+    extrapolate_computational_cost.py \
         -i_proc processed_parameter_values.csv \
         -o output_dir [options]
     
-    # Fixed PCAC mass method
-    python extrapolate_computational_cost.py \
+    # Fixed PCAC mass method (automatic) python
+    extrapolate_computational_cost.py \
         -i_proc processed_parameter_values.csv \
         -i_pcac plateau_PCAC_mass_estimates.csv \
         -o output_dir [options]
@@ -58,11 +57,13 @@ from library.validation.click_validators import (
 from src.analysis._cost_extrapolation_config import (
     validate_config,
     get_shared_config,
-    get_extrapolation_method,
     get_reference_pcac_mass,
     get_target_bare_mass,
 )
-from src.analysis._cost_extrapolation_methods import extrapolate_computational_cost
+from src.analysis._cost_extrapolation_methods import (
+    extrapolate_computational_cost,
+    detect_extrapolation_method,
+)
 
 
 @click.command()
@@ -198,7 +199,9 @@ def main(
     try:
         # Validate method configuration
         logger.info("=== CONFIGURATION VALIDATION ===")
-        method = get_extrapolation_method()
+        method = detect_extrapolation_method(
+            str(input_pcac_csv) if input_pcac_csv else None
+        )
         logger.info(f"Extrapolation method: {method}")
 
         if method == "fixed_bare_mass":
