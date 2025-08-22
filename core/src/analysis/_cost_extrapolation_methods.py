@@ -324,6 +324,7 @@ def _perform_pcac_fitting(pcac_plotter: DataPlotter, logger) -> Dict[str, Any]:
         show_fit_parameters_on_plot=plotting_config["show_fit_parameters"],
         fit_label_location=plotting_config["fit_label_location"],
         fit_min_data_points=validation_config["min_data_points_for_fitting"],
+        fit_curve_range=plotting_config["fit_curve_range"],
         # Output
         save_figure=True,
         verbose=plotting_config["verbose"],

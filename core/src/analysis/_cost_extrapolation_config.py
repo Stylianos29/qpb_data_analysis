@@ -90,6 +90,7 @@ CONFIG = {
             "fit_function": "linear",  # PCAC_mass = a * bare_mass + b
             "show_fit_parameters": True,
             "fit_label_location": "top left",
+            "fit_curve_range": (0, 0.08),  # None or tuple
             # Styling
             "marker_size": 8,
             "capsize": 5,
@@ -110,7 +111,7 @@ CONFIG = {
         },
         # PCAC extrapolation line labels
         "extrapolation_labels": {
-            "vertical_line_label": r"a$m^{\text{derived}}$",  # Derived bare mass
+            "vertical_line_label": r"a$m^{\text{target}}$",  # Derived bare mass
             "horizontal_line_label": r"a$m^{\text{ref.}}_{\text{PCAC}}$",  # Reference PCAC mass
         },
     },
