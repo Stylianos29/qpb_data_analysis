@@ -97,7 +97,7 @@ from src.analysis._cost_extrapolation_methods import (
 )
 @click.option(
     "--output_csv_filename",
-    default=None,
+    default=lambda: get_shared_config()["output"]["csv_filename"],
     help="Output CSV filename (default: from configuration).",
 )
 @click.option(
@@ -153,14 +153,6 @@ def main(
     if not validate_config():
         click.echo("Configuration validation failed. Exiting.", err=True)
         sys.exit(1)
-
-    # TODO: Change it back to click options.
-    # Get shared configuration
-    shared_config = get_shared_config()
-
-    # Set default output CSV filename from config if not provided
-    if output_csv_filename is None:
-        output_csv_filename = shared_config["output"]["csv_filename"]
 
     # Setup directories
     output_directory = Path(output_directory)
@@ -245,7 +237,7 @@ def main(
         logger.log_script_end("Computational cost extrapolation completed successfully")
 
         # Final success message
-        base_subdir = shared_config["base_subdirectory"]
+        base_subdir = get_shared_config()["base_subdirectory"]
         success_msg = "✓ Computational cost extrapolation completed successfully!"
         success_msg += (
             f"\n  • Results saved to: {output_directory / output_csv_filename}"
