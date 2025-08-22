@@ -320,7 +320,11 @@ def _validate_cost_config():
     cost = CONFIG["cost_analysis"]
 
     # Check required cost subsections
-    required_subsections = ["input_columns", "plotting", "extrapolation_lines"]
+    required_subsections = [
+        "input_columns",
+        "plotting",
+        "extrapolation_labels",
+    ]  # REMOVED "extrapolation_lines"
     for subsection in required_subsections:
         if subsection not in cost:
             raise ValueError(f"Missing required cost_analysis subsection: {subsection}")
