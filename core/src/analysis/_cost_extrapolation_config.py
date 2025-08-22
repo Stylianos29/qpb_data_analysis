@@ -111,7 +111,7 @@ CONFIG = {
         # PCAC extrapolation line labels
         "extrapolation_labels": {
             "vertical_line_label": r"a$m^{\text{derived}}$",  # Derived bare mass
-            "horizontal_line_label": r"$m^{\text{ref.}}_{\text{PCAC}}$",  # Reference PCAC mass
+            "horizontal_line_label": r"a$m^{\text{ref.}}_{\text{PCAC}}$",  # Reference PCAC mass
         },
     },
     # COMPUTATIONAL COST ANALYSIS CONFIGURATION

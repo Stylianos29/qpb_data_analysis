@@ -339,6 +339,10 @@ def _perform_pcac_fitting(pcac_plotter: DataPlotter, logger) -> Dict[str, Any]:
 
 def _add_pcac_extrapolation_lines(ax, fit_results=None, **kwargs):
     """Add extrapolation lines to PCAC plots."""
+    # Add zero reference lines first (simple and always works)
+    ax.axhline(0, color="black", linestyle="-", alpha=1.0, linewidth=1.4, zorder=1)
+    ax.axvline(0, color="black", linestyle="-", alpha=1.0, linewidth=1.4, zorder=1)
+
     if not fit_results:
         return
 
