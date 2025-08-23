@@ -588,25 +588,25 @@ def _add_cost_extrapolation_lines_with_pcac_lookup(
     ax.axhline(0, color="black", linestyle="-", alpha=0.8, linewidth=1.2, zorder=1)
     ax.axvline(0, color="black", linestyle="-", alpha=0.8, linewidth=1.2, zorder=1)
 
-    if not fit_results or pcac_summary_df is None:
+    if not fit_results:
         return
 
-    # Get current group info from kwargs
-    group_info = kwargs.get("group_info", {})
-    group_keys = group_info.get("group_keys")
-
-    if group_keys is None:
-        return
-
-    # Look up group-specific bare mass from PCAC DataFrame
-    group_reference_bare_mass = _lookup_group_bare_mass(group_keys, pcac_summary_df)
-
-    if group_reference_bare_mass is None:
-        return
-
-    # Use the existing extrapolation line logic with group-specific reference
-    reference_mean = group_reference_bare_mass[0]
-    reference_error = group_reference_bare_mass[1]
+    # Handle both PCAC lookup and config fallback
+    if pcac_summary_df is not None:
+        # PCAC case: lookup group-specific reference
+        group_info = kwargs.get("group_info", {})
+        group_keys = group_info.get("group_keys")
+        if group_keys is None:
+            return
+        group_reference_bare_mass = _lookup_group_bare_mass(group_keys, pcac_summary_df)
+        if group_reference_bare_mass is None:
+            return
+        reference_mean = group_reference_bare_mass[0]
+        reference_error = group_reference_bare_mass[1]
+    else:
+        # Fixed bare mass case: use config reference
+        reference_mean = get_reference_bare_mass()
+        reference_error = 0.0
 
     # Calculate extrapolated cost
     extrapolated_result = _calculate_extrapolation(fit_results, reference_mean)
@@ -635,7 +635,6 @@ def _add_cost_extrapolation_lines_with_pcac_lookup(
     h_label = labels["horizontal_line_label"]
 
     # Create labels
-    # v_label_text = f"{v_label} = {reference_value:.6f}"
     if reference_error > 0:
         v_label_text = f"{v_label} = {gvar.gvar(reference_mean, reference_error)}"
     else:
