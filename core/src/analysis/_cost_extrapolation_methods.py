@@ -210,21 +210,21 @@ def _pcac_to_bare_mass_conversion(
 
 
 def _calculate_group_bare_mass(row, reference_pcac_mass) -> tuple:
-    """Calculate derived bare mass for a single group row."""
     try:
-        # Extract linear fit parameters: PCAC = a * bare + b
-        a = row["param_a"]  # slope
-        b = row["param_b"]  # intercept
+        a = row["param_a"]
+        b = row["param_b"]
 
-        # Invert: bare = (PCAC_ref - b) / a
-        if abs(a) < 1e-10:
-            return (0.0, 0.0)  # Avoid division by zero
-
-        bare_mass = (reference_pcac_mass - b) / a
-        return (float(bare_mass), 0.0)  # (mean, uncertainty)
-
-    except Exception:
-        return (0.0, 0.0)  # Fallback for any errors
+        # Convert to your preferred tuple format
+        if hasattr(a, "mean") and hasattr(b, "mean"):
+            # gvar case - propagate uncertainty properly
+            bare_mass_gvar = (reference_pcac_mass - b) / a
+            return (float(bare_mass_gvar.mean), float(bare_mass_gvar.sdev))
+        else:
+            # float case
+            bare_mass = (reference_pcac_mass - b) / a
+            return (float(bare_mass), 0.0)
+    except:
+        return (0.0, 0.0)
 
 
 def _load_and_prepare_pcac_data(pcac_csv_path: str, logger) -> pd.DataFrame:
