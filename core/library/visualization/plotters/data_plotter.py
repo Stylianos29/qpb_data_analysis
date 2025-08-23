@@ -581,13 +581,7 @@ class DataPlotter(DataFrameAnalyzer):
                     row["fit_method"] = fit_data.get("method")
 
                     # Add fit parameters (extract means for gvar objects)
-                    params = fit_data.get("parameters", [])
-                    if fit_data.get("method") == "gvar":
-                        import gvar
-
-                        param_values = [float(gvar.mean(p)) for p in params]
-                    else:
-                        param_values = params
+                    param_values = fit_data.get("parameters", [])
 
                     # Add up to 3 parameters (a, b, c)
                     for i, param_val in enumerate(param_values[:3]):
