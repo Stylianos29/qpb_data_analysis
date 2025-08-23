@@ -14,11 +14,12 @@ Supported Methods:
       extrapolate cost
 """
 
+from typing import Dict, Any, Optional, Union
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import gvar
-from typing import Dict, Any, Optional, Union
-from pathlib import Path
 
 # Import library components
 from library import load_csv, DataFrameAnalyzer, DataPlotter
@@ -30,11 +31,7 @@ from src.analysis._cost_extrapolation_config import (
     get_cost_config,
     get_reference_pcac_mass,
     get_reference_bare_mass,
-    get_base_subdirectory,
-    # Backward compatibility
     get_averaging_config,
-    get_validation_config,
-    get_output_config,
     get_extrapolation_config,
 )
 
@@ -130,12 +127,8 @@ def _extrapolate_fixed_bare_mass(
     reference_bare_mass = get_reference_bare_mass()  # float from config
     logger.info(f"Using configured reference bare mass: {reference_bare_mass}")
 
-    return _perform_cost_analysis(
-        processed_csv_path,
-        reference_bare_mass,
-        output_directory,
-        plots_directory,
-        logger,
+    return _perform_cost_analysis_with_pcac_lookup(
+        processed_csv_path, None, output_directory, plots_directory, logger
     )
 
 
@@ -508,7 +501,7 @@ def _invert_pcac_fit(
 
 def _perform_cost_analysis_with_pcac_lookup(
     processed_csv_path: str,
-    pcac_summary_df: pd.DataFrame,
+    pcac_summary_df: Optional[pd.DataFrame],
     output_directory: Path,
     plots_directory: Path,
     logger,
@@ -538,7 +531,7 @@ def _perform_cost_analysis_with_pcac_lookup(
 
 
 def _perform_cost_fitting_with_pcac_lookup(
-    plotter: DataPlotter, pcac_summary_df: pd.DataFrame, logger
+    plotter: DataPlotter, pcac_summary_df: Optional[pd.DataFrame], logger
 ) -> Dict[str, Any]:
     """
     Perform cost fitting using PCAC DataFrame for group-specific references.
