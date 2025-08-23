@@ -158,19 +158,16 @@ def _extrapolate_fixed_pcac_mass(
     """
     logger.info("Performing PCAC mass to bare mass conversion...")
 
-    # Step 1: PCAC analysis - get reference bare mass with uncertainty
-    target_bare_mass_gvar = _pcac_to_bare_mass_conversion(
+    # Step 1: PCAC analysis - get group-specific DataFrame
+    pcac_summary_df = _pcac_to_bare_mass_conversion(
         pcac_csv_path, plots_directory, logger
     )
 
-    # Step 2: Cost extrapolation using derived reference (reuse existing infrastructure)
-    logger.info(f"Reference bare mass from PCAC: {target_bare_mass_gvar}")
-    return _perform_cost_analysis(
-        processed_csv_path,
-        target_bare_mass_gvar,
-        output_directory,
-        plots_directory,
-        logger,
+    logger.info(f"Derived bare masses for {len(pcac_summary_df)} parameter groups")
+
+    # Step 2: Cost extrapolation with group-specific references
+    return _perform_cost_analysis_with_pcac_lookup(
+        processed_csv_path, pcac_summary_df, output_directory, plots_directory, logger
     )
 
 
@@ -204,12 +201,37 @@ def _pcac_to_bare_mass_conversion(
     # Perform PCAC fitting
     fit_results = _perform_pcac_fitting(pcac_plotter, logger)
 
+    # Get summary DataFrame from DataPlotter
+    pcac_summary_df = pcac_plotter.get_summary_dataframe(
+        include_fit_results=True, include_data_counts=True
+    )
+
     # Invert fit to get target bare mass
     reference_pcac_mass = get_reference_pcac_mass()
-    target_bare_mass_gvar = _invert_pcac_fit(fit_results, reference_pcac_mass, logger)
+    pcac_summary_df["derived_bare_mass"] = pcac_summary_df.apply(
+        lambda row: _calculate_group_bare_mass(row, reference_pcac_mass), axis=1
+    )
 
-    logger.info(f"Derived target bare mass: {target_bare_mass_gvar}")
-    return target_bare_mass_gvar
+    logger.info(f"Derived bare masses for {len(pcac_summary_df)} parameter groups")
+    return pcac_summary_df
+
+
+def _calculate_group_bare_mass(row, reference_pcac_mass) -> tuple:
+    """Calculate derived bare mass for a single group row."""
+    try:
+        # Extract linear fit parameters: PCAC = a * bare + b
+        a = row["param_a"]  # slope
+        b = row["param_b"]  # intercept
+
+        # Invert: bare = (PCAC_ref - b) / a
+        if abs(a) < 1e-10:
+            return (0.0, 0.0)  # Avoid division by zero
+
+        bare_mass = (reference_pcac_mass - b) / a
+        return (float(bare_mass), 0.0)  # (mean, uncertainty)
+
+    except Exception:
+        return (0.0, 0.0)  # Fallback for any errors
 
 
 def _load_and_prepare_pcac_data(pcac_csv_path: str, logger) -> pd.DataFrame:
@@ -484,18 +506,17 @@ def _invert_pcac_fit(
 # =============================================================================
 
 
-def _perform_cost_analysis(
+def _perform_cost_analysis_with_pcac_lookup(
     processed_csv_path: str,
-    reference_bare_mass: Union[float, gvar.GVar],
+    pcac_summary_df: pd.DataFrame,
     output_directory: Path,
     plots_directory: Path,
     logger,
 ) -> Dict[str, Any]:
     """
-    Unified cost analysis that works with both float and gvar targets.
-    Handles uncertainty propagation automatically when target is gvar.
+    Cost analysis using PCAC DataFrame for group-specific references.
     """
-    logger.info("Performing cost analysis with unified target handling...")
+    logger.info("Performing cost analysis with PCAC-derived references...")
 
     # Load and prepare cost data (REUSE existing function)
     df = load_and_prepare_data(processed_csv_path, logger)
@@ -503,39 +524,35 @@ def _perform_cost_analysis(
     # Create cost plotter (REUSE existing function)
     plotter = create_cost_plotter(df, plots_directory, logger)
 
-    # Perform cost fitting (REUSE existing infrastructure with custom extrapolation lines)
-    fit_results = _perform_cost_fitting(plotter, reference_bare_mass, logger)
+    # Cost fitting with PCAC lookup
+    fit_results = _perform_cost_fitting_with_pcac_lookup(
+        plotter, pcac_summary_df, logger
+    )
 
     # Export results
-    _export_results(
-        fit_results,
-        plotter,
-        reference_bare_mass,
-        output_directory,
-        logger,
+    _export_cost_results(
+        fit_results, plotter, pcac_summary_df, output_directory, logger
     )
 
     return fit_results
 
 
-def _perform_cost_fitting(
-    plotter: DataPlotter, reference_bare_mass: Union[float, gvar.GVar], logger
+def _perform_cost_fitting_with_pcac_lookup(
+    plotter: DataPlotter, pcac_summary_df: pd.DataFrame, logger
 ) -> Dict[str, Any]:
     """
-    Perform cost fitting with custom target for extrapolation lines.
+    Perform cost fitting using PCAC DataFrame for group-specific references.
     """
-    logger.info("Performing cost fitting with custom target...")
-
     # Get cost plotting configuration
     cost_config = get_cost_config()
     shared_config = get_shared_config()
     plotting_config = cost_config["plotting"]
     validation_config = shared_config["data_validation"]
 
-    # Create custom extrapolation line function
-    def add_cost_extrapolation_lines(ax, fit_results=None, **kwargs):
-        return _add_cost_extrapolation_lines(
-            ax, fit_results, reference_bare_mass, **kwargs
+    # Create custom extrapolation line function with PCAC lookup
+    def add_cost_extrapolation_lines_with_lookup(ax, fit_results=None, **kwargs):
+        return _add_cost_extrapolation_lines_with_pcac_lookup(
+            ax, fit_results, pcac_summary_df, **kwargs
         )
 
     # Perform plotting with curve fitting
@@ -559,7 +576,7 @@ def _perform_cost_fitting(
         save_figure=True,
         verbose=plotting_config["verbose"],
         # Advanced
-        post_plot_customization_function=add_cost_extrapolation_lines,
+        post_plot_customization_function=add_cost_extrapolation_lines_with_lookup,
     )
 
     # Extract and return fit results
@@ -568,39 +585,50 @@ def _perform_cost_fitting(
     return fit_results
 
 
-def _add_cost_extrapolation_lines(
-    ax, fit_results=None, reference_bare_mass=None, **kwargs
+def _add_cost_extrapolation_lines_with_pcac_lookup(
+    ax, fit_results=None, pcac_summary_df=None, **kwargs
 ):
     """
-    Add extrapolation lines to cost plots with custom target.
+    Add cost extrapolation lines using group-specific PCAC-derived bare mass.
     """
-    if not fit_results:
+    # Add zero reference lines (unchanged)
+    ax.axhline(0, color="black", linestyle="-", alpha=0.8, linewidth=1.2, zorder=1)
+    ax.axvline(0, color="black", linestyle="-", alpha=0.8, linewidth=1.2, zorder=1)
+
+    if not fit_results or pcac_summary_df is None:
         return
 
-    # Get reference value
-    if reference_bare_mass is not None:
-        if hasattr(reference_bare_mass, "mean"):  # gvar object
-            reference_value = float(reference_bare_mass.mean)
-        else:  # float
-            reference_value = float(reference_bare_mass)
-    else:
-        # Fallback to config (backward compatibility)
-        reference_value = get_extrapolation_config()["reference_bare_mass"]
+    # Get current group info from kwargs
+    group_info = kwargs.get("group_info", {})
+    group_keys = group_info.get("group_keys")
 
-    # Calculate extrapolated cost with uncertainty
-    extrapolated_result = _calculate_extrapolation(fit_results, reference_value)
+    if group_keys is None:
+        return
+
+    # Look up group-specific bare mass from PCAC DataFrame
+    group_reference_bare_mass = _lookup_group_bare_mass(group_keys, pcac_summary_df)
+
+    if group_reference_bare_mass is None:
+        return
+
+    # Use the existing extrapolation line logic with group-specific reference
+    reference_mean = group_reference_bare_mass[0]
+    reference_error = group_reference_bare_mass[1]
+
+    # Calculate extrapolated cost
+    extrapolated_result = _calculate_extrapolation(fit_results, reference_mean)
     if extrapolated_result is None:
         return
 
     # Extract value and uncertainty
-    if hasattr(extrapolated_result, "mean"):  # gvar object
+    if hasattr(extrapolated_result, "mean"):
         extrapolated_cost = float(extrapolated_result.mean)
         uncertainty = float(extrapolated_result.sdev)
-    else:  # float
+    else:
         extrapolated_cost = float(extrapolated_result)
         uncertainty = 0.0
 
-    # Get configuration
+    # Get styling configuration
     shared_config = get_shared_config()
     cost_config = get_cost_config()
     extrapolation_lines = shared_config["extrapolation_lines"]
@@ -608,13 +636,18 @@ def _add_cost_extrapolation_lines(
     h_style = extrapolation_lines["horizontal_line_style"]
     band_style = extrapolation_lines["uncertainty_band_style"]
 
-    # Get cost-specific labels
+    # Get labels
     labels = cost_config["extrapolation_labels"]
-    v_label = labels["vertical_line_label"]  # Reference bare mass
-    h_label = labels["horizontal_line_label"]  # Extrapolated cost
+    v_label = labels["vertical_line_label"]
+    h_label = labels["horizontal_line_label"]
 
-    # Create combined labels
-    v_label_text = f"{v_label} = {reference_value}"
+    # Create labels
+    # v_label_text = f"{v_label} = {reference_value:.6f}"
+    if reference_error > 0:
+        v_label_text = f"{v_label} = {gvar.gvar(reference_mean, reference_error)}"
+    else:
+        v_label_text = f"{v_label} = {reference_mean:.6f}"
+
     if uncertainty > 0:
         h_label_text = (
             f"{h_label} = {gvar.gvar(extrapolated_cost, uncertainty)} core-hours"
@@ -623,10 +656,10 @@ def _add_cost_extrapolation_lines(
         h_label_text = f"{h_label} = {extrapolated_cost:.2f} core-hours"
 
     # Draw extrapolation lines
-    ax.axvline(reference_value, label=v_label_text, **v_style)
+    ax.axvline(reference_mean, label=v_label_text, **v_style)
     ax.axhline(extrapolated_cost, label=h_label_text, **h_style)
 
-    # Add uncertainty band for horizontal line if uncertainty exists
+    # Add uncertainty band if needed
     if uncertainty > 0:
         band_color = band_style.get("color") or h_style.get("color", "green")
         ax.axhspan(
@@ -636,23 +669,46 @@ def _add_cost_extrapolation_lines(
             color=band_color,
         )
 
-    # Update legend
     ax.legend()
 
 
-def _export_results(
-    fit_results: Dict[Any, Any],
-    plotter: DataPlotter,
-    reference_bare_mass: Union[float, gvar.GVar],
-    output_directory: Path,
-    logger,
-) -> pd.DataFrame:
+def _lookup_group_bare_mass(group_keys, pcac_summary_df) -> Optional[tuple]:
     """
-    Export results with custom reference bare mass.
+    Look up derived bare mass for a specific group from PCAC DataFrame.
     """
+    if not isinstance(group_keys, tuple):
+        group_keys = (group_keys,)
+
+    # Try to match the group in PCAC summary DataFrame
+    # This assumes the DataFrames have the same grouping structure
+    for _, row in pcac_summary_df.iterrows():
+        # Build comparison tuple from row's multivalued parameters
+        row_keys = []
+        for col in [
+            "KL_diagonal_order",
+            "Kernel_operator_type",
+        ]:  # Adjust based on your grouping
+            if col in pcac_summary_df.columns:
+                row_keys.append(row[col])
+
+        if tuple(row_keys) == group_keys:
+            return row["derived_bare_mass"]
+
+    return None  # No match found
+
+
+def _export_cost_results(
+    fit_results, plotter, pcac_summary_df, output_directory, logger
+):
+    """
+    Export cost results - can reuse most of existing export_results logic.
+    """
+    # For now, use the original export_results with a fallback reference
     shared_config = get_shared_config()
-    output_config = shared_config["output"]
-    csv_filename = output_config["csv_filename"]
+    csv_filename = shared_config["output"]["csv_filename"]
+
+    # Use existing export function with fallback reference
+    fallback_reference = get_reference_bare_mass()
 
     return export_results(
         fit_results=fit_results,
@@ -660,7 +716,7 @@ def _export_results(
         output_directory=output_directory,
         csv_filename=csv_filename,
         logger=logger,
-        reference_bare_mass=reference_bare_mass,
+        reference_bare_mass=fallback_reference,  # This could be enhanced later
     )
 
 

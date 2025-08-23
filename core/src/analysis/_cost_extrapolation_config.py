@@ -149,7 +149,7 @@ CONFIG = {
         # Cost extrapolation line labels
         "extrapolation_labels": {
             "vertical_line_label": r"a$m^{\text{ref.}}$",  # Target bare mass
-            "horizontal_line_label": r"$t^{\text{ref.}}$",  # Extrapolated cost
+            "horizontal_line_label": r"$t^{\text{target}}$",  # Extrapolated cost
         },
     },
 }
