@@ -111,13 +111,14 @@ def main(
     log_filename: Optional[str],
 ) -> None:
     """
-    Calculate effective mass from jackknife-analyzed g5-g5 correlator data.
+    Calculate effective mass from jackknife-analyzed g5-g5 correlator
+    data.
 
     This script processes QPB correlator data that has undergone
     jackknife analysis and calculates effective mass using the two-state
     periodic effective mass formula. The script applies symmetrization
-    to the input g5-g5 correlators and preserves the group hierarchy
-    and essential metadata.
+    to the input g5-g5 correlators and preserves the group hierarchy and
+    essential metadata.
     """
     # Handle default directories
     if output_directory is None:
@@ -381,7 +382,8 @@ def _validate_input_data(g5g5_samples: np.ndarray, group_name: str, logger) -> N
         - logger: Logger instance
 
     Raises:
-        ValueError: If dimensions don't match expectations or data is invalid
+        ValueError: If dimensions don't match expectations or data is
+        invalid
     """
     # Check g5g5 dimensions
     if g5g5_samples.shape[1] != EXPECTED_G5G5_LENGTH:
@@ -416,7 +418,8 @@ def _apply_symmetrization(g5g5_samples: np.ndarray, logger) -> np.ndarray:
     """
     Apply symmetrization to g5-g5 correlator samples.
 
-    Uses the same symmetrization method as momentum_correlator.symmetrization().
+    Uses the same symmetrization method as
+    momentum_correlator.symmetrization().
 
     Args:
         - g5g5_samples: Original g5-g5 jackknife samples
@@ -504,9 +507,11 @@ def _calculate_two_state_periodic_effective_mass_correlator(
     g5g5_correlator_array: np.ndarray,
 ) -> np.ndarray:
     """
-    Calculate two-state periodic effective mass correlator from g5-g5 correlator.
+    Calculate two-state periodic effective mass correlator from g5-g5
+    correlator.
 
-    This implements the same calculation as the function from the old effective_mass module:
+    This implements the same calculation as the function from the old
+    effective_mass module:
     effective_mass.calculate_two_state_periodic_effective_mass_correlator()
 
     Args:
