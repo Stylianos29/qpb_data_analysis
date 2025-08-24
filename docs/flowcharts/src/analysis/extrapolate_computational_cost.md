@@ -24,32 +24,39 @@ flowchart TD
     %% PCAC-based Analysis Branch
     J --> L[Load & Prepare PCAC Data]
     L --> M[Create PCAC DataPlotter]
-    M -->     N[Perform Linear Fit:<br/>PCAC_mass vs bare_mass]
-    N --> O[Invert Fit to Get Reference Bare Mass:<br/>bare_mass from PCAC reference]
-    O --> P[Reference Bare Mass with Uncertainty<br/>gvar object]
+    M --> N[Perform Linear Fit per Group:<br/>PCAC_mass vs bare_mass]
+    N --> O[Create Summary DataFrame with<br/>Group-Specific Parameters]
+    O --> P[Invert Each Group Fit:<br/>derive bare_mass with uncertainty]
+    P --> Q[DataFrame: Group-Specific<br/>derived_bare_mass tuples]
     
     %% Direct Analysis Branch  
-    K --> Q[Reference Bare Mass<br/>float value]
+    K --> R[Single Reference Bare Mass<br/>float value from config]
     
-    %% Common Cost Analysis
-    P --> R[Load & Prepare Cost Data]
-    Q --> R
-    R --> S[Average Costs Across Configurations<br/>using DataFrameAnalyzer]
-    S --> T[Create Cost DataPlotter]
-    T -->     U[Perform Shifted Power Law Fit:<br/>cost vs bare_mass]
-    U --> V[Generate Cost Plots with<br/>Extrapolation Lines]
+    %% Cost Analysis with Group Matching
+    Q --> S[Load & Prepare Cost Data]
+    R --> S
+    S --> T[Average Costs Across Configurations<br/>using DataFrameAnalyzer]
+    T --> U[Create Cost DataPlotter]
+    U --> V{Method Type?}
+    V -->|PCAC Method| W[Match Cost Groups with<br/>PCAC DataFrame]
+    V -->|Direct Method| X[Use Config Reference<br/>for All Groups]
+    W --> Y[Each Group Gets Its Own<br/>Physics-Derived Reference]
+    X --> Y
+    Y --> Z[Perform Shifted Power Law Fit<br/>per Group]
+    Z --> AA[Generate Cost Plots with<br/>Group-Specific Extrapolation Lines]
     
     %% Export Phase
-    V --> W[Export Results to CSV]
-    W --> X[Generate Summary Report]
-    X --> Y[End: Success]
+    AA --> BB[Export Results to CSV<br/>with Group-Specific References]
+    BB --> CC[Generate Summary Report]
+    CC --> DD[End: Success]
     
     %% Error Handling
-    B -->|Validation Fails| Z[Exit: Configuration Error]
-    L -->|Load Fails| AA[Exit: PCAC Data Error]
-    R -->|Load Fails| BB[Exit: Cost Data Error]
-    N -->|Fit Fails| CC[Exit: PCAC Fit Error]
-    U -->|Fit Fails| DD[Exit: Cost Fit Error]
+    B -->|Validation Fails| EE[Exit: Configuration Error]
+    L -->|Load Fails| FF[Exit: PCAC Data Error]
+    S -->|Load Fails| GG[Exit: Cost Data Error]
+    N -->|Fit Fails| HH[Exit: PCAC Fit Error]
+    Z -->|Fit Fails| II[Exit: Cost Fit Error]
+    W -->|No Match| JJ[Exit: Group Matching Error]
     
     %% Styling
     classDef startEnd fill:#e1f5fe,stroke:#01579b,stroke-width:2px
@@ -58,13 +65,15 @@ flowchart TD
     classDef method fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
     classDef error fill:#ffebee,stroke:#c62828,stroke-width:2px
     classDef data fill:#f1f8e9,stroke:#33691e,stroke-width:2px
+    classDef grouping fill:#f3e5ab,stroke:#827717,stroke-width:2px
     
-    class A,Y startEnd
-    class B,C,L,M,N,O,R,S,T,U,V,W,X process
-    class E decision
+    class A,DD startEnd
+    class B,C,L,M,N,O,P,S,T,U,Z,AA,BB,CC process
+    class E,V decision
     class F,G,H,I,J,K method
-    class Z,AA,BB,CC,DD error
-    class P,Q data
+    class EE,FF,GG,HH,II,JJ error
+    class Q,R data
+    class W,X,Y grouping
 ```
 
 ## Key Process Components
