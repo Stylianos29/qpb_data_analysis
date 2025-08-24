@@ -7,7 +7,7 @@ provided.
 
 ```mermaid
 flowchart TD
-    A[Start: extrapolate_computational_cost.py] --> B[Validate Configuration]
+    A([Start: extrapolate_computational_cost.py]) --> B[Validate Configuration]
     B --> C[Setup Directories & Logging]
     C --> D[Auto-detect Extrapolation Method]
     
@@ -48,15 +48,15 @@ flowchart TD
     %% Export Phase
     AA --> BB[Export Results to CSV<br/>with Group-Specific References]
     BB --> CC[Generate Summary Report]
-    CC --> DD[End: Success]
+    CC --> DD([End: Success])
     
     %% Error Handling
-    B -->|Validation Fails| EE[Exit: Configuration Error]
-    L -->|Load Fails| FF[Exit: PCAC Data Error]
-    S -->|Load Fails| GG[Exit: Cost Data Error]
-    N -->|Fit Fails| HH[Exit: PCAC Fit Error]
-    Z -->|Fit Fails| II[Exit: Cost Fit Error]
-    W -->|No Match| JJ[Exit: Group Matching Error]
+    B -->|Validation Fails| EE([Exit: Configuration Error])
+    L -->|Load Fails| FF([Exit: PCAC Data Error])
+    S -->|Load Fails| GG([Exit: Cost Data Error])
+    N -->|Fit Fails| HH([Exit: PCAC Fit Error])
+    Z -->|Fit Fails| II([Exit: Cost Fit Error])
+    W -->|No Match| JJ([Exit: Group Matching Error])
     
     %% Styling
     classDef startEnd fill:#e1f5fe,stroke:#01579b,stroke-width:2px
