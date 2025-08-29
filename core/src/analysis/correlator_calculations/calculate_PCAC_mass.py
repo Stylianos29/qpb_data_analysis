@@ -202,11 +202,11 @@ def main(
     if enable_logging:
         log_dir = log_directory or output_directory or os.path.dirname(output_path)
     else:
-        log_dir = log_name = None
+        log_dir = None
 
     logger = create_script_logger(
         log_directory=log_dir,
-        log_filename=log_name,
+        log_filename=log_filename,
         enable_file_logging=enable_logging,
         enable_console_logging=False,
     )
