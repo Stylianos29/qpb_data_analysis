@@ -26,7 +26,6 @@ from src.analysis.correlator_calculations._effective_mass_config import (
     LOWERING_FACTOR,
     REQUIRED_DATASETS,
     OUTPUT_DATASETS,
-    PION_OUTPUT_DATASETS,
     validate_effective_config,
 )
 from src.analysis.correlator_calculations._correlator_analysis_shared_config import (
@@ -76,7 +75,7 @@ def calculate_effective_mass(g5g5_samples):
     return 0.5 * safe_log(numerator / denominator)
 
 
-def process_effective_file(input_path, output_path, use_pion_naming, logger):
+def process_effective_file(input_path, output_path, logger):
     """Process effective mass analysis for all groups."""
     # Find valid groups
     analysis_groups = find_analysis_groups(input_path, REQUIRED_DATASETS)
@@ -85,8 +84,8 @@ def process_effective_file(input_path, output_path, use_pion_naming, logger):
 
     logger.info(f"Processing {len(analysis_groups)} groups")
 
-    # Choose output dataset names
-    output_names = PION_OUTPUT_DATASETS if use_pion_naming else OUTPUT_DATASETS
+    # Choose output dataset names from config
+    output_names = OUTPUT_DATASETS
 
     successful = 0
     processed_parents = set()  # Track which parent groups we've processed
@@ -177,12 +176,6 @@ def process_effective_file(input_path, output_path, use_pion_naming, logger):
     help="Directory for output files. If not specified, uses input file directory.",
 )
 @click.option(
-    "--use_pion_naming",
-    is_flag=True,
-    default=False,
-    help="Use pion-specific dataset naming convention.",
-)
-@click.option(
     "-log_on",
     "--enable_logging",
     is_flag=True,
@@ -207,7 +200,6 @@ def main(
     input_hdf5_file: str,
     output_hdf5_file: str,
     output_directory: Optional[str],
-    use_pion_naming: bool,
     enable_logging: bool,
     log_directory: Optional[str],
     log_filename: Optional[str],
@@ -228,11 +220,11 @@ def main(
     if enable_logging:
         log_dir = log_directory or output_directory or os.path.dirname(output_path)
     else:
-        log_dir = log_name = None
+        log_dir = None
 
     logger = create_script_logger(
         log_directory=log_dir,
-        log_filename=log_name,
+        log_filename=log_filename,
         enable_file_logging=enable_logging,
         enable_console_logging=False,
     )
@@ -241,7 +233,7 @@ def main(
         logger.log_script_start("Effective mass calculation")
 
         successful, failed = process_effective_file(
-            input_hdf5_file, output_path, use_pion_naming, logger
+            input_hdf5_file, output_path, logger
         )
 
         click.echo(f"✓ Effective mass calculation complete")

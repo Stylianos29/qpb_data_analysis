@@ -17,20 +17,12 @@ REQUIRED_DATASETS = [
     "g5g5_jackknife_samples",
 ]
 
-# Output dataset names (standard)
+# Output dataset names
 OUTPUT_DATASETS = {
-    "samples": "effective_mass_jackknife_samples",
-    "mean": "effective_mass_mean_values",
-    "error": "effective_mass_error_values",
-}
-
-# Output dataset names (pion naming)
-PION_OUTPUT_DATASETS = {
     "samples": "pion_effective_mass_jackknife_samples",
     "mean": "pion_effective_mass_mean_values",
     "error": "pion_effective_mass_error_values",
 }
-
 
 # Validation
 def validate_effective_config():
