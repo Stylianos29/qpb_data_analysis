@@ -201,7 +201,6 @@ def main(
     # Setup logging
     if enable_logging:
         log_dir = log_directory or output_directory or os.path.dirname(output_path)
-        log_name = log_filename or "pcac_mass_calculation.log"
     else:
         log_dir = log_name = None
 
