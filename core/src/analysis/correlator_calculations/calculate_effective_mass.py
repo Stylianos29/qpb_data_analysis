@@ -80,7 +80,15 @@ def process_effective_file(input_path, output_path, logger):
     if not analysis_groups:
         raise ValueError(f"No groups with required datasets: {REQUIRED_DATASETS}")
 
-    logger.info(f"Processing {len(analysis_groups)} groups")
+    # Validate file consistency once
+    g5g5_length, expected_effective_length = validate_effective_mass_file_consistency(
+        input_path, REQUIRED_DATASETS, logger
+    )
+
+    logger.info(
+        f"Processing {len(analysis_groups)} groups with g5g5 length {g5g5_length},"
+        f" expected effective mass length {expected_effective_length}"
+    )
 
     # Choose output dataset names from config
     output_names = OUTPUT_DATASETS
@@ -147,6 +155,55 @@ def process_effective_file(input_path, output_path, logger):
                 continue
 
     return successful, len(analysis_groups) - successful
+
+
+def validate_effective_mass_file_consistency(
+    input_file_path, required_datasets, logger
+):
+    """
+    Validate effective mass data consistency once per file using first
+    valid group. Returns the established lengths for the entire file.
+    """
+    from . import _effective_mass_config as config
+
+    # Find first valid group as representative
+    analysis_groups = find_analysis_groups(input_file_path, required_datasets)
+    if not analysis_groups:
+        raise ValueError("No groups with required effective mass datasets found")
+
+    representative_group = analysis_groups[0]
+
+    with h5py.File(input_file_path, "r") as f:
+        group_item = f[representative_group]
+        if not isinstance(group_item, h5py.Group):
+            raise ValueError(
+                f"Expected Group at {representative_group}, got {type(group_item)}"
+            )
+        group = group_item
+
+        # Get actual g5g5 length with type checking
+        g5g5_item = group[required_datasets[0]]  # g5g5_jackknife_samples
+        if not isinstance(g5g5_item, h5py.Dataset):
+            raise ValueError(
+                f"Expected Dataset at {required_datasets[0]}, " f"got {type(g5g5_item)}"
+            )
+
+        g5g5_length = g5g5_item.shape[-1]
+
+        # Calculate expected effective mass length based on processing
+        # parameters
+        if config.TRUNCATE_HALF:
+            # For periodic BC: use first half, then t=1 to T/2-1
+            expected_effective_length = (g5g5_length // 2) - 1
+        else:
+            # Full length: t=1 to T-2
+            expected_effective_length = g5g5_length - 2
+
+    logger.info(
+        f"Validated effective mass file structure: g5g5={g5g5_length}, "
+        f"expected_effective={expected_effective_length}"
+    )
+    return g5g5_length, expected_effective_length
 
 
 @click.command()
