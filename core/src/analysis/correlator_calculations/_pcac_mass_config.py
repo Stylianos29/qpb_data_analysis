@@ -3,6 +3,10 @@
 PCAC mass calculation configuration.
 """
 
+from src.analysis.correlator_calculations._correlator_analysis_shared_config import (
+    validate_shared_config,
+)
+
 # PCAC calculation parameters
 TRUNCATE_START = 2
 TRUNCATE_END = 2
@@ -24,6 +28,9 @@ OUTPUT_DATASETS = {
 # Validation
 def validate_pcac_config():
     """Validate PCAC configuration."""
+    # First validate shared dependencies
+    validate_shared_config()
+
     # Check truncation parameters
     if not isinstance(TRUNCATE_START, int) or TRUNCATE_START < 0:
         raise ValueError(

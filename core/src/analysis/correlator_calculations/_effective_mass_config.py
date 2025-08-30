@@ -3,6 +3,11 @@
 Effective mass calculation configuration.
 """
 
+from src.analysis.correlator_calculations._correlator_analysis_shared_config import (
+    validate_shared_config,
+)
+
+
 # Effective mass calculation parameters
 APPLY_SYMMETRIZATION = True
 TRUNCATE_HALF = True
@@ -24,6 +29,9 @@ OUTPUT_DATASETS = {
 # Validation
 def validate_effective_config():
     """Validate effective mass configuration."""
+    # First validate shared dependencies
+    validate_shared_config()
+
     # Check boolean flags
     if not isinstance(APPLY_SYMMETRIZATION, bool):
         raise ValueError(
