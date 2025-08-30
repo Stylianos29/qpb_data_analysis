@@ -60,7 +60,15 @@ def process_pcac_file(input_path, output_path, logger):
     if not analysis_groups:
         raise ValueError(f"No groups with required datasets: {REQUIRED_DATASETS}")
 
-    logger.info(f"Processing {len(analysis_groups)} groups")
+    # Validate file consistency once
+    g5g5_length, derivative_length = validate_pcac_file_consistency(
+        input_path, REQUIRED_DATASETS, logger
+    )
+
+    logger.info(
+        f"Processing {len(analysis_groups)} groups with g5g5 length "
+        f"{g5g5_length} and derivative length {derivative_length}"
+    )
 
     successful = 0
     processed_parents = set()  # Track which parent groups we've processed
@@ -130,6 +138,63 @@ def process_pcac_file(input_path, output_path, logger):
                 continue
 
     return successful, len(analysis_groups) - successful
+
+
+def validate_pcac_file_consistency(input_file_path, required_datasets, logger):
+    """
+    Validate PCAC data consistency once per file using first valid
+    group. Returns the established lengths for the entire file.
+    """
+    from . import _pcac_mass_config as config
+
+    # Find first valid group as representative
+    analysis_groups = find_analysis_groups(input_file_path, required_datasets)
+    if not analysis_groups:
+        raise ValueError("No groups with required PCAC datasets found")
+
+    representative_group = analysis_groups[0]
+
+    with h5py.File(input_file_path, "r") as f:
+        group_item = f[representative_group]
+        if not isinstance(group_item, h5py.Group):
+            raise ValueError(
+                f"Expected Group at {representative_group}, got {type(group_item)}"
+            )
+        group = group_item
+
+        # Get actual lengths with type checking
+        g5g5_item = group[required_datasets[1]]  # g5g5_jackknife_samples
+        if not isinstance(g5g5_item, h5py.Dataset):
+            raise ValueError(
+                f"Expected Dataset at {required_datasets[1]}, got {type(g5g5_item)}"
+            )
+
+        derivative_item = group[
+            required_datasets[0]
+        ]  # g4g5g5_derivative_jackknife_samples
+        if not isinstance(derivative_item, h5py.Dataset):
+            raise ValueError(
+                f"Expected Dataset at {required_datasets[0]}, got {type(derivative_item)}"
+            )
+
+        g5g5_length = g5g5_item.shape[-1]
+        derivative_length = derivative_item.shape[-1]
+
+        # Validate truncation relationship
+        expected_truncated = g5g5_length - config.TRUNCATE_START - config.TRUNCATE_END
+        if expected_truncated != derivative_length:
+            raise ValueError(
+                f"PCAC length inconsistency in {representative_group}:\n"
+                f"g5g5({g5g5_length}) - {config.TRUNCATE_START} - "
+                f"{config.TRUNCATE_END} = {expected_truncated}, "
+                f"but derivative length is {derivative_length}"
+            )
+
+    logger.info(
+        f"Validated PCAC file structure: g5g5={g5g5_length}, "
+        f"derivative={derivative_length}"
+    )
+    return g5g5_length, derivative_length
 
 
 @click.command()

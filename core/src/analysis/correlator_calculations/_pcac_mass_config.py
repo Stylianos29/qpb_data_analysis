@@ -8,10 +8,6 @@ PCAC_MASS_FACTOR = 0.5
 TRUNCATE_START = 2
 TRUNCATE_END = 2
 
-# Expected dimensions
-G5G5_LENGTH = 48
-DERIVATIVE_LENGTH = 44
-
 # Required datasets
 REQUIRED_DATASETS = [
     "g4g5g5_derivative_jackknife_samples",
@@ -29,9 +25,12 @@ OUTPUT_DATASETS = {
 # Validation
 def validate_pcac_config():
     """Validate PCAC configuration."""
-    expected_truncated = G5G5_LENGTH - TRUNCATE_START - TRUNCATE_END
-    if expected_truncated != DERIVATIVE_LENGTH:
-        raise ValueError(
-            f"Truncation error: {expected_truncated} != {DERIVATIVE_LENGTH}"
-        )
-    return True
+    pass
+
+
+#     expected_truncated = G5G5_LENGTH - TRUNCATE_START - TRUNCATE_END
+#     if expected_truncated != DERIVATIVE_LENGTH:
+#         raise ValueError(
+#             f"Truncation error: {expected_truncated} != {DERIVATIVE_LENGTH}"
+#         )
+#     return True
