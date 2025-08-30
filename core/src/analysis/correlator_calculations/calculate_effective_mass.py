@@ -164,8 +164,6 @@ def validate_effective_mass_file_consistency(
     Validate effective mass data consistency once per file using first
     valid group. Returns the established lengths for the entire file.
     """
-    from . import _effective_mass_config as config
-
     # Find first valid group as representative
     analysis_groups = find_analysis_groups(input_file_path, required_datasets)
     if not analysis_groups:
@@ -192,7 +190,7 @@ def validate_effective_mass_file_consistency(
 
         # Calculate expected effective mass length based on processing
         # parameters
-        if config.TRUNCATE_HALF:
+        if TRUNCATE_HALF:
             # For periodic BC: use first half, then t=1 to T/2-1
             expected_effective_length = (g5g5_length // 2) - 1
         else:

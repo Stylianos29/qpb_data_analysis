@@ -145,8 +145,6 @@ def validate_pcac_file_consistency(input_file_path, required_datasets, logger):
     Validate PCAC data consistency once per file using first valid
     group. Returns the established lengths for the entire file.
     """
-    from . import _pcac_mass_config as config
-
     # Find first valid group as representative
     analysis_groups = find_analysis_groups(input_file_path, required_datasets)
     if not analysis_groups:
@@ -181,12 +179,12 @@ def validate_pcac_file_consistency(input_file_path, required_datasets, logger):
         derivative_length = derivative_item.shape[-1]
 
         # Validate truncation relationship
-        expected_truncated = g5g5_length - config.TRUNCATE_START - config.TRUNCATE_END
+        expected_truncated = g5g5_length - TRUNCATE_START - TRUNCATE_END
         if expected_truncated != derivative_length:
             raise ValueError(
                 f"PCAC length inconsistency in {representative_group}:\n"
-                f"g5g5({g5g5_length}) - {config.TRUNCATE_START} - "
-                f"{config.TRUNCATE_END} = {expected_truncated}, "
+                f"g5g5({g5g5_length}) - {TRUNCATE_START} - "
+                f"{TRUNCATE_END} = {expected_truncated}, "
                 f"but derivative length is {derivative_length}"
             )
 
