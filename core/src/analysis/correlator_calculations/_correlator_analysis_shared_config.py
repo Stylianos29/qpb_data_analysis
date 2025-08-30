@@ -4,7 +4,6 @@ Minimal shared configuration for correlator analysis.
 """
 
 # Shared constants
-MIN_JACKKNIFE_SAMPLES = 10
 
 # Metadata datasets to copy
 METADATA_DATASETS = [
@@ -18,16 +17,6 @@ METADATA_DATASETS = [
 # Validation
 def validate_shared_config():
     """Validate shared configuration."""
-    # Check MIN_JACKKNIFE_SAMPLES
-    if not isinstance(MIN_JACKKNIFE_SAMPLES, int) or MIN_JACKKNIFE_SAMPLES < 2:
-        raise ValueError(
-            f"MIN_JACKKNIFE_SAMPLES must be integer >= 2, got {MIN_JACKKNIFE_SAMPLES}"
-        )
-    if MIN_JACKKNIFE_SAMPLES > 1000:  # Catch obvious typos
-        raise ValueError(
-            f"MIN_JACKKNIFE_SAMPLES too large: {MIN_JACKKNIFE_SAMPLES} > 1000"
-        )
-
     # Check METADATA_DATASETS structure
     if not isinstance(METADATA_DATASETS, list):
         raise ValueError(

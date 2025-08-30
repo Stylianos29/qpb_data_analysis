@@ -10,7 +10,6 @@ import sys
 from typing import Optional
 
 import click
-import numpy as np
 import h5py
 
 from library.validation.click_validators import (
@@ -28,7 +27,6 @@ from src.analysis.correlator_calculations._pcac_mass_config import (
     validate_pcac_config,
 )
 from src.analysis.correlator_calculations._correlator_analysis_shared_config import (
-    MIN_JACKKNIFE_SAMPLES,
     METADATA_DATASETS,
 )
 from src.analysis.correlator_calculations._correlator_analysis_core import (
@@ -106,11 +104,6 @@ def process_pcac_file(input_path, output_path, logger):
 
                 g4g5g5_derivative = g4g5g5_item[:]
                 g5g5_samples = g5g5_item[:]
-
-                # Basic validation
-                if g4g5g5_derivative.shape[0] < MIN_JACKKNIFE_SAMPLES:
-                    logger.warning(f"Skipping {group_path}: insufficient samples")
-                    continue
 
                 # Calculate PCAC mass
                 pcac_mass = calculate_pcac_mass(g4g5g5_derivative, g5g5_samples)

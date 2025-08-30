@@ -29,7 +29,6 @@ from src.analysis.correlator_calculations._effective_mass_config import (
     validate_effective_config,
 )
 from src.analysis.correlator_calculations._correlator_analysis_shared_config import (
-    MIN_JACKKNIFE_SAMPLES,
     METADATA_DATASETS,
 )
 from src.analysis.correlator_calculations._correlator_analysis_core import (
@@ -122,11 +121,6 @@ def process_effective_file(input_path, output_path, logger):
                     continue
 
                 g5g5_samples = g5g5_item[:]
-
-                # Basic validation
-                if g5g5_samples.shape[0] < MIN_JACKKNIFE_SAMPLES:
-                    logger.warning(f"Skipping {group_path}: insufficient samples")
-                    continue
 
                 # Calculate effective mass
                 effective_mass = calculate_effective_mass(g5g5_samples)
