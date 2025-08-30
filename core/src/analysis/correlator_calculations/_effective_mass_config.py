@@ -24,6 +24,46 @@ OUTPUT_DATASETS = {
 # Validation
 def validate_effective_config():
     """Validate effective mass configuration."""
-    if not 0 < LOWERING_FACTOR < 1:
-        raise ValueError(f"Lowering factor must be in (0,1), got {LOWERING_FACTOR}")
-    return True
+    # Check boolean flags
+    if not isinstance(APPLY_SYMMETRIZATION, bool):
+        raise ValueError(
+            f"APPLY_SYMMETRIZATION must be boolean, "
+            f"got {type(APPLY_SYMMETRIZATION)}"
+        )
+    if not isinstance(TRUNCATE_HALF, bool):
+        raise ValueError(f"TRUNCATE_HALF must be boolean, got {type(TRUNCATE_HALF)}")
+
+    # Check lowering factor
+    if not isinstance(LOWERING_FACTOR, (int, float)) or not (0 < LOWERING_FACTOR < 1):
+        raise ValueError(
+            f"LOWERING_FACTOR must be between 0 and 1, got {LOWERING_FACTOR}"
+        )
+
+    # Check required datasets
+    if len(REQUIRED_DATASETS) != 1:
+        raise ValueError(
+            f"REQUIRED_DATASETS must have exactly 1 element, "
+            f"got {len(REQUIRED_DATASETS)}"
+        )
+    if "g5g5" not in REQUIRED_DATASETS[0]:
+        raise ValueError("REQUIRED_DATASETS must contain a dataset with 'g5g5'")
+
+    # Check output datasets structure (same as PCAC)
+    expected_keys = {"samples", "mean", "error"}
+    if len(OUTPUT_DATASETS) != 3:
+        raise ValueError(
+            f"OUTPUT_DATASETS must have exactly 3 elements, "
+            f"got {len(OUTPUT_DATASETS)}"
+        )
+    if set(OUTPUT_DATASETS.keys()) != expected_keys:
+        raise ValueError(
+            f"OUTPUT_DATASETS keys must be {expected_keys}, "
+            f"got {set(OUTPUT_DATASETS.keys())}"
+        )
+
+    for key, value in OUTPUT_DATASETS.items():
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(
+                f"OUTPUT_DATASETS['{key}'] must be non-empty string, "
+                f"got {repr(value)}"
+            )
