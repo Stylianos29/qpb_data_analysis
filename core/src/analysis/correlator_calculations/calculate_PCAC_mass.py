@@ -21,7 +21,6 @@ from library.validation.click_validators import (
 from library.utils.logging_utilities import create_script_logger
 
 from src.analysis.correlator_calculations._pcac_mass_config import (
-    PCAC_MASS_FACTOR,
     TRUNCATE_START,
     TRUNCATE_END,
     REQUIRED_DATASETS,
@@ -42,7 +41,7 @@ from src.analysis.correlator_calculations._correlator_analysis_core import (
 
 
 def calculate_pcac_mass(g4g5g5_derivative, g5g5_samples):
-    """Calculate PCAC mass: factor * derivative / g5g5_truncated."""
+    """Calculate PCAC mass: 0.5 * derivative / g5g5_truncated."""
     # Truncate g5g5 to match derivative length
     if TRUNCATE_END > 0:
         g5g5_truncated = g5g5_samples[:, TRUNCATE_START:-TRUNCATE_END]
@@ -50,7 +49,7 @@ def calculate_pcac_mass(g4g5g5_derivative, g5g5_samples):
         g5g5_truncated = g5g5_samples[:, TRUNCATE_START:]
 
     # Calculate PCAC mass
-    return safe_divide(PCAC_MASS_FACTOR * g4g5g5_derivative, g5g5_truncated)
+    return safe_divide(0.5 * g4g5g5_derivative, g5g5_truncated)
 
 
 def process_pcac_file(input_path, output_path, logger):

@@ -4,7 +4,6 @@ PCAC mass calculation configuration.
 """
 
 # PCAC calculation parameters
-PCAC_MASS_FACTOR = 0.5
 TRUNCATE_START = 2
 TRUNCATE_END = 2
 
