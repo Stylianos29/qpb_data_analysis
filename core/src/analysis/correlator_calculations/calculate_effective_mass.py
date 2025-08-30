@@ -30,8 +30,6 @@ from src.analysis.correlator_calculations._effective_mass_config import (
 )
 from src.analysis.correlator_calculations._correlator_analysis_shared_config import (
     MIN_JACKKNIFE_SAMPLES,
-    HDF5_COMPRESSION,
-    HDF5_COMPRESSION_LEVEL,
     METADATA_DATASETS,
 )
 from src.analysis.correlator_calculations._correlator_analysis_core import (
@@ -135,8 +133,6 @@ def process_effective_file(input_path, output_path, logger):
                 output_group.create_dataset(
                     output_names["samples"],
                     data=effective_mass,
-                    compression=HDF5_COMPRESSION,
-                    compression_opts=HDF5_COMPRESSION_LEVEL,
                 )
                 output_group.create_dataset(output_names["mean"], data=mean_values)
                 output_group.create_dataset(output_names["error"], data=error_values)

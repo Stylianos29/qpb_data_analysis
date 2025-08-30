@@ -24,6 +24,7 @@ OUTPUT_DATASETS = {
     "error": "pion_effective_mass_error_values",
 }
 
+
 # Validation
 def validate_effective_config():
     """Validate effective mass configuration."""

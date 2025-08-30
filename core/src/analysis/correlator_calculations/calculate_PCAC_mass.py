@@ -30,8 +30,6 @@ from src.analysis.correlator_calculations._pcac_mass_config import (
 )
 from src.analysis.correlator_calculations._correlator_analysis_shared_config import (
     MIN_JACKKNIFE_SAMPLES,
-    HDF5_COMPRESSION,
-    HDF5_COMPRESSION_LEVEL,
     METADATA_DATASETS,
 )
 from src.analysis.correlator_calculations._correlator_analysis_core import (
@@ -118,8 +116,6 @@ def process_pcac_file(input_path, output_path, logger):
                 output_group.create_dataset(
                     OUTPUT_DATASETS["samples"],
                     data=pcac_mass,
-                    compression=HDF5_COMPRESSION,
-                    compression_opts=HDF5_COMPRESSION_LEVEL,
                 )
                 output_group.create_dataset(OUTPUT_DATASETS["mean"], data=mean_values)
                 output_group.create_dataset(OUTPUT_DATASETS["error"], data=error_values)
