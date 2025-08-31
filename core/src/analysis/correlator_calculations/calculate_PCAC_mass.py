@@ -198,16 +198,9 @@ def validate_pcac_file_consistency(input_file_path, required_datasets, logger):
 @click.option(
     "-o",
     "--output_hdf5_file",
-    required=True,
+    default="correlators_PCAC_mass_analysis.h5",
     callback=hdf5_file.output,
-    help="Path for output HDF5 file with PCAC mass results.",
-)
-@click.option(
-    "-out_dir",
-    "--output_directory",
-    default=None,
-    callback=directory.must_exist,
-    help="Directory for output files. If not specified, uses input file directory.",
+    help="Path for output HDF5 file with PCAC mass calculation results. Default: correlators_PCAC_mass_analysis.h5",
 )
 @click.option(
     "-log_on",
@@ -233,7 +226,6 @@ def validate_pcac_file_consistency(input_file_path, required_datasets, logger):
 def main(
     input_hdf5_file: str,
     output_hdf5_file: str,
-    output_directory: Optional[str],
     enable_logging: bool,
     log_directory: Optional[str],
     log_filename: Optional[str],
@@ -243,17 +235,18 @@ def main(
     # Validate configuration
     validate_pcac_config()
 
-    # Setup paths
-    if output_directory:
-        output_path = os.path.join(output_directory, output_hdf5_file)
+    # Setup output path
+    if os.path.dirname(output_hdf5_file):
+        # Full path given - use as-is
+        output_path = output_hdf5_file
     else:
+        # Filename only - put in input file's directory
         output_path = os.path.join(os.path.dirname(input_hdf5_file), output_hdf5_file)
 
     # Setup logging
+    log_dir = None
     if enable_logging:
-        log_dir = log_directory or output_directory or os.path.dirname(output_path)
-    else:
-        log_dir = None
+        log_dir = log_directory or os.path.dirname(output_path)
 
     logger = create_script_logger(
         log_directory=log_dir,
