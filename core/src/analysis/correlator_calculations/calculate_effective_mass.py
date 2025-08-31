@@ -8,6 +8,7 @@ Usage: python calculate_effective_mass.py -i input.h5 -o output.h5
 import os
 import sys
 from typing import Optional
+from datetime import datetime
 
 import click
 import numpy as np
@@ -26,6 +27,7 @@ from src.analysis.correlator_calculations._effective_mass_config import (
     LOWERING_FACTOR,
     REQUIRED_DATASETS,
     OUTPUT_DATASETS,
+    ANALYSIS_DOCUMENTATION,
     validate_effective_config,
 )
 from src.analysis.correlator_calculations._correlator_analysis_shared_config import (
@@ -127,6 +129,14 @@ def process_effective_file(input_path, output_path, logger):
                 mean_values, error_values = calculate_jackknife_statistics(
                     effective_mass
                 )
+
+                # Add analysis methodology documentation to output file
+                output_file.attrs["analysis_date"] = datetime.now().isoformat()
+                output_file.attrs["source_file"] = os.path.basename(input_path)
+
+                # Add documentation from config
+                for key, value in ANALYSIS_DOCUMENTATION.items():
+                    output_file.attrs[key] = value
 
                 # Create output group
                 output_group = output_file.create_group(group_path)

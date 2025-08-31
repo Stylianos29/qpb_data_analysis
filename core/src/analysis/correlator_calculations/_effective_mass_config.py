@@ -25,6 +25,28 @@ OUTPUT_DATASETS = {
     "error": "pion_effective_mass_error_values",
 }
 
+# Analysis documentation attributes
+ANALYSIS_DOCUMENTATION = {
+    "analysis_type": "Effective mass calculation from jackknife g5g5 correlator data",
+    "effective_mass_formula": (
+        "Two-state periodic: 0.5 * ln((C(t-1) + sqrt(...)) / (C(t+1) + sqrt(...)))"
+    ),
+    "symmetrization_applied": (
+        "Correlator symmetrization: "
+        f"{'enabled' if APPLY_SYMMETRIZATION else 'disabled'}"
+    ),
+    "truncation_applied": (
+        "Half-length truncation: "
+        f"{'enabled' if TRUNCATE_HALF else 'disabled'} "
+        "(periodic boundary conditions)"
+    ),
+    "time_range_note": (
+        "Effective mass calculated for t=1 to "
+        f"{'T//2' if TRUNCATE_HALF else 'T-2'} "
+        "(boundary points excluded for finite differences)"
+    ),
+}
+
 
 # Validation
 def validate_effective_config():

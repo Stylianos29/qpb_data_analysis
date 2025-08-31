@@ -24,6 +24,20 @@ OUTPUT_DATASETS = {
     "error": "PCAC_mass_error_values",
 }
 
+# Analysis documentation attributes
+ANALYSIS_DOCUMENTATION = {
+    "analysis_type": "PCAC mass calculation from jackknife correlator data",
+    "pcac_formula": "PCAC_mass = 0.5 * g4g5g5_derivative / g5g5_truncated",
+    "truncation_description": (
+        f"g5g5 correlator truncated by removing {TRUNCATE_START} initial and "
+        f"{TRUNCATE_END} final time points to match g4g5g5_derivative length"
+    ),
+    "time_range_note": (
+        f"PCAC mass calculated for t={TRUNCATE_START} to t=T-{TRUNCATE_END+1} "
+        "(after g5g5 truncation to match derivative length)"
+    ),
+}
+
 
 # Validation
 def validate_pcac_config():
