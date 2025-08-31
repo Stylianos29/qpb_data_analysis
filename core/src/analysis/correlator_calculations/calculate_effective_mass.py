@@ -100,65 +100,55 @@ def process_effective_file(input_path, output_path, logger):
     with h5py.File(input_path, "r") as input_file, h5py.File(
         output_path, "w"
     ) as output_file:
-        # No file-level attributes - clean structure like input
 
         for group_path in analysis_groups:
-            try:
-                input_item = input_file[group_path]
-                if not isinstance(input_item, h5py.Group):
-                    continue
-
-                # Copy parent group attributes (second-to-deepest level)
-                copy_parent_attributes(
-                    input_file, output_file, group_path, processed_parents
-                )
-
-                # Read data with type-safe access
-                g5g5_item = input_item[REQUIRED_DATASETS[0]]
-
-                if not isinstance(g5g5_item, h5py.Dataset):
-                    logger.warning(
-                        f"Skipping {group_path}: {REQUIRED_DATASETS[0]} is not a dataset"
-                    )
-                    continue
-
-                g5g5_samples = g5g5_item[:]
-
-                # Calculate effective mass
-                effective_mass = calculate_effective_mass(g5g5_samples)
-                mean_values, error_values = calculate_jackknife_statistics(
-                    effective_mass
-                )
-
-                # Add analysis methodology documentation to output file
-                output_file.attrs["analysis_date"] = datetime.now().isoformat()
-                output_file.attrs["source_file"] = os.path.basename(input_path)
-
-                # Add documentation from config
-                for key, value in ANALYSIS_DOCUMENTATION.items():
-                    output_file.attrs[key] = value
-
-                # Create output group
-                output_group = output_file.create_group(group_path)
-
-                # Save results
-                output_group.create_dataset(
-                    output_names["samples"],
-                    data=effective_mass,
-                )
-                output_group.create_dataset(output_names["mean"], data=mean_values)
-                output_group.create_dataset(output_names["error"], data=error_values)
-
-                # Copy metadata (datasets + deepest group attributes)
-                copy_metadata(input_item, output_group, METADATA_DATASETS)
-
-                successful += 1
-
-            except Exception as e:
-                logger.error(f"Failed to process {group_path}: {e}")
+            input_item = input_file[group_path]
+            if not isinstance(input_item, h5py.Group):
                 continue
 
-    return successful, len(analysis_groups) - successful
+            # Copy parent group attributes (second-to-deepest level)
+            copy_parent_attributes(
+                input_file, output_file, group_path, processed_parents
+            )
+
+            # Read data with type-safe access
+            g5g5_item = input_item[REQUIRED_DATASETS[0]]
+
+            if not isinstance(g5g5_item, h5py.Dataset):
+                logger.warning(
+                    f"Skipping {group_path}: {REQUIRED_DATASETS[0]} is not a dataset"
+                )
+                continue
+
+            g5g5_samples = g5g5_item[:]
+
+            # Calculate effective mass
+            effective_mass = calculate_effective_mass(g5g5_samples)
+            mean_values, error_values = calculate_jackknife_statistics(effective_mass)
+
+            # Add analysis methodology documentation to output file
+            output_file.attrs["analysis_date"] = datetime.now().isoformat()
+            output_file.attrs["source_file"] = os.path.basename(input_path)
+
+            # Add documentation from config
+            for key, value in ANALYSIS_DOCUMENTATION.items():
+                output_file.attrs[key] = value
+
+            # Create output group
+            output_group = output_file.create_group(group_path)
+
+            # Save results
+            output_group.create_dataset(
+                output_names["samples"],
+                data=effective_mass,
+            )
+            output_group.create_dataset(output_names["mean"], data=mean_values)
+            output_group.create_dataset(output_names["error"], data=error_values)
+
+            # Copy metadata (datasets + deepest group attributes)
+            copy_metadata(input_item, output_group, METADATA_DATASETS)
+
+    return len(analysis_groups)
 
 
 def validate_effective_mass_file_consistency(
@@ -280,16 +270,11 @@ def main(
     try:
         logger.log_script_start("Effective mass calculation")
 
-        successful, failed = process_effective_file(
-            input_hdf5_file, output_path, logger
-        )
+        total_groups = process_effective_file(input_hdf5_file, output_path, logger)
 
         click.echo(f"✓ Effective mass calculation complete")
-        click.echo(f"  Processed: {successful}/{successful + failed} groups")
+        click.echo(f"  Processed: {total_groups} groups")
         click.echo(f"  Output: {output_path}")
-
-        if failed > 0:
-            click.echo(f"  ⚠ {failed} groups failed", err=True)
 
         logger.log_script_end("Effective mass calculation completed")
 

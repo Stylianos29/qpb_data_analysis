@@ -69,77 +69,68 @@ def process_pcac_file(input_path, output_path, logger):
         f"{g5g5_length} and derivative length {derivative_length}"
     )
 
-    successful = 0
     processed_parents = set()  # Track which parent groups we've processed
 
     with h5py.File(input_path, "r") as input_file, h5py.File(
         output_path, "w"
     ) as output_file:
-        # No file-level attributes - clean structure like input
 
         for group_path in analysis_groups:
-            try:
-                input_item = input_file[group_path]
-                if not isinstance(input_item, h5py.Group):
-                    continue
-
-                # Copy parent group attributes (second-to-deepest level)
-                copy_parent_attributes(
-                    input_file, output_file, group_path, processed_parents
-                )
-
-                # Read data with type-safe access
-                g4g5g5_item = input_item[REQUIRED_DATASETS[0]]
-                g5g5_item = input_item[REQUIRED_DATASETS[1]]
-
-                if not isinstance(g4g5g5_item, h5py.Dataset):
-                    logger.warning(
-                        f"Skipping {group_path}: {REQUIRED_DATASETS[0]} is not a dataset"
-                    )
-                    continue
-
-                if not isinstance(g5g5_item, h5py.Dataset):
-                    logger.warning(
-                        f"Skipping {group_path}: {REQUIRED_DATASETS[1]} is not a dataset"
-                    )
-                    continue
-
-                g4g5g5_derivative = g4g5g5_item[:]
-                g5g5_samples = g5g5_item[:]
-
-                # Calculate PCAC mass
-                pcac_mass = calculate_pcac_mass(g4g5g5_derivative, g5g5_samples)
-                mean_values, error_values = calculate_jackknife_statistics(pcac_mass)
-
-                # Add analysis methodology documentation to output file
-                output_file.attrs["analysis_date"] = datetime.now().isoformat()
-                output_file.attrs["source_file"] = os.path.basename(input_path)
-
-                # Add documentation from config
-                for key, value in ANALYSIS_DOCUMENTATION.items():
-                    output_file.attrs[key] = value
-
-                # Create output group
-                output_group = output_file.create_group(group_path)
-
-                # Save results
-                output_group.create_dataset(
-                    OUTPUT_DATASETS["samples"],
-                    data=pcac_mass,
-                )
-                output_group.create_dataset(OUTPUT_DATASETS["mean"], data=mean_values)
-                output_group.create_dataset(OUTPUT_DATASETS["error"], data=error_values)
-
-                # Copy metadata (datasets + deepest group attributes)
-                copy_metadata(input_item, output_group, METADATA_DATASETS)
-
-                successful += 1
-
-            except Exception as e:
-                logger.error(f"Failed to process {group_path}: {e}")
+            input_item = input_file[group_path]
+            if not isinstance(input_item, h5py.Group):
                 continue
 
-    return successful, len(analysis_groups) - successful
+            # Copy parent group attributes (second-to-deepest level)
+            copy_parent_attributes(
+                input_file, output_file, group_path, processed_parents
+            )
+
+            # Read data with type-safe access
+            g4g5g5_item = input_item[REQUIRED_DATASETS[0]]
+            g5g5_item = input_item[REQUIRED_DATASETS[1]]
+
+            if not isinstance(g4g5g5_item, h5py.Dataset):
+                logger.warning(
+                    f"Skipping {group_path}: {REQUIRED_DATASETS[0]} is not a dataset"
+                )
+                continue
+
+            if not isinstance(g5g5_item, h5py.Dataset):
+                logger.warning(
+                    f"Skipping {group_path}: {REQUIRED_DATASETS[1]} is not a dataset"
+                )
+                continue
+
+            g4g5g5_derivative = g4g5g5_item[:]
+            g5g5_samples = g5g5_item[:]
+
+            # Calculate PCAC mass
+            pcac_mass = calculate_pcac_mass(g4g5g5_derivative, g5g5_samples)
+            mean_values, error_values = calculate_jackknife_statistics(pcac_mass)
+
+            # Add analysis methodology documentation to output file
+            output_file.attrs["analysis_date"] = datetime.now().isoformat()
+            output_file.attrs["source_file"] = os.path.basename(input_path)
+
+            # Add documentation from config
+            for key, value in ANALYSIS_DOCUMENTATION.items():
+                output_file.attrs[key] = value
+
+            # Create output group
+            output_group = output_file.create_group(group_path)
+
+            # Save results
+            output_group.create_dataset(
+                OUTPUT_DATASETS["samples"],
+                data=pcac_mass,
+            )
+            output_group.create_dataset(OUTPUT_DATASETS["mean"], data=mean_values)
+            output_group.create_dataset(OUTPUT_DATASETS["error"], data=error_values)
+
+            # Copy metadata (datasets + deepest group attributes)
+            copy_metadata(input_item, output_group, METADATA_DATASETS)
+
+    return len(analysis_groups)
 
 
 def validate_pcac_file_consistency(input_file_path, required_datasets, logger):
@@ -268,14 +259,11 @@ def main(
     try:
         logger.log_script_start("PCAC mass calculation")
 
-        successful, failed = process_pcac_file(input_hdf5_file, output_path, logger)
+        total_groups = process_pcac_file(input_hdf5_file, output_path, logger)
 
         click.echo(f"✓ PCAC mass calculation complete")
-        click.echo(f"  Processed: {successful}/{successful + failed} groups")
+        click.echo(f"  Processed: {total_groups} groups")
         click.echo(f"  Output: {output_path}")
-
-        if failed > 0:
-            click.echo(f"  ⚠ {failed} groups failed", err=True)
 
         logger.log_script_end("PCAC mass calculation completed")
 
