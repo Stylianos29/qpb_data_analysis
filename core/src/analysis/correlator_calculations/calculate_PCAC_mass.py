@@ -5,14 +5,16 @@ PCAC mass calculation script.
 Usage: python calculate_PCAC_mass.py -i input.h5 -o output.h5
 """
 
-from datetime import datetime
 import os
 import sys
 from typing import Optional
+from datetime import datetime
+from pathlib import Path
 
 import click
 import h5py
 
+from library.constants.paths import ROOT
 from library.validation.click_validators import (
     hdf5_file,
     directory,
@@ -263,7 +265,7 @@ def main(
 
         click.echo(f"✓ PCAC mass calculation complete")
         click.echo(f"  Processed: {total_groups} groups")
-        click.echo(f"  Output: {output_path}")
+        click.echo(f"  Output: {Path(output_path).relative_to(ROOT)}")
 
         logger.log_script_end("PCAC mass calculation completed")
 

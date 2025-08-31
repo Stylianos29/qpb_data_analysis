@@ -9,11 +9,13 @@ import os
 import sys
 from typing import Optional
 from datetime import datetime
+from pathlib import Path
 
 import click
 import numpy as np
 import h5py
 
+from library.constants.paths import ROOT
 from library.validation.click_validators import (
     hdf5_file,
     directory,
@@ -274,7 +276,7 @@ def main(
 
         click.echo(f"✓ Effective mass calculation complete")
         click.echo(f"  Processed: {total_groups} groups")
-        click.echo(f"  Output: {output_path}")
+        click.echo(f"  Output: {Path(output_path).relative_to(ROOT)}")
 
         logger.log_script_end("Effective mass calculation completed")
 
