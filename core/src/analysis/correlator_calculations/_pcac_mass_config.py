@@ -12,9 +12,9 @@ TRUNCATE_START = 2
 TRUNCATE_END = 2
 
 # Required datasets
-REQUIRED_DATASETS = [
-    "g4g5g5_derivative_jackknife_samples",
-    "g5g5_jackknife_samples",
+REQUIRED_DATASETS = [ # Order is important
+    "g4g5g5_derivative_jackknife_samples", # g4g5g5 derivative dataset
+    "g5g5_jackknife_samples", # g5g5 dataset
 ]
 
 # Output dataset names
