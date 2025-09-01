@@ -75,7 +75,7 @@ ANALYSIS_CONFIGS = {
         "mean_dataset": "pion_effective_mass_mean_values",
         "error_dataset": "pion_effective_mass_error_values",
         "samples_dataset": "pion_effective_mass_jackknife_samples",
-        "plot_base_directory": "effective_mass_visualization",
+        "plot_base_directory": "Effective_mass_visualization",
         "time_offset": 1,  # Effective mass starts at t=1
         "plot_config": {
             "y_scale": "linear",
