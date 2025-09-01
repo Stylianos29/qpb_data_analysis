@@ -63,7 +63,7 @@ def process_pcac_file(input_path, output_path, logger):
 
     # Validate file consistency once
     g5g5_length, derivative_length = validate_pcac_file_consistency(
-        input_path, REQUIRED_DATASETS, logger
+        input_path, analysis_groups[0], REQUIRED_DATASETS, logger
     )
 
     logger.info(
@@ -135,18 +135,13 @@ def process_pcac_file(input_path, output_path, logger):
     return len(analysis_groups)
 
 
-def validate_pcac_file_consistency(input_file_path, required_datasets, logger):
+def validate_pcac_file_consistency(
+    input_file_path, representative_group, required_datasets, logger
+):
     """
     Validate PCAC data consistency once per file using first valid
     group. Returns the established lengths for the entire file.
     """
-    # Find first valid group as representative
-    analysis_groups = find_analysis_groups(input_file_path, required_datasets)
-    if not analysis_groups:
-        raise ValueError("No groups with required PCAC datasets found")
-
-    representative_group = analysis_groups[0]
-
     with h5py.File(input_file_path, "r") as f:
         group_item = f[representative_group]
         if not isinstance(group_item, h5py.Group):
@@ -203,7 +198,10 @@ def validate_pcac_file_consistency(input_file_path, required_datasets, logger):
     "--output_hdf5_file",
     default="correlators_PCAC_mass_analysis.h5",
     callback=hdf5_file.output,
-    help="Path for output HDF5 file with PCAC mass calculation results. Default: correlators_PCAC_mass_analysis.h5",
+    help=(
+        "Path for output HDF5 file with PCAC mass calculation results. "
+        "Default: correlators_PCAC_mass_analysis.h5"
+    ),
 )
 @click.option(
     "-log_on",

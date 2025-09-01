@@ -85,7 +85,7 @@ def process_effective_file(input_path, output_path, logger):
 
     # Validate file consistency once
     g5g5_length, expected_effective_length = validate_effective_mass_file_consistency(
-        input_path, REQUIRED_DATASETS, logger
+        input_path, analysis_groups[0], REQUIRED_DATASETS, logger
     )
 
     logger.info(
@@ -93,10 +93,6 @@ def process_effective_file(input_path, output_path, logger):
         f" expected effective mass length {expected_effective_length}"
     )
 
-    # Choose output dataset names from config
-    output_names = OUTPUT_DATASETS
-
-    successful = 0
     processed_parents = set()  # Track which parent groups we've processed
 
     with h5py.File(input_path, "r") as input_file, h5py.File(
@@ -141,11 +137,11 @@ def process_effective_file(input_path, output_path, logger):
 
             # Save results
             output_group.create_dataset(
-                output_names["samples"],
+                OUTPUT_DATASETS["samples"],
                 data=effective_mass,
             )
-            output_group.create_dataset(output_names["mean"], data=mean_values)
-            output_group.create_dataset(output_names["error"], data=error_values)
+            output_group.create_dataset(OUTPUT_DATASETS["mean"], data=mean_values)
+            output_group.create_dataset(OUTPUT_DATASETS["error"], data=error_values)
 
             # Copy metadata (datasets + deepest group attributes)
             copy_metadata(input_item, output_group, METADATA_DATASETS)
@@ -154,19 +150,12 @@ def process_effective_file(input_path, output_path, logger):
 
 
 def validate_effective_mass_file_consistency(
-    input_file_path, required_datasets, logger
+    input_file_path, representative_group, required_datasets, logger
 ):
     """
     Validate effective mass data consistency once per file using first
     valid group. Returns the established lengths for the entire file.
     """
-    # Find first valid group as representative
-    analysis_groups = find_analysis_groups(input_file_path, required_datasets)
-    if not analysis_groups:
-        raise ValueError("No groups with required effective mass datasets found")
-
-    representative_group = analysis_groups[0]
-
     with h5py.File(input_file_path, "r") as f:
         group_item = f[representative_group]
         if not isinstance(group_item, h5py.Group):

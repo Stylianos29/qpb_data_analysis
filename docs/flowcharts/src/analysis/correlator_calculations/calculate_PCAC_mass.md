@@ -1,12 +1,13 @@
 # Calculate PCAC Mass Script Flowchart
 
 ## Design Goal
-Calculate PCAC (Partially Conserved Axial Current) mass from
-jackknife-analyzed correlator data using the streamlined formula:
+Calculate local PCAC (Partially Conserved Axial Current) mass from
+jackknife-analyzed correlator data using the formula (no tree
+corrections):
 
     PCAC_mass = 0.5 * g4g5g5_derivative / g5g5_truncated
 
-The script implements dynamic validation, configurable documentation,
+The script implements configurable documentation, dynamic validation,
 and robust data processing with minimal complexity.
 
 ## Flowchart
