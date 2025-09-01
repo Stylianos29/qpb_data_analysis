@@ -174,9 +174,9 @@ def main(
         filename_builder = PlotFilenameBuilder(constants.FILENAME_LABELS_BY_COLUMN_NAME)
         title_builder = PlotTitleBuilder(constants.TITLE_LABELS_BY_COLUMN_NAME)
 
-        # Prepare base output directory
-        base_plots_dir = _prepare_base_output_directory(
-            plots_directory, analysis_config, clear_existing, file_manager, logger
+        # Prepare plots base subdirectory
+        base_plots_dir = file_manager.prepare_subdirectory(
+            analysis_config["plot_base_directory"], clear_existing
         )
 
         # Process correlator data
@@ -209,35 +209,6 @@ def main(
         logger.log_script_end(f"Correlator visualization ({analysis_type}) failed")
         click.echo(f"❌ ERROR: {e}", err=True)
         sys.exit(1)
-
-
-def _prepare_base_output_directory(
-    output_directory: str,
-    analysis_config: Dict,
-    clear_existing: bool,
-    file_manager: PlotFileManager,
-    logger,
-) -> str:
-    """
-    Prepare the base output directory for plots.
-
-    Returns:
-        Path to base plots directory
-    """
-    base_plots_dir = os.path.join(
-        output_directory, analysis_config["plot_base_directory"]
-    )
-
-    if clear_existing and os.path.exists(base_plots_dir):
-        logger.info(f"Clearing existing plots directory: {base_plots_dir}")
-        import shutil
-
-        shutil.rmtree(base_plots_dir)
-
-    os.makedirs(base_plots_dir, exist_ok=True)
-    logger.info(f"Base plots directory: {base_plots_dir}")
-
-    return base_plots_dir
 
 
 def _process_correlator_data(
