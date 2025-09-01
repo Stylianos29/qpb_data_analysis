@@ -34,6 +34,7 @@ from src.analysis.correlator_calculations._effective_mass_config import (
 )
 from src.analysis.correlator_calculations._correlator_analysis_shared_config import (
     METADATA_DATASETS,
+    REPRESENTATIVE_GROUP_INDEX,
 )
 from src.analysis.correlator_calculations._correlator_analysis_core import (
     calculate_jackknife_statistics,
@@ -125,7 +126,10 @@ def process_effective_file(input_path, output_path, logger):
 
     # Validate file consistency once
     g5g5_length, expected_effective_length = validate_effective_mass_file_consistency(
-        input_path, analysis_groups[0], REQUIRED_DATASETS, logger
+        input_path,
+        analysis_groups[REPRESENTATIVE_GROUP_INDEX],
+        REQUIRED_DATASETS,
+        logger,
     )
 
     logger.info(

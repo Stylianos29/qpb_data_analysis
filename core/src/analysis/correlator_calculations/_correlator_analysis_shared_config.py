@@ -4,6 +4,9 @@ Minimal shared configuration for correlator analysis.
 """
 
 # Shared constants
+REPRESENTATIVE_GROUP_INDEX = 0  # Index of group to use for file-level validation
+# Note: Using index 0 is recommended for safety - ensures validation
+# uses the first available group
 
 # Metadata datasets to copy
 METADATA_DATASETS = [
@@ -17,6 +20,16 @@ METADATA_DATASETS = [
 # Validation
 def validate_shared_config():
     """Validate shared configuration."""
+    # Check REPRESENTATIVE_GROUP_INDEX
+    if (
+        not isinstance(REPRESENTATIVE_GROUP_INDEX, int)
+        or REPRESENTATIVE_GROUP_INDEX < 0
+    ):
+        raise ValueError(
+            "REPRESENTATIVE_GROUP_INDEX must be non-negative integer, "
+            f"got {REPRESENTATIVE_GROUP_INDEX}"
+        )
+
     # Check METADATA_DATASETS structure
     if not isinstance(METADATA_DATASETS, list):
         raise ValueError(
@@ -24,16 +37,19 @@ def validate_shared_config():
         )
     if len(METADATA_DATASETS) != 4:
         raise ValueError(
-            f"METADATA_DATASETS must have exactly 4 elements, got {len(METADATA_DATASETS)}"
+            "METADATA_DATASETS must have exactly 4 elements, "
+            f"got {len(METADATA_DATASETS)}"
         )
 
     # Check metadata dataset names
     for i, dataset_name in enumerate(METADATA_DATASETS):
         if not isinstance(dataset_name, str) or not dataset_name.strip():
             raise ValueError(
-                f"METADATA_DATASETS[{i}] must be non-empty string, got {repr(dataset_name)}"
+                f"METADATA_DATASETS[{i}] must be non-empty string, "
+                f"got {repr(dataset_name)}"
             )
         if " " in dataset_name:
             raise ValueError(
-                f"METADATA_DATASETS[{i}] should not contain spaces: {repr(dataset_name)}"
+                f"METADATA_DATASETS[{i}] should not contain spaces: "
+                f"{repr(dataset_name)}"
             )
