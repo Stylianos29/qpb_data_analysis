@@ -58,7 +58,7 @@ ANALYSIS_CONFIGS = {
     "pcac_mass": {
         "dataset_pattern": "PCAC_mass_{suffix}",
         "samples_dataset": PCAC_OUTPUT_DATASETS["samples"],
-        "mean_dataset": PCAC_OUTPUT_DATASETS["mean"], 
+        "mean_dataset": PCAC_OUTPUT_DATASETS["mean"],
         "error_dataset": PCAC_OUTPUT_DATASETS["error"],
         "plot_base_directory": "PCAC_mass_visualization",
         "time_offset": PCAC_TRUNCATE_START,  # PCAC starts at t=2 due to truncation
@@ -76,7 +76,7 @@ ANALYSIS_CONFIGS = {
         "dataset_pattern": "pion_effective_mass_{suffix}",
         "samples_dataset": EFFECTIVE_OUTPUT_DATASETS["samples"],
         "mean_dataset": EFFECTIVE_OUTPUT_DATASETS["mean"],
-        "error_dataset": EFFECTIVE_OUTPUT_DATASETS["error"], 
+        "error_dataset": EFFECTIVE_OUTPUT_DATASETS["error"],
         "plot_base_directory": "Effective_mass_visualization",
         "time_offset": 1,  # Effective mass starts at t=1
         "plot_config": {
