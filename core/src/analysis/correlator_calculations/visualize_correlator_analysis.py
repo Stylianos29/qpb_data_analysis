@@ -475,7 +475,6 @@ def _create_multi_sample_plots(
             plot_labels,
             mean_data,
             error_data,
-            # (start_idx, end_idx - 1),
             (start_idx + 1, end_idx),
             analysis_config,
             group_metadata,
@@ -488,10 +487,10 @@ def _create_multi_sample_plots(
         base_name = f"correlator_samples_{start_idx+1:03d}_{end_idx:03d}"
         plot_path = file_manager.plot_path(group_plots_dir, base_name)
 
+        styling = PLOT_STYLING.copy()
         fig.savefig(
             plot_path,
-            # TODO: Check if it's obsolete
-            **analysis_config.get("plot_quality", {"dpi": 300, "bbox_inches": "tight"}),
+            **styling.get("output", {"dpi": 300, "bbox_inches": "tight"}),
         )
         plt.close(fig)
 
@@ -522,7 +521,7 @@ def _create_single_correlator_plot(
         figure_size=analysis_config.get("figure_size", (12, 8))
     )
 
-    styling = PLOT_STYLING
+    styling = PLOT_STYLING.copy()
 
     # Plot jackknife average (keep prominent but balanced)
     ax.errorbar(

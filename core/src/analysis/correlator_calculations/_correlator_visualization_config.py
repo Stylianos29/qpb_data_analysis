@@ -75,6 +75,11 @@ PLOT_STYLING = {
         "default_figure_size": (12, 8),
         "title_wrap_length": 100,
     },
+    "output": {
+        "dpi": 300,
+        "bbox_inches": "tight",
+        "format": "png",
+    },
 }
 
 # Default plot appearance
