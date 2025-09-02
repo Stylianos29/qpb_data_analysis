@@ -1,400 +1,244 @@
 #!/usr/bin/env python3
 """
-Core functions for correlator analysis visualization.
+Core plotting functions for correlator analysis visualization.
 
-This module contains all the plotting and data processing functions for
-visualizing both PCAC mass and effective mass jackknife samples.
+This module provides the fundamental plotting functions used by
+correlator analysis visualization scripts. It handles the creation of
+multi-sample correlator plots showing both individual jackknife samples
+and their statistical averages with error bars.
+
+The module is designed to work with the project's visualization
+infrastructure (PlotLayoutManager, PlotStyleManager, etc.) and uses
+configuration-driven styling through PLOT_STYLING constants.
+
+Key Functions:
+    - _create_multi_sample_plots: Creates multiple plots for a
+      correlator group, batching samples according to samples_per_plot
+      configuration
+    - _create_single_correlator_plot: Creates individual plots showing
+      sample data overlaid with jackknife averages and error bars
+
+Features:
+    - Configuration-driven styling and layout
+    - Proper matplotlib resource management with automatic figure
+      cleanup
+    - Integration with project's visualization managers and builders
+    - Support for both PCAC mass and effective mass visualizations
+    - Configurable legend titles with dynamic sample range formatting
+    - Z-order controlled layering for optimal visual hierarchy
+
+Usage:
+    This is a private module imported by visualization scripts such as
+    visualize_correlator_analysis.py. Functions expect preprocessed data
+    and configured visualization managers.
+
+Dependencies:
+    - Project visualization infrastructure (managers, builders)
+    - PLOT_STYLING configuration from _correlator_visualization_config
+    - Matplotlib with Agg backend for non-interactive plotting
 """
 
 import os
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Tuple
 
-import numpy as np
-import h5py
-import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
-from matplotlib.axes import Axes
+import click
+import numpy as np
 
-# Import configuration
+# Configure matplotlib to use non-interactive backend
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+# Import library components
+from library.visualization.managers.file_manager import PlotFileManager
+from library.visualization.managers.layout_manager import PlotLayoutManager
+from library.visualization.managers.style_manager import PlotStyleManager
+from library.visualization.builders.title_builder import PlotTitleBuilder
+from library import constants
+
+# Import from auxiliary files
 from src.analysis.correlator_calculations._correlator_visualization_config import (
-    SAMPLE_PLOT_STYLE,
-    AVERAGE_PLOT_STYLE,
-    DEFAULT_FIGURE_SIZE,
     DEFAULT_FONT_SIZE,
-    SAMPLES_PER_PLOT,
-    PLOT_QUALITY,
-    get_analysis_config,
-    get_sample_color,
-    apply_dataset_slicing,
+    PLOT_STYLING,
 )
 
 
-def generate_plot_filename(group_name, start_sample, end_sample, analysis_type):
-    """Generate filename for multi-sample plot."""
-    return (
-        f"{group_name}_{analysis_type}_samples_{start_sample:03d}_{end_sample:03d}.png"
-    )
-
-
-def load_gauge_configuration_labels(group, n_samples, logger):
-    """Load gauge configuration labels with fallback to indices."""
-    try:
-        if "gauge_configuration_labels" in group:
-            labels_obj = group["gauge_configuration_labels"]
-            if isinstance(labels_obj, h5py.Dataset):
-                labels = [str(label) for label in labels_obj[()]]
-                if len(labels) >= n_samples:
-                    return labels[:n_samples]
-
-        # Fallback to sample indices
-        logger.warning("Using sample indices as configuration labels")
-        return [f"Sample_{i:03d}" for i in range(n_samples)]
-
-    except Exception as e:
-        logger.warning(f"Error loading configuration labels: {e}, using indices")
-        return [f"Sample_{i:03d}" for i in range(n_samples)]
-
-
-def validate_dataset_shapes(samples_data, mean_values, error_values, group_path):
-    """Validate that dataset shapes are consistent."""
+def _create_multi_sample_plots(
+    samples_data: np.ndarray,
+    mean_data: np.ndarray,
+    error_data: np.ndarray,
+    config_labels: List[str],
+    group_name: str,
+    base_plots_dir: str,
+    analysis_config: Dict,
+    group_metadata: Dict,
+    file_manager: PlotFileManager,
+    layout_manager: PlotLayoutManager,
+    style_manager: PlotStyleManager,
+    title_builder: PlotTitleBuilder,
+    verbose: bool,
+) -> int:
+    """Create multi-sample plots for correlator data."""
     n_samples, n_time_points = samples_data.shape
+    samples_per_plot = analysis_config.get("samples_per_plot", 8)
+    n_plots = (n_samples + samples_per_plot - 1) // samples_per_plot
 
-    if len(mean_values) != n_time_points:
-        raise ValueError(
-            f"Shape mismatch in {group_path}: samples have {n_time_points} time points, "
-            f"but mean has {len(mean_values)}"
-        )
+    # Create time index
+    time_offset = analysis_config.get("time_offset", 0)
+    time_index = np.arange(n_time_points) + time_offset
 
-    if len(error_values) != n_time_points:
-        raise ValueError(
-            f"Shape mismatch in {group_path}: samples have {n_time_points} time points, "
-            f"but error has {len(error_values)}"
-        )
+    # Create group subdirectory in base plots subdirectory
+    group_plots_dir = os.path.join(base_plots_dir, group_name)
+    os.makedirs(group_plots_dir, exist_ok=True)
 
-
-def create_time_index(n_time_points, time_offset):
-    """Create time index array with proper offset."""
-    return np.arange(n_time_points) + time_offset
-
-
-def create_correlator_plot(
-    time_index,
-    samples_data,
-    sample_labels,
-    mean_values,
-    error_values,
-    group_name,
-    sample_indices,
-    analysis_config,
-    logger,
-):
-    """Create a correlator plot with multiple samples and average."""
-    plot_config = analysis_config["plot_config"]
-
-    # Apply dataset-specific slicing
-    sliced_time, sliced_samples, sliced_mean, sliced_error = apply_dataset_slicing(
-        time_index, samples_data, mean_values, error_values, plot_config
-    )
-
-    # Create figure and axis
-    fig, ax = plt.subplots(figsize=DEFAULT_FIGURE_SIZE)
-
-    # Plot each sample
-    sample_style = SAMPLE_PLOT_STYLE.copy()
-    sample_style.pop("label_suffix", None)  # Remove non-matplotlib parameter
-
-    for i, (sample_data, sample_label) in enumerate(zip(sliced_samples, sample_labels)):
-        color = get_sample_color(sample_indices[0] + i)
-        ax.plot(
-            sliced_time,
-            sample_data,
-            label=sample_label,
-            color=color,
-            **sample_style,
-        )
-
-    # Plot average with error bars
-    average_style = AVERAGE_PLOT_STYLE.copy()
-    avg_label = average_style.pop("label", "Jackknife average")
-
-    # Validate data arrays
-    if sliced_time is None or sliced_mean is None or sliced_error is None:
-        raise ValueError("One or more data arrays is None - cannot create plot")
-
-    if len(sliced_time) == 0 or len(sliced_mean) == 0:
-        raise ValueError("Empty data arrays - cannot create plot")
-
-    ax.errorbar(
-        sliced_time,
-        sliced_mean,
-        yerr=sliced_error,
-        label=avg_label,
-        **average_style,
-    )
-
-    # Add zero line if configured
-    if plot_config.get("show_zero_line", False):
-        ax.axhline(y=0, color="black", linestyle="--", alpha=0.5)
-
-    # Set axis properties
-    ax.set_yscale(plot_config["y_scale"])
-    ax.set_xlabel(plot_config["x_label"], fontsize=DEFAULT_FONT_SIZE)
-    ax.set_ylabel(plot_config["y_label"], fontsize=DEFAULT_FONT_SIZE)
-
-    # Add legend
-    ax.legend()
-
-    # Set title
-    start_idx, end_idx = sample_indices
-    title = f"{group_name} - Samples {start_idx} to {end_idx}"
-    ax.set_title(title, fontsize=DEFAULT_FONT_SIZE + 2)
-
-    return fig, ax
-
-
-def create_multi_sample_plots(
-    samples_data,
-    mean_values,
-    error_values,
-    config_labels,
-    group_name,
-    group_path,
-    analysis_config,
-    group_plots_dir,
-    logger,
-    verbose,
-):
-    """Create multiple plots with specified number of samples per
-    plot."""
-    n_samples, n_time_points = samples_data.shape
-    n_plots = (n_samples + SAMPLES_PER_PLOT - 1) // SAMPLES_PER_PLOT
     plots_created = 0
-
-    # Create time index with analysis-specific offset
-    time_index = create_time_index(n_time_points, analysis_config["time_offset"])
-
     if verbose:
-        print(
-            f"    Creating {n_plots} multi-sample plots ({SAMPLES_PER_PLOT} samples each)"
-        )
+        click.echo(f"    Creating {n_plots} plots ({samples_per_plot} samples each)")
 
     for plot_idx in range(n_plots):
-        start_sample = plot_idx * SAMPLES_PER_PLOT
-        end_sample = min(start_sample + SAMPLES_PER_PLOT, n_samples)
+        start_idx = plot_idx * samples_per_plot
+        end_idx = min(start_idx + samples_per_plot, n_samples)
 
-        try:
-            # Extract samples for this plot
-            plot_samples_data = samples_data[start_sample:end_sample, :]
-            plot_sample_labels = config_labels[start_sample:end_sample]
+        # Extract data for this plot
+        plot_samples = samples_data[start_idx:end_idx]
+        plot_labels = config_labels[start_idx:end_idx]
 
-            # Create the plot
-            fig, _ = create_correlator_plot(
-                time_index,
-                plot_samples_data,
-                plot_sample_labels,
-                mean_values,
-                error_values,
-                group_name,
-                (start_sample, end_sample - 1),
-                analysis_config,
-                logger,
-            )
+        # Create the plot
+        fig = _create_single_correlator_plot(
+            time_index,
+            plot_samples,
+            plot_labels,
+            mean_data,
+            error_data,
+            (start_idx + 1, end_idx),
+            analysis_config,
+            group_metadata,
+            layout_manager,
+            style_manager,
+            title_builder,
+        )
 
-            # Generate filename
-            analysis_type = next(
-                k for k, v in analysis_config.items() if v == analysis_config
-            )
-            filename = generate_plot_filename(
-                group_name, start_sample, end_sample - 1, "correlator"
-            )
+        # Generate filename and save using file manager
+        base_name = f"correlator_samples_{start_idx+1:03d}_{end_idx:03d}"
+        plot_path = file_manager.plot_path(group_plots_dir, base_name)
 
-            # Save plot
-            full_path = os.path.join(group_plots_dir, filename)
-            fig.savefig(full_path, **PLOT_QUALITY)
-            plt.close(fig)
+        styling = PLOT_STYLING.copy()
+        fig.savefig(
+            plot_path,
+            **styling.get("output", {"dpi": 300, "bbox_inches": "tight"}),
+        )
+        plt.close(fig)
 
-            plots_created += 1
-
-            if verbose:
-                print(f"      Created plot {plot_idx + 1}/{n_plots}: {filename}")
-
-        except Exception as e:
-            logger.error(
-                f"Error creating plot {plot_idx} for samples "
-                f"{start_sample}-{end_sample-1}: {e}"
-            )
-            continue
+        plots_created += 1
+        if verbose:
+            click.echo(f"      Created: {os.path.basename(plot_path)}")
 
     return plots_created
 
 
-def load_correlator_datasets(group, analysis_config, group_path, logger):
-    """Load correlator datasets based on analysis configuration."""
-    # Load samples dataset
-    samples_dataset_name = analysis_config["samples_dataset"]
-    try:
-        samples_obj = group[samples_dataset_name]
-        if not isinstance(samples_obj, h5py.Dataset):
-            raise ValueError(f"'{samples_dataset_name}' is not a dataset")
-        samples_data = samples_obj[()]
-    except KeyError:
-        raise ValueError(
-            f"Dataset '{samples_dataset_name}' not found in group '{group_path}'"
-        )
+def _create_single_correlator_plot(
+    time_index: np.ndarray,
+    samples_data: np.ndarray,
+    sample_labels: List[str],
+    mean_data: np.ndarray,
+    error_data: np.ndarray,
+    sample_range: Tuple[int, int],
+    analysis_config: Dict,
+    group_metadata: Dict,
+    layout_manager: PlotLayoutManager,
+    style_manager: PlotStyleManager,
+    title_builder: PlotTitleBuilder,
+) -> Figure:
+    """Create a single correlator plot with samples and average."""
 
-    # Load mean values dataset
-    mean_dataset_name = analysis_config["mean_dataset"]
-    try:
-        mean_obj = group[mean_dataset_name]
-        if not isinstance(mean_obj, h5py.Dataset):
-            raise ValueError(f"'{mean_dataset_name}' is not a dataset")
-        mean_values = mean_obj[()]
-    except KeyError:
-        raise ValueError(
-            f"Dataset '{mean_dataset_name}' not found in group '{group_path}'"
-        )
-
-    # Load error values dataset
-    error_dataset_name = analysis_config["error_dataset"]
-    try:
-        error_obj = group[error_dataset_name]
-        if not isinstance(error_obj, h5py.Dataset):
-            raise ValueError(f"'{error_dataset_name}' is not a dataset")
-        error_values = error_obj[()]
-    except KeyError:
-        raise ValueError(
-            f"Dataset '{error_dataset_name}' not found in group '{group_path}'"
-        )
-
-    # Validate shapes
-    validate_dataset_shapes(samples_data, mean_values, error_values, group_path)
-
-    logger.debug(
-        f"Loaded datasets: samples {samples_data.shape}, "
-        f"mean {mean_values.shape}, error {error_values.shape}"
+    # Create figure using layout manager
+    fig, ax = layout_manager.create_figure(
+        figure_size=analysis_config.get("figure_size", (12, 8))
     )
 
-    return samples_data, mean_values, error_values
+    styling = PLOT_STYLING.copy()
 
-
-def prepare_group_output_directory(base_plots_dir, group_name, clear_existing, logger):
-    """Prepare output directory for a specific group."""
-    group_plots_dir = os.path.join(base_plots_dir, group_name)
-
-    if clear_existing and os.path.exists(group_plots_dir):
-        import shutil
-
-        shutil.rmtree(group_plots_dir)
-        logger.debug(f"Cleared existing plots for group: {group_name}")
-
-    os.makedirs(group_plots_dir, exist_ok=True)
-
-    return group_plots_dir
-
-
-def process_correlator_group(
-    group_path,
-    hdf5_file,
-    base_plots_dir,
-    analysis_config,
-    clear_existing,
-    logger,
-    verbose,
-):
-    """Process a single correlator group for visualization."""
-    try:
-        # Verify group exists and is valid
-        group = hdf5_file[group_path]
-        if not isinstance(group, h5py.Group):
-            logger.error(f"Path '{group_path}' is not an HDF5 group")
-            return 0
-    except KeyError:
-        logger.error(f"Group path '{group_path}' not found in HDF5 file")
-        return 0
-
-    # Extract group name for directory structure
-    group_name = group_path.split("/")[-1]
-
-    try:
-        # Load correlator datasets
-        samples_data, mean_values, error_values = load_correlator_datasets(
-            group, analysis_config, group_path, logger
-        )
-
-        # Load configuration labels
-        config_labels = load_gauge_configuration_labels(
-            group, samples_data.shape[0], logger
-        )
-
-        # Prepare output directory
-        group_plots_dir = prepare_group_output_directory(
-            base_plots_dir, group_name, clear_existing, logger
-        )
-
-        # Create multi-sample plots
-        plots_created = create_multi_sample_plots(
-            samples_data,
-            mean_values,
-            error_values,
-            config_labels,
-            group_name,
-            group_path,
-            analysis_config,
-            group_plots_dir,
-            logger,
-            verbose,
-        )
-
-        if verbose:
-            print(f"  ✓ Group {group_name}: Created {plots_created} plots")
-
-        return plots_created
-
-    except Exception as e:
-        logger.error(f"Error processing group {group_path}: {e}")
-        return 0
-
-
-def prepare_base_output_directory(
-    output_directory, analysis_config, clear_existing, logger
-):
-    """Prepare base output directory for plots."""
-    base_plots_dir = os.path.join(
-        output_directory, analysis_config["plot_base_directory"]
+    # Plot jackknife average (keep prominent but balanced)
+    ax.errorbar(
+        time_index,
+        mean_data,
+        yerr=error_data,
+        label=styling["average"]["legend_label"],
+        color=styling["average"]["color"],
+        marker=styling["average"]["marker"],
+        markersize=styling["average"]["marker_size"],
+        capsize=styling["average"]["capsize"],
+        capthick=styling["average"]["capthick"],
+        elinewidth=styling["average"]["elinewidth"],
+        alpha=styling["average"]["alpha"],
+        zorder=styling["average"]["zorder"],
     )
 
-    if clear_existing and os.path.exists(base_plots_dir):
-        logger.info(f"Clearing existing plots directory: {base_plots_dir}")
-        import shutil
+    # Generate style mapping for sample labels
+    style_map = style_manager.generate_marker_color_map(sample_labels)
 
-        shutil.rmtree(base_plots_dir)
+    # Plot individual samples with LARGER markers
+    for i, (sample_data, label) in enumerate(zip(samples_data, sample_labels)):
+        marker, color = style_map.get(label, ("o", f"C{i}"))
+        ax.plot(
+            time_index,
+            sample_data,
+            label=label,
+            color=color,
+            marker=marker,
+            markersize=styling["samples"]["marker_size"],
+            alpha=styling["samples"]["alpha"],
+            linestyle=styling["samples"]["linestyle"],
+            zorder=styling["samples"]["zorder"],
+        )
 
-    os.makedirs(base_plots_dir, exist_ok=True)
-    logger.info(f"Base plots directory: {base_plots_dir}")
+    # Configure axes using constants and analysis config
+    plot_config = analysis_config["plot_config"]
 
-    return base_plots_dir
+    # Use AXES_LABELS_BY_COLUMN_NAME for proper labels
+    x_label = constants.AXES_LABELS_BY_COLUMN_NAME.get("time_index") or plot_config.get(
+        "x_label"
+    )
+    y_label = constants.AXES_LABELS_BY_COLUMN_NAME.get(
+        analysis_config["samples_dataset"]
+    ) or plot_config.get("y_label")
 
+    ax.set_xlabel(x_label, fontsize=DEFAULT_FONT_SIZE)
+    ax.set_ylabel(y_label, fontsize=DEFAULT_FONT_SIZE)
+    ax.set_yscale(plot_config["y_scale"])
 
-def find_correlator_groups(hdf5_file, analysis_config, logger):
-    """Find all groups containing the required correlator datasets."""
-    required_datasets = [
-        analysis_config["samples_dataset"],
-        analysis_config["mean_dataset"],
-        analysis_config["error_dataset"],
-    ]
+    # Create title using title builder (no fallback!)
+    title_metadata = group_metadata.copy()
 
-    valid_groups = []
+    title = title_builder.build(
+        metadata_dict=title_metadata,
+        tunable_params=list(group_metadata.keys()),
+        leading_substring=styling["title"]["leading_substring"],
+        wrapping_length=styling["title"]["wrapping_length"],
+    )
+    ax.set_title(
+        title, fontsize=DEFAULT_FONT_SIZE + styling["title"]["font_size_offset"]
+    )
 
-    def find_groups(name, obj):
-        if isinstance(obj, h5py.Group):
-            # Check if this group contains all required datasets
-            has_all_datasets = all(dataset in obj for dataset in required_datasets)
-            if has_all_datasets:
-                valid_groups.append(name)
+    # Format the legend title with actual values
+    legend_title = styling["legend"]["title"].format(
+        sample_range=sample_range,  # Pass the tuple
+        total_samples=int(title_metadata["Number_of_gauge_configurations"]),
+    )
 
-    hdf5_file.visititems(find_groups)
+    # Add LEGEND with configuration labels
+    ax.legend(
+        title=legend_title,
+        fontsize=DEFAULT_FONT_SIZE + styling["legend"]["font_size_offset"],
+        loc=styling["legend"]["location"],
+    )
 
-    logger.info(f"Found {len(valid_groups)} groups with required datasets")
-    logger.debug(f"Valid groups: {valid_groups}")
+    # Add configurable grid
+    if styling["grid"]["enabled"]:
+        ax.grid(True, alpha=styling["grid"]["alpha"])
 
-    return valid_groups
+    plt.tight_layout()
+
+    return fig
