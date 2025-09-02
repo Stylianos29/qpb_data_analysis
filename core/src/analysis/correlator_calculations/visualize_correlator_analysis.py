@@ -137,7 +137,8 @@ def main(
     verbose: bool,
 ) -> None:
     """
-    Visualize correlator analysis jackknife samples from HDF5 analysis results.
+    Visualize correlator analysis jackknife samples from HDF5 analysis
+    results.
 
     This script creates plots showing correlator jackknife samples along
     with their statistical averages and error bars.
@@ -170,7 +171,8 @@ def main(
         logger.info(f"Plots directory: {plots_directory}")
         logger.info(f"Samples per plot: {analysis_config.get('samples_per_plot', 8)}")
 
-        # Setup visualization managers (following exact pattern from visualize_PCAC_mass.py)
+        # Setup visualization managers (following exact pattern from
+        # visualize_PCAC_mass.py)
         file_manager = PlotFileManager(plots_directory)
         layout_manager = PlotLayoutManager(constants)
         style_manager = PlotStyleManager(constants)
@@ -234,7 +236,8 @@ def _process_correlator_data(
     """
     total_plots = 0
 
-    # Initialize HDF5Analyzer for metadata extraction (following exact pattern)
+    # Initialize HDF5Analyzer for metadata extraction (following exact
+    # pattern)
     analyzer = HDF5Analyzer(input_hdf5_file)
 
     try:
@@ -288,6 +291,14 @@ def _process_correlator_data(
     return total_plots
 
 
+# TODO: "group_name" is unnecessary
+def _extract_group_metadata(group: h5py.Group, group_path: str):
+    """Extract all attributes from group and add group name."""
+    group_metadata = dict(group.attrs)
+    group_metadata["group_name"] = os.path.basename(group_path)  # type: ignore
+    return group_metadata
+
+
 def _process_single_correlator_group(
     hdf5_file: h5py.File,
     group_path: str,
@@ -308,198 +319,125 @@ def _process_single_correlator_group(
     Returns:
         Number of plots created for this group
     """
-    # Verify that group_path points to an HDF5 group
     try:
         group = hdf5_file[group_path]
+        # Verify that group_path points to an HDF5 group
         if not isinstance(group, h5py.Group):
             logger.error(
-                f"Path '{group_path}' does not point to an HDF5 group (type: {type(group)})"
+                f"Path '{group_path}' does not point to an HDF5 group "
+                f"(type: {type(group)})"
             )
             return 0
-    except KeyError:
-        logger.error(f"Group path '{group_path}' not found in HDF5 file")
-        return 0
-    except Exception as e:
-        logger.error(f"Error accessing group '{group_path}': {e}")
-        return 0
 
-    # Load correlator datasets
-    try:
+        # Load correlator datasets
         samples_data, mean_data, error_data = _load_correlator_datasets(
-            group, analysis_config, group_path, logger
+            group, analysis_config, group_path
         )
+
+        n_samples = samples_data.shape[0]
+        config_labels = _load_configuration_labels(group, n_samples)
+
+        _validate_correlator_data(samples_data, mean_data, error_data)
+
+        # Extract metadata with simple fallback
+        group_metadata = _extract_group_metadata(group, group_path)
+        group_name = group_metadata["group_name"]
+
+        # Create plots for this group
+        plots_created = _create_multi_sample_plots(
+            samples_data,
+            mean_data,
+            error_data,
+            config_labels,
+            group_name,  # type: ignore
+            group_path,
+            base_plots_dir,
+            analysis_config,
+            group_metadata,
+            analyzer,
+            file_manager,
+            layout_manager,
+            style_manager,
+            filename_builder,
+            title_builder,
+            logger,
+            verbose,
+        )
+
+        return plots_created
+
     except Exception as e:
-        logger.error(f"Failed to load datasets from group {group_path}: {e}")
-        return 0
+        logger.error(f"Failed to process group {group_path}: {e}")
+        return 0  # Single point of failure handling
 
-    # Load configuration labels
-    n_samples = samples_data.shape[0]
-    config_labels = _load_configuration_labels(group, n_samples, logger)
 
-    # Validate data dimensions
-    _validate_correlator_data(samples_data, mean_data, error_data, group_path, logger)
-
-    # Extract group metadata using analyzer
+def _load_single_dataset(
+    group: h5py.Group, dataset_name: str, group_path: str
+) -> np.ndarray:
+    """Load and validate a single dataset from group."""
     try:
-        # Get all attributes for this group
-        group_metadata = {}
-        for attr_name in group.attrs:
-            group_metadata[attr_name] = group.attrs[attr_name]
-
-        # Add basic group information
-        group_name = os.path.basename(group_path)
-        group_metadata["group_name"] = group_name
-
-    except Exception as e:
-        logger.warning(f"Could not extract group metadata: {e}")
-        group_metadata = {"group_name": os.path.basename(group_path)}
-
-    # Create plots for this group
-    plots_created = _create_multi_sample_plots(
-        samples_data,
-        mean_data,
-        error_data,
-        config_labels,
-        group_name,
-        group_path,
-        base_plots_dir,
-        analysis_config,
-        group_metadata,
-        analyzer,
-        file_manager,
-        layout_manager,
-        style_manager,
-        filename_builder,
-        title_builder,
-        logger,
-        verbose,
-    )
-
-    return plots_created
+        dataset_obj = group[dataset_name]
+        if not isinstance(dataset_obj, h5py.Dataset):
+            raise ValueError(f"'{dataset_name}' is not a dataset")
+        return dataset_obj[()]
+    except KeyError:
+        raise ValueError(f"Dataset '{dataset_name}' not found in group '{group_path}'")
 
 
 def _load_correlator_datasets(
-    group: h5py.Group, analysis_config: Dict, group_path: str, logger
+    group: h5py.Group, analysis_config: Dict, group_path: str
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Load correlator datasets (samples, mean, error) from group.
-
-    Returns:
-        Tuple of (samples_data, mean_data, error_data)
-    """
-
-    # Load jackknife samples dataset
-    samples_dataset_name = analysis_config["samples_dataset"]
-    try:
-        samples_obj = group[samples_dataset_name]
-        if not isinstance(samples_obj, h5py.Dataset):
-            raise ValueError(f"'{samples_dataset_name}' is not a dataset")
-        samples_data = samples_obj[()]
-    except KeyError:
-        raise ValueError(
-            f"Dataset '{samples_dataset_name}' not found in group '{group_path}'"
-        )
-
-    # Load mean values dataset
-    mean_dataset_name = analysis_config["mean_dataset"]
-    try:
-        mean_obj = group[mean_dataset_name]
-        if not isinstance(mean_obj, h5py.Dataset):
-            raise ValueError(f"'{mean_dataset_name}' is not a dataset")
-        mean_data = mean_obj[()]
-    except KeyError:
-        raise ValueError(
-            f"Dataset '{mean_dataset_name}' not found in group '{group_path}'"
-        )
-
-    # Load error values dataset
-    error_dataset_name = analysis_config["error_dataset"]
-    try:
-        error_obj = group[error_dataset_name]
-        if not isinstance(error_obj, h5py.Dataset):
-            raise ValueError(f"'{error_dataset_name}' is not a dataset")
-        error_data = error_obj[()]
-    except KeyError:
-        raise ValueError(
-            f"Dataset '{error_dataset_name}' not found in group '{group_path}'"
-        )
+    """Load correlator datasets (samples, mean, error) from group."""
+    samples_data = _load_single_dataset(
+        group, analysis_config["samples_dataset"], group_path
+    )
+    mean_data = _load_single_dataset(group, analysis_config["mean_dataset"], group_path)
+    error_data = _load_single_dataset(
+        group, analysis_config["error_dataset"], group_path
+    )
 
     return samples_data, mean_data, error_data
 
 
-def _load_configuration_labels(group: h5py.Group, n_samples: int, logger) -> List[str]:
-    """
-    Load configuration labels with fallback to defaults.
+def _load_configuration_labels(group: h5py.Group, n_samples: int) -> List[str]:
+    """Load configuration labels and validate count matches samples."""
+    config_obj = group["gauge_configuration_labels"]
 
-    Returns:
-        List of configuration labels
-    """
-    try:
-        # Try to load gauge configuration labels
-        if "gauge_configuration_labels" in group:
-            # Verify it's a dataset before accessing
-            config_obj = group["gauge_configuration_labels"]
-            if not isinstance(config_obj, h5py.Dataset):
-                logger.warning(
-                    "'gauge_configuration_labels' is not a dataset "
-                    f"(type: {type(config_obj)}), using default labels"
-                )
-                return [f"Sample_{i:03d}" for i in range(n_samples)]
+    if not isinstance(config_obj, h5py.Dataset):
+        raise ValueError("'gauge_configuration_labels' is not a dataset")
 
-            config_data = config_obj[()]
-            config_labels = [
-                label.decode() if isinstance(label, bytes) else str(label)
-                for label in config_data
-            ]
-        else:
-            # Fallback to default labels
-            config_labels = [f"Sample_{i:03d}" for i in range(n_samples)]
-            logger.warning("No gauge_configuration_labels found, using default labels")
+    labels = [
+        label.decode() if isinstance(label, bytes) else str(label)
+        for label in config_obj[()]
+    ]
 
-        # Ensure we have enough labels
-        if len(config_labels) < n_samples:
-            logger.warning(
-                f"Insufficient config labels ({len(config_labels)}) for samples ({n_samples})"
-            )
-            config_labels.extend(
-                [f"Sample_{i:03d}" for i in range(len(config_labels), n_samples)]
-            )
+    if len(labels) != n_samples:
+        raise ValueError(
+            f"Label count mismatch: {len(labels)} labels vs {n_samples} samples"
+        )
 
-        return config_labels
-
-    except Exception as e:
-        logger.warning(f"Error loading configuration labels: {e}")
-        return [f"Sample_{i:03d}" for i in range(n_samples)]
+    return labels
 
 
 def _validate_correlator_data(
     samples_data: np.ndarray,
     mean_data: np.ndarray,
     error_data: np.ndarray,
-    group_path: str,
-    logger,
 ) -> None:
-    """
-    Validate correlator data dimensions and consistency.
-    """
+    """Validate correlator data dimensions and consistency."""
     n_samples, n_time_points = samples_data.shape
 
     if mean_data.shape[0] != n_time_points:
         raise ValueError(
-            f"Group {group_path}: Mean values length ({mean_data.shape[0]}) "
+            f"Mean values length ({mean_data.shape[0]}) "
             f"doesn't match time points ({n_time_points})"
         )
 
     if error_data.shape[0] != n_time_points:
         raise ValueError(
-            f"Group {group_path}: Error values length ({error_data.shape[0]}) "
+            f"Error values length ({error_data.shape[0]}) "
             f"doesn't match time points ({n_time_points})"
         )
-
-    logger.debug(
-        f"Group {group_path}: Validation passed - "
-        f"{n_samples} jackknife samples, {n_time_points} time points"
-    )
 
 
 def _create_multi_sample_plots(
@@ -697,7 +635,8 @@ def _create_single_correlator_plot(
         ax.set_title(title, fontsize=DEFAULT_FONT_SIZE + 2)
 
         # # Configure legend using layout manager
-        # layout_manager.configure_legend(ax, bbox_to_anchor=(1.05, 1), loc='upper left')
+        # layout_manager.configure_legend(ax, bbox_to_anchor=(1.05, 1),
+        # loc='upper left')
 
         # Add grid
         ax.grid(True, alpha=0.3)
