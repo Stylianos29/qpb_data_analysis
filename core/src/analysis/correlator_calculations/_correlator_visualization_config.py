@@ -7,15 +7,17 @@ mass and effective mass jackknife samples, including plot styling,
 dataset specifications, and analysis-specific parameters.
 """
 
-# Import analysis-specific configurations for time offsets and dataset
-# info
+# Import analysis-specific configurations
 from src.analysis.correlator_calculations._pcac_mass_config import (
     TRUNCATE_START as PCAC_TRUNCATE_START,
+    OUTPUT_DATASETS as PCAC_OUTPUT_DATASETS,
 )
 from src.analysis.correlator_calculations._effective_mass_config import (
     APPLY_SYMMETRIZATION,
     TRUNCATE_HALF,
+    OUTPUT_DATASETS as EFFECTIVE_OUTPUT_DATASETS,
 )
+
 
 # Common plot styling configuration
 SAMPLE_PLOT_STYLE = {
@@ -55,9 +57,9 @@ PLOT_QUALITY = {
 ANALYSIS_CONFIGS = {
     "pcac_mass": {
         "dataset_pattern": "PCAC_mass_{suffix}",
-        "mean_dataset": "PCAC_mass_mean_values",
-        "error_dataset": "PCAC_mass_error_values",
-        "samples_dataset": "PCAC_mass_jackknife_samples",
+        "samples_dataset": PCAC_OUTPUT_DATASETS["samples"],
+        "mean_dataset": PCAC_OUTPUT_DATASETS["mean"], 
+        "error_dataset": PCAC_OUTPUT_DATASETS["error"],
         "plot_base_directory": "PCAC_mass_visualization",
         "time_offset": PCAC_TRUNCATE_START,  # PCAC starts at t=2 due to truncation
         "plot_config": {
@@ -72,9 +74,9 @@ ANALYSIS_CONFIGS = {
     },
     "effective_mass": {
         "dataset_pattern": "pion_effective_mass_{suffix}",
-        "mean_dataset": "pion_effective_mass_mean_values",
-        "error_dataset": "pion_effective_mass_error_values",
-        "samples_dataset": "pion_effective_mass_jackknife_samples",
+        "samples_dataset": EFFECTIVE_OUTPUT_DATASETS["samples"],
+        "mean_dataset": EFFECTIVE_OUTPUT_DATASETS["mean"],
+        "error_dataset": EFFECTIVE_OUTPUT_DATASETS["error"], 
         "plot_base_directory": "Effective_mass_visualization",
         "time_offset": 1,  # Effective mass starts at t=1
         "plot_config": {
