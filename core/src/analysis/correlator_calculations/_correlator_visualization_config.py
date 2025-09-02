@@ -10,11 +10,10 @@ dataset specifications, and analysis-specific parameters.
 # Import analysis-specific configurations
 from src.analysis.correlator_calculations._pcac_mass_config import (
     TRUNCATE_START as PCAC_TRUNCATE_START,
-    TRUNCATE_END as PCAC_TRUNCATE_END,
     OUTPUT_DATASETS as PCAC_OUTPUT_DATASETS,
 )
 from src.analysis.correlator_calculations._effective_mass_config import (
-    TRUNCATE_HALF as EFFECTIVE_TRUNCATE_HALF,
+    TRUNCATE_HALF as EFFECTIVE_TRUNCATE_HALF,  # TODO: I need to use it!
     OUTPUT_DATASETS as EFFECTIVE_OUTPUT_DATASETS,
 )
 
@@ -37,6 +36,45 @@ AVERAGE_PLOT_STYLE = {
     "elinewidth": 2,  # Error bar line width
     "label": "Jackknife average",
     "color": "red",  # Distinctive color for average
+}
+
+# Plot styling configuration
+PLOT_STYLING = {
+    "samples": {
+        "marker_size": 10,
+        "alpha": 0.7,
+        "linestyle": "none",
+        "zorder": 10,  # Higher z-order puts samples on top
+    },
+    "average": {
+        "legend_label": "Jackknife Average",
+        "marker_size": 8,
+        "alpha": 1.0,
+        "color": "red",
+        "marker": "s",
+        "capsize": 8,
+        "capthick": 2,
+        "elinewidth": 2,
+        "zorder": 5,  # Lower z-order puts it behind samples
+    },
+    "title": {
+        "wrapping_length": 120,
+        "font_size_offset": 2,  # +2 from DEFAULT_FONT_SIZE
+        "leading_substring": "",
+    },
+    "legend": {
+        "title": "Samples {sample_range[0]} to {sample_range[1]} out of {total_samples}",
+        "location": "best",  # "best", "upper right", "center left", etc.
+        "font_size_offset": -1,  # -1 from DEFAULT_FONT_SIZE
+    },
+    "grid": {
+        "enabled": True,
+        "alpha": 0.8,
+    },
+    "layout": {
+        "default_figure_size": (12, 8),
+        "title_wrap_length": 100,
+    },
 }
 
 # Default plot appearance

@@ -30,6 +30,7 @@ Usage:
 
 import os
 import sys
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from matplotlib.figure import Figure
@@ -49,7 +50,6 @@ from library.data.hdf5_analyzer import HDF5Analyzer
 from library.visualization.managers.file_manager import PlotFileManager
 from library.visualization.managers.layout_manager import PlotLayoutManager
 from library.visualization.managers.style_manager import PlotStyleManager
-from library.visualization.builders.filename_builder import PlotFilenameBuilder
 from library.visualization.builders.title_builder import PlotTitleBuilder
 from library import constants
 from library.utils.logging_utilities import create_script_logger
@@ -67,6 +67,7 @@ from src.analysis.correlator_calculations._correlator_visualization_config impor
     get_analysis_config,
     validate_visualization_config,
     DEFAULT_FONT_SIZE,
+    PLOT_STYLING,
 )
 
 
@@ -175,7 +176,6 @@ def main(
         file_manager = PlotFileManager(plots_directory)
         layout_manager = PlotLayoutManager(constants)
         style_manager = PlotStyleManager(constants)
-        filename_builder = PlotFilenameBuilder(constants.FILENAME_LABELS_BY_COLUMN_NAME)
         title_builder = PlotTitleBuilder(constants.TITLE_LABELS_BY_COLUMN_NAME)
 
         # Prepare plots base subdirectory
@@ -191,7 +191,6 @@ def main(
             file_manager,
             layout_manager,
             style_manager,
-            filename_builder,
             title_builder,
             logger,
             verbose,
@@ -202,7 +201,7 @@ def main(
             logger.log_script_end(f"Successfully created {total_plots} plots")
             click.echo(
                 f"✅ {analysis_type.replace('_', ' ').title()} visualization complete. Created "
-                f"{total_plots} plots in: {base_plots_dir}"
+                f"{total_plots} plots in: {Path(base_plots_dir).relative_to(ROOT)}"
             )
         else:
             logger.warning("No plots were created")
@@ -222,7 +221,6 @@ def _process_correlator_data(
     file_manager: PlotFileManager,
     layout_manager: PlotLayoutManager,
     style_manager: PlotStyleManager,
-    filename_builder: PlotFilenameBuilder,
     title_builder: PlotTitleBuilder,
     logger,
     verbose: bool,
@@ -235,8 +233,7 @@ def _process_correlator_data(
     """
     total_plots = 0
 
-    # Initialize HDF5Analyzer for metadata extraction (following exact
-    # pattern)
+    # Initialize HDF5Analyzer for metadata extraction
     analyzer = HDF5Analyzer(input_hdf5_file)
 
     try:
@@ -255,6 +252,13 @@ def _process_correlator_data(
 
             logger.info(f"Found {len(correlator_groups)} groups with correlator data")
 
+            # Cache parent metadata ONCE for all groups
+            first_group_path = correlator_groups[0]
+            parent_path = os.path.dirname(first_group_path)
+            parent_group = hdf5_file[parent_path]
+            parent_metadata = dict(parent_group.attrs)  # Load once, use for all groups
+            logger.debug(f"Cached parent metadata from: {parent_path}")
+
             for group_path in correlator_groups:
                 if verbose:
                     click.echo(f"  Processing group: {group_path}")
@@ -263,13 +267,12 @@ def _process_correlator_data(
                     plots_created = _process_single_correlator_group(
                         hdf5_file,
                         group_path,
+                        parent_metadata,
                         base_plots_dir,
                         analysis_config,
-                        analyzer,
                         file_manager,
                         layout_manager,
                         style_manager,
-                        filename_builder,
                         title_builder,
                         logger,
                         verbose,
@@ -293,13 +296,12 @@ def _process_correlator_data(
 def _process_single_correlator_group(
     hdf5_file: h5py.File,
     group_path: str,
+    parent_metadata: Dict,
     base_plots_dir: str,
     analysis_config: Dict,
-    analyzer: HDF5Analyzer,
     file_manager: PlotFileManager,
     layout_manager: PlotLayoutManager,
     style_manager: PlotStyleManager,
-    filename_builder: PlotFilenameBuilder,
     title_builder: PlotTitleBuilder,
     logger,
     verbose: bool,
@@ -330,7 +332,7 @@ def _process_single_correlator_group(
 
         _validate_correlator_data(samples_data, mean_data, error_data)
 
-        group_metadata = dict(group.attrs)
+        group_metadata = dict(group.attrs) | parent_metadata
         group_name = os.path.basename(group_path)
 
         # Create plots for this group
@@ -473,7 +475,8 @@ def _create_multi_sample_plots(
             plot_labels,
             mean_data,
             error_data,
-            (start_idx, end_idx - 1),
+            # (start_idx, end_idx - 1),
+            (start_idx + 1, end_idx),
             analysis_config,
             group_metadata,
             layout_manager,
@@ -482,11 +485,12 @@ def _create_multi_sample_plots(
         )
 
         # Generate filename and save using file manager
-        base_name = f"correlator_samples_{start_idx:03d}_{end_idx-1:03d}"
+        base_name = f"correlator_samples_{start_idx+1:03d}_{end_idx:03d}"
         plot_path = file_manager.plot_path(group_plots_dir, base_name)
 
         fig.savefig(
             plot_path,
+            # TODO: Check if it's obsolete
             **analysis_config.get("plot_quality", {"dpi": 300, "bbox_inches": "tight"}),
         )
         plt.close(fig)
@@ -518,20 +522,22 @@ def _create_single_correlator_plot(
         figure_size=analysis_config.get("figure_size", (12, 8))
     )
 
+    styling = PLOT_STYLING
+
     # Plot jackknife average (keep prominent but balanced)
     ax.errorbar(
         time_index,
         mean_data,
         yerr=error_data,
-        label="Jackknife Average",
-        color="red",
-        marker="s",
-        markersize=8,
-        capsize=8,
-        capthick=2,
-        elinewidth=2,
-        alpha=1.0,
-        zorder=5,  # Lower z-order puts it behind samples
+        label=styling["average"]["legend_label"],
+        color=styling["average"]["color"],
+        marker=styling["average"]["marker"],
+        markersize=styling["average"]["marker_size"],
+        capsize=styling["average"]["capsize"],
+        capthick=styling["average"]["capthick"],
+        elinewidth=styling["average"]["elinewidth"],
+        alpha=styling["average"]["alpha"],
+        zorder=styling["average"]["zorder"],
     )
 
     # Generate style mapping for sample labels
@@ -546,10 +552,10 @@ def _create_single_correlator_plot(
             label=label,
             color=color,
             marker=marker,
-            markersize=10,  # LARGER markers as requested
-            alpha=0.7,
-            linestyle="none",
-            zorder=10,  # Higher z-order puts samples on top
+            markersize=styling["samples"]["marker_size"],
+            alpha=styling["samples"]["alpha"],
+            linestyle=styling["samples"]["linestyle"],
+            zorder=styling["samples"]["zorder"],
         )
 
     # Configure axes using constants and analysis config
@@ -573,18 +579,30 @@ def _create_single_correlator_plot(
     title = title_builder.build(
         metadata_dict=title_metadata,
         tunable_params=list(group_metadata.keys()),
-        leading_substring=f"Samples {sample_range[0]} to {sample_range[1]}",
-        wrapping_length=120,  # Longer titles as requested
+        leading_substring=styling["title"]["leading_substring"],
+        wrapping_length=styling["title"]["wrapping_length"],
     )
-    ax.set_title(title, fontsize=DEFAULT_FONT_SIZE + 2)
+    ax.set_title(
+        title, fontsize=DEFAULT_FONT_SIZE + styling["title"]["font_size_offset"]
+    )
 
-    # Add LEGEND with configuration labels (major missing feature!)
-    ax.legend(fontsize=DEFAULT_FONT_SIZE - 1, loc="best")
+    # Format the legend title with actual values
+    legend_title = styling["legend"]["title"].format(
+        sample_range=sample_range,  # Pass the tuple
+        total_samples=int(title_metadata["Number_of_gauge_configurations"]),
+    )
 
-    # Add grid
-    ax.grid(True, alpha=0.7)
+    # Add LEGEND with configuration labels
+    ax.legend(
+        title=legend_title,
+        fontsize=DEFAULT_FONT_SIZE + styling["legend"]["font_size_offset"],
+        loc=styling["legend"]["location"],
+    )
 
-    # Use layout manager for final adjustments
+    # Add configurable grid
+    if styling["grid"]["enabled"]:
+        ax.grid(True, alpha=styling["grid"]["alpha"])
+
     plt.tight_layout()
 
     return fig
