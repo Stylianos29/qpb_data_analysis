@@ -291,14 +291,6 @@ def _process_correlator_data(
     return total_plots
 
 
-# TODO: "group_name" is unnecessary
-def _extract_group_metadata(group: h5py.Group, group_path: str):
-    """Extract all attributes from group and add group name."""
-    group_metadata = dict(group.attrs)
-    group_metadata["group_name"] = os.path.basename(group_path)  # type: ignore
-    return group_metadata
-
-
 def _process_single_correlator_group(
     hdf5_file: h5py.File,
     group_path: str,
@@ -339,9 +331,8 @@ def _process_single_correlator_group(
 
         _validate_correlator_data(samples_data, mean_data, error_data)
 
-        # Extract metadata with simple fallback
-        group_metadata = _extract_group_metadata(group, group_path)
-        group_name = group_metadata["group_name"]
+        group_metadata = dict(group.attrs)
+        group_name = os.path.basename(group_path)
 
         # Create plots for this group
         plots_created = _create_multi_sample_plots(
@@ -349,7 +340,7 @@ def _process_single_correlator_group(
             mean_data,
             error_data,
             config_labels,
-            group_name,  # type: ignore
+            group_name,
             group_path,
             base_plots_dir,
             analysis_config,
@@ -626,7 +617,7 @@ def _create_single_correlator_plot(
             title = title_builder.build(
                 metadata_dict=title_metadata,
                 tunable_params=list(group_metadata.keys()),
-                leading_substring=f"{group_name} - Samples {sample_range[0]} to {sample_range[1]}",
+                leading_substring=f"Samples {sample_range[0]} to {sample_range[1]}",
             )
         except Exception as e:
             # Fallback title if builder fails
