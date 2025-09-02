@@ -30,7 +30,6 @@ Usage:
 
 import os
 import sys
-from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from matplotlib.figure import Figure
@@ -341,17 +340,13 @@ def _process_single_correlator_group(
             error_data,
             config_labels,
             group_name,
-            group_path,
             base_plots_dir,
             analysis_config,
             group_metadata,
-            analyzer,
             file_manager,
             layout_manager,
             style_manager,
-            filename_builder,
             title_builder,
-            logger,
             verbose,
         )
 
@@ -416,7 +411,7 @@ def _validate_correlator_data(
     error_data: np.ndarray,
 ) -> None:
     """Validate correlator data dimensions and consistency."""
-    n_samples, n_time_points = samples_data.shape
+    _, n_time_points = samples_data.shape
 
     if mean_data.shape[0] != n_time_points:
         raise ValueError(
@@ -437,40 +432,29 @@ def _create_multi_sample_plots(
     error_data: np.ndarray,
     config_labels: List[str],
     group_name: str,
-    group_path: str,
     base_plots_dir: str,
     analysis_config: Dict,
     group_metadata: Dict,
-    analyzer: HDF5Analyzer,
     file_manager: PlotFileManager,
     layout_manager: PlotLayoutManager,
     style_manager: PlotStyleManager,
-    filename_builder: PlotFilenameBuilder,
     title_builder: PlotTitleBuilder,
-    logger,
     verbose: bool,
 ) -> int:
-    """
-    Create multi-sample plots for correlator data.
-
-    Returns:
-        Number of plots created
-    """
+    """Create multi-sample plots for correlator data."""
     n_samples, n_time_points = samples_data.shape
     samples_per_plot = analysis_config.get("samples_per_plot", 8)
+    n_plots = (n_samples + samples_per_plot - 1) // samples_per_plot
 
-    # Create time index with analysis-specific offset
+    # Create time index
     time_offset = analysis_config.get("time_offset", 0)
     time_index = np.arange(n_time_points) + time_offset
 
-    # Create group subdirectory
+    # Create group subdirectory in base plots subdirectory
     group_plots_dir = os.path.join(base_plots_dir, group_name)
     os.makedirs(group_plots_dir, exist_ok=True)
 
-    # Calculate number of plots needed
-    n_plots = (n_samples + samples_per_plot - 1) // samples_per_plot
     plots_created = 0
-
     if verbose:
         click.echo(f"    Creating {n_plots} plots ({samples_per_plot} samples each)")
 
@@ -478,64 +462,38 @@ def _create_multi_sample_plots(
         start_idx = plot_idx * samples_per_plot
         end_idx = min(start_idx + samples_per_plot, n_samples)
 
-        try:
-            # Extract samples for this plot
-            plot_samples = samples_data[start_idx:end_idx]
-            plot_labels = config_labels[start_idx:end_idx]
+        # Extract data for this plot
+        plot_samples = samples_data[start_idx:end_idx]
+        plot_labels = config_labels[start_idx:end_idx]
 
-            # Create the plot
-            fig = _create_single_correlator_plot(
-                time_index,
-                plot_samples,
-                plot_labels,
-                mean_data,
-                error_data,
-                group_name,
-                (start_idx, end_idx - 1),
-                analysis_config,
-                group_metadata,
-                layout_manager,
-                style_manager,
-                title_builder,
-            )
+        # Create the plot
+        fig = _create_single_correlator_plot(
+            time_index,
+            plot_samples,
+            plot_labels,
+            mean_data,
+            error_data,
+            (start_idx, end_idx - 1),
+            analysis_config,
+            group_metadata,
+            layout_manager,
+            style_manager,
+            title_builder,
+        )
 
-            # Generate filename using filename builder
-            try:
-                plot_metadata = group_metadata.copy()
-                plot_metadata["sample_start"] = start_idx
-                plot_metadata["sample_end"] = end_idx - 1
+        # Generate filename and save using file manager
+        base_name = f"correlator_samples_{start_idx:03d}_{end_idx-1:03d}"
+        plot_path = file_manager.plot_path(group_plots_dir, base_name)
 
-                base_name = f"correlator_samples_{start_idx:03d}_{end_idx-1:03d}"
-                filename = filename_builder.build(
-                    metadata_dict=plot_metadata,
-                    base_name=base_name,
-                    multivalued_params=list(group_metadata.keys()),
-                )
-            except Exception as e:
-                # Fallback filename if builder fails
-                logger.warning(f"Filename builder failed: {e}, using fallback")
-                filename = f"{group_name}_correlator_samples_{start_idx:03d}_{end_idx-1:03d}.png"
+        fig.savefig(
+            plot_path,
+            **analysis_config.get("plot_quality", {"dpi": 300, "bbox_inches": "tight"}),
+        )
+        plt.close(fig)
 
-            # Save plot
-            output_path = os.path.join(group_plots_dir, filename)
-            fig.savefig(
-                output_path,
-                **analysis_config.get(
-                    "plot_quality", {"dpi": 300, "bbox_inches": "tight"}
-                ),
-            )
-            plt.close(fig)  # Critical: close figure to prevent memory leak
-
-            plots_created += 1
-
-            if verbose:
-                click.echo(f"      Created: {filename}")
-
-        except Exception as e:
-            logger.error(
-                f"Error creating plot {plot_idx} for samples {start_idx}-{end_idx-1}: {e}"
-            )
-            continue
+        plots_created += 1
+        if verbose:
+            click.echo(f"      Created: {os.path.basename(plot_path)}")
 
     return plots_created
 
@@ -546,7 +504,6 @@ def _create_single_correlator_plot(
     sample_labels: List[str],
     mean_data: np.ndarray,
     error_data: np.ndarray,
-    group_name: str,
     sample_range: Tuple[int, int],
     analysis_config: Dict,
     group_metadata: Dict,
@@ -554,90 +511,83 @@ def _create_single_correlator_plot(
     style_manager: PlotStyleManager,
     title_builder: PlotTitleBuilder,
 ) -> Figure:
-    """
-    Create a single correlator plot with multiple samples and average.
-
-    Returns:
-        Matplotlib figure
-    """
+    """Create a single correlator plot with samples and average."""
 
     # Create figure using layout manager
-    fig, ax = layout_manager.create_figure()
-    #     figsize=analysis_config.get("figure_size", (10, 7)),
-    #     subplot_config="single"
-    # )
+    fig, ax = layout_manager.create_figure(
+        figure_size=analysis_config.get("figure_size", (12, 8))
+    )
 
-    try:
-        # Generate color/marker mapping using style manager
-        marker_color_map = style_manager.generate_marker_color_map(
-            sample_labels, index_shift=sample_range[0]
-        )
+    # Plot jackknife average (keep prominent but balanced)
+    ax.errorbar(
+        time_index,
+        mean_data,
+        yerr=error_data,
+        label="Jackknife Average",
+        color="red",
+        marker="s",
+        markersize=8,
+        capsize=8,
+        capthick=2,
+        elinewidth=2,
+        alpha=1.0,
+        zorder=5,  # Lower z-order puts it behind samples
+    )
 
-        # Plot individual samples
-        for i, (sample_data, label) in enumerate(zip(samples_data, sample_labels)):
-            marker, color = marker_color_map.get(label, ("o", f"C{i}"))
+    # Generate style mapping for sample labels
+    style_map = style_manager.generate_marker_color_map(sample_labels)
 
-            ax.plot(
-                time_index,
-                sample_data,
-                label=label,
-                color=color,
-                marker=marker,
-                markersize=6,
-                alpha=0.7,
-                linestyle="none",
-            )
-
-        # Plot jackknife average with error bars
-        ax.errorbar(
+    # Plot individual samples with LARGER markers
+    for i, (sample_data, label) in enumerate(zip(samples_data, sample_labels)):
+        marker, color = style_map.get(label, ("o", f"C{i}"))
+        ax.plot(
             time_index,
-            mean_data,
-            yerr=error_data,
-            label="Jackknife Average",
-            color="red",
-            marker="s",
-            markersize=8,
-            capsize=8,
-            capthick=2,
-            elinewidth=2,
-            alpha=1.0,
+            sample_data,
+            label=label,
+            color=color,
+            marker=marker,
+            markersize=10,  # LARGER markers as requested
+            alpha=0.7,
+            linestyle="none",
+            zorder=10,  # Higher z-order puts samples on top
         )
 
-        # Configure plot appearance from analysis config
-        plot_config = analysis_config["plot_config"]
-        ax.set_xlabel(plot_config["x_label"], fontsize=DEFAULT_FONT_SIZE)
-        ax.set_ylabel(plot_config["y_label"], fontsize=DEFAULT_FONT_SIZE)
-        ax.set_yscale(plot_config["y_scale"])
+    # Configure axes using constants and analysis config
+    plot_config = analysis_config["plot_config"]
 
-        # Create title using title builder
-        try:
-            title_metadata = group_metadata.copy()
-            title_metadata["sample_range"] = f"{sample_range[0]}-{sample_range[1]}"
+    # Use AXES_LABELS_BY_COLUMN_NAME for proper labels
+    x_label = constants.AXES_LABELS_BY_COLUMN_NAME.get("time_index") or plot_config.get(
+        "x_label"
+    )
+    y_label = constants.AXES_LABELS_BY_COLUMN_NAME.get(
+        analysis_config["samples_dataset"]
+    ) or plot_config.get("y_label")
 
-            title = title_builder.build(
-                metadata_dict=title_metadata,
-                tunable_params=list(group_metadata.keys()),
-                leading_substring=f"Samples {sample_range[0]} to {sample_range[1]}",
-            )
-        except Exception as e:
-            # Fallback title if builder fails
-            title = f"{group_name} - Samples {sample_range[0]} to {sample_range[1]}"
+    ax.set_xlabel(x_label, fontsize=DEFAULT_FONT_SIZE)
+    ax.set_ylabel(y_label, fontsize=DEFAULT_FONT_SIZE)
+    ax.set_yscale(plot_config["y_scale"])
 
-        ax.set_title(title, fontsize=DEFAULT_FONT_SIZE + 2)
+    # Create title using title builder (no fallback!)
+    title_metadata = group_metadata.copy()
 
-        # # Configure legend using layout manager
-        # layout_manager.configure_legend(ax, bbox_to_anchor=(1.05, 1),
-        # loc='upper left')
+    title = title_builder.build(
+        metadata_dict=title_metadata,
+        tunable_params=list(group_metadata.keys()),
+        leading_substring=f"Samples {sample_range[0]} to {sample_range[1]}",
+        wrapping_length=120,  # Longer titles as requested
+    )
+    ax.set_title(title, fontsize=DEFAULT_FONT_SIZE + 2)
 
-        # Add grid
-        ax.grid(True, alpha=0.3)
+    # Add LEGEND with configuration labels (major missing feature!)
+    ax.legend(fontsize=DEFAULT_FONT_SIZE - 1, loc="best")
 
-        plt.tight_layout()
-        return fig
+    # Add grid
+    ax.grid(True, alpha=0.7)
 
-    except Exception as e:
-        plt.close(fig)
-        raise RuntimeError(f"Error creating correlator plot: {e}")
+    # Use layout manager for final adjustments
+    plt.tight_layout()
+
+    return fig
 
 
 if __name__ == "__main__":
