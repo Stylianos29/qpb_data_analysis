@@ -10,11 +10,11 @@ dataset specifications, and analysis-specific parameters.
 # Import analysis-specific configurations
 from src.analysis.correlator_calculations._pcac_mass_config import (
     TRUNCATE_START as PCAC_TRUNCATE_START,
+    TRUNCATE_END as PCAC_TRUNCATE_END,
     OUTPUT_DATASETS as PCAC_OUTPUT_DATASETS,
 )
 from src.analysis.correlator_calculations._effective_mass_config import (
-    APPLY_SYMMETRIZATION,
-    TRUNCATE_HALF,
+    TRUNCATE_HALF as EFFECTIVE_TRUNCATE_HALF,
     OUTPUT_DATASETS as EFFECTIVE_OUTPUT_DATASETS,
 )
 
