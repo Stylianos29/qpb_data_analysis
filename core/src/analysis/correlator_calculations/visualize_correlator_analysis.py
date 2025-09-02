@@ -60,7 +60,10 @@ from library.validation.click_validators import (
     validate_log_filename,
 )
 
-# Import configuration
+# Import from auxiliary files
+from src.analysis.correlator_calculations._correlator_analysis_core import (
+    find_analysis_groups,
+)
 from src.analysis.correlator_calculations._correlator_visualization_config import (
     get_analysis_config,
     validate_visualization_config,
@@ -237,9 +240,12 @@ def _process_correlator_data(
     try:
         with h5py.File(input_hdf5_file, "r") as hdf5_file:
             # Find all groups containing correlator data
-            correlator_groups = _find_correlator_groups(
-                hdf5_file, analysis_config, logger
-            )
+            required_datasets = [
+                analysis_config["samples_dataset"],
+                analysis_config["mean_dataset"],
+                analysis_config["error_dataset"],
+            ]
+            correlator_groups = find_analysis_groups(input_hdf5_file, required_datasets)
 
             if not correlator_groups:
                 logger.warning("No groups with correlator data found")
@@ -280,28 +286,6 @@ def _process_correlator_data(
         analyzer.close()
 
     return total_plots
-
-
-def _find_correlator_groups(
-    hdf5_file: h5py.File, analysis_config: Dict, logger
-) -> List[str]:
-    """
-    Find all groups containing correlator datasets.
-
-    Returns:
-        List of group paths containing correlator data
-    """
-    correlator_groups = []
-    target_dataset = analysis_config["samples_dataset"]
-
-    def find_groups(name, obj):
-        if isinstance(obj, h5py.Group) and target_dataset in obj:
-            correlator_groups.append(name)
-
-    hdf5_file.visititems(find_groups)
-    logger.debug(f"Found {len(correlator_groups)} groups with correlator data")
-
-    return correlator_groups
 
 
 def _process_single_correlator_group(
