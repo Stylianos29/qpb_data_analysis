@@ -209,6 +209,9 @@ def _create_single_correlator_plot(
     ax.set_ylabel(y_label, fontsize=DEFAULT_FONT_SIZE)
     ax.set_yscale(plot_config["y_scale"])
 
+    # Set x-axis limits to start from zero
+    ax.set_xlim(xmin=0)
+
     # Create title using title builder (no fallback!)
     title_metadata = group_metadata.copy()
 
