@@ -65,6 +65,28 @@ from src.analysis.correlator_calculations._correlator_visualization_config impor
 )
 
 
+def _get_time_slice_indices(
+    time_index: np.ndarray, time_range_config: Dict
+) -> Tuple[int, int]:
+    """Convert time range configuration to slice indices."""
+    t_min = time_range_config.get("min", 0)
+    t_max_config = time_range_config.get("max")
+
+    # Calculate t_max
+    if t_max_config is None:
+        t_max = np.max(time_index) + 1
+    elif t_max_config < 0:
+        t_max = np.max(time_index) + t_max_config + 1
+    else:
+        t_max = t_max_config + 1
+
+    # Convert to indices
+    i_min = np.searchsorted(time_index, t_min)
+    i_max = np.searchsorted(time_index, t_max)
+
+    return int(i_min), int(i_max)
+
+
 def _create_multi_sample_plots(
     samples_data: np.ndarray,
     mean_data: np.ndarray,
@@ -96,6 +118,16 @@ def _create_multi_sample_plots(
     plots_created = 0
     if verbose:
         click.echo(f"    Creating {n_plots} plots ({samples_per_plot} samples each)")
+
+    # Apply time range restriction if configured
+    time_range_config = analysis_config.get("time_range", {})
+    if time_range_config and set(time_range_config.values()) != {None}:
+        i_min, i_max = _get_time_slice_indices(time_index, time_range_config)
+        # Slice all data arrays
+        time_index = time_index[i_min:i_max]
+        mean_data = mean_data[i_min:i_max]
+        error_data = error_data[i_min:i_max]
+        samples_data = samples_data[:, i_min:i_max]
 
     for plot_idx in range(n_plots):
         start_idx = plot_idx * samples_per_plot

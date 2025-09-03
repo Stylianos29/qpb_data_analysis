@@ -7,6 +7,8 @@ mass and effective mass jackknife samples, including plot styling,
 dataset specifications, and analysis-specific parameters.
 """
 
+from typing import Dict
+
 # Import analysis-specific configurations
 from src.analysis.correlator_calculations._pcac_mass_config import (
     TRUNCATE_START as PCAC_TRUNCATE_START,
@@ -105,6 +107,10 @@ ANALYSIS_CONFIGS = {
         "error_dataset": PCAC_OUTPUT_DATASETS["error"],
         "plot_base_directory": "PCAC_mass_visualization",
         "time_offset": PCAC_TRUNCATE_START,  # PCAC starts at t=2 due to truncation
+        "time_range": {
+            "min": 5,  # Positive integer, or None
+            "max": -2,  # If negative: offset from max, if positive: absolute value
+        },
         "plot_config": {
             "y_scale": "linear",
             "x_label": "Time slice (t/a)",
@@ -122,6 +128,10 @@ ANALYSIS_CONFIGS = {
         "error_dataset": EFFECTIVE_OUTPUT_DATASETS["error"],
         "plot_base_directory": "Effective_mass_visualization",
         "time_offset": 1,  # Effective mass starts at t=1
+        "time_range": {
+            "min": 6,  # Positive integer, or None
+            "max": None,  # If negative: offset from max, if positive: absolute value
+        },
         "plot_config": {
             "y_scale": "linear",
             "x_label": "Time slice (t/a)",
@@ -218,5 +228,36 @@ def validate_visualization_config():
 
     if len(SAMPLE_COLORS) < SAMPLES_PER_PLOT:
         raise ValueError(
-            f"Need at least {SAMPLES_PER_PLOT} sample colors, got {len(SAMPLE_COLORS)}"
+            f"Need at least {SAMPLES_PER_PLOT} sample colors, "
+            f"got {len(SAMPLE_COLORS)}"
         )
+
+    # Validate time_range for each analysis type
+    for analysis_type, analysis_config in ANALYSIS_CONFIGS.items():
+        if "time_range" in analysis_config:
+            _validate_time_range(analysis_config["time_range"])
+
+
+def _validate_time_range(time_range_config: Dict) -> None:
+    """Validate time_range configuration values."""
+    if not time_range_config:
+        return
+
+    t_min = time_range_config.get("min")
+    t_max = time_range_config.get("max")
+
+    # Check min is integer or None
+    if t_min is not None and not isinstance(t_min, int):
+        raise ValueError(
+            f"time_range.min must be integer or None, got {type(t_min).__name__}"
+        )
+
+    # Check max is integer or None
+    if t_max is not None and not isinstance(t_max, int):
+        raise ValueError(
+            f"time_range.max must be integer or None, got {type(t_max).__name__}"
+        )
+
+    # Check min is not negative
+    if t_min is not None and t_min < 0:
+        raise ValueError(f"time_range.min cannot be negative, got {t_min}")
