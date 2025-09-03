@@ -156,10 +156,9 @@ def _create_multi_sample_plots(
         base_name = f"correlator_samples_{start_idx+1:03d}_{end_idx:03d}"
         plot_path = file_manager.plot_path(group_plots_dir, base_name)
 
-        styling = PLOT_STYLING.copy()
         fig.savefig(
             plot_path,
-            **styling.get("output", {"dpi": 300, "bbox_inches": "tight"}),
+            **PLOT_STYLING.get("output", {"dpi": 300, "bbox_inches": "tight"}),
         )
         plt.close(fig)
 
@@ -190,22 +189,20 @@ def _create_single_correlator_plot(
         figure_size=analysis_config.get("figure_size", (12, 8))
     )
 
-    styling = PLOT_STYLING.copy()
-
     # Plot jackknife average (keep prominent but balanced)
     ax.errorbar(
         time_index,
         mean_data,
         yerr=error_data,
-        label=styling["average"]["legend_label"],
-        color=styling["average"]["color"],
-        marker=styling["average"]["marker"],
-        markersize=styling["average"]["marker_size"],
-        capsize=styling["average"]["capsize"],
-        capthick=styling["average"]["capthick"],
-        elinewidth=styling["average"]["elinewidth"],
-        alpha=styling["average"]["alpha"],
-        zorder=styling["average"]["zorder"],
+        label=PLOT_STYLING["average"]["legend_label"],
+        color=PLOT_STYLING["average"]["color"],
+        marker=PLOT_STYLING["average"]["marker"],
+        markersize=PLOT_STYLING["average"]["marker_size"],
+        capsize=PLOT_STYLING["average"]["capsize"],
+        capthick=PLOT_STYLING["average"]["capthick"],
+        elinewidth=PLOT_STYLING["average"]["elinewidth"],
+        alpha=PLOT_STYLING["average"]["alpha"],
+        zorder=PLOT_STYLING["average"]["zorder"],
     )
 
     # Generate style mapping for sample labels
@@ -220,10 +217,10 @@ def _create_single_correlator_plot(
             label=label,
             color=color,
             marker=marker,
-            markersize=styling["samples"]["marker_size"],
-            alpha=styling["samples"]["alpha"],
-            linestyle=styling["samples"]["linestyle"],
-            zorder=styling["samples"]["zorder"],
+            markersize=PLOT_STYLING["samples"]["marker_size"],
+            alpha=PLOT_STYLING["samples"]["alpha"],
+            linestyle=PLOT_STYLING["samples"]["linestyle"],
+            zorder=PLOT_STYLING["samples"]["zorder"],
         )
 
     # Configure axes using constants and analysis config
@@ -250,15 +247,15 @@ def _create_single_correlator_plot(
     title = title_builder.build(
         metadata_dict=title_metadata,
         tunable_params=list(group_metadata.keys()),
-        leading_substring=styling["title"]["leading_substring"],
-        wrapping_length=styling["title"]["wrapping_length"],
+        leading_substring=PLOT_STYLING["title"]["leading_substring"],
+        wrapping_length=PLOT_STYLING["title"]["wrapping_length"],
     )
     ax.set_title(
-        title, fontsize=DEFAULT_FONT_SIZE + styling["title"]["font_size_offset"]
+        title, fontsize=DEFAULT_FONT_SIZE + PLOT_STYLING["title"]["font_size_offset"]
     )
 
     # Format the legend title with actual values
-    legend_title = styling["legend"]["title"].format(
+    legend_title = PLOT_STYLING["legend"]["title"].format(
         sample_range=sample_range,  # Pass the tuple
         total_samples=int(title_metadata["Number_of_gauge_configurations"]),
     )
@@ -266,13 +263,13 @@ def _create_single_correlator_plot(
     # Add LEGEND with configuration labels
     ax.legend(
         title=legend_title,
-        fontsize=DEFAULT_FONT_SIZE + styling["legend"]["font_size_offset"],
-        loc=styling["legend"]["location"],
+        fontsize=DEFAULT_FONT_SIZE + PLOT_STYLING["legend"]["font_size_offset"],
+        loc=PLOT_STYLING["legend"]["location"],
     )
 
     # Add configurable grid
-    if styling["grid"]["enabled"]:
-        ax.grid(True, alpha=styling["grid"]["alpha"])
+    if PLOT_STYLING["grid"]["enabled"]:
+        ax.grid(True, alpha=PLOT_STYLING["grid"]["alpha"])
 
     plt.tight_layout()
 
