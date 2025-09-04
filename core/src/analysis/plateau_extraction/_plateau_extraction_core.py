@@ -27,18 +27,26 @@ def symmetrize_time_series(data: np.ndarray) -> np.ndarray:
     Symmetrize time series data: C_sym(t) = 0.5 * (C(t) + C(T-t)).
 
     Args:
-        data: 1D or 2D array (samples × time for 2D)
+        data: 1D or 2D array (samples x time for 2D)
 
     Returns:
         Symmetrized array of same shape
+
+    Raises:
+        ValueError: If data has unsupported dimensions
     """
     if data.ndim == 1:
         reverse = data[::-1]
         return 0.5 * (data + np.roll(reverse, shift=1))
-    else:
+    elif data.ndim == 2:
         # Handle 2D case (multiple samples)
         reverse = data[:, ::-1]
         return 0.5 * (data + np.roll(reverse, shift=1, axis=1))
+    else:
+        raise ValueError(
+            f"Unsupported array dimensions: {data.ndim}. "
+            "Only 1D and 2D arrays are supported."
+        )
 
 
 def calculate_jackknife_statistics(
@@ -124,7 +132,7 @@ def process_single_group(
     Process a single group to extract plateau from jackknife samples.
 
     Args:
-        jackknife_samples: 2D array (n_samples × n_time) mean_values: 1D
+        jackknife_samples: 2D array (n_samples x n_time) mean_values: 1D
         array of mean values error_values: 1D array of error values
         config_labels: List of configuration labels sigma_thresholds:
         List of sigma thresholds to try min_plateau_size: Minimum
