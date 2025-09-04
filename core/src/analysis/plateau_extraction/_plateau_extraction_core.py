@@ -120,29 +120,27 @@ def detect_plateau_region(
 
 def process_single_group(
     jackknife_samples: np.ndarray,
-    mean_values: np.ndarray,
     error_values: np.ndarray,
     config_labels: List[str],
     sigma_thresholds: List[float],
     min_plateau_size: int,
     search_range: Dict[str, Any],
-    logger,
 ) -> Dict[str, Any]:
     """
     Process a single group to extract plateau from jackknife samples.
 
     Args:
-        jackknife_samples: 2D array (n_samples x n_time) mean_values: 1D
-        array of mean values error_values: 1D array of error values
-        config_labels: List of configuration labels sigma_thresholds:
-        List of sigma thresholds to try min_plateau_size: Minimum
-        plateau size search_range: Search range configuration logger:
-        Logger instance
+        - jackknife_samples: 2D array (n_samples x n_time) mean_values:
+          1D
+        - config_labels: List of configuration labels sigma_thresholds:
+        - List of sigma thresholds to try min_plateau_size: Minimum
+        - plateau size search_range: Search range configuration logger:
+        - Logger instance
 
     Returns:
         Dictionary with extraction results
     """
-    n_samples, n_time = jackknife_samples.shape
+    n_samples, _ = jackknife_samples.shape
     sample_results = []
 
     # Try to extract plateau from each individual sample
@@ -179,9 +177,11 @@ def process_single_group(
 
     # Calculate jackknife average of plateau values
     plateau_values = [sr["plateau_value"] for sr in sample_results]
+    # TODO: Calculate the jackknife error properly
     plateau_gvar = gv.gvar(np.mean(plateau_values), np.std(plateau_values, ddof=1))
 
-    # Use most common plateau bounds
+    # Use most common plateau bounds #TODO: The plateau bounds must be
+    # common for all samples
     bounds_list = [sr["plateau_bounds"] for sr in sample_results]
     most_common_bounds = max(set(bounds_list), key=bounds_list.count)
 
@@ -327,13 +327,11 @@ def process_analysis_group(
     # Extract plateau
     result = process_single_group(
         jackknife_samples,
-        mean_values,
         error_values,
         config_labels,
         sigma_thresholds,
         min_plateau_size,
         search_range,
-        logger,
     )
 
     result["group_name"] = group_name
