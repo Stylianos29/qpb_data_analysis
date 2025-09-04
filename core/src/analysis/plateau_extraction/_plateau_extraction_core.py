@@ -404,14 +404,12 @@ def process_all_groups(
         try:
             valid_groups = []
             for group_path in analyzer.active_groups:
-                if not isinstance(hdf5_file, h5py.Group):
+                group = hdf5_file[group_path]
+                if not isinstance(group, h5py.Group):
+                    logger.error(f"Invalid group at path: {group_path}")
                     continue
-                if group_path in hdf5_file:
-                    group = hdf5_file[group_path]
-                    if not isinstance(group, h5py.Group):
-                        continue
-                    if all(dataset in group for dataset in input_datasets.values()):
-                        valid_groups.append(group_path)
+                if all(dataset in group for dataset in input_datasets.values()):
+                    valid_groups.append(group_path)
 
             if not valid_groups:
                 logger.warning("No groups found with required datasets")
