@@ -73,7 +73,7 @@ ERROR_HANDLING = {
 # =============================================================================
 
 
-def validate_shared_config() -> bool:
+def validate_shared_config():
     """Validate shared configuration parameters."""
     # Check sigma thresholds
     if not PLATEAU_DETECTION_SIGMA_THRESHOLDS:
@@ -97,5 +97,3 @@ def validate_shared_config() -> bool:
     # Check error handling
     if not 0 < ERROR_HANDLING["min_successful_fraction"] <= 1:
         raise ValueError("min_successful_fraction must be between 0 and 1")
-
-    return True

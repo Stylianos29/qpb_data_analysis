@@ -45,7 +45,7 @@ OUTPUT_COLUMN_PREFIX = "PCAC"  # For column names like "PCAC_plateau_mean"
 # =============================================================================
 
 
-def validate_pcac_config() -> bool:
+def validate_pcac_config():
     """Validate PCAC-specific configuration."""
     # First validate shared config
     validate_shared_config()
@@ -60,5 +60,3 @@ def validate_pcac_config() -> bool:
 
     if not OUTPUT_COLUMN_PREFIX:
         raise ValueError("OUTPUT_COLUMN_PREFIX cannot be empty")
-
-    return True

@@ -7,7 +7,7 @@ mass time series using jackknife analysis and robust plateau detection
 methods.
 
 The script processes HDF5 files from calculate_effective_mass.py,
-detects plateau regions, and exports results to CSV.
+detects plateau regions, and exports results to CSV and HDF5 files.
 
 Usage:
     python extract_plateau_pion_mass.py -i effective_mass_analysis.h5 -o
@@ -16,7 +16,6 @@ Usage:
 
 import os
 import sys
-from pathlib import Path
 from typing import Optional
 
 import click
@@ -91,7 +90,7 @@ from src.analysis.plateau_extraction._plateau_extraction_core import (
 @click.option(
     "-log_dir",
     "--log_directory",
-    default=None,  # TODO: Is it redundant with callback?
+    default=None,
     callback=directory.can_create,
     help="Directory for log files. Default: same as output directory.",
 )
@@ -122,13 +121,11 @@ def main(
     Extract plateau pion effective mass values from effective mass time
     series.
 
-    This script processes pion effective mass jackknife samples, detects
-    plateau regions, and exports results to CSV.
+    This script processes PCAC mass jackknife samples, detects plateau
+    regions, and exports results to HDF5 and CSV format.
     """
     # Validate configuration
-    if not validate_pion_config():
-        click.echo("❌ Invalid configuration detected.", err=True)
-        sys.exit(1)
+    validate_pion_config()
 
     # Setup logging
     log_dir = None
@@ -148,8 +145,8 @@ def main(
         # Log parameters
         logger.info(f"Input file: {input_hdf5_file}")
         logger.info(f"Output directory: {output_directory}")
-        logger.info(f"Output HDF5: {output_hdf5_filename}")
-        logger.info(f"Output CSV: {output_csv_filename}")
+        logger.info(f"Output HDF5 file: {output_hdf5_filename}")
+        logger.info(f"Output CSV file: {output_csv_filename}")
 
         # Process all groups
         results = process_all_groups(
