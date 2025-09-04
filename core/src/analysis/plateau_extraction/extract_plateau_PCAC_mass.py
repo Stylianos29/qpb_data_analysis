@@ -64,7 +64,11 @@ def _load_configuration_labels(group: h5py.Group) -> List[str]:
     if "gauge_configuration_labels" not in group:
         return []
 
-    labels_data = group["gauge_configuration_labels"][:]
+    labels_obj = group["gauge_configuration_labels"]
+    if not isinstance(labels_obj, h5py.Dataset):
+        return []
+
+    labels_data = labels_obj[:]
     return [
         label.decode("utf-8") if isinstance(label, bytes) else label
         for label in labels_data
@@ -115,10 +119,21 @@ def _process_analysis_group(
     logger,
 ) -> Dict:
     """Process a single analysis group to extract plateau."""
+    # Validate required datasets
+    jackknife_samples_dataset = group[INPUT_DATASETS["samples"]]
+    if not isinstance(jackknife_samples_dataset, h5py.Dataset):
+        return {}
+    mean_values_dataset = group[INPUT_DATASETS["mean"]]
+    if not isinstance(mean_values_dataset, h5py.Dataset):
+        return {}
+    error_values_dataset = group[INPUT_DATASETS["error"]]
+    if not isinstance(error_values_dataset, h5py.Dataset):
+        return {}
+
     # Load data
-    jackknife_samples = group[INPUT_DATASETS["samples"]][:]
-    mean_values = group[INPUT_DATASETS["mean"]][:]
-    error_values = group[INPUT_DATASETS["error"]][:]
+    jackknife_samples = jackknife_samples_dataset[:]
+    mean_values = mean_values_dataset[:]
+    error_values = error_values_dataset[:]
     config_labels = _load_configuration_labels(group)
 
     # Apply preprocessing
@@ -218,6 +233,9 @@ def _process_all_groups(
             for group_path in analyzer.active_groups:
                 if group_path in hdf5_file:
                     group = hdf5_file[group_path]
+                    if not isinstance(group, h5py.Group):
+                        logger.error(f"Object {group_path} is not a group")
+                        continue
                     if all(dataset in group for dataset in INPUT_DATASETS.values()):
                         valid_groups.append(group_path)
 
@@ -237,6 +255,9 @@ def _process_all_groups(
                 logger.info(f"Processing group: {group_path}")
 
                 group = hdf5_file[group_path]
+                if not isinstance(group, h5py.Group):
+                    logger.error(f"Object {group_path} is not a group")
+                    continue
                 result = _process_analysis_group(group, group_name, logger)
                 results.append(result)
 
