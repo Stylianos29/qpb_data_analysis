@@ -246,6 +246,19 @@ def extract_group_metadata(group: h5py.Group) -> Dict:
     return metadata
 
 
+def extract_parent_group_metadata(hdf5_file: h5py.File, group_path: str) -> Dict:
+    """Extract shared metadata from parent group (second-to-deepest
+    level)."""
+    parent_path = os.path.dirname(group_path)
+
+    if parent_path in hdf5_file:
+        parent_group = hdf5_file[parent_path]
+        if isinstance(parent_group, h5py.Group):
+            return extract_group_metadata(parent_group)
+
+    return {}
+
+
 def apply_preprocessing(
     jackknife_samples: np.ndarray,
     mean_values: np.ndarray,
@@ -287,11 +300,12 @@ def process_analysis_group(
     min_plateau_size: int,
     search_range: Dict[str, Any],
     data_type: str,
+    parent_metadata: Dict,
     logger,
 ) -> Dict:
     """Process a single analysis group to extract plateau."""
+    # Validate and load datasets
     try:
-        # Validate and load datasets
         jackknife_samples = load_dataset_array(group, input_datasets["samples"])
         mean_values = load_dataset_array(group, input_datasets["mean"])
         error_values = load_dataset_array(group, input_datasets["error"])
@@ -299,7 +313,7 @@ def process_analysis_group(
     except ValueError as e:
         return {"success": False, "error_message": str(e)}
 
-    # Apply preprocessing
+    # Apply symmetrization and truncation if configured
     jackknife_samples, mean_values, error_values = apply_preprocessing(
         jackknife_samples,
         mean_values,
@@ -322,9 +336,12 @@ def process_analysis_group(
         logger,
     )
 
-    # Add metadata
     result["group_name"] = group_name
-    result["metadata"] = extract_group_metadata(group)
+
+    # Add metadata
+    group_metadata = extract_group_metadata(group)
+    combined_metadata = {**parent_metadata, **group_metadata}
+    result["metadata"] = combined_metadata
 
     return result
 
@@ -425,6 +442,10 @@ def process_all_groups(
 
             logger.info(f"Found {len(valid_groups)} groups to process")
 
+            # Extract parent metadata once (using first group to
+            # determine parent)
+            parent_metadata = extract_parent_group_metadata(hdf5_file, valid_groups[0])
+
             # Process each group
             for group_path in valid_groups:
                 group_name = os.path.basename(group_path)
@@ -447,6 +468,7 @@ def process_all_groups(
                     min_plateau_size,
                     search_range,
                     data_type,
+                    parent_metadata,
                     logger,
                 )
                 results.append(result)
