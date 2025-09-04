@@ -178,7 +178,6 @@ def main(
             results,
             output_csv_path,
             OUTPUT_COLUMN_PREFIX,
-            TIME_OFFSET,
             CSV_OUTPUT_CONFIG,
             logger,
         )
