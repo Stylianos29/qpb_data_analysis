@@ -8,6 +8,7 @@ plateau values from time series data using jackknife analysis.
 
 import os
 from typing import Tuple, Dict, List, Optional, Any
+
 import numpy as np
 import pandas as pd
 import h5py
@@ -15,7 +16,10 @@ import click
 import gvar as gv
 
 from library.data.hdf5_analyzer import HDF5Analyzer
-
+from library.constants import (
+    PARAMETERS_WITH_EXPONENTIAL_FORMAT,
+    PARAMETERS_OF_INTEGER_VALUE,
+)
 
 # =============================================================================
 # LOW-LEVEL UTILITY FUNCTIONS
@@ -344,67 +348,6 @@ def process_analysis_group(
     return result
 
 
-def create_csv_record(
-    result: Dict,
-    output_column_prefix: str,
-    time_offset: int,
-    csv_config: Dict[str, Any],
-) -> Dict:
-    """Create CSV record from extraction result."""
-    record = {}
-
-    # Add metadata
-    metadata = result.get("metadata", {})
-    for key in [
-        "bare_mass",
-        "kappa",
-        "clover_coefficient",
-        "kernel_operator_type",
-        "solver_type",
-    ]:
-        record[key] = metadata.get(key, "")
-
-    if result["success"]:
-        plateau_value = result["plateau_value"]
-        plateau_bounds = result["plateau_bounds"]
-
-        # Add extraction results with column prefix
-        record[f"{output_column_prefix}_plateau_mean"] = plateau_value.mean
-        record[f"{output_column_prefix}_plateau_error"] = plateau_value.sdev
-        record[f"{output_column_prefix}_plateau_start_time"] = (
-            plateau_bounds[0] + time_offset
-        )
-        record[f"{output_column_prefix}_plateau_end_time"] = (
-            plateau_bounds[1] + time_offset
-        )
-        record[f"{output_column_prefix}_plateau_n_points"] = (
-            plateau_bounds[1] - plateau_bounds[0]
-        )
-
-        # Add statistics
-        record["n_successful_samples"] = result["n_samples"]
-        record["n_total_samples"] = result["n_samples"]
-        record["n_failed_samples"] = 0
-
-        # Add diagnostics if configured
-        if csv_config["include_diagnostics"]:
-            record["estimation_method"] = result["diagnostics"]["method"]
-            record["sigma_threshold_used"] = result["sigma_threshold"]
-    else:
-        # Failed extraction
-        record[f"{output_column_prefix}_plateau_mean"] = np.nan
-        record[f"{output_column_prefix}_plateau_error"] = np.nan
-        record[f"{output_column_prefix}_plateau_start_time"] = np.nan
-        record[f"{output_column_prefix}_plateau_end_time"] = np.nan
-        record[f"{output_column_prefix}_plateau_n_points"] = np.nan
-        record["n_successful_samples"] = 0
-        record["n_total_samples"] = result.get("n_samples", 0)
-        record["n_failed_samples"] = result.get("n_samples", 0)
-        record["error_message"] = result.get("error_message", "Unknown error")
-
-    return record
-
-
 def process_all_groups(
     input_file: str,
     input_datasets: Dict[str, str],
@@ -485,34 +428,114 @@ def process_all_groups(
     return results
 
 
+# =============================================================================
+# CSV EXPORT FUNCTIONS
+# =============================================================================
+
+
+def _reorder_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Ensure priority columns come first in specified order."""
+    priority_columns = ["Overlap_operator_method", "Kernel_operator_type"]
+
+    # Only include priority columns that actually exist
+    existing_priority = [col for col in priority_columns if col in df.columns]
+    remaining_columns = [col for col in df.columns if col not in priority_columns]
+
+    # Create new column order: priority first, then the rest
+    new_column_order = existing_priority + remaining_columns
+
+    # Reorder DataFrame
+    return df.reindex(columns=new_column_order)
+
+
+def _apply_export_formatting(df: pd.DataFrame) -> pd.DataFrame:
+    """Apply proper formatting using existing constants."""
+    available_columns = set(df.columns)
+
+    for col in available_columns:
+        if col in PARAMETERS_OF_INTEGER_VALUE:
+            # Format as integers
+            df[col] = df[col].apply(lambda x: int(x) if pd.notna(x) else "")
+
+        elif col in PARAMETERS_WITH_EXPONENTIAL_FORMAT:
+            # Format in exponential notation
+            df[col] = df[col].apply(
+                lambda x: f"{x:.1e}" if pd.notna(x) and x != 0 else "0.000000"
+            )
+
+    return df
+
+
+def create_csv_record(
+    result: Dict,
+    output_column_prefix: str,
+) -> Dict:
+    """Create CSV record with only essential data."""
+    # Start with ALL metadata (single-valued + multivalued parameters)
+    record = result.get("metadata", {}).copy()
+
+    if result["success"]:
+        plateau_value = result["plateau_value"]
+        # Plateau as tuple format: "(mean, uncertainty)" with 12 decimal
+        # precision
+        record[f"{output_column_prefix}_plateau"] = (
+            f"({plateau_value.mean:.12f}, {plateau_value.sdev:.12f})"
+        )
+
+        # Extract failed configuration labels from sample results
+        sample_results = result.get("diagnostics", {}).get("sample_results", [])
+        failed_labels = []
+
+        # Check if we have the full sample count vs successful count
+        total_samples = result.get("n_samples", 0)
+        if len(sample_results) < total_samples:
+            # Some samples failed - we need to identify which ones
+            successful_configs = {sr["config_label"] for sr in sample_results}
+            # Note: We'd need access to original config_labels to
+            # identify failed ones For now, just note that some failed
+            failed_count = total_samples - len(sample_results)
+            if failed_count > 0:
+                failed_labels = [f"failed_samples_{failed_count}"]
+
+        record["failed_config_labels"] = (
+            ";".join(failed_labels) if failed_labels else ""
+        )
+    else:
+        record[f"{output_column_prefix}_plateau"] = "NaN"
+        record["failed_config_labels"] = result.get("error_message", "")
+
+    return record
+
+
 def export_to_csv(
     results: List[Dict],
     output_file: str,
     output_column_prefix: str,
-    time_offset: int,
-    csv_config: Dict[str, Any],
+    delimiter: str,
     logger,
 ) -> None:
-    """Export extraction results to CSV file."""
+    """Export extraction results to CSV file with proper formatting."""
     if not results:
         logger.warning("No results to export")
         return
 
     # Convert results to records
-    records = [
-        create_csv_record(result, output_column_prefix, time_offset, csv_config)
-        for result in results
-    ]
+    records = [create_csv_record(result, output_column_prefix) for result in results]
 
     # Create DataFrame
     df = pd.DataFrame(records)
 
-    # Save to CSV with configured precision
+    # Apply column-specific formatting
+    df = _apply_export_formatting(df)
+
+    # Reorder columns
+    df = _reorder_columns(df)
+
+    # Save to CSV
     df.to_csv(
         output_file,
         index=False,
-        float_format=f"%.{csv_config['float_precision']}f",
-        sep=csv_config["delimiter"],
+        sep=delimiter,
     )
 
     logger.info(f"Exported {len(records)} results to {output_file}")
