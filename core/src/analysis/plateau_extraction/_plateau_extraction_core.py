@@ -75,11 +75,10 @@ def detect_plateau_region(
     Detect plateau region in time series using weighted range test.
 
     Args:
-        time_series: 1D array of time series values
-        errors: 1D array of corresponding errors
-        sigma_threshold: Number of sigma for plateau criterion
-        min_plateau_size: Minimum number of points in plateau
-        search_range: Search range configuration
+        time_series: 1D array of time series values errors: 1D array of
+        corresponding errors sigma_threshold: Number of sigma for
+        plateau criterion min_plateau_size: Minimum number of points in
+        plateau search_range: Search range configuration
 
     Returns:
         (start_index, end_index) of plateau region, or None if not found
@@ -102,7 +101,8 @@ def detect_plateau_region(
             weighted_mean = np.sum(weights * plateau_data) / np.sum(weights)
             weighted_error = 1.0 / np.sqrt(np.sum(weights))
 
-            # Check if all points are within sigma_threshold of weighted mean
+            # Check if all points are within sigma_threshold of weighted
+            # mean
             deviations = np.abs(plateau_data - weighted_mean) / plateau_errors
             if np.all(deviations <= sigma_threshold):
                 return (start, end)
@@ -124,14 +124,12 @@ def process_single_group(
     Process a single group to extract plateau from jackknife samples.
 
     Args:
-        jackknife_samples: 2D array (n_samples × n_time)
-        mean_values: 1D array of mean values
-        error_values: 1D array of error values
-        config_labels: List of configuration labels
-        sigma_thresholds: List of sigma thresholds to try
-        min_plateau_size: Minimum plateau size
-        search_range: Search range configuration
-        logger: Logger instance
+        jackknife_samples: 2D array (n_samples × n_time) mean_values: 1D
+        array of mean values error_values: 1D array of error values
+        config_labels: List of configuration labels sigma_thresholds:
+        List of sigma thresholds to try min_plateau_size: Minimum
+        plateau size search_range: Search range configuration logger:
+        Logger instance
 
     Returns:
         Dictionary with extraction results
@@ -195,6 +193,18 @@ def process_single_group(
 # =============================================================================
 # DATA LOADING AND PREPROCESSING FUNCTIONS
 # =============================================================================
+
+
+def load_dataset_array(group: h5py.Group, dataset_name: str) -> np.ndarray:
+    """Validate and load dataset from HDF5 group as NumPy array."""
+    if dataset_name not in group:
+        raise ValueError(f"Missing dataset: {dataset_name}")
+
+    dataset_obj = group[dataset_name]
+    if not isinstance(dataset_obj, h5py.Dataset):
+        raise ValueError(f"Object '{dataset_name}' is not a dataset")
+
+    return dataset_obj[:]
 
 
 def load_configuration_labels(group: h5py.Group) -> List[str]:
@@ -272,24 +282,14 @@ def process_analysis_group(
     logger,
 ) -> Dict:
     """Process a single analysis group to extract plateau."""
-    # Validate and load datasets
-    jackknife_samples_dataset = group[input_datasets["samples"]]
-    if not isinstance(jackknife_samples_dataset, h5py.Dataset):
-        return {"success": False, "error_message": "Invalid samples dataset"}
-
-    mean_values_dataset = group[input_datasets["mean"]]
-    if not isinstance(mean_values_dataset, h5py.Dataset):
-        return {"success": False, "error_message": "Invalid mean dataset"}
-
-    error_values_dataset = group[input_datasets["error"]]
-    if not isinstance(error_values_dataset, h5py.Dataset):
-        return {"success": False, "error_message": "Invalid error dataset"}
-
-    # Load data
-    jackknife_samples = jackknife_samples_dataset[:]
-    mean_values = mean_values_dataset[:]
-    error_values = error_values_dataset[:]
-    config_labels = load_configuration_labels(group)
+    try:
+        # Validate and load datasets
+        jackknife_samples = load_dataset_array(group, input_datasets["samples"])
+        mean_values = load_dataset_array(group, input_datasets["mean"])
+        error_values = load_dataset_array(group, input_datasets["error"])
+        config_labels = load_configuration_labels(group)
+    except ValueError as e:
+        return {"success": False, "error_message": str(e)}
 
     # Apply preprocessing
     jackknife_samples, mean_values, error_values = apply_preprocessing(
@@ -428,7 +428,7 @@ def process_all_groups(
 
                 group = hdf5_file[group_path]
                 if not isinstance(group, h5py.Group):
-                    continue
+                    continue  # Already logged error above
                 result = process_analysis_group(
                     group,
                     group_name,
