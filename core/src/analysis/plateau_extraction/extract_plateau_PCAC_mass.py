@@ -15,11 +15,13 @@ Usage:
 
 import os
 import sys
+from pathlib import Path
 from typing import Optional
 
 import click
 
 # Import library components
+from library.constants.paths import ROOT
 from library.utils.logging_utilities import create_script_logger
 from library.validation.click_validators import (
     hdf5_file,
@@ -169,10 +171,10 @@ def main(
             sys.exit(1)
 
         # Export to CSV
-        output_path = os.path.join(output_directory, output_csv_filename)
+        output_csv_path = os.path.join(output_directory, output_csv_filename)
         export_to_csv(
             results,
-            output_path,
+            output_csv_path,
             OUTPUT_COLUMN_PREFIX,
             TIME_OFFSET,
             CSV_OUTPUT_CONFIG,
@@ -186,7 +188,7 @@ def main(
         logger.log_script_end(f"Extraction complete: {n_success}/{n_total} successful")
         click.echo(
             f"✅ Plateau extraction complete: {n_success}/{n_total} successful\n"
-            f"   Results saved to: {output_path}"
+            f"   Results saved to: {Path(output_csv_path).relative_to(ROOT)}"
         )
 
     except Exception as e:
