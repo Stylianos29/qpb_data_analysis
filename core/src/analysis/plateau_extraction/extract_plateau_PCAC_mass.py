@@ -23,6 +23,7 @@ import click
 from library.utils.logging_utilities import create_script_logger
 from library.validation.click_validators import (
     hdf5_file,
+    csv_file,
     directory,
     validate_log_filename,
 )
@@ -71,12 +72,14 @@ from src.analysis.plateau_extraction._plateau_extraction_core import (
     "-out_h5",
     "--output_hdf5_filename",
     default=DEFAULT_OUTPUT_HDF5_FILENAME,
+    callback=hdf5_file.output,
     help=f"Output HDF5 filename. Default: {DEFAULT_OUTPUT_HDF5_FILENAME}",
 )
 @click.option(
     "-out_csv",
     "--output_csv_filename",
     default=DEFAULT_OUTPUT_CSV_FILENAME,
+    callback=csv_file.output,
     help=f"Output CSV filename. Default: {DEFAULT_OUTPUT_CSV_FILENAME}",
 )
 @click.option(
