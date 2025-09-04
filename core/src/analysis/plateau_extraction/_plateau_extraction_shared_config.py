@@ -16,7 +16,9 @@ from typing import List
 # Plateau detection parameters
 PLATEAU_DETECTION_SIGMA_THRESHOLDS = [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
 MIN_PLATEAU_SIZE = 5
-PLATEAU_DETECTION_METHOD = "weighted_range"  # Options: 'weighted_range', 'chi_squared', 'range_based'
+PLATEAU_DETECTION_METHOD = (
+    "weighted_range"  # Options: 'weighted_range', 'chi_squared', 'range_based'
+)
 
 # Estimation methods
 PLATEAU_ESTIMATION_METHOD = "inverse_variance_weighted"
@@ -25,7 +27,7 @@ USE_INVERSE_VARIANCE_WEIGHTING = True
 # Metadata datasets to read from HDF5
 METADATA_DATASETS = [
     "gauge_configuration_labels",
-    "mpi_geometry_values", 
+    "mpi_geometry_values",
     "qpb_log_filenames",
     "Number_of_gauge_configurations",
 ]
@@ -76,26 +78,24 @@ def validate_shared_config() -> bool:
     # Check sigma thresholds
     if not PLATEAU_DETECTION_SIGMA_THRESHOLDS:
         raise ValueError("PLATEAU_DETECTION_SIGMA_THRESHOLDS cannot be empty")
-    
+
     if any(s <= 0 for s in PLATEAU_DETECTION_SIGMA_THRESHOLDS):
         raise ValueError("All sigma thresholds must be positive")
-    
+
     if max(PLATEAU_DETECTION_SIGMA_THRESHOLDS) > 5.0:
         raise ValueError("Maximum sigma threshold should not exceed 5.0")
-    
+
     # Check plateau size
     if MIN_PLATEAU_SIZE < 3:
         raise ValueError("MIN_PLATEAU_SIZE must be at least 3")
-    
+
     # Check detection method
     valid_methods = {"weighted_range", "chi_squared", "range_based"}
     if PLATEAU_DETECTION_METHOD not in valid_methods:
-        raise ValueError(
-            f"PLATEAU_DETECTION_METHOD must be one of {valid_methods}"
-        )
-    
+        raise ValueError(f"PLATEAU_DETECTION_METHOD must be one of {valid_methods}")
+
     # Check error handling
     if not 0 < ERROR_HANDLING["min_successful_fraction"] <= 1:
         raise ValueError("min_successful_fraction must be between 0 and 1")
-    
+
     return True

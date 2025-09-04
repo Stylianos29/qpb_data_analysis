@@ -29,13 +29,14 @@ SYMMETRIZATION_TRUNCATION = False
 
 # Plateau search range (in array indices, not time values)
 PLATEAU_SEARCH_RANGE = {
-    "min_start": 3,  # Don't search before index 3 
+    "min_start": 3,  # Don't search before index 3
     "max_end": -1,  # Don't include last point
     "prefer_central": True,  # Prefer plateaus in central region
 }
 
-# Output file configuration  
-DEFAULT_OUTPUT_FILENAME = "plateau_pion_mass_estimates.csv"
+# Output file configuration
+DEFAULT_OUTPUT_HDF5_FILENAME = "plateau_pion_mass_extraction.h5"
+DEFAULT_OUTPUT_CSV_FILENAME = "plateau_pion_mass_estimates.csv"
 OUTPUT_COLUMN_PREFIX = "pion"  # For column names like "pion_plateau_mean"
 
 
@@ -48,16 +49,16 @@ def validate_pion_config() -> bool:
     """Validate pion-specific configuration."""
     # First validate shared config
     validate_shared_config()
-    
+
     # Check time offset
     if TIME_OFFSET < 0:
         raise ValueError("TIME_OFFSET must be non-negative")
-    
+
     # Check plateau search range
     if PLATEAU_SEARCH_RANGE["min_start"] < 0:
         raise ValueError("min_start must be non-negative")
-    
+
     if not OUTPUT_COLUMN_PREFIX:
         raise ValueError("OUTPUT_COLUMN_PREFIX cannot be empty")
-    
+
     return True

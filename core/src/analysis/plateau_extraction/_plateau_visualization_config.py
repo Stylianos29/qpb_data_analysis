@@ -2,8 +2,8 @@
 """
 Configuration for plateau extraction visualization.
 
-This module provides configuration for visualizing plateau extraction results
-from both PCAC mass and pion effective mass analyses.
+This module provides configuration for visualizing plateau extraction
+results from both PCAC mass and pion effective mass analyses.
 """
 
 from typing import Dict, Any
@@ -65,7 +65,7 @@ ANALYSIS_CONFIGS = {
     "pcac_mass": {
         "input_datasets": {
             "samples": "PCAC_mass_jackknife_samples",
-            "mean": "PCAC_mass_mean_values", 
+            "mean": "PCAC_mass_mean_values",
             "error": "PCAC_mass_error_values",
         },
         "time_offset": 2,  # PCAC mass starts at t=2
@@ -130,16 +130,22 @@ def get_data_processing_config() -> Dict[str, Any]:
 def validate_visualization_config() -> bool:
     """Validate visualization configuration consistency."""
     # Check that all analysis configs have required keys
-    required_keys = {"input_datasets", "time_offset", "y_label", "x_label", 
-                    "plot_subdirectory", "title_prefix"}
-    
+    required_keys = {
+        "input_datasets",
+        "time_offset",
+        "y_label",
+        "x_label",
+        "plot_subdirectory",
+        "title_prefix",
+    }
+
     for analysis_type, config in ANALYSIS_CONFIGS.items():
         missing_keys = required_keys - set(config.keys())
         if missing_keys:
             raise ValueError(
                 f"Analysis config '{analysis_type}' missing keys: {missing_keys}"
             )
-    
+
     # Check that input datasets have required sub-keys
     dataset_keys = {"samples", "mean", "error"}
     for analysis_type, config in ANALYSIS_CONFIGS.items():
@@ -148,12 +154,12 @@ def validate_visualization_config() -> bool:
             raise ValueError(
                 f"Analysis '{analysis_type}' missing dataset keys: {missing_dataset_keys}"
             )
-    
+
     # Validate numeric ranges
     if DATA_PROCESSING["max_samples_per_figure"] < 1:
         raise ValueError("max_samples_per_figure must be at least 1")
-    
+
     if PLOT_STYLING["figure"]["max_panels"] < 1:
         raise ValueError("max_panels must be at least 1")
-    
+
     return True
