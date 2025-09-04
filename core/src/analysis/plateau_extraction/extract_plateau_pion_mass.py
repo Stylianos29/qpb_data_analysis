@@ -188,7 +188,7 @@ def main(
         logger.log_script_end(f"Extraction complete: {n_success}/{n_total} successful")
         click.echo(
             f"✅ Plateau extraction complete: {n_success}/{n_total} successful\n"
-            f"   CSV results: {output_csv_path}"
+            f"   Results saved to: {output_csv_path}"
         )
 
     except Exception as e:
