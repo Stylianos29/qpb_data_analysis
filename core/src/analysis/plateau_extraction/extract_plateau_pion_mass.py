@@ -66,8 +66,8 @@ from src.analysis.plateau_extraction._plateau_extraction_core import (
     "-o",
     "--output_directory",
     required=True,
-    callback=directory.can_create,
-    help="Directory for output files (CSV and HDF5).",
+    callback=directory.must_exist,
+    help="Directory for output files.",
 )
 @click.option(
     "-out_h5",
@@ -82,16 +82,21 @@ from src.analysis.plateau_extraction._plateau_extraction_core import (
     help=f"Output CSV filename. Default: {DEFAULT_OUTPUT_CSV_FILENAME}",
 )
 @click.option(
-    "--enable_logging/--no_logging",
-    default=True,
+    "-log_on",
+    "--enable_logging",
+    is_flag=True,
+    default=False,
     help="Enable or disable logging to file.",
 )
 @click.option(
+    "-log_dir",
     "--log_directory",
+    default=None,  # TODO: Is it redundant with callback?
     callback=directory.can_create,
     help="Directory for log files. Default: same as output directory.",
 )
 @click.option(
+    "-log_name",
     "--log_filename",
     callback=validate_log_filename,
     help="Custom log filename. Default: auto-generated.",
@@ -100,6 +105,7 @@ from src.analysis.plateau_extraction._plateau_extraction_core import (
     "-v",
     "--verbose",
     is_flag=True,
+    default=False,
     help="Enable verbose console output.",
 )
 def main(
@@ -125,10 +131,9 @@ def main(
         sys.exit(1)
 
     # Setup logging
+    log_dir = None
     if enable_logging:
         log_dir = log_directory or output_directory
-    else:
-        log_dir = None
 
     logger = create_script_logger(
         log_directory=log_dir,
@@ -137,7 +142,7 @@ def main(
         enable_console_logging=verbose,
     )
 
-    logger.log_script_start("Pion effective mass plateau extraction")
+    logger.log_script_start("Pion mass plateau extraction")
 
     try:
         # Log parameters
