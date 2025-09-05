@@ -52,6 +52,7 @@ from src.analysis.plateau_extraction._pcac_plateau_config import (
 from src.analysis.plateau_extraction._plateau_extraction_core import (
     process_all_groups,
     export_to_csv,
+    export_to_hdf5,
 )
 
 
@@ -177,6 +178,17 @@ def main(
             output_csv_path,
             OUTPUT_COLUMN_PREFIX,
             CSV_OUTPUT_CONFIG["delimiter"],
+            logger,
+        )
+
+        # Export to HDF5
+        output_hdf5_path = os.path.join(output_directory, output_hdf5_filename)
+        export_to_hdf5(
+            results,
+            input_hdf5_file,
+            output_hdf5_path,
+            INPUT_DATASETS,
+            OUTPUT_COLUMN_PREFIX,
             logger,
         )
 

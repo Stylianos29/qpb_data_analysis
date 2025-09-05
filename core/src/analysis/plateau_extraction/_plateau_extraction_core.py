@@ -8,6 +8,7 @@ plateau values from time series data using jackknife analysis.
 
 import os
 from typing import Tuple, Dict, List, Optional, Any
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -15,6 +16,11 @@ import h5py
 import click
 import gvar as gv
 
+
+from src.analysis.correlator_calculations._correlator_analysis_core import (
+    copy_parent_attributes,
+    copy_metadata,
+)
 from library.data.hdf5_analyzer import HDF5Analyzer
 from library.constants import (
     PARAMETERS_WITH_EXPONENTIAL_FORMAT,
@@ -539,3 +545,216 @@ def export_to_csv(
     )
 
     logger.info(f"Exported {len(records)} results to {output_file}")
+
+
+# =============================================================================
+# HDF5 EXPORT FUNCTIONS
+# =============================================================================
+
+# import os from datetime import datetime from typing import Dict, List
+# import h5py import numpy as np
+
+# from src.analysis.correlator_calculations._correlator_analysis_core
+#     import ( copy_parent_attributes, copy_metadata, )
+
+
+def _create_output_datasets_config(output_column_prefix: str) -> Dict[str, str]:
+    """Create output dataset configuration for visualization."""
+    return {
+        "original_samples": f"{output_column_prefix}_time_series_samples",
+        "plateau_estimates": f"{output_column_prefix}_plateau_estimates",
+        "config_labels": "gauge_configuration_labels",
+    }
+
+
+def _map_results_to_groups(results: List[Dict]) -> Dict[str, Dict]:
+    """Map successful results to their HDF5 group paths."""
+    group_mapping = {}
+
+    for result in results:
+        if result["success"]:
+            group_name = result["group_name"]
+            group_mapping[group_name] = result
+
+    return group_mapping
+
+
+def _extract_visualization_data(
+    input_group: h5py.Group,
+    result: Dict,
+    input_datasets: Dict[str, str],
+    logger,
+) -> tuple:
+    """Extract data needed for visualization from input group and
+    result."""
+    try:
+        # Load original time series data
+        original_samples = load_dataset_array(input_group, input_datasets["samples"])
+        config_labels = load_configuration_labels(input_group)
+
+        # Extract individual plateau estimates from diagnostics
+        sample_results = result["diagnostics"]["sample_results"]
+        plateau_estimates = np.array([sr["plateau_value"] for sr in sample_results])
+
+        # Ensure we have the right number of labels
+        n_samples = len(sample_results)
+        if len(config_labels) >= n_samples:
+            config_labels = config_labels[:n_samples]
+        else:
+            # Pad with default labels if needed
+            config_labels.extend(
+                [f"sample_{i}" for i in range(len(config_labels), n_samples)]
+            )
+
+        return original_samples, plateau_estimates, config_labels
+
+    except Exception as e:
+        logger.error(f"Failed to extract visualization data: {e}")
+        return None, None, None
+
+
+def export_to_hdf5(
+    results: List[Dict],
+    input_hdf5_file: str,
+    output_hdf5_file: str,
+    input_datasets: Dict[str, str],
+    output_column_prefix: str,
+    logger,
+) -> None:
+    """Export plateau results to HDF5 for visualization."""
+    if not results:
+        logger.warning("No results to export to HDF5")
+        return
+
+    # Map results to group paths
+    group_mapping = _map_results_to_groups(results)
+
+    if not group_mapping:
+        logger.warning("No successful results to export to HDF5")
+        return
+
+    # Get output dataset configuration
+    output_datasets = _create_output_datasets_config(output_column_prefix)
+
+    # Metadata datasets to copy (excluding ones we create ourselves)
+    metadata_datasets = ["mpi_geometry_values", "qpb_log_filenames"]
+
+    logger.info(f"Exporting {len(group_mapping)} successful results to HDF5")
+
+    processed_parents = set()  # Track which parent groups we've processed
+
+    with h5py.File(input_hdf5_file, "r") as input_file, h5py.File(
+        output_hdf5_file, "w"
+    ) as output_file:
+
+        # Add file-level documentation
+        output_file.attrs["analysis_type"] = (
+            f"{output_column_prefix} plateau extraction results"
+        )
+        output_file.attrs["analysis_date"] = datetime.now().isoformat()
+        output_file.attrs["source_file"] = os.path.basename(input_hdf5_file)
+        output_file.attrs["description"] = (
+            f"Visualization-optimized HDF5 file containing original time series, "
+            f"individual plateau estimates, and configuration labels for {output_column_prefix} analysis"
+        )
+
+        # Use HDF5Analyzer to find available groups (same as
+        # process_all_groups)
+        from library.data.hdf5_analyzer import HDF5Analyzer
+
+        analyzer = HDF5Analyzer(input_hdf5_file)
+
+        # Match full group paths with our results by basename
+        available_groups = []
+        for group_path in analyzer.active_groups:
+            group_name = os.path.basename(group_path)
+            if group_name in group_mapping:
+                available_groups.append(group_path)
+                group_mapping[group_name]["group_path"] = group_path
+
+        analyzer.close()
+
+        if not available_groups:
+            logger.error("No matching group paths found between results and input file")
+            return
+
+        logger.info(f"Found {len(available_groups)} matching groups for export")
+
+        # Process each group
+        for group_path in available_groups:
+            group_name = os.path.basename(group_path)
+            result = group_mapping[group_name]
+
+            logger.info(f"Processing group: {group_path}")
+
+            # Get input group
+            input_group = input_file[group_path]
+            if not isinstance(input_group, h5py.Group):
+                logger.warning(f"Skipping {group_path}: not a valid group")
+                continue
+
+            # Copy parent group attributes (second-to-deepest level)
+            copy_parent_attributes(
+                input_file, output_file, group_path, processed_parents
+            )
+
+            # Extract visualization data
+            original_samples, plateau_estimates, config_labels = (
+                _extract_visualization_data(input_group, result, input_datasets, logger)
+            )
+
+            if original_samples is None:
+                logger.warning(
+                    f"Skipping {group_path}: failed to extract visualization data"
+                )
+                continue
+
+            # Create output group
+            output_group = output_file.create_group(group_path)
+
+            # Save visualization datasets
+            output_group.create_dataset(
+                output_datasets["original_samples"],
+                data=original_samples,
+                compression="gzip",
+                compression_opts=6,
+            )
+
+            output_group.create_dataset(
+                output_datasets["plateau_estimates"],
+                data=plateau_estimates,
+                compression="gzip",
+                compression_opts=6,
+            )
+
+            # Save configuration labels as variable-length strings
+            dt = h5py.string_dtype(encoding="utf-8")
+            output_group.create_dataset(
+                output_datasets["config_labels"],
+                data=[
+                    (
+                        label.encode("utf-8")
+                        if isinstance(label, str)
+                        else str(label).encode("utf-8")
+                    )
+                    for label in config_labels
+                ],
+                dtype=dt,
+            )
+
+            # Copy essential metadata
+            copy_metadata(input_group, output_group, metadata_datasets)
+
+            # Add group-specific attributes
+            output_group.attrs["plateau_extraction_success"] = True
+            output_group.attrs["n_samples"] = len(plateau_estimates)
+            output_group.attrs["n_time_points"] = original_samples.shape[1]
+
+            plateau_stats = result["plateau_value"]
+            output_group.attrs["plateau_mean"] = plateau_stats.mean
+            output_group.attrs["plateau_error"] = plateau_stats.sdev
+            output_group.attrs["sigma_threshold_used"] = result["sigma_threshold"]
+
+            logger.info(f"Successfully exported group: {group_name}")
+
+    logger.info(f"HDF5 export complete: {output_hdf5_file}")
