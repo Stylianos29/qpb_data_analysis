@@ -4,6 +4,12 @@ Core utilities for plateau extraction.
 
 This module provides shared functions for detecting and extracting
 plateau values from time series data using jackknife analysis.
+
+The correct procedure:
+1. Calculate jackknife average (with uncertainties) from all samples
+2. Detect plateau region on the averaged time series  
+3. Apply the common bounds to extract individual plateau values
+4. Calculate jackknife statistics from individual plateau values
 """
 
 import os
@@ -15,7 +21,6 @@ import pandas as pd
 import h5py
 import click
 import gvar as gv
-
 
 from src.analysis.correlator_calculations._correlator_analysis_core import (
     copy_parent_attributes,
@@ -82,129 +87,284 @@ def calculate_jackknife_statistics(
     return mean_values, error_values
 
 
-def detect_plateau_region(
-    time_series: np.ndarray,
-    errors: np.ndarray,
+def calculate_jackknife_average_with_covariance(
+    jackknife_samples: np.ndarray,
+) -> np.ndarray:
+    """
+    Calculate jackknife average with full covariance matrix.
+
+    Args:
+        jackknife_samples: Array of shape (N_samples, N_time)
+
+    Returns:
+        Array of gvar objects with jackknife means and covariances
+    """
+    n_samples, n_time = jackknife_samples.shape
+
+    # Calculate mean
+    jk_mean = np.mean(jackknife_samples, axis=0)
+
+    # Calculate covariance matrix
+    covariance_matrix = np.zeros((n_time, n_time))
+    for i in range(n_time):
+        for j in range(n_time):
+            values_i = jackknife_samples[:, i]
+            values_j = jackknife_samples[:, j]
+            mean_i = jk_mean[i]
+            mean_j = jk_mean[j]
+            cov_ij = (
+                (n_samples - 1)
+                / n_samples
+                * np.sum((values_i - mean_i) * (values_j - mean_j))
+            )
+            covariance_matrix[i, j] = cov_ij
+
+    # Create gvar array with full covariance
+    return gv.gvar(jk_mean, covariance_matrix)
+
+
+def detect_plateau_region_weighted_range(
+    time_series_gvar: np.ndarray,
     sigma_threshold: float,
     min_plateau_size: int,
     search_range: Dict[str, Any],
 ) -> Optional[Tuple[int, int]]:
     """
-    Detect plateau region in time series using weighted range test.
+    Detect plateau region using weighted range test on gvar time series.
 
     Args:
-        time_series: 1D array of time series values errors: 1D array of
-        corresponding errors sigma_threshold: Number of sigma for
-        plateau criterion min_plateau_size: Minimum number of points in
-        plateau search_range: Search range configuration
+        time_series_gvar: Array of gvar objects (from jackknife average)
+        sigma_threshold: Number of sigma for plateau criterion
+        min_plateau_size: Minimum number of points in plateau
+        search_range: Search range configuration
 
     Returns:
         (start_index, end_index) of plateau region, or None if not found
     """
-    n_points = len(time_series)
+    n_points = len(time_series_gvar)
     min_start = search_range.get("min_start", 0)
     max_end = search_range.get("max_end", -1)
 
     if max_end < 0:
         max_end = n_points + max_end
 
+    # Extract means and standard deviations
+    means = np.array([val.mean for val in time_series_gvar])
+    stds = np.array([val.sdev for val in time_series_gvar])
+
     # Search for plateau regions
     for start in range(min_start, max_end - min_plateau_size + 1):
         for end in range(start + min_plateau_size, max_end + 1):
-            plateau_data = time_series[start:end]
-            plateau_errors = errors[start:end]
+            plateau_means = means[start:end]
+            plateau_stds = stds[start:end]
 
             # Weighted range test
-            weights = 1.0 / (plateau_errors**2)
-            weighted_mean = np.sum(weights * plateau_data) / np.sum(weights)
+            weights = 1.0 / (plateau_stds**2 + 1e-12)  # Avoid division by zero
+            weighted_mean = np.sum(weights * plateau_means) / np.sum(weights)
             weighted_error = 1.0 / np.sqrt(np.sum(weights))
 
-            # Check if all points are within sigma_threshold of weighted
-            # mean
-            deviations = np.abs(plateau_data - weighted_mean) / plateau_errors
+            # Check if all points are within sigma_threshold of weighted mean
+            deviations = np.abs(plateau_means - weighted_mean) / plateau_stds
             if np.all(deviations <= sigma_threshold):
                 return (start, end)
 
     return None
 
 
-def process_single_group(
+# =============================================================================
+# MAIN PLATEAU EXTRACTION FUNCTIONS
+# =============================================================================
+
+
+def extract_plateau_from_jackknife_samples(
     jackknife_samples: np.ndarray,
-    error_values: np.ndarray,
     config_labels: List[str],
     sigma_thresholds: List[float],
     min_plateau_size: int,
     search_range: Dict[str, Any],
+    group_name: str,
+    logger,
 ) -> Dict[str, Any]:
     """
-    Process a single group to extract plateau from jackknife samples.
+    Extract plateau values using the CORRECT statistical procedure:
+    1. Calculate jackknife average with covariances
+    2. Detect plateau on averaged (less noisy) time series
+    3. Apply common bounds to extract individual plateau values
+    4. Calculate final jackknife statistics
 
     Args:
-        - jackknife_samples: 2D array (n_samples x n_time) mean_values:
-          1D
-        - config_labels: List of configuration labels sigma_thresholds:
-        - List of sigma thresholds to try min_plateau_size: Minimum
-        - plateau size search_range: Search range configuration logger:
-        - Logger instance
+        jackknife_samples: Array of shape (N_samples, N_time)
+        config_labels: List of configuration labels
+        sigma_thresholds: List of sigma thresholds to try
+        min_plateau_size: Minimum plateau size
+        search_range: Search range configuration
+        group_name: Name for logging
+        logger: Logger instance
 
     Returns:
         Dictionary with extraction results
     """
-    n_samples, _ = jackknife_samples.shape
-    sample_results = []
+    n_samples, n_time = jackknife_samples.shape
 
-    # Try to extract plateau from each individual sample
-    for i, sample_data in enumerate(jackknife_samples):
-        sample_result = None
-        for sigma in sigma_thresholds:
-            plateau_bounds = detect_plateau_region(
-                sample_data, error_values, sigma, min_plateau_size, search_range
-            )
-            if plateau_bounds is not None:
-                start, end = plateau_bounds
-                plateau_value = np.mean(sample_data[start:end])
-                sample_result = {
-                    "plateau_value": plateau_value,
-                    "plateau_bounds": plateau_bounds,
-                    "sigma_threshold": sigma,
-                    "config_label": (
-                        config_labels[i] if i < len(config_labels) else f"sample_{i}"
-                    ),
-                }
-                break
+    logger.info(
+        f"Group {group_name}: Starting plateau extraction on {n_samples} samples"
+    )
 
-        if sample_result is not None:
-            sample_results.append(sample_result)
-
-    # Check if we have enough successful extractions
-    n_successful = len(sample_results)
-    if n_successful < n_samples * 0.5:  # At least 50% success
+    # Step 1: Calculate jackknife average with full covariance
+    try:
+        gvar_time_series = calculate_jackknife_average_with_covariance(
+            jackknife_samples
+        )
+        logger.debug(
+            f"Group {group_name}: Calculated jackknife average with covariance"
+        )
+    except Exception as e:
+        logger.error(f"Group {group_name}: Failed to calculate jackknife average: {e}")
         return {
             "success": False,
-            "n_samples": n_successful,
-            "error_message": f"Only {n_successful}/{n_samples} samples had successful plateau extraction",
+            "group_name": group_name,
+            "error_message": f"Failed to calculate jackknife average: {e}",
+            "n_total_samples": n_samples,
         }
 
-    # Calculate jackknife average of plateau values
-    plateau_values = [sr["plateau_value"] for sr in sample_results]
-    # TODO: Calculate the jackknife error properly
-    plateau_gvar = gv.gvar(np.mean(plateau_values), np.std(plateau_values, ddof=1))
+    # Step 2: Detect plateau region on the averaged time series
+    plateau_bounds = None
+    sigma_used = None
 
-    # Use most common plateau bounds #TODO: The plateau bounds must be
-    # common for all samples
-    bounds_list = [sr["plateau_bounds"] for sr in sample_results]
-    most_common_bounds = max(set(bounds_list), key=bounds_list.count)
+    for sigma_threshold in sigma_thresholds:
+        try:
+            plateau_bounds = detect_plateau_region_weighted_range(
+                gvar_time_series, sigma_threshold, min_plateau_size, search_range
+            )
+
+            if plateau_bounds is not None:
+                sigma_used = sigma_threshold
+                logger.info(
+                    f"Group {group_name}: Plateau detected at σ={sigma_threshold}, "
+                    f"bounds=[{plateau_bounds[0]}:{plateau_bounds[1]}]"
+                )
+                break
+
+        except Exception as e:
+            logger.debug(
+                f"Group {group_name}: Plateau detection failed at σ={sigma_threshold}: {e}"
+            )
+            continue
+
+    if plateau_bounds is None:
+        max_sigma = max(sigma_thresholds)
+        logger.warning(
+            f"Group {group_name}: No plateau found with any σ threshold (max={max_sigma})"
+        )
+        return {
+            "success": False,
+            "group_name": group_name,
+            "error_message": f"No plateau found with any sigma threshold (max={max_sigma})",
+            "n_total_samples": n_samples,
+        }
+
+    plateau_start, plateau_end = plateau_bounds
+    n_plateau_points = plateau_end - plateau_start
+
+    # Step 3: Extract individual plateau values using common bounds
+    individual_plateau_values = []
+    individual_sigma_thresholds = []
+    successful_config_labels = []
+    successful_sample_indices = []
+
+    for i, sample_data in enumerate(jackknife_samples):
+        try:
+            plateau_region = sample_data[plateau_start:plateau_end]
+
+            # Check for invalid values
+            if not np.all(np.isfinite(plateau_region)):
+                logger.debug(
+                    f"Group {group_name}: Sample {i} has invalid values in plateau region"
+                )
+                continue
+
+            # Calculate plateau value for this sample
+            individual_plateau = np.mean(plateau_region)
+            individual_plateau_values.append(individual_plateau)
+
+            # Store sigma threshold used (same for all successful samples)
+            individual_sigma_thresholds.append(sigma_used)
+
+            # Keep track of successful indices and config labels
+            successful_sample_indices.append(i)
+            if i < len(config_labels):
+                successful_config_labels.append(config_labels[i])
+            else:
+                successful_config_labels.append(f"sample_{i:03d}")
+
+        except Exception as e:
+            logger.debug(
+                f"Group {group_name}: Failed to extract plateau for sample {i}: {e}"
+            )
+            continue
+
+    n_successful = len(individual_plateau_values)
+    n_failed = n_samples - n_successful
+
+    # Check if we have enough successful extractions
+    min_success_rate = 0.5  # At least 50% must succeed
+    if n_successful < n_samples * min_success_rate:
+        logger.warning(
+            f"Group {group_name}: Insufficient successful extractions "
+            f"({n_successful}/{n_samples} = {n_successful/n_samples:.1%})"
+        )
+        return {
+            "success": False,
+            "group_name": group_name,
+            "error_message": f"Only {n_successful}/{n_samples} successful plateau extractions",
+            "n_total_samples": n_samples,
+            "n_successful": n_successful,
+            "n_failed": n_failed,
+            "plateau_bounds": plateau_bounds,
+            "sigma_threshold": sigma_used,
+        }
+
+    # Step 4: Calculate final jackknife statistics from individual plateau values
+    plateau_values_array = np.array(individual_plateau_values)
+    plateau_mean = np.mean(plateau_values_array)
+
+    # Proper jackknife error calculation
+    plateau_variance = (
+        (n_successful - 1)
+        / n_successful
+        * np.sum((plateau_values_array - plateau_mean) ** 2)
+    )
+    plateau_error = np.sqrt(plateau_variance)
+
+    # Create gvar result
+    plateau_gvar = gv.gvar(plateau_mean, plateau_error)
+
+    # Extract successful time series for HDF5 export (processed data only)
+    successful_time_series = jackknife_samples[successful_sample_indices, :]
+
+    logger.info(
+        f"Group {group_name}: Success! Plateau = {plateau_gvar}, "
+        f"{n_successful}/{n_samples} samples, σ={sigma_used}"
+    )
 
     return {
         "success": True,
+        "group_name": group_name,
         "plateau_value": plateau_gvar,
-        "plateau_bounds": most_common_bounds,
-        "n_samples": n_successful,
-        "sigma_threshold": sample_results[0]["sigma_threshold"],  # Most stringent used
-        "diagnostics": {
-            "method": "jackknife_average",
-            "sample_results": sample_results,
-        },
+        "plateau_bounds": plateau_bounds,
+        "plateau_mean": plateau_mean,
+        "plateau_error": plateau_error,
+        "sigma_threshold": sigma_used,
+        "n_total_samples": n_samples,
+        "n_successful": n_successful,
+        "n_failed": n_failed,
+        "n_plateau_points": n_plateau_points,
+        "individual_plateau_values": plateau_values_array,
+        "individual_sigma_thresholds": np.array(individual_sigma_thresholds),
+        "successful_config_labels": successful_config_labels,
+        "successful_sample_indices": successful_sample_indices,
+        "successful_time_series": successful_time_series,  # Processed data for HDF5
+        "estimation_method": "jackknife_with_common_bounds",
     }
 
 
@@ -216,57 +376,45 @@ def process_single_group(
 def load_dataset_array(group: h5py.Group, dataset_name: str) -> np.ndarray:
     """Validate and load dataset from HDF5 group as NumPy array."""
     if dataset_name not in group:
-        raise ValueError(f"Missing dataset: {dataset_name}")
+        raise ValueError(f"Dataset '{dataset_name}' not found in group")
 
-    dataset_obj = group[dataset_name]
-    if not isinstance(dataset_obj, h5py.Dataset):
-        raise ValueError(f"Object '{dataset_name}' is not a dataset")
+    dataset = group[dataset_name]
+    if not isinstance(dataset, h5py.Dataset):
+        raise ValueError(f"'{dataset_name}' is not an HDF5 dataset")
 
-    return dataset_obj[:]
+    data = dataset[()]
+    if not isinstance(data, np.ndarray):
+        data = np.array(data)
+
+    return data
 
 
 def load_configuration_labels(group: h5py.Group) -> List[str]:
-    """Load and decode configuration labels from HDF5 group."""
-    if "gauge_configuration_labels" not in group:
-        return []
+    """Load configuration labels from HDF5 group."""
+    labels = []
 
-    labels_obj = group["gauge_configuration_labels"]
-    if not isinstance(labels_obj, h5py.Dataset):
-        return []
-
-    labels_data = labels_obj[:]
-    return [
-        label.decode("utf-8") if isinstance(label, bytes) else label
-        for label in labels_data
-    ]
-
-
-def extract_group_metadata(group: h5py.Group) -> Dict:
-    """Extract metadata from HDF5 group for CSV output."""
-    metadata = {}
-
-    # Get group attributes
-    for key, value in group.attrs.items():
-        # Convert numpy types to Python types for CSV
-        if hasattr(value, "item"):
-            metadata[key] = value.item()
+    if "gauge_configuration_labels" in group:
+        gauge_configuration_labels_dataset = group["gauge_configuration_labels"]
+        if not isinstance(gauge_configuration_labels_dataset, h5py.Dataset):
+            raise ValueError(
+                f"'{gauge_configuration_labels_dataset}' is not an HDF5 dataset"
+            )
+        labels_data = gauge_configuration_labels_dataset[()]
+        if isinstance(labels_data, np.ndarray):
+            labels = [
+                label.decode("utf-8") if isinstance(label, bytes) else str(label)
+                for label in labels_data
+            ]
         else:
-            metadata[key] = value
+            # Single label
+            label = (
+                labels_data.decode("utf-8")
+                if isinstance(labels_data, bytes)
+                else str(labels_data)
+            )
+            labels = [label]
 
-    return metadata
-
-
-def extract_parent_group_metadata(hdf5_file: h5py.File, group_path: str) -> Dict:
-    """Extract shared metadata from parent group (second-to-deepest
-    level)."""
-    parent_path = os.path.dirname(group_path)
-
-    if parent_path in hdf5_file:
-        parent_group = hdf5_file[parent_path]
-        if isinstance(parent_group, h5py.Group):
-            return extract_group_metadata(parent_group)
-
-    return {}
+    return labels
 
 
 def apply_preprocessing(
@@ -277,26 +425,96 @@ def apply_preprocessing(
     symmetrization_truncation: bool,
     data_type: str,
     logger,
-) -> tuple:
-    """Apply symmetrization and truncation if configured."""
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Apply preprocessing steps (symmetrization, truncation) to time series data.
+
+    Args:
+        jackknife_samples: Shape (N_samples, N_time)
+        mean_values: Shape (N_time,)
+        error_values: Shape (N_time,)
+        apply_symmetrization: Whether to symmetrize
+        symmetrization_truncation: Whether to truncate after symmetrization
+        data_type: "PCAC mass" or "pion effective mass" (for logging)
+        logger: Logger instance
+
+    Returns:
+        Tuple of processed (jackknife_samples, mean_values, error_values)
+    """
+    original_time_points = jackknife_samples.shape[1]
+
     if apply_symmetrization:
         logger.info(f"Applying symmetrization to {data_type} data")
+
+        # Symmetrize all arrays
         jackknife_samples = symmetrize_time_series(jackknife_samples)
         mean_values = symmetrize_time_series(mean_values)
         error_values = symmetrize_time_series(error_values)
 
         if symmetrization_truncation:
-            half_length = len(mean_values) // 2
-            jackknife_samples = jackknife_samples[:, :half_length]
-            mean_values = mean_values[:half_length]
-            error_values = error_values[:half_length]
-            logger.info(f"Truncated to half length: {half_length} points")
+            # CRITICAL: For PCAC mass, truncate to T/2 after symmetrization
+            truncate_length = original_time_points // 2
+            logger.info(
+                f"Truncating {data_type} to T/2 = {truncate_length} points after symmetrization"
+            )
+
+            jackknife_samples = jackknife_samples[:, :truncate_length]
+            mean_values = mean_values[:truncate_length]
+            error_values = error_values[:truncate_length]
+
+    final_time_points = jackknife_samples.shape[1]
+    logger.info(
+        f"{data_type} preprocessing: {original_time_points} → {final_time_points} time points"
+    )
 
     return jackknife_samples, mean_values, error_values
 
 
+def extract_group_metadata(group: h5py.Group) -> Dict[str, Any]:
+    """Extract metadata from HDF5 group."""
+    metadata = {}
+
+    # Validate that group is indeed an HDF5 group
+    if not isinstance(group, h5py.Group):
+        raise ValueError(f"Expected h5py.Group, got {type(group)}")
+
+    # Extract all group attributes
+    for key, value in group.attrs.items():
+        metadata[key] = value
+
+    # Extract key metadata datasets if present
+    metadata_keys = ["Number_of_gauge_configurations"]
+    for key in metadata_keys:
+        if key in group:
+            dataset = group[key]
+            if not isinstance(dataset, h5py.Dataset):
+                raise ValueError(f"'{dataset}' is not an HDF5 dataset")
+            data = dataset[()]
+            metadata[key] = data.item() if hasattr(data, "item") else data
+
+    return metadata
+
+
+def extract_parent_group_metadata(
+    hdf5_file: h5py.File, sample_group_path: str
+) -> Dict[str, Any]:
+    """Extract metadata from parent group."""
+    parent_metadata = {}
+
+    # Navigate to parent group
+    path_parts = sample_group_path.split("/")
+    if len(path_parts) > 1:
+        parent_path = "/".join(path_parts[:-1])
+        if parent_path in hdf5_file:
+            parent_group = hdf5_file[parent_path]
+            for key, value in parent_group.attrs.items():
+                parent_metadata[key] = value
+
+    return parent_metadata
+
+
 # =============================================================================
-# GROUP PROCESSING FUNCTIONS
+# HIGH-LEVEL PROCESSING FUNCTIONS
 # =============================================================================
 
 
@@ -310,41 +528,73 @@ def process_analysis_group(
     min_plateau_size: int,
     search_range: Dict[str, Any],
     data_type: str,
-    parent_metadata: Dict,
+    parent_metadata: Dict[str, Any],
     logger,
-) -> Dict:
-    """Process a single analysis group to extract plateau."""
+) -> Dict[str, Any]:
+    """
+    Process a single analysis group to extract plateau values.
+
+    Args:
+        group: HDF5 group containing the data
+        group_name: Name of the group for logging
+        input_datasets: Dataset name mapping
+        apply_symmetrization: Whether to apply symmetrization
+        symmetrization_truncation: Whether to truncate after symmetrization
+        sigma_thresholds: List of sigma thresholds to try
+        min_plateau_size: Minimum plateau size
+        search_range: Search range configuration
+        data_type: Type of data being processed (for logging)
+        parent_metadata: Metadata from parent group
+        logger: Logger instance
+
+    Returns:
+        Dictionary with processing results
+    """
+    logger.info(f"Processing group: {group_name}")
+
     # Validate and load datasets
     try:
         jackknife_samples = load_dataset_array(group, input_datasets["samples"])
         mean_values = load_dataset_array(group, input_datasets["mean"])
         error_values = load_dataset_array(group, input_datasets["error"])
         config_labels = load_configuration_labels(group)
-    except ValueError as e:
-        return {"success": False, "error_message": str(e)}
+    except Exception as e:
+        logger.error(f"Group {group_name}: Failed to load data: {e}")
+        return {
+            "success": False,
+            "group_name": group_name,
+            "error_message": f"Data loading error: {e}",
+        }
 
-    # Apply symmetrization and truncation if configured
-    jackknife_samples, mean_values, error_values = apply_preprocessing(
-        jackknife_samples,
-        mean_values,
-        error_values,
-        apply_symmetrization,
-        symmetrization_truncation,
-        data_type,
-        logger,
-    )
+    # Apply preprocessing
+    try:
+        jackknife_samples, mean_values, error_values = apply_preprocessing(
+            jackknife_samples,
+            mean_values,
+            error_values,
+            apply_symmetrization,
+            symmetrization_truncation,
+            data_type,
+            logger,
+        )
+    except Exception as e:
+        logger.error(f"Group {group_name}: Failed to preprocess data: {e}")
+        return {
+            "success": False,
+            "group_name": group_name,
+            "error_message": f"Preprocessing error: {e}",
+        }
 
     # Extract plateau
-    result = process_single_group(
+    result = extract_plateau_from_jackknife_samples(
         jackknife_samples,
-        error_values,
         config_labels,
         sigma_thresholds,
         min_plateau_size,
         search_range,
+        group_name,
+        logger,
     )
-
-    result["group_name"] = group_name
 
     # Add metadata
     group_metadata = extract_group_metadata(group)
@@ -378,7 +628,7 @@ def process_all_groups(
             for group_path in analyzer.active_groups:
                 group = hdf5_file[group_path]
                 if not isinstance(group, h5py.Group):
-                    logger.error(f"Invalid group at path: {group_path}")
+                    logger.debug(f"Skipping non-group: {group_path}")
                     continue
                 if all(dataset in group for dataset in input_datasets.values()):
                     valid_groups.append(group_path)
@@ -389,8 +639,7 @@ def process_all_groups(
 
             logger.info(f"Found {len(valid_groups)} groups to process")
 
-            # Extract parent metadata once (using first group to
-            # determine parent)
+            # Extract parent metadata once
             parent_metadata = extract_parent_group_metadata(hdf5_file, valid_groups[0])
 
             # Process each group
@@ -403,8 +652,10 @@ def process_all_groups(
                 logger.info(f"Processing group: {group_path}")
 
                 group = hdf5_file[group_path]
+                # Validate that group is indeed an HDF5 group
                 if not isinstance(group, h5py.Group):
-                    continue  # Already logged error above
+                    raise ValueError(f"Expected h5py.Group, got {type(group)}")
+
                 result = process_analysis_group(
                     group,
                     group_name,
@@ -426,7 +677,10 @@ def process_all_groups(
                         f"{result['plateau_value']}"
                     )
                 else:
-                    logger.warning(f"Failed to extract plateau for {group_name}")
+                    logger.warning(
+                        f"Failed to extract plateau for {group_name}: "
+                        f"{result.get('error_message', 'Unknown error')}"
+                    )
 
         finally:
             analyzer.close()
@@ -439,178 +693,80 @@ def process_all_groups(
 # =============================================================================
 
 
-def _reorder_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """Ensure priority columns come first in specified order."""
-    priority_columns = ["Overlap_operator_method", "Kernel_operator_type"]
-
-    # Only include priority columns that actually exist
-    existing_priority = [col for col in priority_columns if col in df.columns]
-    remaining_columns = [col for col in df.columns if col not in priority_columns]
-
-    # Create new column order: priority first, then the rest
-    new_column_order = existing_priority + remaining_columns
-
-    # Reorder DataFrame
-    return df.reindex(columns=new_column_order)
-
-
-def _apply_export_formatting(df: pd.DataFrame) -> pd.DataFrame:
-    """Apply proper formatting using existing constants."""
-    available_columns = set(df.columns)
-
-    for col in available_columns:
-        if col in PARAMETERS_OF_INTEGER_VALUE:
-            # Format as integers
-            df[col] = df[col].apply(lambda x: int(x) if pd.notna(x) else "")
-
-        elif col in PARAMETERS_WITH_EXPONENTIAL_FORMAT:
-            # Format in exponential notation
-            df[col] = df[col].apply(
-                lambda x: f"{x:.1e}" if pd.notna(x) and x != 0 else "0.000000"
-            )
-
-    return df
-
-
-def create_csv_record(
-    result: Dict,
-    output_column_prefix: str,
-) -> Dict:
-    """Create CSV record with only essential data."""
-    # Start with ALL metadata (single-valued + multivalued parameters)
-    record = result.get("metadata", {}).copy()
-
-    if result["success"]:
-        plateau_value = result["plateau_value"]
-        # Plateau as tuple format: "(mean, uncertainty)" with 12 decimal
-        # precision
-        record[f"{output_column_prefix}_plateau"] = (
-            f"({plateau_value.mean:.12f}, {plateau_value.sdev:.12f})"
-        )
-
-        # Extract failed configuration labels from sample results
-        sample_results = result.get("diagnostics", {}).get("sample_results", [])
-        failed_labels = []
-
-        # Check if we have the full sample count vs successful count
-        total_samples = result.get("n_samples", 0)
-        if len(sample_results) < total_samples:
-            # Some samples failed - we need to identify which ones
-            successful_configs = {sr["config_label"] for sr in sample_results}
-            # Note: We'd need access to original config_labels to
-            # identify failed ones For now, just note that some failed
-            failed_count = total_samples - len(sample_results)
-            if failed_count > 0:
-                failed_labels = [f"failed_samples_{failed_count}"]
-
-        record["failed_config_labels"] = (
-            ";".join(failed_labels) if failed_labels else ""
-        )
-    else:
-        record[f"{output_column_prefix}_plateau"] = "NaN"
-        record["failed_config_labels"] = result.get("error_message", "")
-
-    return record
-
-
 def export_to_csv(
     results: List[Dict],
-    output_file: str,
+    output_csv_path: str,
     output_column_prefix: str,
     delimiter: str,
     logger,
 ) -> None:
-    """Export extraction results to CSV file with proper formatting."""
+    """Export extraction results to CSV file."""
     if not results:
-        logger.warning("No results to export")
+        logger.warning("No results to export to CSV")
         return
 
-    # Convert results to records
-    records = [create_csv_record(result, output_column_prefix) for result in results]
+    # Filter successful results
+    successful_results = [r for r in results if r.get("success", False)]
 
-    # Create DataFrame
-    df = pd.DataFrame(records)
+    if not successful_results:
+        logger.warning("No successful results to export to CSV")
+        return
 
-    # Apply column-specific formatting
-    df = _apply_export_formatting(df)
+    logger.info(f"Exporting {len(successful_results)} successful results to CSV")
 
-    # Reorder columns
-    df = _reorder_columns(df)
+    # Prepare data for CSV
+    csv_data = []
 
-    # Save to CSV
-    df.to_csv(
-        output_file,
-        index=False,
-        sep=delimiter,
-    )
+    for result in successful_results:
+        row_data = {}
 
-    logger.info(f"Exported {len(records)} results to {output_file}")
+        # Add metadata
+        metadata = result.get("metadata", {})
+        for key, value in metadata.items():
+            # Format special parameters
+            if key in PARAMETERS_WITH_EXPONENTIAL_FORMAT:
+                row_data[key] = f"{value:.2e}"
+            elif key in PARAMETERS_OF_INTEGER_VALUE:
+                row_data[key] = int(value) if not np.isnan(float(value)) else value
+            else:
+                row_data[key] = value
+
+        # Add extraction results
+        row_data[f"{output_column_prefix}_plateau_mean"] = result["plateau_mean"]
+        row_data[f"{output_column_prefix}_plateau_error"] = result["plateau_error"]
+        row_data[f"{output_column_prefix}_plateau_start_time"] = result[
+            "plateau_bounds"
+        ][0]
+        row_data[f"{output_column_prefix}_plateau_end_time"] = result["plateau_bounds"][
+            1
+        ]
+        row_data[f"{output_column_prefix}_plateau_n_points"] = result[
+            "n_plateau_points"
+        ]
+        row_data[f"{output_column_prefix}_n_successful_samples"] = result[
+            "n_successful"
+        ]
+        row_data[f"{output_column_prefix}_n_total_samples"] = result["n_total_samples"]
+        row_data[f"{output_column_prefix}_n_failed_samples"] = result["n_failed"]
+        row_data[f"{output_column_prefix}_sigma_threshold_used"] = result[
+            "sigma_threshold"
+        ]
+        row_data[f"{output_column_prefix}_estimation_method"] = result[
+            "estimation_method"
+        ]
+
+        csv_data.append(row_data)
+
+    # Create DataFrame and save
+    df = pd.DataFrame(csv_data)
+    df.to_csv(output_csv_path, index=False, sep=delimiter, float_format=f"%.6f")
+
+    logger.info(f"CSV export complete: {output_csv_path}")
 
 
 # =============================================================================
 # HDF5 EXPORT FUNCTIONS
 # =============================================================================
-
-# import os from datetime import datetime from typing import Dict, List
-# import h5py import numpy as np
-
-# from src.analysis.correlator_calculations._correlator_analysis_core
-#     import ( copy_parent_attributes, copy_metadata, )
-
-
-def _create_output_datasets_config(output_column_prefix: str) -> Dict[str, str]:
-    """Create output dataset configuration for visualization."""
-    return {
-        "original_samples": f"{output_column_prefix}_time_series_samples",
-        "plateau_estimates": f"{output_column_prefix}_plateau_estimates",
-        "config_labels": "gauge_configuration_labels",
-    }
-
-
-def _map_results_to_groups(results: List[Dict]) -> Dict[str, Dict]:
-    """Map successful results to their HDF5 group paths."""
-    group_mapping = {}
-
-    for result in results:
-        if result["success"]:
-            group_name = result["group_name"]
-            group_mapping[group_name] = result
-
-    return group_mapping
-
-
-def _extract_visualization_data(
-    input_group: h5py.Group,
-    result: Dict,
-    input_datasets: Dict[str, str],
-    logger,
-) -> tuple:
-    """Extract data needed for visualization from input group and
-    result."""
-    try:
-        # Load original time series data
-        original_samples = load_dataset_array(input_group, input_datasets["samples"])
-        config_labels = load_configuration_labels(input_group)
-
-        # Extract individual plateau estimates from diagnostics
-        sample_results = result["diagnostics"]["sample_results"]
-        plateau_estimates = np.array([sr["plateau_value"] for sr in sample_results])
-
-        # Ensure we have the right number of labels
-        n_samples = len(sample_results)
-        if len(config_labels) >= n_samples:
-            config_labels = config_labels[:n_samples]
-        else:
-            # Pad with default labels if needed
-            config_labels.extend(
-                [f"sample_{i}" for i in range(len(config_labels), n_samples)]
-            )
-
-        return original_samples, plateau_estimates, config_labels
-
-    except Exception as e:
-        logger.error(f"Failed to extract visualization data: {e}")
-        return None, None, None
 
 
 def export_to_hdf5(
@@ -621,27 +777,27 @@ def export_to_hdf5(
     output_column_prefix: str,
     logger,
 ) -> None:
-    """Export plateau results to HDF5 for visualization."""
+    """Export results to HDF5 format optimized for visualization."""
     if not results:
         logger.warning("No results to export to HDF5")
         return
 
-    # Map results to group paths
-    group_mapping = _map_results_to_groups(results)
+    # Filter successful results only
+    successful_results = [r for r in results if r.get("success", False)]
 
-    if not group_mapping:
+    if not successful_results:
         logger.warning("No successful results to export to HDF5")
         return
 
-    # Get output dataset configuration
-    output_datasets = _create_output_datasets_config(output_column_prefix)
+    logger.info(f"Exporting {len(successful_results)} successful results to HDF5")
 
-    # Metadata datasets to copy (excluding ones we create ourselves)
-    metadata_datasets = ["mpi_geometry_values", "qpb_log_filenames"]
-
-    logger.info(f"Exporting {len(group_mapping)} successful results to HDF5")
-
-    processed_parents = set()  # Track which parent groups we've processed
+    # Create output datasets configuration
+    output_datasets = {
+        "time_series": f"{output_column_prefix}_time_series_samples",
+        "plateau_estimates": f"{output_column_prefix}_plateau_estimates",
+        "sigma_thresholds": f"{output_column_prefix}_individual_sigma_thresholds",
+        "config_labels": "gauge_configuration_labels",
+    }
 
     with h5py.File(input_hdf5_file, "r") as input_file, h5py.File(
         output_hdf5_file, "w"
@@ -654,107 +810,92 @@ def export_to_hdf5(
         output_file.attrs["analysis_date"] = datetime.now().isoformat()
         output_file.attrs["source_file"] = os.path.basename(input_hdf5_file)
         output_file.attrs["description"] = (
-            f"Visualization-optimized HDF5 file containing original time series, "
-            f"individual plateau estimates, and configuration labels for {output_column_prefix} analysis"
+            f"Visualization-optimized HDF5 file containing processed time series, "
+            f"individual plateau estimates, sigma thresholds, and configuration labels for {output_column_prefix} analysis"
         )
 
-        # Use HDF5Analyzer to find available groups (same as
-        # process_all_groups)
-        from library.data.hdf5_analyzer import HDF5Analyzer
-
+        # Use HDF5Analyzer to get structure
         analyzer = HDF5Analyzer(input_hdf5_file)
 
-        # Match full group paths with our results by basename
-        available_groups = []
+        # Map results to group paths
+        result_mapping = {r["group_name"]: r for r in successful_results}
+
+        # Process each successful result
         for group_path in analyzer.active_groups:
             group_name = os.path.basename(group_path)
-            if group_name in group_mapping:
-                available_groups.append(group_path)
-                group_mapping[group_name]["group_path"] = group_path
 
-        analyzer.close()
+            if group_name not in result_mapping:
+                continue  # Skip unsuccessful groups
 
-        if not available_groups:
-            logger.error("No matching group paths found between results and input file")
-            return
-
-        logger.info(f"Found {len(available_groups)} matching groups for export")
-
-        # Process each group
-        for group_path in available_groups:
-            group_name = os.path.basename(group_path)
-            result = group_mapping[group_name]
-
-            logger.info(f"Processing group: {group_path}")
-
-            # Get input group
+            result = result_mapping[group_name]
             input_group = input_file[group_path]
-            if not isinstance(input_group, h5py.Group):
-                logger.warning(f"Skipping {group_path}: not a valid group")
-                continue
 
-            # Copy parent group attributes (second-to-deepest level)
-            copy_parent_attributes(
-                input_file, output_file, group_path, processed_parents
+            # Create corresponding output group structure
+            output_group = output_file.require_group(group_path)
+
+            # Use processed time series data (already symmetrized/truncated)
+            processed_time_series = result["successful_time_series"]
+
+            # Get individual plateau estimates and sigma thresholds
+            individual_estimates = result["individual_plateau_values"]
+            individual_sigmas = result["individual_sigma_thresholds"]
+
+            # Get successful config labels
+            successful_labels = result["successful_config_labels"]
+
+            logger.debug(
+                f"Group {group_name}: Exporting {len(individual_estimates)} successful samples, "
+                f"time series shape: {processed_time_series.shape}"
             )
 
-            # Extract visualization data
-            original_samples, plateau_estimates, config_labels = (
-                _extract_visualization_data(input_group, result, input_datasets, logger)
-            )
-
-            if original_samples is None:
-                logger.warning(
-                    f"Skipping {group_path}: failed to extract visualization data"
-                )
-                continue
-
-            # Create output group
-            output_group = output_file.create_group(group_path)
-
-            # Save visualization datasets
+            # Save processed time series samples (smaller file size)
             output_group.create_dataset(
-                output_datasets["original_samples"],
-                data=original_samples,
+                output_datasets["time_series"],
+                data=processed_time_series,
                 compression="gzip",
                 compression_opts=6,
             )
 
+            # Save individual plateau estimates
             output_group.create_dataset(
                 output_datasets["plateau_estimates"],
-                data=plateau_estimates,
+                data=individual_estimates,
                 compression="gzip",
                 compression_opts=6,
             )
 
-            # Save configuration labels as variable-length strings
+            # Save individual sigma thresholds
+            output_group.create_dataset(
+                output_datasets["sigma_thresholds"],
+                data=individual_sigmas,
+                compression="gzip",
+                compression_opts=6,
+            )
+
+            # Save configuration labels
             dt = h5py.string_dtype(encoding="utf-8")
             output_group.create_dataset(
                 output_datasets["config_labels"],
-                data=[
-                    (
-                        label.encode("utf-8")
-                        if isinstance(label, str)
-                        else str(label).encode("utf-8")
-                    )
-                    for label in config_labels
-                ],
+                data=[label.encode("utf-8") for label in successful_labels],
                 dtype=dt,
             )
 
             # Copy essential metadata
+            metadata_datasets = ["mpi_geometry_values", "qpb_log_filenames"]
             copy_metadata(input_group, output_group, metadata_datasets)
 
-            # Add group-specific attributes
+            # Add plateau extraction attributes
             output_group.attrs["plateau_extraction_success"] = True
-            output_group.attrs["n_samples"] = len(plateau_estimates)
-            output_group.attrs["n_time_points"] = original_samples.shape[1]
-
-            plateau_stats = result["plateau_value"]
-            output_group.attrs["plateau_mean"] = plateau_stats.mean
-            output_group.attrs["plateau_error"] = plateau_stats.sdev
+            output_group.attrs["n_samples"] = len(individual_estimates)
+            output_group.attrs["n_time_points"] = processed_time_series.shape[1]
+            output_group.attrs["plateau_mean"] = result["plateau_mean"]
+            output_group.attrs["plateau_error"] = result["plateau_error"]
+            output_group.attrs["plateau_start"] = result["plateau_bounds"][0]
+            output_group.attrs["plateau_end"] = result["plateau_bounds"][1]
             output_group.attrs["sigma_threshold_used"] = result["sigma_threshold"]
 
-            logger.info(f"Successfully exported group: {group_name}")
+            logger.debug(f"Exported group: {group_name}")
+
+        analyzer.close()
 
     logger.info(f"HDF5 export complete: {output_hdf5_file}")
