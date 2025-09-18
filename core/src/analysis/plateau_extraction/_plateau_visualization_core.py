@@ -131,6 +131,29 @@ def load_extraction_results_from_group(
     # Create time index array
     time_index = np.arange(n_time_points) + time_offset
 
+    # Apply trimming if configured
+    trimming_config = analysis_config.get("trimming", {})
+    if trimming_config.get("apply_trimming", False):
+        trim_start = trimming_config.get("trim_start_points", 0) - time_offset + 1
+        trim_end = trimming_config.get("trim_end_points", 0) - 1
+
+        # Calculate trimmed indices
+        start_idx = max(0, trim_start)
+        end_idx = n_time_points - max(0, trim_end) if trim_end > 0 else n_time_points
+
+        # Apply trimming to data
+        time_index = time_index[start_idx:end_idx]
+        time_series_data = time_series_data[:, start_idx:end_idx]
+
+        # Adjust plateau bounds (shift by trimming offset)
+        if plateau_start is not None and plateau_end is not None:
+            plateau_start = max(0, plateau_start - start_idx)
+            plateau_end = min(len(time_index), plateau_end - start_idx)
+            # Validate bounds are still valid
+            if plateau_start >= len(time_index) or plateau_end <= 0:
+                plateau_start = None
+                plateau_end = None
+
     # Package results for each sample
     extraction_results = []
     for i in range(n_samples):
@@ -521,7 +544,8 @@ def configure_tick_formatting(ax: Axes, axes_config: Dict[str, Any]) -> None:
 
     # Set x-axis to start from 0 if possible
     xlim = ax.get_xlim()
-    ax.set_xlim(left=max(0, xlim[0]))
+    # ax.set_xlim(left=max(0, xlim[0]))
+    ax.set_xlim(xmin=0)
 
 
 # =============================================================================

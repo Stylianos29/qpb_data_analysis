@@ -36,6 +36,12 @@ ANALYSIS_CONFIGS = {
         "plot_subdirectory": "plateau_extraction_pcac",
         "column_prefix": "PCAC",
         "description": "PCAC mass",
+        # PCAC-mass-specific trimming settings
+        "trimming": {
+            "apply_trimming": True,
+            "trim_start_points": 4,
+            "trim_end_points": 3,
+        },
     },
     "pion_mass": {
         "input_datasets": {
@@ -50,6 +56,12 @@ ANALYSIS_CONFIGS = {
         "plot_subdirectory": "plateau_extraction_pion",
         "column_prefix": "pion",
         "description": "pion effective mass",
+        # Pion-mass-specific trimming settings
+        "trimming": {
+            "apply_trimming": True,
+            "trim_start_points": 5,
+            "trim_end_points": 2,
+        },
     },
 }
 
