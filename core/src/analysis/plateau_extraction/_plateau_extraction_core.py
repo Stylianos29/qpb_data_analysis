@@ -769,6 +769,35 @@ def export_to_csv(
 # =============================================================================
 
 
+def _copy_parent_group_structure(
+    input_file: h5py.File,
+    output_file: h5py.File,
+    parent_path: str,
+    logger,
+) -> None:
+    """Copy parent group structure and attributes to output file."""
+    try:
+        if parent_path in input_file:
+            input_parent = input_file[parent_path]
+
+            # Create parent group in output file
+            output_parent = output_file.require_group(parent_path)
+
+            # Copy all parent group attributes (the constant parameters!)
+            for attr_name, attr_value in input_parent.attrs.items():
+                try:
+                    output_parent.attrs[attr_name] = attr_value
+                except (TypeError, ValueError) as e:
+                    logger.warning(f"Could not copy attribute {attr_name}: {e}")
+
+            logger.debug(
+                f"Copied {len(input_parent.attrs)} attributes from parent group: {parent_path}"
+            )
+
+    except Exception as e:
+        logger.error(f"Error copying parent group structure for {parent_path}: {e}")
+
+
 def export_to_hdf5(
     results: List[Dict],
     input_hdf5_file: str,
@@ -820,6 +849,9 @@ def export_to_hdf5(
         # Map results to group paths
         result_mapping = {r["group_name"]: r for r in successful_results}
 
+        # Track processed parent groups to avoid duplication
+        processed_parents = set()
+
         # Process each successful result
         for group_path in analyzer.active_groups:
             group_name = os.path.basename(group_path)
@@ -829,6 +861,14 @@ def export_to_hdf5(
 
             result = result_mapping[group_name]
             input_group = input_file[group_path]
+
+            # Copy parent group structure and attributes
+            parent_path = "/".join(group_path.split("/")[:-1])
+            if parent_path and parent_path not in processed_parents:
+                _copy_parent_group_structure(
+                    input_file, output_file, parent_path, logger
+                )
+                processed_parents.add(parent_path)
 
             # Create corresponding output group structure
             output_group = output_file.require_group(group_path)
