@@ -323,6 +323,7 @@ def plot_single_panel(
         markerfacecolor=time_series_style["markerfacecolor"],
         markeredgecolor=time_series_style["markeredgecolor"],
         markeredgewidth=time_series_style["markeredgewidth"],
+        label="Time series data",
     )
 
     # Add plateau region (green shaded area)
@@ -346,6 +347,22 @@ def plot_single_panel(
 
     # Configure ticks
     configure_tick_formatting(ax, axes_config)
+
+    # Add opaque legend explaining visual elements
+    legend = ax.legend(
+        loc="upper right",
+        frameon=True,  # Show frame
+        fancybox=True,  # Rounded corners
+        shadow=True,  # Drop shadow
+        framealpha=1.0,  # Fully opaque
+        facecolor="white",  # White background
+        edgecolor="gray",  # Gray border
+        fontsize=styling["fonts"]["legend_size"],
+    )
+
+    # Make legend background fully opaque
+    legend.get_frame().set_facecolor("white")
+    legend.get_frame().set_alpha(1.0)
 
 
 def add_plateau_region_shading(
@@ -385,6 +402,7 @@ def add_plateau_region_shading(
         linewidth=plateau_style["linewidth"],
         linestyle=plateau_style["linestyle"],
         zorder=0,  # Behind data points
+        label="Plateau region",
     )
     ax.add_patch(rect)
 
@@ -413,6 +431,7 @@ def add_plateau_fit_line(
         linewidth=fit_style["linewidth"],
         alpha=fit_style["alpha"],
         zorder=2,  # Above shaded region but below data points
+        label="Plateau fit",
     )
 
 
