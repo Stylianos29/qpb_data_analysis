@@ -692,6 +692,31 @@ def save_plateau_extraction_figure(
 # =============================================================================
 
 
+def _extract_combined_metadata(group: h5py.Group, logger) -> Dict[str, Any]:
+    """
+    Extract combined metadata from group and parent groups.
+    Following the same pattern as extract_plateau_PCAC_mass.py
+    """
+    metadata = {}
+
+    # Extract group attributes (variable parameters)
+    for attr_name, attr_value in group.attrs.items():
+        metadata[attr_name] = attr_value
+
+    # Extract parent group attributes (constant parameters)
+    group_path = str(group.name)
+    parent_path = "/".join(group_path.split("/")[:-1])
+
+    if parent_path and parent_path in group.file:
+        parent_group = group.file[parent_path]
+        for attr_name, attr_value in parent_group.attrs.items():
+            if attr_name not in metadata:  # Don't override group-specific
+                metadata[attr_name] = attr_value
+
+    logger.debug(f"Extracted {len(metadata)} combined metadata parameters")
+    return metadata
+
+
 def process_group_visualization(
     group: h5py.Group,
     group_name: str,
@@ -719,6 +744,9 @@ def process_group_visualization(
     try:
         # Load extraction results
         extractions = load_extraction_results_from_group(group, analysis_config)
+
+        # Extract metadata
+        combined_metadata = _extract_combined_metadata(group, logger)
 
         if not extractions:
             logger.warning(f"No extraction results found for group {group_name}")
@@ -749,7 +777,7 @@ def process_group_visualization(
             fig = create_plateau_extraction_figure(
                 figure_extractions,
                 analysis_config,
-                group_metadata,
+                combined_metadata,
                 title_builder,
                 fig_idx,
             )
