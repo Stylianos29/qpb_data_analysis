@@ -99,7 +99,7 @@ def process_pcac_critical_mass(input_csv_path, output_directory, logger):
     "--enable_logging",
     is_flag=True,
     help="Enable logging",
-    )
+)
 @click.option(
     "-log_dir",
     "--log_directory",
