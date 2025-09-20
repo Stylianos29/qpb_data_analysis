@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Critical mass calculation from Pion plateau estimates.
+Critical mass calculation from PCAC plateau estimates.
 
-Usage: python calculate_critical_mass_from_pion.py \
-        -i plateau_pion.csv \
-        -o output_dir
+Usage: python calculate_critical_mass_from_pcac.py \
+    -i plateau_pcac.csv \
+    -o output_dir
 """
 
 from pathlib import Path
@@ -18,10 +18,10 @@ from library.validation.click_validators import (
 )
 from library.utils.logging_utilities import create_script_logger
 
-from src.analysis.critical_mass_extrapolation._pion_critical_mass_config import (
+from src.analysis.critical_mass_extrapolation._pcac_critical_mass_config import (
     REQUIRED_COLUMNS,
     OUTPUT_FILENAME,
-    validate_pion_critical_config,
+    validate_pcac_critical_config,
 )
 from src.analysis.critical_mass_extrapolation._critical_mass_shared_config import (
     GROUPING_PARAMETERS,
@@ -34,8 +34,8 @@ from src.analysis.critical_mass_extrapolation._critical_mass_core import (
 )
 
 
-def validate_pion_input_data(df, logger):
-    """Validate Pion plateau data for critical mass calculation."""
+def validate_pcac_input_data(df, logger):
+    """Validate PCAC plateau data for critical mass calculation."""
     required_cols = REQUIRED_COLUMNS
     missing_cols = [col for col in required_cols if col not in df.columns]
 
@@ -46,14 +46,14 @@ def validate_pion_input_data(df, logger):
     if len(df) < 3:
         raise ValueError("Need at least 3 data points for extrapolation")
 
-    logger.info(f"Validated {len(df)} Pion plateau data points")
+    logger.info(f"Validated {len(df)} PCAC plateau data points")
 
 
-def process_pion_critical_mass(input_csv_path, output_directory, logger):
-    """Process Pion plateau data to calculate critical mass values."""
+def process_pcac_critical_mass(input_csv_path, output_directory, logger):
+    """Process PCAC plateau data to calculate critical mass values."""
     # Load and validate input data
-    df = load_and_validate_plateau_data(input_csv_path, "pion")
-    validate_pion_input_data(df, logger)
+    df = load_and_validate_plateau_data(input_csv_path, "pcac")
+    validate_pcac_input_data(df, logger)
 
     # Group data by lattice parameters
     grouped_data = group_data_by_parameters(df, GROUPING_PARAMETERS)
@@ -63,7 +63,7 @@ def process_pion_critical_mass(input_csv_path, output_directory, logger):
     results = []
     for group_id, group_df in grouped_data:
         try:
-            result = calculate_critical_mass_for_group(group_id, group_df, "pion")
+            result = calculate_critical_mass_for_group(group_id, group_df, "pcac")
             if result:
                 results.append(result)
         except Exception as e:
@@ -85,7 +85,7 @@ def process_pion_critical_mass(input_csv_path, output_directory, logger):
     "--input_csv",
     required=True,
     callback=csv_file.input,
-    help="Input CSV file with Pion plateau estimates",
+    help="Input CSV file with PCAC plateau estimates",
 )
 @click.option(
     "-o",
@@ -105,9 +105,9 @@ def process_pion_critical_mass(input_csv_path, output_directory, logger):
     "-log", "--log_filename", callback=validate_log_filename, help="Log filename"
 )
 def main(input_csv, output_directory, enable_logging, log_directory, log_filename):
-    """Calculate critical bare mass from Pion plateau estimates."""
+    """Calculate critical bare mass from PCAC plateau estimates."""
     # Validate configuration
-    validate_pion_critical_config()
+    validate_pcac_critical_config()
 
     # Set fallback for output directory
     if output_directory is None:
@@ -125,17 +125,17 @@ def main(input_csv, output_directory, enable_logging, log_directory, log_filenam
     )
 
     try:
-        logger.log_script_start("Pion critical mass calculation")
+        logger.log_script_start("PCAC critical mass calculation")
 
         # Process data
-        output_path = process_pion_critical_mass(input_csv, output_directory, logger)
+        output_path = process_pcac_critical_mass(input_csv, output_directory, logger)
 
-        click.echo(f"✓ Pion critical mass calculation complete: {output_path}")
-        logger.log_script_end("Pion critical mass calculation completed")
+        click.echo(f"✓ PCAC critical mass calculation complete: {output_path}")
+        logger.log_script_end("PCAC critical mass calculation completed")
 
     except Exception as e:
         logger.error(f"Script failed: {e}")
-        logger.log_script_end("Pion critical mass calculation failed")
+        logger.log_script_end("PCAC critical mass calculation failed")
         raise
 
 
