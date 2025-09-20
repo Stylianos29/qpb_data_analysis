@@ -94,7 +94,12 @@ def process_pcac_critical_mass(input_csv_path, output_directory, logger):
     callback=directory.can_create,
     help="Output directory for results",
 )
-@click.option("-log_on", "--enable_logging", is_flag=True, help="Enable logging")
+@click.option(
+    "-log_on",
+    "--enable_logging",
+    is_flag=True,
+    help="Enable logging",
+    )
 @click.option(
     "-log_dir",
     "--log_directory",
@@ -102,7 +107,10 @@ def process_pcac_critical_mass(input_csv_path, output_directory, logger):
     help="Directory for log files",
 )
 @click.option(
-    "-log", "--log_filename", callback=validate_log_filename, help="Log filename"
+    "-log",
+    "--log_filename",
+    callback=validate_log_filename,
+    help="Log filename",
 )
 def main(input_csv, output_directory, enable_logging, log_directory, log_filename):
     """Calculate critical bare mass from PCAC plateau estimates."""
