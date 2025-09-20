@@ -251,6 +251,8 @@ def calculate_critical_mass_for_group(group_id, group_df, analysis_type):
                 result["Overlap_operator_method"] = group_df[col].iloc[0]
             elif col == "Kernel_operator_type":
                 result["Kernel_operator_type"] = group_df[col].iloc[0]
+            elif col == "KL_diagonal_order":
+                result["KL_diagonal_order"] = group_df[col].iloc[0]
 
         # Add critical mass results
         result.update(
@@ -285,6 +287,7 @@ def calculate_critical_mass_for_group(group_id, group_df, analysis_type):
                 y_error_col,
                 "Overlap_operator_method",
                 "Kernel_operator_type",
+                "KL_diagonal_order",
             ]:
                 values = group_df[col].unique()
                 if len(values) == 1:
