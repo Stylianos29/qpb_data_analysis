@@ -26,11 +26,9 @@ REQUIRED_COLUMNS = [
 METADATA_COLUMNS = [
     "PCAC_plateau_start_time",
     "PCAC_plateau_end_time",
-    "PCAC_plateau_n_points",
     "PCAC_n_successful_samples",
     "PCAC_n_total_samples",
     "PCAC_n_failed_samples",
-    "PCAC_estimation_method",
     "PCAC_sigma_threshold_used",
 ]
 

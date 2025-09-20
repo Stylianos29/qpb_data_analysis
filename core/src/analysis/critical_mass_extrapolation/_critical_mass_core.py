@@ -242,23 +242,50 @@ def calculate_critical_mass_for_group(group_id, group_df, analysis_type):
         if critical_mass is None:
             return None
 
-        # Package results
-        result = {
-            "critical_mass_mean": gv.mean(critical_mass),
-            "critical_mass_error": gv.sdev(critical_mass),
-            "slope_mean": gv.mean(fit_result.p[0]),
-            "slope_error": gv.sdev(fit_result.p[0]),
-            "intercept_mean": gv.mean(fit_result.p[1]),
-            "intercept_error": gv.sdev(fit_result.p[1]),
-            "n_data_points": len(x_data),
-            "r_squared": quality_metrics["r_squared"],
-            "chi2_reduced": quality_metrics["chi2_reduced"],
-            "fit_quality": quality_metrics["Q"],
-        }
+        # Package results with ordered columns
+        result = {}
 
-        # Add group metadata (only unique values)
+        # Add key physics parameters first
         for col in group_df.columns:
-            if col not in [mass_col, y_mean_col, y_error_col]:
+            if col == "Overlap_operator_method":
+                result["Overlap_operator_method"] = group_df[col].iloc[0]
+            elif col == "Kernel_operator_type":
+                result["Kernel_operator_type"] = group_df[col].iloc[0]
+
+        # Add critical mass results
+        result.update(
+            {
+                "critical_mass_mean": gv.mean(critical_mass),
+                "critical_mass_error": gv.sdev(critical_mass),
+                "slope_mean": gv.mean(fit_result.p[0]),
+                "slope_error": gv.sdev(fit_result.p[0]),
+                "intercept_mean": gv.mean(fit_result.p[1]),
+                "intercept_error": gv.sdev(fit_result.p[1]),
+                "n_data_points": len(x_data),
+                "r_squared": quality_metrics["r_squared"],
+                "chi2_reduced": quality_metrics["chi2_reduced"],
+                "fit_quality": quality_metrics["Q"],
+            }
+        )
+
+        # Add remaining metadata (only those specified in config)
+        if analysis_type == "pcac":
+            from src.analysis.critical_mass_extrapolation._pcac_critical_mass_config import (
+                METADATA_COLUMNS,
+            )
+        else:  # pion
+            from src.analysis.critical_mass_extrapolation._pion_critical_mass_config import (
+                METADATA_COLUMNS,
+            )
+
+        for col in group_df.columns:
+            if col in METADATA_COLUMNS and col not in [
+                mass_col,
+                y_mean_col,
+                y_error_col,
+                "Overlap_operator_method",
+                "Kernel_operator_type",
+            ]:
                 values = group_df[col].unique()
                 if len(values) == 1:
                     result[col] = values[0]

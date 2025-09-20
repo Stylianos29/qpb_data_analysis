@@ -26,11 +26,9 @@ REQUIRED_COLUMNS = [
 METADATA_COLUMNS = [
     "pion_plateau_start_time",
     "pion_plateau_end_time",
-    "pion_plateau_n_points",
     "pion_n_successful_samples",
     "pion_n_total_samples",
     "pion_n_failed_samples",
-    "pion_estimation_method",
     "pion_sigma_threshold_used",
 ]
 
