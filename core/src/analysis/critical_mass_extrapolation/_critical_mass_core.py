@@ -328,7 +328,7 @@ def format_dataframe_for_export(df):
     return df_formatted
 
 
-def export_results_to_csv(results, output_directory, filename):
+def export_results_to_csv(results, output_path):
     """Export critical mass results to CSV file with proper
     formatting."""
     if not results:
@@ -339,9 +339,6 @@ def export_results_to_csv(results, output_directory, filename):
 
     # Apply proper formatting
     df_formatted = format_dataframe_for_export(df_results)
-
-    # Construct output path
-    output_path = Path(output_directory) / filename
 
     # Ensure output directory exists
     output_path.parent.mkdir(parents=True, exist_ok=True)

@@ -33,7 +33,7 @@ METADATA_COLUMNS = [
 ]
 
 # Output file configuration
-OUTPUT_FILENAME = "critical_bare_mass_from_pcac.csv"
+DEFAULT_OUTPUT_FILENAME = "critical_bare_mass_from_pcac.csv"
 OUTPUT_COLUMN_PREFIX = "pcac"
 
 # PCAC-specific filtering (if any)
@@ -56,11 +56,6 @@ def get_required_columns():
 def get_metadata_columns():
     """Get list of metadata columns to preserve."""
     return METADATA_COLUMNS.copy()
-
-
-def get_output_filename():
-    """Get default output filename for PCAC results."""
-    return OUTPUT_FILENAME
 
 
 def get_pcac_filters():
@@ -94,8 +89,8 @@ def validate_pcac_critical_config():
         raise ValueError("REQUIRED_COLUMNS must include mass, mean, and error columns")
 
     # Check output filename
-    if not OUTPUT_FILENAME or not OUTPUT_FILENAME.endswith(".csv"):
-        raise ValueError("OUTPUT_FILENAME must be a non-empty CSV filename")
+    if not DEFAULT_OUTPUT_FILENAME or not DEFAULT_OUTPUT_FILENAME.endswith(".csv"):
+        raise ValueError("DEFAULT_OUTPUT_FILENAME must be a non-empty CSV filename")
 
     # Check PCAC-specific filters
     if PCAC_SPECIFIC_FILTERS["min_plateau_points"] < 2:

@@ -20,7 +20,7 @@ from library.utils.logging_utilities import create_script_logger
 
 from src.analysis.critical_mass_extrapolation._pion_critical_mass_config import (
     REQUIRED_COLUMNS,
-    OUTPUT_FILENAME,
+    DEFAULT_OUTPUT_FILENAME,
     validate_pion_critical_config,
 )
 from src.analysis.critical_mass_extrapolation._critical_mass_shared_config import (
@@ -49,7 +49,7 @@ def validate_pion_input_data(df, logger):
     logger.info(f"Validated {len(df)} Pion plateau data points")
 
 
-def process_pion_critical_mass(input_csv_path, output_directory, logger):
+def process_pion_critical_mass(input_csv_path, output_csv_path, logger):
     """Process Pion plateau data to calculate critical mass values."""
     # Load and validate input data
     df = load_and_validate_plateau_data(input_csv_path, "pion")
@@ -72,7 +72,7 @@ def process_pion_critical_mass(input_csv_path, output_directory, logger):
 
     # Export results
     if results:
-        output_path = export_results_to_csv(results, output_directory, OUTPUT_FILENAME)
+        output_path = export_results_to_csv(results, output_csv_path)
         logger.info(f"Exported {len(results)} critical mass values to {output_path}")
         return output_path
     else:
@@ -89,10 +89,10 @@ def process_pion_critical_mass(input_csv_path, output_directory, logger):
 )
 @click.option(
     "-o",
-    "--output_directory",
-    default=None,
-    callback=directory.can_create,
-    help="Output directory for results",
+    "--output_csv_file",
+    default=DEFAULT_OUTPUT_FILENAME,
+    callback=csv_file.output,
+    help=f"Output CSV file (name or path). Default: {DEFAULT_OUTPUT_FILENAME}",
 )
 @click.option(
     "-log_on",
@@ -112,14 +112,19 @@ def process_pion_critical_mass(input_csv_path, output_directory, logger):
     callback=validate_log_filename,
     help="Log filename",
 )
-def main(input_csv, output_directory, enable_logging, log_directory, log_filename):
+def main(input_csv, output_csv, enable_logging, log_directory, log_filename):
     """Calculate critical bare mass from Pion plateau estimates."""
     # Validate configuration
     validate_pion_critical_config()
 
-    # Set fallback for output directory
-    if output_directory is None:
-        output_directory = str(Path(input_csv).parent)
+    # Determine output directory from output_csv
+    output_csv_path = Path(output_csv)
+    if output_csv_path.is_absolute():
+        output_directory = output_csv_path.parent
+    else:
+        output_directory = Path(input_csv).parent
+        output_csv = str(output_directory / output_csv)
+    output_directory = str(output_directory)
 
     # Set up logging
     log_dir = (
@@ -136,7 +141,7 @@ def main(input_csv, output_directory, enable_logging, log_directory, log_filenam
         logger.log_script_start("Pion critical mass calculation")
 
         # Process data
-        output_path = process_pion_critical_mass(input_csv, output_directory, logger)
+        output_path = process_pion_critical_mass(input_csv, output_csv, logger)
 
         click.echo(f"✓ Pion critical mass calculation complete: {output_path}")
         logger.log_script_end("Pion critical mass calculation completed")
