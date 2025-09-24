@@ -225,23 +225,6 @@ def group_data_by_parameters(df, grouping_parameters):
 # =============================================================================
 
 
-def validate_group_for_fitting(group_df, min_points=3):
-    """Validate that group has sufficient data for linear fitting."""
-    if len(group_df) < min_points:
-        return False, f"Insufficient data points: {len(group_df)} < {min_points}"
-
-    # Check for valid mass values
-    mass_col = "bare_mass" if "bare_mass" in group_df.columns else "Bare_mass"
-    if mass_col not in group_df.columns:
-        return False, "Missing bare mass column"
-
-    valid_masses = group_df[mass_col].notna().sum()
-    if valid_masses < min_points:
-        return False, f"Insufficient valid mass values: {valid_masses} < {min_points}"
-
-    return True, "Valid"
-
-
 def perform_linear_fit(x_data, y_data):
     """Perform linear fit with gvar/lsqfit."""
     # Convert to gvar if needed
@@ -302,11 +285,6 @@ def validate_fit_quality(fit_result, quality_metrics, fit_config):
 
 def calculate_critical_mass_for_group(group_id, group_df, analysis_type):
     """Calculate critical mass for a parameter group."""
-    # Validate group
-    is_valid, validation_msg = validate_group_for_fitting(group_df)
-    if not is_valid:
-        return None
-
     # Extract data for fitting
     mass_col = "bare_mass" if "bare_mass" in group_df.columns else "Bare_mass"
     x_data = group_df[mass_col].values
