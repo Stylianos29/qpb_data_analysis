@@ -21,6 +21,61 @@ from library.constants import (
     PARAMETERS_WITH_EXPONENTIAL_FORMAT,
     PARAMETERS_OF_INTEGER_VALUE,
 )
+from src.analysis.critical_mass_extrapolation._critical_mass_shared_config import (
+    GROUPING_PARAMETERS,
+)
+
+
+def validate_critical_mass_input_data(df, required_columns, analysis_type, logger):
+    """Validate plateau data for critical mass calculation."""
+    missing_cols = [col for col in required_columns if col not in df.columns]
+
+    if missing_cols:
+        raise ValueError(f"Missing required columns: {missing_cols}")
+
+    if len(df) < 3:
+        raise ValueError("Need at least 3 data points for extrapolation")
+
+    logger.info(f"Validated {len(df)} {analysis_type.upper()} plateau data points")
+
+
+def process_critical_mass_analysis(
+    input_csv_path, output_csv_path, analysis_type, required_columns, logger
+):
+    """Process plateau data to calculate critical mass values."""
+
+    # Load and validate input data
+    logger.info(f"Loading {analysis_type.upper()} plateau data")
+    df = load_and_validate_plateau_data(input_csv_path, analysis_type)
+    validate_critical_mass_input_data(df, required_columns, analysis_type, logger)
+
+    # Group data by lattice parameters
+    logger.info("Grouping data by lattice parameters")
+    grouped_data = group_data_by_parameters(df, GROUPING_PARAMETERS)
+    logger.info(f"Processing {len(grouped_data)} parameter groups")
+
+    # Calculate critical mass for each group
+    results = []
+    for group_id, group_df in grouped_data:
+        logger.info(f"Processing group: {group_id}")
+        try:
+            result = calculate_critical_mass_for_group(
+                group_id, group_df, analysis_type
+            )
+            if result:
+                results.append(result)
+        except Exception as e:
+            logger.warning(f"Failed to process group {group_id}: {e}")
+            continue
+
+    if not results:
+        raise ValueError("No valid critical mass calculations completed")
+
+    # Export results
+    logger.info(f"Exporting {len(results)} results to {output_csv_path}")
+    output_path = export_results_to_csv(results, output_csv_path)
+
+    return output_path
 
 
 # =============================================================================

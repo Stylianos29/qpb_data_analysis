@@ -4,9 +4,8 @@ Critical mass calculation from PCAC plateau estimates.
 
 Usage: python calculate_critical_mass_from_pcac.py \
     -i plateau_pcac.csv \
-    -o output_dir
+    -o output.csv
 """
-
 
 from pathlib import Path
 
@@ -24,60 +23,9 @@ from src.analysis.critical_mass_extrapolation._pcac_critical_mass_config import 
     DEFAULT_OUTPUT_FILENAME,
     validate_pcac_critical_config,
 )
-from src.analysis.critical_mass_extrapolation._critical_mass_shared_config import (
-    GROUPING_PARAMETERS,
-)
 from src.analysis.critical_mass_extrapolation._critical_mass_core import (
-    load_and_validate_plateau_data,
-    group_data_by_parameters,
-    calculate_critical_mass_for_group,
-    export_results_to_csv,
+    process_critical_mass_analysis,
 )
-
-
-def validate_pcac_input_data(df, logger):
-    """Validate PCAC plateau data for critical mass calculation."""
-    required_cols = REQUIRED_COLUMNS
-    missing_cols = [col for col in required_cols if col not in df.columns]
-
-    if missing_cols:
-        raise ValueError(f"Missing required columns: {missing_cols}")
-
-    # Check for sufficient data points
-    if len(df) < 3:
-        raise ValueError("Need at least 3 data points for extrapolation")
-
-    logger.info(f"Validated {len(df)} PCAC plateau data points")
-
-
-def process_pcac_critical_mass(input_csv_path, output_csv_path, logger):
-    """Process PCAC plateau data to calculate critical mass values."""
-    # Load and validate input data
-    df = load_and_validate_plateau_data(input_csv_path, "pcac")
-    validate_pcac_input_data(df, logger)
-
-    # Group data by lattice parameters
-    grouped_data = group_data_by_parameters(df, GROUPING_PARAMETERS)
-    logger.info(f"Processing {len(grouped_data)} parameter groups")
-
-    # Calculate critical mass for each group
-    results = []
-    for group_id, group_df in grouped_data:
-        try:
-            result = calculate_critical_mass_for_group(group_id, group_df, "pcac")
-            if result:
-                results.append(result)
-        except Exception as e:
-            logger.warning(f"Failed to process group {group_id}: {e}")
-            continue
-
-    # Export results
-    if results:
-        output_path = export_results_to_csv(results, output_csv_path)
-        logger.info(f"Exported {len(results)} critical mass values to {output_path}")
-        return output_path
-    else:
-        raise ValueError("No valid critical mass calculations completed")
 
 
 @click.command()
@@ -115,7 +63,7 @@ def process_pcac_critical_mass(input_csv_path, output_csv_path, logger):
 )
 def main(input_csv, output_csv, enable_logging, log_directory, log_filename):
     """Calculate critical bare mass from PCAC plateau estimates."""
-    # Validate configuration
+
     validate_pcac_critical_config()
 
     # Determine output directory from output_csv
@@ -142,8 +90,9 @@ def main(input_csv, output_csv, enable_logging, log_directory, log_filename):
     try:
         logger.log_script_start("PCAC critical mass calculation")
 
-        # Process data
-        output_path = process_pcac_critical_mass(input_csv, output_csv, logger)
+        output_path = process_critical_mass_analysis(
+            input_csv, output_csv, "pcac", REQUIRED_COLUMNS, logger
+        )
 
         click.echo(f"✓ PCAC critical mass calculation complete: {output_path}")
         logger.log_script_end("PCAC critical mass calculation completed")
