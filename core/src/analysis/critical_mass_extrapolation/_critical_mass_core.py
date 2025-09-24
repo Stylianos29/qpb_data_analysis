@@ -24,14 +24,13 @@ from library.constants import (
 from src.analysis.critical_mass_extrapolation._critical_mass_shared_config import (
     GROUPING_PARAMETERS,
 )
+from library.data import load_csv
 
 
-def validate_critical_mass_input_data(df, required_columns, analysis_type, logger):
+def validate_critical_mass_input_data(df, analysis_type, logger):
     """Validate plateau data for critical mass calculation."""
-    missing_cols = [col for col in required_columns if col not in df.columns]
-
-    if missing_cols:
-        raise ValueError(f"Missing required columns: {missing_cols}")
+    # load_csv() already handled column validation and empty file checks
+    # Only need to check sufficient data points
 
     if len(df) < 3:
         raise ValueError("Need at least 3 data points for extrapolation")
@@ -44,10 +43,14 @@ def process_critical_mass_analysis(
 ):
     """Process plateau data to calculate critical mass values."""
 
-    # Load and validate input data
+    # Load and validate input data using library function
     logger.info(f"Loading {analysis_type.upper()} plateau data")
-    df = load_and_validate_plateau_data(input_csv_path, analysis_type)
-    validate_critical_mass_input_data(df, required_columns, analysis_type, logger)
+    df = load_csv(
+        input_csv_path,
+        validate_required_columns=set(required_columns),
+        apply_categorical=True,
+    )
+    validate_critical_mass_input_data(df, analysis_type, logger)
 
     # Group data by lattice parameters
     logger.info("Grouping data by lattice parameters")
