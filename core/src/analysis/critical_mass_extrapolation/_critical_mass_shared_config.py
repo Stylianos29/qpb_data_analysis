@@ -13,6 +13,8 @@ from typing import List, Dict, Any
 # CONSTANTS
 # =============================================================================
 
+GROUPING_EXCLUDED_PARAMETERS = ["Bare_mass", "MPI_geometry"]
+
 # Parameters used for grouping data points (lattice configurations)
 GROUPING_PARAMETERS = [
     "KL_diagonal_order",

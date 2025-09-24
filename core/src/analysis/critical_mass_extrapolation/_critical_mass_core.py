@@ -22,25 +22,30 @@ from library.constants import (
     PARAMETERS_OF_INTEGER_VALUE,
 )
 from src.analysis.critical_mass_extrapolation._critical_mass_shared_config import (
-    GROUPING_PARAMETERS,
+    GROUPING_EXCLUDED_PARAMETERS,
 )
 from library.data import load_csv
 
 
-def validate_critical_mass_input_data(df, analysis_type, logger):
+def validate_critical_mass_input_data(
+    df: pd.DataFrame, analysis_type: str, logger
+) -> None:
     """Validate plateau data for critical mass calculation."""
-    # load_csv() already handled column validation and empty file checks
-    # Only need to check sufficient data points
-
     if len(df) < 3:
         raise ValueError("Need at least 3 data points for extrapolation")
 
-    logger.info(f"Validated {len(df)} {analysis_type.upper()} plateau data points")
+    logger.info(
+        f"Validated {len(df)} {analysis_type.upper()} plateau data points for group"
+    )
 
 
 def process_critical_mass_analysis(
-    input_csv_path, output_csv_path, analysis_type, required_columns, logger
-):
+    input_csv_path: str,
+    output_csv_path: str,
+    analysis_type: str,
+    required_columns: List[str],
+    logger,
+) -> str:
     """Process plateau data to calculate critical mass values."""
 
     # Load and validate input data using library function
@@ -50,16 +55,46 @@ def process_critical_mass_analysis(
         validate_required_columns=set(required_columns),
         apply_categorical=True,
     )
-    validate_critical_mass_input_data(df, analysis_type, logger)
 
-    # Group data by lattice parameters
+    analyzer = DataFrameAnalyzer(df)
+
+    # Filter exclusion list to only include parameters that exist in the data
+    available_multivalued_params = analyzer.list_of_multivalued_tunable_parameter_names
+    filtered_exclusions = [
+        param
+        for param in GROUPING_EXCLUDED_PARAMETERS
+        if param in available_multivalued_params
+    ]
+
+    # Log what we're excluding
+    if filtered_exclusions:
+        logger.info(f"Excluding from grouping: {filtered_exclusions}")
+    else:
+        logger.info("No parameters to exclude from grouping")
+
+    # Group data using analyzer's intelligence
     logger.info("Grouping data by lattice parameters")
-    grouped_data = group_data_by_parameters(df, GROUPING_PARAMETERS)
-    logger.info(f"Processing {len(grouped_data)} parameter groups")
+    grouped_data = analyzer.group_by_multivalued_tunable_parameters(
+        filter_out_parameters_list=filtered_exclusions
+    )
 
-    # Calculate critical mass for each group
-    results = []
+    # Validate and collect valid groups in one pass
+    valid_groups = []
     for group_id, group_df in grouped_data:
+        try:
+            validate_critical_mass_input_data(group_df, analysis_type, logger)
+            valid_groups.append((group_id, group_df))
+        except ValueError as e:
+            logger.warning(f"Skipping group {group_id}: {e}")
+
+    if not valid_groups:
+        raise ValueError("No groups have sufficient data points for analysis")
+
+    logger.info(f"Processing {len(valid_groups)} valid parameter groups")
+
+    # Calculate critical mass for each valid group
+    results = []
+    for group_id, group_df in valid_groups:
         logger.info(f"Processing group: {group_id}")
         try:
             result = calculate_critical_mass_for_group(
