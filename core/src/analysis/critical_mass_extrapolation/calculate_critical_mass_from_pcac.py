@@ -125,6 +125,7 @@ def main(input_csv, output_csv, enable_logging, log_directory, log_filename):
     else:
         output_directory = Path(input_csv).parent
         output_csv = str(output_directory / output_csv)
+    output_directory.mkdir(parents=True, exist_ok=True)
     output_directory = str(output_directory)
 
     # Set up logging

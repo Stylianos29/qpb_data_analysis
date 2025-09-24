@@ -89,7 +89,7 @@ def process_pion_critical_mass(input_csv_path, output_csv_path, logger):
 )
 @click.option(
     "-o",
-    "--output_csv_file",
+    "--output_csv",
     default=DEFAULT_OUTPUT_FILENAME,
     callback=csv_file.output,
     help=f"Output CSV file (name or path). Default: {DEFAULT_OUTPUT_FILENAME}",
@@ -124,6 +124,7 @@ def main(input_csv, output_csv, enable_logging, log_directory, log_filename):
     else:
         output_directory = Path(input_csv).parent
         output_csv = str(output_directory / output_csv)
+    output_directory.mkdir(parents=True, exist_ok=True)
     output_directory = str(output_directory)
 
     # Set up logging

@@ -340,9 +340,6 @@ def export_results_to_csv(results, output_path):
     # Apply proper formatting
     df_formatted = format_dataframe_for_export(df_results)
 
-    # Ensure output directory exists
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
     # Export to CSV with proper float formatting for non-special columns
     df_formatted.to_csv(output_path, index=False, float_format="%.6f")
 
