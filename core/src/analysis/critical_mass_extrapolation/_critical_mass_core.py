@@ -97,9 +97,7 @@ def process_critical_mass_analysis(
     for group_id, group_df in valid_groups:
         logger.info(f"Processing group: {group_id}")
         try:
-            result = calculate_critical_mass_for_group(
-                group_id, group_df, analysis_type
-            )
+            result = calculate_critical_mass_for_group(group_df, analysis_type)
             if result:
                 results.append(result)
         except Exception as e:
@@ -283,7 +281,7 @@ def validate_fit_quality(fit_result, quality_metrics, fit_config):
     return validation_results
 
 
-def calculate_critical_mass_for_group(group_id, group_df, analysis_type):
+def calculate_critical_mass_for_group(group_df, analysis_type):
     """Calculate critical mass for a parameter group."""
     # Extract data for fitting
     mass_col = "bare_mass" if "bare_mass" in group_df.columns else "Bare_mass"
