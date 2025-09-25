@@ -357,6 +357,27 @@ def calculate_critical_mass_for_group(
 # =============================================================================
 
 
+def reorder_columns_for_export(df: pd.DataFrame) -> pd.DataFrame:
+    """Reorder DataFrame columns with preferred physics parameters first."""
+    preferred_order = [
+        "Overlap_operator_method",
+        "Kernel_operator_type",
+        "KL_diagonal_order",
+        "Number_of_Chebyshev_terms",
+    ]
+
+    # Get existing preferred columns in order
+    existing_preferred = [col for col in preferred_order if col in df.columns]
+
+    # Get remaining columns
+    remaining_cols = [col for col in df.columns if col not in existing_preferred]
+
+    # Create final column order
+    final_order = existing_preferred + remaining_cols
+
+    return df[final_order]
+
+
 def format_dataframe_for_export(df):
     """Apply proper formatting to DataFrame columns based on parameter
     types."""
@@ -381,19 +402,13 @@ def format_dataframe_for_export(df):
     return df_formatted
 
 
-def export_results_to_csv(results, output_path):
-    """Export critical mass results to CSV file with proper
-    formatting."""
-    if not results:
-        raise ValueError("No results to export")
+def export_results_to_csv(results: List[Dict], output_csv_path: str) -> str:
+    """Export critical mass results to CSV file."""
+    df = pd.DataFrame(results)
 
-    # Convert to DataFrame
-    df_results = pd.DataFrame(results)
+    # Reorder columns with physics parameters first
+    df = reorder_columns_for_export(df)
 
-    # Apply proper formatting
-    df_formatted = format_dataframe_for_export(df_results)
+    df.to_csv(output_csv_path, index=False)
 
-    # Export to CSV with proper float formatting for non-special columns
-    df_formatted.to_csv(output_path, index=False, float_format="%.6f")
-
-    return str(output_path)
+    return output_csv_path
