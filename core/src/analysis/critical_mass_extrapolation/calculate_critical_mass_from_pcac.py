@@ -20,6 +20,7 @@ from library.utils.logging_utilities import create_script_logger
 
 from src.analysis.critical_mass_extrapolation._pcac_critical_mass_config import (
     REQUIRED_COLUMNS,
+    COLUMN_MAPPING,
     DEFAULT_OUTPUT_FILENAME,
     validate_pcac_critical_config,
 )
@@ -91,7 +92,7 @@ def main(input_csv, output_csv, enable_logging, log_directory, log_filename):
         logger.log_script_start("PCAC critical mass calculation")
 
         output_path = process_critical_mass_analysis(
-            input_csv, output_csv, "pcac", REQUIRED_COLUMNS, logger
+            input_csv, output_csv, "pcac", COLUMN_MAPPING, REQUIRED_COLUMNS, logger
         )
 
         click.echo(f"✓ PCAC critical mass calculation complete: {output_path}")

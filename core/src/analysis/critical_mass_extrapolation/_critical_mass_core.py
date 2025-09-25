@@ -222,20 +222,11 @@ def process_critical_mass_analysis(
     input_csv_path: str,
     output_csv_path: str,
     analysis_type: str,
+    column_mapping: Dict[str, str],
     required_columns: List[str],
     logger,
 ) -> str:
     """Process plateau data to calculate critical mass values."""
-
-    # Get config based on analysis type
-    if analysis_type == "pcac":
-        from src.analysis.critical_mass_extrapolation._pcac_critical_mass_config import (
-            COLUMN_MAPPING,
-        )
-    else:  # pion
-        from src.analysis.critical_mass_extrapolation._pion_critical_mass_config import (
-            COLUMN_MAPPING,
-        )
 
     # Load and validate input data using library function
     logger.info(f"Loading {analysis_type.upper()} plateau data")
@@ -273,7 +264,7 @@ def process_critical_mass_analysis(
     for group_id, group_df in grouped_data:
         try:
             validate_critical_mass_input_data(
-                group_df, analysis_type, COLUMN_MAPPING, logger
+                group_df, analysis_type, column_mapping, logger
             )
             valid_groups.append((group_id, group_df))
         except ValueError as e:
@@ -289,7 +280,7 @@ def process_critical_mass_analysis(
     for group_id, group_df in valid_groups:
         logger.info(f"Processing group: {group_id}")
         try:
-            result = calculate_critical_mass_for_group(group_df, COLUMN_MAPPING)
+            result = calculate_critical_mass_for_group(group_df, column_mapping)
             if result:
                 results.append(result)
         except Exception as e:
