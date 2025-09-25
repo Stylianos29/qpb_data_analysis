@@ -221,6 +221,7 @@ def export_results_to_csv(results: List[Dict], output_csv_path: str) -> str:
 def calculate_critical_mass_for_group(
     group_df: pd.DataFrame,
     column_mapping: Dict[str, str],
+    plateau_mass_power: int,
     enable_quadratic_fit: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """Calculate critical mass for a parameter group."""
@@ -379,6 +380,7 @@ def process_critical_mass_analysis(
     column_mapping: Dict[str, str],
     required_columns: List[str],
     quadratic_config: Dict[str, Any],
+    plateau_mass_power: int,
     logger,
 ) -> str:
     """Process plateau data to calculate critical mass values."""
@@ -438,13 +440,28 @@ def process_critical_mass_analysis(
 
     logger.info(f"Processing {len(valid_groups)} valid parameter groups")
 
+    # Log the fitting approach based on plateau mass power
+    if plateau_mass_power == 1:
+        logger.info(
+            f"{analysis_type.upper()} analysis: fitting plateau_mass vs bare_mass"
+        )
+    elif plateau_mass_power == 2:
+        logger.info(
+            f"{analysis_type.upper()} analysis: fitting plateau_mass² vs bare_mass"
+        )
+    else:
+        logger.info(
+            f"{analysis_type.upper()} analysis: "
+            f"fitting plateau_mass^{plateau_mass_power} vs bare_mass"
+        )
+
     # Calculate critical mass for each valid group
     results = []
     for group_id, group_df in valid_groups:
         logger.info(f"Processing group: {group_id}")
         try:
             result = calculate_critical_mass_for_group(
-                group_df, column_mapping, enable_quadratic_fit
+                group_df, column_mapping, plateau_mass_power, enable_quadratic_fit
             )
             if result:
                 results.append(result)

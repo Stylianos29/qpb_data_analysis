@@ -22,6 +22,7 @@ from src.analysis.critical_mass_extrapolation._pion_critical_mass_config import 
     REQUIRED_COLUMNS,
     COLUMN_MAPPING,
     QUADRATIC_FIT_CONFIG,
+    PLATEAU_MASS_POWER,
     DEFAULT_OUTPUT_FILENAME,
     validate_pion_critical_config,
 )
@@ -99,6 +100,7 @@ def main(input_csv, output_csv, enable_logging, log_directory, log_filename):
             COLUMN_MAPPING,
             REQUIRED_COLUMNS,
             QUADRATIC_FIT_CONFIG,
+            PLATEAU_MASS_POWER,
             logger,
         )
 

@@ -29,6 +29,8 @@ COLUMN_MAPPING = {
     "plateau_error": "pion_plateau_error",
 }
 
+PLATEAU_MASS_POWER = 2  # Fit pion_mass^2 vs bare_mass
+
 # Quadratic fitting configuration
 QUADRATIC_FIT_CONFIG = {
     "enable_quadratic_fit": False,  # Enable quadratic fit for validation

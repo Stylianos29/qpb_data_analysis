@@ -29,6 +29,8 @@ COLUMN_MAPPING = {
     "plateau_error": "PCAC_plateau_error",
 }
 
+PLATEAU_MASS_POWER = 1  # Fit PCAC_mass^1 vs bare_mass
+
 # Quadratic fitting configuration
 QUADRATIC_FIT_CONFIG = {
     "enable_quadratic_fit": True,  # Enable quadratic fit for validation
