@@ -22,15 +22,12 @@ REQUIRED_COLUMNS = [
     "pion_plateau_error",
 ]
 
-# Optional columns for metadata preservation
-METADATA_COLUMNS = [
-    "pion_plateau_start_time",
-    "pion_plateau_end_time",
-    "pion_n_successful_samples",
-    "pion_n_total_samples",
-    "pion_n_failed_samples",
-    "pion_sigma_threshold_used",
-]
+# Column mapping for flexibility
+COLUMN_MAPPING = {
+    "bare_mass": "Bare_mass",
+    "plateau_mean": "pion_plateau_mean",
+    "plateau_error": "pion_plateau_error",
+}
 
 # Output file configuration
 DEFAULT_OUTPUT_FILENAME = "critical_bare_mass_from_pion.csv"
@@ -52,11 +49,6 @@ PION_SPECIFIC_FILTERS = {
 def get_required_columns():
     """Get list of required CSV columns for Pion analysis."""
     return REQUIRED_COLUMNS.copy()
-
-
-def get_metadata_columns():
-    """Get list of metadata columns to preserve."""
-    return METADATA_COLUMNS.copy()
 
 
 def get_pion_filters():

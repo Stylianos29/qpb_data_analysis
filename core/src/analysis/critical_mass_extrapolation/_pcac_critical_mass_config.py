@@ -22,15 +22,12 @@ REQUIRED_COLUMNS = [
     "PCAC_plateau_error",
 ]
 
-# Optional columns for metadata preservation
-METADATA_COLUMNS = [
-    "PCAC_plateau_start_time",
-    "PCAC_plateau_end_time",
-    "PCAC_n_successful_samples",
-    "PCAC_n_total_samples",
-    "PCAC_n_failed_samples",
-    "PCAC_sigma_threshold_used",
-]
+# Column mapping for flexibility
+COLUMN_MAPPING = {
+    "bare_mass": "Bare_mass",
+    "plateau_mean": "PCAC_plateau_mean",
+    "plateau_error": "PCAC_plateau_error",
+}
 
 # Output file configuration
 DEFAULT_OUTPUT_FILENAME = "critical_bare_mass_from_pcac.csv"
@@ -51,11 +48,6 @@ PCAC_SPECIFIC_FILTERS = {
 def get_required_columns():
     """Get list of required CSV columns for PCAC analysis."""
     return REQUIRED_COLUMNS.copy()
-
-
-def get_metadata_columns():
-    """Get list of metadata columns to preserve."""
-    return METADATA_COLUMNS.copy()
 
 
 def get_pcac_filters():

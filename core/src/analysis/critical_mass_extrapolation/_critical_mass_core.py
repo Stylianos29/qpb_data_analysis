@@ -28,11 +28,26 @@ from library.data import load_csv
 
 
 def validate_critical_mass_input_data(
-    df: pd.DataFrame, analysis_type: str, logger
+    df: pd.DataFrame, analysis_type: str, column_mapping: Dict[str, str], logger
 ) -> None:
     """Validate plateau data for critical mass calculation."""
+
+    # Check sufficient data points
     if len(df) < 3:
         raise ValueError("Need at least 3 data points for extrapolation")
+
+    # Check required columns exist
+    y_mean_col = column_mapping["plateau_mean"]
+    y_error_col = column_mapping["plateau_error"]
+
+    missing_cols = []
+    if y_mean_col not in df.columns:
+        missing_cols.append(y_mean_col)
+    if y_error_col not in df.columns:
+        missing_cols.append(y_error_col)
+
+    if missing_cols:
+        raise ValueError(f"Missing required columns: {missing_cols}")
 
     logger.info(
         f"Validated {len(df)} {analysis_type.upper()} plateau data points for group"
@@ -47,6 +62,11 @@ def process_critical_mass_analysis(
     logger,
 ) -> str:
     """Process plateau data to calculate critical mass values."""
+    # Get config based on analysis type
+    if analysis_type == "pcac":
+        from ._pcac_critical_mass_config import COLUMN_MAPPING
+    else:
+        from ._pion_critical_mass_config import COLUMN_MAPPING
 
     # Load and validate input data using library function
     logger.info(f"Loading {analysis_type.upper()} plateau data")
@@ -58,7 +78,8 @@ def process_critical_mass_analysis(
 
     analyzer = DataFrameAnalyzer(df)
 
-    # Filter exclusion list to only include parameters that exist in the data
+    # Filter exclusion list to only include parameters that exist in the
+    # list of multivalued parameters
     available_multivalued_params = analyzer.list_of_multivalued_tunable_parameter_names
     filtered_exclusions = [
         param
@@ -82,7 +103,9 @@ def process_critical_mass_analysis(
     valid_groups = []
     for group_id, group_df in grouped_data:
         try:
-            validate_critical_mass_input_data(group_df, analysis_type, logger)
+            validate_critical_mass_input_data(
+                group_df, analysis_type, COLUMN_MAPPING, logger
+            )
             valid_groups.append((group_id, group_df))
         except ValueError as e:
             logger.warning(f"Skipping group {group_id}: {e}")
@@ -97,7 +120,7 @@ def process_critical_mass_analysis(
     for group_id, group_df in valid_groups:
         logger.info(f"Processing group: {group_id}")
         try:
-            result = calculate_critical_mass_for_group(group_df, analysis_type)
+            result = calculate_critical_mass_for_group(group_df, COLUMN_MAPPING)
             if result:
                 results.append(result)
         except Exception as e:
@@ -281,91 +304,52 @@ def validate_fit_quality(fit_result, quality_metrics, fit_config):
     return validation_results
 
 
-def calculate_critical_mass_for_group(group_df, analysis_type):
+def calculate_critical_mass_for_group(
+    group_df: pd.DataFrame, column_mapping: Dict[str, str]
+) -> Optional[Dict[str, Any]]:
     """Calculate critical mass for a parameter group."""
+
+    mass_col = column_mapping["bare_mass"]
+    y_mean_col = column_mapping["plateau_mean"]
+    y_error_col = column_mapping["plateau_error"]
+
     # Extract data for fitting
-    mass_col = "bare_mass" if "bare_mass" in group_df.columns else "Bare_mass"
     x_data = group_df[mass_col].values
-
-    # Get plateau mass data based on analysis type
-    if analysis_type == "pcac":
-        y_mean_col = "PCAC_plateau_mean"
-        y_error_col = "PCAC_plateau_error"
-    else:  # pion
-        y_mean_col = "pion_plateau_mean"
-        y_error_col = "pion_plateau_error"
-
-    if y_mean_col not in group_df.columns or y_error_col not in group_df.columns:
-        return None
-
     y_mean = group_df[y_mean_col].values
     y_error = group_df[y_error_col].values
     y_data = gv.gvar(y_mean, y_error)
 
-    # Perform linear fit
-    try:
-        fit_result = perform_linear_fit(x_data, y_data)
-        quality_metrics = calculate_fit_quality_metrics(fit_result, x_data, y_data)
-        critical_mass = calculate_critical_mass_from_fit(fit_result)
+    # Perform linear fit (no inner try - let outer try/catch handle it)
+    fit_result = perform_linear_fit(x_data, y_data)
+    quality_metrics = calculate_fit_quality_metrics(fit_result, x_data, y_data)
+    critical_mass = calculate_critical_mass_from_fit(fit_result)
 
-        if critical_mass is None:
-            return None
-
-        # Package results with ordered columns
-        result = {}
-
-        # Add key physics parameters first
-        for col in group_df.columns:
-            if col == "Overlap_operator_method":
-                result["Overlap_operator_method"] = group_df[col].iloc[0]
-            elif col == "Kernel_operator_type":
-                result["Kernel_operator_type"] = group_df[col].iloc[0]
-            elif col == "KL_diagonal_order":
-                result["KL_diagonal_order"] = group_df[col].iloc[0]
-
-        # Add critical mass results
-        result.update(
-            {
-                "critical_mass_mean": gv.mean(critical_mass),
-                "critical_mass_error": gv.sdev(critical_mass),
-                "slope_mean": gv.mean(fit_result.p[0]),
-                "slope_error": gv.sdev(fit_result.p[0]),
-                "intercept_mean": gv.mean(fit_result.p[1]),
-                "intercept_error": gv.sdev(fit_result.p[1]),
-                "n_data_points": len(x_data),
-                "r_squared": quality_metrics["r_squared"],
-                "chi2_reduced": quality_metrics["chi2_reduced"],
-                "fit_quality": quality_metrics["Q"],
-            }
-        )
-
-        # Add remaining metadata (only those specified in config)
-        if analysis_type == "pcac":
-            from src.analysis.critical_mass_extrapolation._pcac_critical_mass_config import (
-                METADATA_COLUMNS,
-            )
-        else:  # pion
-            from src.analysis.critical_mass_extrapolation._pion_critical_mass_config import (
-                METADATA_COLUMNS,
-            )
-
-        for col in group_df.columns:
-            if col in METADATA_COLUMNS and col not in [
-                mass_col,
-                y_mean_col,
-                y_error_col,
-                "Overlap_operator_method",
-                "Kernel_operator_type",
-                "KL_diagonal_order",
-            ]:
-                values = group_df[col].unique()
-                if len(values) == 1:
-                    result[col] = values[0]
-
-        return result
-
-    except Exception as e:
+    if critical_mass is None:
         return None
+
+    # Build core results dictionary (no column ordering here)
+    result = {
+        "critical_mass_mean": gv.mean(critical_mass),
+        "critical_mass_error": gv.sdev(critical_mass),
+        "slope_mean": gv.mean(fit_result.p[0]),
+        "slope_error": gv.sdev(fit_result.p[0]),
+        "intercept_mean": gv.mean(fit_result.p[1]),
+        "intercept_error": gv.sdev(fit_result.p[1]),
+        "n_data_points": len(x_data),
+        "r_squared": quality_metrics["r_squared"],
+        "chi2_reduced": quality_metrics["chi2_reduced"],
+        "fit_quality": quality_metrics["Q"],
+    }
+
+    # Add metadata columns that exist and are single-valued
+    excluded_cols = {mass_col, y_mean_col, y_error_col}
+    for col in group_df.columns:
+        if col not in excluded_cols:  # Remove metadata_columns filter
+            values = group_df[col].unique()
+            if len(values) == 1:
+                result[col] = values[0]
+
+    return result
 
 
 # =============================================================================
