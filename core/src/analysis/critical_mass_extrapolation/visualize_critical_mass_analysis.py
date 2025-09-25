@@ -125,8 +125,11 @@ def process_critical_mass_visualization(
     "-t",
     "--analysis_type",
     type=click.Choice(["pcac", "pion"], case_sensitive=False),
-    default=None,
-    help="Analysis type (auto-detected if not specified)",
+    required=True,
+    help=(
+        "Analysis type for critical mass visualization "
+        "(PCAC mass or pion effective mass)"
+    ),
 )
 @click.option("-log_on", "--enable_logging", is_flag=True, help="Enable logging")
 @click.option(
@@ -148,27 +151,19 @@ def main(
     log_filename,
 ):
     """Create critical mass extrapolation visualization plots."""
-    # Set fallback for plots directory
-    if plots_directory is None:
-        plots_directory = str(Path(results_csv).parent / "plots")
-
-    # Auto-detect analysis type if not specified
-    if analysis_type is None:
-        if "pcac" in str(results_csv).lower():
-            analysis_type = "pcac"
-        elif "pion" in str(results_csv).lower():
-            analysis_type = "pion"
-        else:
-            raise click.ClickException(
-                "Cannot auto-detect analysis type. Please specify with -t/--analysis_type"
-            )
 
     # Validate configuration
     validate_visualization_config()
 
+    # Set fallback for plots directory
+    if plots_directory is None:
+        plots_directory = str(Path(results_csv).parent)
+
     # Set up logging
     log_dir = (
-        log_directory if log_directory else plots_directory if enable_logging else None
+        log_directory
+        if log_directory
+        else str(Path(results_csv).parent) if enable_logging else None
     )
 
     logger = create_script_logger(
@@ -180,14 +175,11 @@ def main(
     try:
         logger.log_script_start(f"Critical mass {analysis_type.upper()} visualization")
 
-        # Process visualization
         plots_created = process_critical_mass_visualization(
             results_csv, plateau_csv, plots_directory, analysis_type, logger
         )
 
-        click.echo(
-            f"✓ Created {plots_created} critical mass extrapolation plots in: {plots_directory}"
-        )
+        click.echo(f"✓ Created {plots_created} critical mass extrapolation plots")
         logger.log_script_end(
             f"Critical mass {analysis_type.upper()} visualization completed"
         )
