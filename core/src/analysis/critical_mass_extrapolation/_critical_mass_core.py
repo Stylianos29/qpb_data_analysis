@@ -31,6 +31,12 @@ def linear_function(x, p):
     return p[0] * x + p[1]
 
 
+def quadratic_function(x, p):
+    """Quadratic function for fitting: y = p[0] * x^2 + p[1] * x +
+    p[2]."""
+    return p[0] * x**2 + p[1] * x + p[2]
+
+
 def safe_divide(numerator, denominator, default=np.nan):
     """Safe division with fallback for zero or invalid denominators."""
     with np.errstate(divide="ignore", invalid="ignore"):
@@ -54,10 +60,85 @@ def perform_linear_fit(x_data, y_data):
     return fit_result
 
 
-def calculate_fit_quality_metrics(fit_result, x_data, y_data):
-    """Calculate R², reduced chi-squared, and other fit quality
-    metrics."""
-    y_fit = linear_function(x_data, fit_result.p)
+def perform_quadratic_fit(x_data, y_data, linear_fit_result):
+    """Perform quadratic fit using gvar/lsqfit with data-driven initial
+    guess."""
+    # Extract linear fit parameters
+    linear_slope = gv.mean(linear_fit_result.p[0])
+    linear_intercept = gv.mean(linear_fit_result.p[1])
+
+    # Calculate data-driven initial guess for quadratic coefficient
+    x_range = np.max(x_data) - np.min(x_data)
+    a_guess = abs(linear_slope) / x_range * 0.1  # 10% of linear slope per unit x
+
+    # Initial parameter guess: [a, b, c] = [quadratic, linear, constant]
+    p0 = [a_guess, linear_slope, linear_intercept]
+
+    # Perform nonlinear fit using lsqfit
+    fit_result = lsqfit.nonlinear_fit(
+        data=(x_data, y_data), fcn=quadratic_function, p0=p0
+    )
+
+    return fit_result
+
+
+def calculate_critical_mass_from_quadratic_fit(
+    quadratic_fit_result, linear_critical_mass
+):
+    """Calculate critical mass from quadratic fit by selecting root
+    closest to linear result."""
+    a = quadratic_fit_result.p[0]  # quadratic coefficient
+    b = quadratic_fit_result.p[1]  # linear coefficient
+    c = quadratic_fit_result.p[2]  # constant term
+
+    # Check if quadratic coefficient is effectively zero
+    if abs(gv.mean(a)) < 1e-10:
+        # Degenerate to linear case: bx + c = 0 -> x = -c/b
+        if gv.mean(b) == 0:
+            return None
+        return -c / b
+
+    # Calculate discriminant: b² - 4ac
+    discriminant = b**2 - 4 * a * c
+
+    # Check for real roots
+    if gv.mean(discriminant) < 0:
+        # No real roots
+        return None
+
+    # Calculate both roots: x = (-b ± √discriminant) / (2a)
+    sqrt_discriminant = gv.sqrt(discriminant)
+    root1 = (-b + sqrt_discriminant) / (2 * a)
+    root2 = (-b - sqrt_discriminant) / (2 * a)
+
+    # Select root closest to linear critical mass
+    linear_value = (
+        gv.mean(linear_critical_mass) if linear_critical_mass is not None else 0.0
+    )
+
+    distance1 = abs(gv.mean(root1) - linear_value)
+    distance2 = abs(gv.mean(root2) - linear_value)
+
+    return root1 if distance1 <= distance2 else root2
+
+
+def calculate_fit_quality_metrics(fit_result, x_data, y_data, fit_function=None):
+    """
+    Calculate R², reduced chi-squared, and other fit quality metrics.
+
+    Parameters:
+        - fit_result: lsqfit result object
+        - x_data: independent variable data
+        - y_data: dependent variable data (gvar format)
+        - fit_function: function used for fitting (defaults to
+          linear_function)
+    """
+    # Use linear function as default if not specified
+    if fit_function is None:
+        fit_function = linear_function
+
+    # Calculate fitted values
+    y_fit = fit_function(x_data, fit_result.p)
 
     # Calculate residuals and R²
     ss_res = np.sum((gv.mean(y_data) - gv.mean(y_fit)) ** 2)
@@ -138,7 +219,9 @@ def export_results_to_csv(results: List[Dict], output_csv_path: str) -> str:
 
 
 def calculate_critical_mass_for_group(
-    group_df: pd.DataFrame, column_mapping: Dict[str, str]
+    group_df: pd.DataFrame,
+    column_mapping: Dict[str, str],
+    enable_quadratic_fit: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """Calculate critical mass for a parameter group."""
 
@@ -174,6 +257,77 @@ def calculate_critical_mass_for_group(
         "chi2_reduced": quality_metrics["chi2_reduced"],
         "fit_quality": quality_metrics["Q"],
     }
+
+    # Perform quadratic fit if enabled
+    if enable_quadratic_fit:
+        try:
+            # Perform quadratic fit using linear results for initial
+            # guess
+            quadratic_fit_result = perform_quadratic_fit(x_data, y_data, fit_result)
+
+            # Calculate quadratic fit quality metrics
+            quadratic_quality_metrics = calculate_fit_quality_metrics(
+                quadratic_fit_result, x_data, y_data, quadratic_function
+            )
+
+            # Calculate quadratic critical mass
+            quadratic_critical_mass = calculate_critical_mass_from_quadratic_fit(
+                quadratic_fit_result, critical_mass
+            )
+
+            # Add quadratic fit results to output
+            result.update(
+                {
+                    "quadratic_a_mean": gv.mean(quadratic_fit_result.p[0]),
+                    "quadratic_a_error": gv.sdev(quadratic_fit_result.p[0]),
+                    "quadratic_b_mean": gv.mean(quadratic_fit_result.p[1]),
+                    "quadratic_b_error": gv.sdev(quadratic_fit_result.p[1]),
+                    "quadratic_c_mean": gv.mean(quadratic_fit_result.p[2]),
+                    "quadratic_c_error": gv.sdev(quadratic_fit_result.p[2]),
+                    "quadratic_r_squared": quadratic_quality_metrics["r_squared"],
+                    "quadratic_chi2_reduced": quadratic_quality_metrics["chi2_reduced"],
+                    "quadratic_fit_quality": quadratic_quality_metrics["Q"],
+                }
+            )
+
+            # Add quadratic critical mass (may be NaN if no real roots)
+            if quadratic_critical_mass is not None:
+                result.update(
+                    {
+                        "quadratic_critical_mass_mean": gv.mean(
+                            quadratic_critical_mass
+                        ),
+                        "quadratic_critical_mass_error": gv.sdev(
+                            quadratic_critical_mass
+                        ),
+                    }
+                )
+            else:
+                result.update(
+                    {
+                        "quadratic_critical_mass_mean": np.nan,
+                        "quadratic_critical_mass_error": np.nan,
+                    }
+                )
+
+        except Exception as e:
+            # If quadratic fit fails, add NaN values for all quadratic
+            # results
+            result.update(
+                {
+                    "quadratic_a_mean": np.nan,
+                    "quadratic_a_error": np.nan,
+                    "quadratic_b_mean": np.nan,
+                    "quadratic_b_error": np.nan,
+                    "quadratic_c_mean": np.nan,
+                    "quadratic_c_error": np.nan,
+                    "quadratic_critical_mass_mean": np.nan,
+                    "quadratic_critical_mass_error": np.nan,
+                    "quadratic_r_squared": np.nan,
+                    "quadratic_chi2_reduced": np.nan,
+                    "quadratic_fit_quality": np.nan,
+                }
+            )
 
     # Add all single-valued columns automatically
     excluded_cols = {mass_col, y_mean_col, y_error_col}
@@ -224,9 +378,13 @@ def process_critical_mass_analysis(
     analysis_type: str,
     column_mapping: Dict[str, str],
     required_columns: List[str],
+    quadratic_config: Dict[str, Any],
     logger,
 ) -> str:
     """Process plateau data to calculate critical mass values."""
+
+    # Get quadratic fit configuration from passed parameter
+    enable_quadratic_fit = quadratic_config["enable_quadratic_fit"]
 
     # Load and validate input data using library function
     logger.info(f"Loading {analysis_type.upper()} plateau data")
@@ -252,6 +410,11 @@ def process_critical_mass_analysis(
         logger.info(f"Excluding from grouping: {filtered_exclusions}")
     else:
         logger.info("No parameters to exclude from grouping")
+
+    if enable_quadratic_fit:
+        logger.info("Quadratic fitting enabled for validation")
+    else:
+        logger.info("Quadratic fitting disabled (linear only)")
 
     # Group data using analyzer's intelligence
     logger.info("Grouping data by lattice parameters")
@@ -280,7 +443,9 @@ def process_critical_mass_analysis(
     for group_id, group_df in valid_groups:
         logger.info(f"Processing group: {group_id}")
         try:
-            result = calculate_critical_mass_for_group(group_df, column_mapping)
+            result = calculate_critical_mass_for_group(
+                group_df, column_mapping, enable_quadratic_fit
+            )
             if result:
                 results.append(result)
         except Exception as e:

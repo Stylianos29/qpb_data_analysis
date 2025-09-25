@@ -29,6 +29,12 @@ COLUMN_MAPPING = {
     "plateau_error": "PCAC_plateau_error",
 }
 
+# Quadratic fitting configuration
+QUADRATIC_FIT_CONFIG = {
+    "enable_quadratic_fit": True,  # Enable quadratic fit for validation
+    "quadratic_coefficient_scale": 0.1,  # Scale factor for initial guess: |slope|/range * scale
+}
+
 # Output file configuration
 DEFAULT_OUTPUT_FILENAME = "critical_bare_mass_from_pcac.csv"
 OUTPUT_COLUMN_PREFIX = "pcac"
@@ -55,6 +61,11 @@ def get_pcac_filters():
     return PCAC_SPECIFIC_FILTERS.copy()
 
 
+def get_quadratic_fit_config():
+    """Get quadratic fitting configuration for PCAC analysis."""
+    return QUADRATIC_FIT_CONFIG.copy()
+
+
 # =============================================================================
 # VALIDATION FUNCTIONS
 # =============================================================================
@@ -79,6 +90,13 @@ def validate_pcac_critical_config():
 
     if not (has_mass_col and has_mean_col and has_error_col):
         raise ValueError("REQUIRED_COLUMNS must include mass, mean, and error columns")
+
+    # Validate quadratic fit config
+    if not (0 < QUADRATIC_FIT_CONFIG["quadratic_coefficient_scale"] <= 1.0):
+        raise ValueError("quadratic_coefficient_scale must be between 0 and 1")
+
+    if not isinstance(QUADRATIC_FIT_CONFIG["enable_quadratic_fit"], bool):
+        raise ValueError("enable_quadratic_fit must be boolean")
 
     # Check output filename
     if not DEFAULT_OUTPUT_FILENAME or not DEFAULT_OUTPUT_FILENAME.endswith(".csv"):
