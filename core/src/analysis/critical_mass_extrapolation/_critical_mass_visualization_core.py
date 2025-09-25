@@ -29,16 +29,13 @@ from src.analysis.critical_mass_extrapolation._critical_mass_visualization_confi
 # =============================================================================
 
 
-def load_and_validate_results_data(csv_path, analysis_type):
+def load_and_validate_results_data(
+    csv_path: str, results_column_mapping: dict
+) -> pd.DataFrame:
     """Load critical mass results CSV and validate columns."""
     df = pd.read_csv(csv_path)
 
-    required_cols = [
-        "critical_mass_mean",
-        "critical_mass_error",
-        "slope_mean",
-        "intercept_mean",
-    ]
+    required_cols = list(results_column_mapping.values())
     missing_cols = [col for col in required_cols if col not in df.columns]
 
     if missing_cols:
@@ -47,19 +44,18 @@ def load_and_validate_results_data(csv_path, analysis_type):
     return df
 
 
-def load_and_validate_plateau_data(csv_path, analysis_type):
+def load_and_validate_plateau_data(
+    csv_path: str, plateau_column_mapping: dict
+) -> pd.DataFrame:
     """Load plateau mass CSV and validate columns."""
     df = pd.read_csv(csv_path)
 
-    # Check for required columns based on analysis type
-    if analysis_type == "pcac":
-        mass_col = "PCAC_plateau_mean"
-        error_col = "PCAC_plateau_error"
-    else:  # pion
-        mass_col = "pion_plateau_mean"
-        error_col = "pion_plateau_error"
+    # Get column names from mapping
+    bare_mass_col = plateau_column_mapping["bare_mass"]
+    plateau_mean_col = plateau_column_mapping["plateau_mean"]
+    plateau_error_col = plateau_column_mapping["plateau_error"]
 
-    required_cols = ["Bare_mass", mass_col, error_col]
+    required_cols = [bare_mass_col, plateau_mean_col, plateau_error_col]
     missing_cols = [col for col in required_cols if col not in df.columns]
 
     if missing_cols:
@@ -180,25 +176,32 @@ def annotate_critical_mass(ax, critical_mass_mean, critical_mass_error, styling)
     )
 
 
-def create_extrapolation_plot(group_info, analysis_type, styling):
-    """Create single critical mass extrapolation plot."""
+def create_critical_mass_plot(group_info, analysis_type, plateau_column_mapping):
+    """Create critical mass extrapolation plot using configurable column
+    mapping."""
+
+    styling = get_plot_styling()
     plateau_data = group_info["plateau_data"]
     results_data = group_info["results_data"]
 
     # Set up figure
     fig, ax = plt.subplots(figsize=styling["figure_size"])
 
-    # Get data
-    x_data = plateau_data["Bare_mass"].values
+    # Get data using column mapping
+    bare_mass_col = plateau_column_mapping["bare_mass"]
+    plateau_mean_col = plateau_column_mapping["plateau_mean"]
+    plateau_error_col = plateau_column_mapping["plateau_error"]
 
-    if analysis_type == "pcac":
-        y_data = plateau_data["PCAC_plateau_mean"].values
-        y_errors = plateau_data["PCAC_plateau_error"].values
-        y_label = "PCAC Mass"
-    else:
-        y_data = plateau_data["pion_plateau_mean"].values
-        y_errors = plateau_data["pion_plateau_error"].values
-        y_label = "Pion Effective Mass"
+    x_data = plateau_data[bare_mass_col].values
+    y_data = plateau_data[plateau_mean_col].values
+    y_errors = plateau_data[plateau_error_col].values
+
+    # Get y-axis label from config
+    from src.analysis.critical_mass_extrapolation._critical_mass_visualization_config import (
+        ANALYSIS_CONFIGS,
+    )
+
+    y_label = ANALYSIS_CONFIGS[analysis_type]["default_y_label"]
 
     # Plot data points with error bars
     ax.errorbar(
@@ -260,15 +263,28 @@ def create_extrapolation_plot(group_info, analysis_type, styling):
 
 
 def create_critical_mass_extrapolation_plots(
-    group_info, title_builder, file_manager, plots_subdir_path, analysis_type
+    group_info,
+    title_builder,
+    file_manager,
+    plots_subdir_path,
+    analysis_type,
 ):
     """Create critical mass extrapolation plot for a parameter group."""
     try:
         # Get styling configuration
         styling = get_plot_styling()
 
-        # Create the plot
-        fig, ax = create_extrapolation_plot(group_info, analysis_type, styling)
+        # Get column mapping for this analysis type
+        from src.analysis.critical_mass_extrapolation._critical_mass_visualization_config import (
+            get_plateau_column_mapping,
+        )
+
+        plateau_column_mapping = get_plateau_column_mapping(analysis_type)
+
+        # Create the plot (pass column mapping, not styling)
+        fig, ax = create_critical_mass_plot(
+            group_info, analysis_type, plateau_column_mapping
+        )
 
         # Generate title
         title_text = title_builder.build(

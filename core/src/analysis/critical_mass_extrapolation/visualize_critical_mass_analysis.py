@@ -26,6 +26,8 @@ from library.constants.labels import TITLE_LABELS_DICTIONARY
 
 from src.analysis.critical_mass_extrapolation._critical_mass_visualization_config import (
     validate_visualization_config,
+    get_results_column_mapping,
+    get_plateau_column_mapping,
 )
 from src.analysis.critical_mass_extrapolation._critical_mass_visualization_core import (
     create_critical_mass_extrapolation_plots,
@@ -53,9 +55,17 @@ def process_critical_mass_visualization(
     results_csv_path, plateau_csv_path, plots_directory, analysis_type, logger
 ):
     """Process critical mass data and create visualizations."""
-    # Load and validate data
-    results_df = load_and_validate_results_data(results_csv_path, analysis_type)
-    plateau_df = load_and_validate_plateau_data(plateau_csv_path, analysis_type)
+
+    results_column_mapping = get_results_column_mapping()
+    plateau_column_mapping = get_plateau_column_mapping(analysis_type)
+
+    # Load and validate data using NEW configurable functions
+    results_df = load_and_validate_results_data(
+        results_csv_path, results_column_mapping
+    )
+    plateau_df = load_and_validate_plateau_data(
+        plateau_csv_path, plateau_column_mapping
+    )
     validate_input_data_consistency(results_df, plateau_df, logger)
 
     # Set up visualization infrastructure
@@ -176,7 +186,11 @@ def main(
         logger.log_script_start(f"Critical mass {analysis_type.upper()} visualization")
 
         plots_created = process_critical_mass_visualization(
-            results_csv, plateau_csv, plots_directory, analysis_type, logger
+            results_csv,
+            plateau_csv,
+            plots_directory,
+            analysis_type,
+            logger,
         )
 
         click.echo(f"✓ Created {plots_created} critical mass extrapolation plots")

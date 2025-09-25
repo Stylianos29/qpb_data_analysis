@@ -13,6 +13,41 @@ from typing import Dict, Any
 # CONSTANTS
 # =============================================================================
 
+# Results CSV column mapping (standard across all analysis types)
+RESULTS_COLUMN_MAPPING = {
+    "critical_mass_mean": "critical_mass_mean",
+    "critical_mass_error": "critical_mass_error",
+    "slope_mean": "slope_mean",
+    "intercept_mean": "intercept_mean",
+    "r_squared": "r_squared",
+}
+
+
+def get_results_column_mapping():
+    """Get results CSV column mapping."""
+    return RESULTS_COLUMN_MAPPING.copy()
+
+
+# Analysis-specific plateau column mappings
+PLATEAU_COLUMN_MAPPINGS = {
+    "pcac": {
+        "bare_mass": "Bare_mass",
+        "plateau_mean": "PCAC_plateau_mean",
+        "plateau_error": "PCAC_plateau_error",
+    },
+    "pion": {
+        "bare_mass": "Bare_mass",
+        "plateau_mean": "pion_plateau_mean",
+        "plateau_error": "pion_plateau_error",
+    },
+}
+
+
+def get_plateau_column_mapping(analysis_type: str):
+    """Get plateau column mapping for specified analysis type."""
+    return PLATEAU_COLUMN_MAPPINGS[analysis_type].copy()
+
+
 # Plot styling configuration
 PLOT_STYLING = {
     # Figure settings
