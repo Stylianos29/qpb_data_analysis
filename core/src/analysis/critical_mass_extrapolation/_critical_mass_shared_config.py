@@ -51,6 +51,33 @@ PHYSICAL_VALIDATION = {
     "require_negative_slope": False,  # Whether slope must be negative
 }
 
+# Output CSV column names
+OUTPUT_COLUMN_NAMES = {
+    # Linear fit results
+    "critical_mass_mean": "critical_mass_mean",
+    "critical_mass_error": "critical_mass_error",
+    "slope_mean": "slope_mean",
+    "slope_error": "slope_error",
+    "intercept_mean": "intercept_mean",
+    "intercept_error": "intercept_error",
+    "n_data_points": "n_data_points",
+    "r_squared": "r_squared",
+    "chi2_reduced": "chi2_reduced",
+    "fit_quality": "fit_quality",
+    # Quadratic fit results (when enabled)
+    "quadratic_a_mean": "quadratic_a_mean",
+    "quadratic_a_error": "quadratic_a_error",
+    "quadratic_b_mean": "quadratic_b_mean",
+    "quadratic_b_error": "quadratic_b_error",
+    "quadratic_c_mean": "quadratic_c_mean",
+    "quadratic_c_error": "quadratic_c_error",
+    "quadratic_critical_mass_mean": "quadratic_critical_mass_mean",
+    "quadratic_critical_mass_error": "quadratic_critical_mass_error",
+    "quadratic_r_squared": "quadratic_r_squared",
+    "quadratic_chi2_reduced": "quadratic_chi2_reduced",
+    "quadratic_fit_quality": "quadratic_fit_quality",
+}
+
 # CSV output configuration
 CSV_OUTPUT_CONFIG = {
     "float_precision": 6,

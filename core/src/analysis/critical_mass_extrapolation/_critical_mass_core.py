@@ -18,6 +18,7 @@ from library.data.analyzer import DataFrameAnalyzer
 from library.data import load_csv
 from src.analysis.critical_mass_extrapolation._critical_mass_shared_config import (
     GROUPING_EXCLUDED_PARAMETERS,
+    OUTPUT_COLUMN_NAMES,
 )
 
 
@@ -247,16 +248,16 @@ def calculate_critical_mass_for_group(
 
     # Build core results dictionary
     result = {
-        "critical_mass_mean": gv.mean(critical_mass),
-        "critical_mass_error": gv.sdev(critical_mass),
-        "slope_mean": gv.mean(fit_result.p[0]),
-        "slope_error": gv.sdev(fit_result.p[0]),
-        "intercept_mean": gv.mean(fit_result.p[1]),
-        "intercept_error": gv.sdev(fit_result.p[1]),
-        "n_data_points": len(x_data),
-        "r_squared": quality_metrics["r_squared"],
-        "chi2_reduced": quality_metrics["chi2_reduced"],
-        "fit_quality": quality_metrics["Q"],
+        OUTPUT_COLUMN_NAMES["critical_mass_mean"]: gv.mean(critical_mass),
+        OUTPUT_COLUMN_NAMES["critical_mass_error"]: gv.sdev(critical_mass),
+        OUTPUT_COLUMN_NAMES["slope_mean"]: gv.mean(fit_result.p[0]),
+        OUTPUT_COLUMN_NAMES["slope_error"]: gv.sdev(fit_result.p[0]),
+        OUTPUT_COLUMN_NAMES["intercept_mean"]: gv.mean(fit_result.p[1]),
+        OUTPUT_COLUMN_NAMES["intercept_error"]: gv.sdev(fit_result.p[1]),
+        OUTPUT_COLUMN_NAMES["n_data_points"]: len(x_data),
+        OUTPUT_COLUMN_NAMES["r_squared"]: quality_metrics["r_squared"],
+        OUTPUT_COLUMN_NAMES["chi2_reduced"]: quality_metrics["chi2_reduced"],
+        OUTPUT_COLUMN_NAMES["fit_quality"]: quality_metrics["Q"],
     }
 
     # Perform quadratic fit if enabled
@@ -279,15 +280,33 @@ def calculate_critical_mass_for_group(
             # Add quadratic fit results to output
             result.update(
                 {
-                    "quadratic_a_mean": gv.mean(quadratic_fit_result.p[0]),
-                    "quadratic_a_error": gv.sdev(quadratic_fit_result.p[0]),
-                    "quadratic_b_mean": gv.mean(quadratic_fit_result.p[1]),
-                    "quadratic_b_error": gv.sdev(quadratic_fit_result.p[1]),
-                    "quadratic_c_mean": gv.mean(quadratic_fit_result.p[2]),
-                    "quadratic_c_error": gv.sdev(quadratic_fit_result.p[2]),
-                    "quadratic_r_squared": quadratic_quality_metrics["r_squared"],
-                    "quadratic_chi2_reduced": quadratic_quality_metrics["chi2_reduced"],
-                    "quadratic_fit_quality": quadratic_quality_metrics["Q"],
+                    OUTPUT_COLUMN_NAMES["quadratic_a_mean"]: gv.mean(
+                        quadratic_fit_result.p[0]
+                    ),
+                    OUTPUT_COLUMN_NAMES["quadratic_a_error"]: gv.sdev(
+                        quadratic_fit_result.p[0]
+                    ),
+                    OUTPUT_COLUMN_NAMES["quadratic_b_mean"]: gv.mean(
+                        quadratic_fit_result.p[1]
+                    ),
+                    OUTPUT_COLUMN_NAMES["quadratic_b_error"]: gv.sdev(
+                        quadratic_fit_result.p[1]
+                    ),
+                    OUTPUT_COLUMN_NAMES["quadratic_c_mean"]: gv.mean(
+                        quadratic_fit_result.p[2]
+                    ),
+                    OUTPUT_COLUMN_NAMES["quadratic_c_error"]: gv.sdev(
+                        quadratic_fit_result.p[2]
+                    ),
+                    OUTPUT_COLUMN_NAMES[
+                        "quadratic_r_squared"
+                    ]: quadratic_quality_metrics["r_squared"],
+                    OUTPUT_COLUMN_NAMES[
+                        "quadratic_chi2_reduced"
+                    ]: quadratic_quality_metrics["chi2_reduced"],
+                    OUTPUT_COLUMN_NAMES[
+                        "quadratic_fit_quality"
+                    ]: quadratic_quality_metrics["Q"],
                 }
             )
 
@@ -295,10 +314,10 @@ def calculate_critical_mass_for_group(
             if quadratic_critical_mass is not None:
                 result.update(
                     {
-                        "quadratic_critical_mass_mean": gv.mean(
+                        OUTPUT_COLUMN_NAMES["quadratic_critical_mass_mean"]: gv.mean(
                             quadratic_critical_mass
                         ),
-                        "quadratic_critical_mass_error": gv.sdev(
+                        OUTPUT_COLUMN_NAMES["quadratic_critical_mass_error"]: gv.sdev(
                             quadratic_critical_mass
                         ),
                     }
@@ -306,8 +325,8 @@ def calculate_critical_mass_for_group(
             else:
                 result.update(
                     {
-                        "quadratic_critical_mass_mean": np.nan,
-                        "quadratic_critical_mass_error": np.nan,
+                        OUTPUT_COLUMN_NAMES["quadratic_critical_mass_mean"]: np.nan,
+                        OUTPUT_COLUMN_NAMES["quadratic_critical_mass_error"]: np.nan,
                     }
                 )
 
@@ -316,17 +335,17 @@ def calculate_critical_mass_for_group(
             # results
             result.update(
                 {
-                    "quadratic_a_mean": np.nan,
-                    "quadratic_a_error": np.nan,
-                    "quadratic_b_mean": np.nan,
-                    "quadratic_b_error": np.nan,
-                    "quadratic_c_mean": np.nan,
-                    "quadratic_c_error": np.nan,
-                    "quadratic_critical_mass_mean": np.nan,
-                    "quadratic_critical_mass_error": np.nan,
-                    "quadratic_r_squared": np.nan,
-                    "quadratic_chi2_reduced": np.nan,
-                    "quadratic_fit_quality": np.nan,
+                    OUTPUT_COLUMN_NAMES["quadratic_a_mean"]: np.nan,
+                    OUTPUT_COLUMN_NAMES["quadratic_a_error"]: np.nan,
+                    OUTPUT_COLUMN_NAMES["quadratic_b_mean"]: np.nan,
+                    OUTPUT_COLUMN_NAMES["quadratic_b_error"]: np.nan,
+                    OUTPUT_COLUMN_NAMES["quadratic_c_mean"]: np.nan,
+                    OUTPUT_COLUMN_NAMES["quadratic_c_error"]: np.nan,
+                    OUTPUT_COLUMN_NAMES["quadratic_critical_mass_mean"]: np.nan,
+                    OUTPUT_COLUMN_NAMES["quadratic_critical_mass_error"]: np.nan,
+                    OUTPUT_COLUMN_NAMES["quadratic_r_squared"]: np.nan,
+                    OUTPUT_COLUMN_NAMES["quadratic_chi2_reduced"]: np.nan,
+                    OUTPUT_COLUMN_NAMES["quadratic_fit_quality"]: np.nan,
                 }
             )
 
