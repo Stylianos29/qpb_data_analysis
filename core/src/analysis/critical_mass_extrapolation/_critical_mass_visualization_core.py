@@ -65,53 +65,104 @@ def load_and_validate_plateau_data(
 
 
 def group_data_for_visualization(results_df, plateau_df, analysis_type):
-    """Group results and plateau data for visualization."""
+    """Group results and plateau data for visualization using
+    DataFrameAnalyzer."""
+
+    # Import the analyzer and shared config
+    from library.data.analyzer import DataFrameAnalyzer
+    from src.analysis.critical_mass_extrapolation._critical_mass_shared_config import (
+        GROUPING_EXCLUDED_PARAMETERS,
+    )
+
+    # Use DataFrameAnalyzer on plateau data (more data points for better
+    # analysis)
+    analyzer = DataFrameAnalyzer(plateau_df)
+
+    # Filter exclusion list to only include parameters that exist in the
+    # list of multivalued parameters
+    available_multivalued_params = analyzer.list_of_multivalued_tunable_parameter_names
+    filtered_exclusions = [
+        param
+        for param in GROUPING_EXCLUDED_PARAMETERS
+        if param in available_multivalued_params
+    ]
+
+    # Group plateau data using analyzer's intelligence
+    grouped_plateau_data = analyzer.group_by_multivalued_tunable_parameters(
+        filter_out_parameters_list=filtered_exclusions
+    )
+
+    # Build grouped data for visualization
     grouped_data = []
 
-    # Group by the same parameters used in analysis
-    grouping_params = ["KL_diagonal_order", "Kernel_operator_type"]
-    available_params = [p for p in grouping_params if p in plateau_df.columns]
+    for group_id, plateau_group in grouped_plateau_data:
+        # Extract group parameters from the group_id string group_id
+        # format: "param1_value1_param2_value2_..."
+        group_metadata = _extract_metadata_from_group_id(group_id, plateau_group)
 
-    if not available_params:
-        # Single group case
+        # Find matching results row using the same grouping logic
+        matching_results = _find_matching_results(results_df, group_metadata)
+
+        if matching_results is None:
+            continue  # Skip if no matching results found
+
+        # Create group info structure expected by plotting functions
         group_info = {
-            "group_id": "all_data",
-            "plateau_data": plateau_df,
-            "results_data": results_df.iloc[0] if len(results_df) > 0 else None,
-            "group_metadata": {},
+            "group_id": group_id,
+            "plateau_data": plateau_group,
+            "results_data": matching_results,
+            "group_metadata": group_metadata,
         }
         grouped_data.append(group_info)
-    else:
-        # Group plateau data
-        for group_values, plateau_group in plateau_df.groupby(available_params):
-            if not isinstance(group_values, tuple):
-                group_values = (group_values,)
-
-            # Find matching results row
-            results_mask = pd.Series([True] * len(results_df))
-            for i, param in enumerate(available_params):
-                if param in results_df.columns:
-                    results_mask &= results_df[param] == group_values[i]
-
-            matching_results = results_df[results_mask]
-            if len(matching_results) == 0:
-                continue
-
-            # Create group info
-            group_id = "_".join(
-                [f"{p}{v}" for p, v in zip(available_params, group_values)]
-            )
-            group_metadata = dict(zip(available_params, group_values))
-
-            group_info = {
-                "group_id": group_id,
-                "plateau_data": plateau_group,
-                "results_data": matching_results.iloc[0],
-                "group_metadata": group_metadata,
-            }
-            grouped_data.append(group_info)
 
     return grouped_data
+
+
+def _extract_metadata_from_group_id(group_id, plateau_group):
+    """Extract group metadata from first row of plateau group."""
+    # Get the first row to extract parameter values
+    first_row = plateau_group.iloc[0]
+
+    # Import shared config to get grouping parameters
+    from src.analysis.critical_mass_extrapolation._critical_mass_shared_config import (
+        get_grouping_parameters,
+    )
+
+    grouping_params = get_grouping_parameters()
+
+    # Extract metadata for parameters that exist and are single-valued
+    # in this group
+    group_metadata = {}
+    for param in grouping_params:
+        if param in plateau_group.columns:
+            unique_values = plateau_group[param].unique()
+            if len(unique_values) == 1:  # Single-valued in this group
+                group_metadata[param] = unique_values[0]
+
+    return group_metadata
+
+
+def _find_matching_results(results_df, group_metadata):
+    """Find results row that matches the group metadata."""
+    if len(results_df) == 0:
+        return None
+
+    # Create mask to find matching results
+    results_mask = pd.Series([True] * len(results_df))
+
+    for param, value in group_metadata.items():
+        if param in results_df.columns:
+            results_mask &= results_df[param] == value
+
+    matching_results = results_df[results_mask]
+
+    if len(matching_results) == 0:
+        return None
+    elif len(matching_results) == 1:
+        return matching_results.iloc[0]  # Return as Series
+    else:
+        # Multiple matches - take the first one
+        return matching_results.iloc[0]
 
 
 # =============================================================================
