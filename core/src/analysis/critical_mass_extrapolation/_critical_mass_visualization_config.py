@@ -112,7 +112,7 @@ LAYOUT_CONFIG = {
 VISUALIZATION_CONFIG = {
     "max_plots_per_directory": 50,
     "plot_file_format": "png",
-    "clear_existing_plots": True,
+    "clear_existing_plots": False,
     "enable_plot_validation": True,
 }
 
@@ -144,6 +144,11 @@ def get_plot_styling():
 def get_layout_config():
     """Get layout configuration."""
     return LAYOUT_CONFIG.copy()
+
+
+def get_default_clear_existing():
+    """Get default value for clearing existing plots."""
+    return VISUALIZATION_CONFIG["clear_existing_plots"]
 
 
 def get_visualization_config():

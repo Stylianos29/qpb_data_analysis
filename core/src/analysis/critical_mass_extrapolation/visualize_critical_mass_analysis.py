@@ -52,7 +52,12 @@ def validate_input_data_consistency(results_df, plateau_df, logger):
 
 
 def process_critical_mass_visualization(
-    results_csv_path, plateau_csv_path, plots_directory, analysis_type, logger
+    results_csv_path,
+    plateau_csv_path,
+    plots_directory,
+    analysis_type,
+    clear_existing_plots,
+    logger,
 ):
     """Process critical mass data and create visualizations."""
 
@@ -77,8 +82,11 @@ def process_critical_mass_visualization(
     file_manager = PlotFileManager(base_directory=str(plots_directory))
     # Clear and prepare subdirectory
     plots_subdir_path = file_manager.prepare_subdirectory(
-        plot_base_name, clear_existing=True, confirm_clear=False
+        plot_base_name, clear_existing=clear_existing_plots, confirm_clear=False
     )
+
+    if clear_existing_plots:
+        logger.info(f"Cleared existing plots in {plot_base_name} subdirectory")
 
     # Group data for visualization
     grouped_data = group_data_for_visualization(results_df, plateau_df, analysis_type)
@@ -141,6 +149,13 @@ def process_critical_mass_visualization(
         "(PCAC mass or pion effective mass)"
     ),
 )
+@click.option(
+    "-c",
+    "--clear_existing",
+    is_flag=True,
+    default=False,
+    help="Clear existing plots in output subdirectory before creating new ones",
+)
 @click.option("-log_on", "--enable_logging", is_flag=True, help="Enable logging")
 @click.option(
     "-log_dir",
@@ -156,6 +171,7 @@ def main(
     plateau_csv,
     plots_directory,
     analysis_type,
+    clear_existing,
     enable_logging,
     log_directory,
     log_filename,
@@ -190,6 +206,7 @@ def main(
             plateau_csv,
             plots_directory,
             analysis_type,
+            clear_existing,
             logger,
         )
 
