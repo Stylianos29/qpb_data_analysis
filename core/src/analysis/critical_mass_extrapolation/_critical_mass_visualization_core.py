@@ -72,6 +72,13 @@ def calculate_plot_ranges(
     """
     bare_mass = plateau_data["Bare_mass"].to_numpy(dtype=float)
 
+    # Get plateau mass column and apply power transformation
+    from src.analysis.critical_mass_extrapolation._critical_mass_visualization_config import (
+        get_plateau_mass_power,
+    )
+
+    plateau_mass_power = get_plateau_mass_power(analysis_type)
+
     # Get plateau mass column (still hard-coded for functions using
     # analysis_type)
     if analysis_type == "pcac":
@@ -79,14 +86,17 @@ def calculate_plot_ranges(
     else:
         plateau_mass = plateau_data["pion_plateau_mean"].to_numpy(dtype=float)
 
+    # Apply power transformation to match calculation
+    plateau_mass_transformed = plateau_mass**plateau_mass_power
+
     # X-range: extend beyond data to show extrapolation
     x_min = min(bare_mass.min(), results_data["critical_mass_mean"] * 1.2)
     x_max = max(bare_mass.max(), 0.0) * 1.1
     x_range = (x_min, x_max)
 
     # Y-range: include zero and some margin
-    y_min = min(plateau_mass.min() * 1.1, -0.01)
-    y_max = plateau_mass.max() * 1.1
+    y_min = min(plateau_mass_transformed.min() * 1.1, -0.01)
+    y_max = plateau_mass_transformed.max() * 1.1
     y_range = (y_min, y_max)
 
     return x_range, y_range
@@ -369,6 +379,9 @@ def create_critical_mass_plot(
     Returns:
         Tuple of (figure, axes) matplotlib objects
     """
+    from src.analysis.critical_mass_extrapolation._critical_mass_visualization_config import (
+        get_plateau_mass_power,
+    )
 
     styling = get_plot_styling()
     plateau_data = group_info["plateau_data"]
@@ -383,8 +396,20 @@ def create_critical_mass_plot(
     plateau_error_col = plateau_column_mapping["plateau_error"]
 
     x_data = plateau_data[bare_mass_col].values
-    y_data = plateau_data[plateau_mean_col].values
-    y_errors = plateau_data[plateau_error_col].values
+    y_data_raw = plateau_data[plateau_mean_col].values
+    y_errors_raw = plateau_data[plateau_error_col].values
+
+    # Apply power transformation to match calculation
+    plateau_mass_power = get_plateau_mass_power(analysis_type)
+    y_data = y_data_raw**plateau_mass_power
+
+    # Transform errors using error propagation: σ(y^n) = n * y^(n-1) * σ(y)
+    if plateau_mass_power == 1:
+        y_errors = y_errors_raw
+    else:
+        y_errors = (
+            plateau_mass_power * (y_data_raw ** (plateau_mass_power - 1)) * y_errors_raw
+        )
 
     # Get y-axis label from config
     y_label = ANALYSIS_CONFIGS[analysis_type]["default_y_label"]

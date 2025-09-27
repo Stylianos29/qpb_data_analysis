@@ -144,10 +144,7 @@ def process_critical_mass_visualization(
     "--analysis_type",
     type=click.Choice(["pcac", "pion"], case_sensitive=False),
     required=True,
-    help=(
-        "Analysis type for critical mass visualization "
-        "(PCAC mass or pion effective mass)"
-    ),
+    help=("Analysis type for critical mass visualization " "(PCAC mass or pion mass)"),
 )
 @click.option(
     "-c",
