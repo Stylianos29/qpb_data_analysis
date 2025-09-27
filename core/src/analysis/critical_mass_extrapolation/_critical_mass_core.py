@@ -238,9 +238,13 @@ def calculate_critical_mass_for_group(
     y_error = group_df[y_error_col].values
     y_data = gv.gvar(y_mean, y_error)
 
+    y_means_transformed = y_data**plateau_mass_power
+
     # Perform linear fit
-    fit_result = perform_linear_fit(x_data, y_data)
-    quality_metrics = calculate_fit_quality_metrics(fit_result, x_data, y_data)
+    fit_result = perform_linear_fit(x_data, y_means_transformed)
+    quality_metrics = calculate_fit_quality_metrics(
+        fit_result, x_data, y_means_transformed
+    )
     critical_mass = calculate_critical_mass_from_fit(fit_result)
 
     if critical_mass is None:
