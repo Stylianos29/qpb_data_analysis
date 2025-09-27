@@ -2,8 +2,10 @@
 """
 Core plotting functions for critical mass extrapolation visualization.
 
-This module provides functions for creating linear extrapolation plots
-showing plateau mass vs bare mass with critical mass determination.
+Provides functions for creating linear extrapolation plots showing
+plateau mass vs bare mass with critical mass determination. Handles data
+loading, grouping, and plot generation for both PCAC and pion mass
+analyses.
 """
 
 import os
@@ -36,7 +38,18 @@ from src.analysis.critical_mass_extrapolation._critical_mass_visualization_confi
 def create_linear_fit_line(
     x_range: Tuple[float, float], slope: float, intercept: float, n_points: int = 100
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Create smooth linear fit line for plotting."""
+    """
+    Create smooth linear fit line for plotting extrapolation.
+
+    Args:
+        - x_range: Tuple of (min, max) x values for line extent
+        - slope: Linear fit slope coefficient
+        - intercept: Linear fit y-intercept
+        - n_points: Number of points for smooth line (default 100)
+
+    Returns:
+        Tuple of (x_fit, y_fit) arrays for plotting linear fit
+    """
     x_fit = np.linspace(x_range[0], x_range[1], n_points)
     y_fit = slope * x_fit + intercept
     return x_fit, y_fit
@@ -45,7 +58,18 @@ def create_linear_fit_line(
 def calculate_plot_ranges(
     plateau_data: pd.DataFrame, results_data: pd.Series, analysis_type: str
 ) -> Tuple[Tuple[float, float], Tuple[float, float]]:
-    """Calculate appropriate plot ranges including extrapolation."""
+    """
+    Calculate appropriate plot ranges including extrapolation.
+
+    Args:
+        - plateau_data: DataFrame containing bare mass and plateau
+          values
+        - results_data: Series containing critical mass results
+        - analysis_type: Type of analysis ("pcac" or "pion")
+
+    Returns:
+        Tuple of (x_range, y_range) where each range is (min, max)
+    """
     bare_mass = plateau_data["Bare_mass"].to_numpy(dtype=float)
 
     # Get plateau mass column (still hard-coded for functions using
@@ -74,7 +98,15 @@ def annotate_critical_mass(
     critical_mass_error: float,
     styling: Dict[str, Any],
 ) -> None:
-    """Add critical mass annotation to plot."""
+    """
+    Add critical mass vertical line and annotation to plot.
+
+    Args:
+        - ax: Matplotlib axes object for annotation
+        - critical_mass_mean: Critical mass central value
+        - critical_mass_error: Critical mass uncertainty
+        - styling: Plot styling configuration dictionary
+    """
     # Add vertical line at critical mass
     ax.axvline(
         critical_mass_mean,
@@ -108,7 +140,17 @@ def annotate_critical_mass(
 def _extract_metadata_from_group_id(
     group_id: str, plateau_group: pd.DataFrame
 ) -> Dict[str, Any]:
-    """Extract group metadata from first row of plateau group."""
+    """
+    Extract lattice parameter metadata from plateau data group.
+
+    Args:
+        - group_id: String identifier for parameter group
+        - plateau_group: DataFrame containing plateau data for this
+          group
+
+    Returns:
+        Dictionary of single-valued lattice parameters for this group
+    """
     # Get the first row to extract parameter values
     first_row = plateau_group.iloc[0]
 
@@ -134,7 +176,17 @@ def _extract_metadata_from_group_id(
 def _find_matching_results(
     results_df: pd.DataFrame, group_metadata: Dict[str, Any]
 ) -> Optional[pd.Series]:
-    """Find results row that matches the group metadata."""
+    """
+    Find results row matching the plateau data group parameters.
+
+    Args:
+        - results_df: DataFrame containing critical mass calculation
+          results
+        - group_metadata: Dictionary of group parameter values to match
+
+    Returns:
+        Matching results row as Series, or None if no match found
+    """
     if len(results_df) == 0:
         return None
 
@@ -164,7 +216,17 @@ def _find_matching_results(
 def load_and_validate_results_data(
     csv_path: str, results_column_mapping: Dict[str, str]
 ) -> pd.DataFrame:
-    """Load critical mass results CSV and validate columns."""
+    """
+    Load critical mass results CSV and validate required columns.
+
+    Args:
+        - csv_path: Path to results CSV file
+        - results_column_mapping: Dictionary mapping standard names to
+          CSV columns
+
+    Returns:
+        DataFrame containing validated results data
+    """
     df = pd.read_csv(csv_path)
 
     required_cols = list(results_column_mapping.values())
@@ -179,7 +241,17 @@ def load_and_validate_results_data(
 def load_and_validate_plateau_data(
     csv_path: str, plateau_column_mapping: Dict[str, str]
 ) -> pd.DataFrame:
-    """Load plateau mass CSV and validate columns."""
+    """
+    Load plateau mass estimates CSV and validate required columns.
+
+    Args:
+        - csv_path: Path to plateau data CSV file
+        - plateau_column_mapping: Dictionary mapping standard names to
+          CSV columns
+
+    Returns:
+        DataFrame containing validated plateau data
+    """
     df = pd.read_csv(csv_path)
 
     # Get column names from mapping
@@ -199,8 +271,23 @@ def load_and_validate_plateau_data(
 def group_data_for_visualization(
     results_df: pd.DataFrame, plateau_df: pd.DataFrame, analysis_type: str
 ) -> List[Dict[str, Any]]:
-    """Group results and plateau data for visualization using
-    DataFrameAnalyzer."""
+    """
+    Group plateau and results data by lattice parameters for plotting.
+
+    Uses DataFrameAnalyzer to intelligently group plateau data, then
+    matches each group with corresponding critical mass calculation
+    results.
+
+    Args:
+        - results_df: DataFrame containing critical mass calculation
+          results
+        - plateau_df: DataFrame containing plateau mass estimates
+        - analysis_type: Type of analysis ("pcac" or "pion")
+
+    Returns:
+        List of dictionaries, each containing group metadata, plateau
+        data, and matching results data for one parameter combination
+    """
 
     # Import the analyzer and shared config
     from src.analysis.critical_mass_extrapolation._critical_mass_shared_config import (
@@ -266,8 +353,22 @@ def create_critical_mass_plot(
     analysis_type: str,
     plateau_column_mapping: Dict[str, str],
 ) -> Tuple[Figure, Axes]:
-    """Create critical mass extrapolation plot using configurable column
-    mapping."""
+    """
+    Create critical mass extrapolation plot for one parameter group.
+
+    Generates plot showing plateau mass vs bare mass data with error
+    bars, linear fit line, critical mass annotation, and chiral limit
+    reference.
+
+    Args:
+        - group_info: Dictionary containing plateau data and results for
+          group
+        - analysis_type: Type of analysis ("pcac" or "pion")
+        - plateau_column_mapping: Dictionary mapping column names
+
+    Returns:
+        Tuple of (figure, axes) matplotlib objects
+    """
 
     styling = get_plot_styling()
     plateau_data = group_info["plateau_data"]
@@ -359,7 +460,24 @@ def create_critical_mass_extrapolation_plots(
     plots_subdir_path: str,
     analysis_type: str,
 ) -> Optional[str]:
-    """Create critical mass extrapolation plot for a parameter group."""
+    """
+    Create and save critical mass extrapolation plot for parameter
+    group.
+
+    Top-level function that creates plot, generates title and filename,
+    and saves to disk with proper error handling.
+
+    Args:
+        - group_info: Dictionary containing group data and metadata
+        - title_builder: PlotTitleBuilder instance for plot titles
+        - file_manager: PlotFileManager instance (unused but kept for
+          interface)
+        - plots_subdir_path: Directory path for saving plots
+        - analysis_type: Type of analysis ("pcac" or "pion")
+
+    Returns:
+        Output file path if successful, None if failed
+    """
     try:
         # Get styling configuration
         styling = get_plot_styling()
