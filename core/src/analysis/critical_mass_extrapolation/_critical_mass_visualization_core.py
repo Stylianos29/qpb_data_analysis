@@ -15,177 +15,45 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 
+from library.data.analyzer import DataFrameAnalyzer
 from library.visualization.builders.filename_builder import PlotFilenameBuilder
 from library.constants.labels import FILENAME_LABELS_BY_COLUMN_NAME
 
 from src.analysis.critical_mass_extrapolation._critical_mass_visualization_config import (
     get_plot_styling,
+    ANALYSIS_CONFIGS,
 )
 
 
 # =============================================================================
-# DATA LOADING AND VALIDATION
+# LOW-LEVEL UTILITY FUNCTIONS (Bottom of dependency chain)
 # =============================================================================
 
 
-def load_and_validate_results_data(
-    csv_path: str, results_column_mapping: dict
-) -> pd.DataFrame:
-    """Load critical mass results CSV and validate columns."""
-    df = pd.read_csv(csv_path)
-
-    required_cols = list(results_column_mapping.values())
-    missing_cols = [col for col in required_cols if col not in df.columns]
-
-    if missing_cols:
-        raise ValueError(f"Results CSV missing required columns: {missing_cols}")
-
-    return df
-
-
-def load_and_validate_plateau_data(
-    csv_path: str, plateau_column_mapping: dict
-) -> pd.DataFrame:
-    """Load plateau mass CSV and validate columns."""
-    df = pd.read_csv(csv_path)
-
-    # Get column names from mapping
-    bare_mass_col = plateau_column_mapping["bare_mass"]
-    plateau_mean_col = plateau_column_mapping["plateau_mean"]
-    plateau_error_col = plateau_column_mapping["plateau_error"]
-
-    required_cols = [bare_mass_col, plateau_mean_col, plateau_error_col]
-    missing_cols = [col for col in required_cols if col not in df.columns]
-
-    if missing_cols:
-        raise ValueError(f"Plateau CSV missing required columns: {missing_cols}")
-
-    return df
-
-
-def group_data_for_visualization(results_df, plateau_df, analysis_type):
-    """Group results and plateau data for visualization using
-    DataFrameAnalyzer."""
-
-    # Import the analyzer and shared config
-    from library.data.analyzer import DataFrameAnalyzer
-    from src.analysis.critical_mass_extrapolation._critical_mass_shared_config import (
-        GROUPING_EXCLUDED_PARAMETERS,
-    )
-
-    # Use DataFrameAnalyzer on plateau data (more data points for better
-    # analysis)
-    analyzer = DataFrameAnalyzer(plateau_df)
-
-    # Filter exclusion list to only include parameters that exist in the
-    # list of multivalued parameters
-    available_multivalued_params = analyzer.list_of_multivalued_tunable_parameter_names
-    filtered_exclusions = [
-        param
-        for param in GROUPING_EXCLUDED_PARAMETERS
-        if param in available_multivalued_params
-    ]
-
-    # Group plateau data using analyzer's intelligence
-    grouped_plateau_data = analyzer.group_by_multivalued_tunable_parameters(
-        filter_out_parameters_list=filtered_exclusions
-    )
-
-    # Build grouped data for visualization
-    grouped_data = []
-
-    for group_id, plateau_group in grouped_plateau_data:
-        # Extract group parameters from the group_id string group_id
-        # format: "param1_value1_param2_value2_..."
-        group_metadata = _extract_metadata_from_group_id(group_id, plateau_group)
-
-        # Find matching results row using the same grouping logic
-        matching_results = _find_matching_results(results_df, group_metadata)
-
-        if matching_results is None:
-            continue  # Skip if no matching results found
-
-        # Create group info structure expected by plotting functions
-        group_info = {
-            "group_id": group_id,
-            "plateau_data": plateau_group,
-            "results_data": matching_results,
-            "group_metadata": group_metadata,
-        }
-        grouped_data.append(group_info)
-
-    return grouped_data
-
-
-def _extract_metadata_from_group_id(group_id, plateau_group):
-    """Extract group metadata from first row of plateau group."""
-    # Get the first row to extract parameter values
-    first_row = plateau_group.iloc[0]
-
-    # Import shared config to get grouping parameters
-    from src.analysis.critical_mass_extrapolation._critical_mass_shared_config import (
-        get_grouping_parameters,
-    )
-
-    grouping_params = get_grouping_parameters()
-
-    # Extract metadata for parameters that exist and are single-valued
-    # in this group
-    group_metadata = {}
-    for param in grouping_params:
-        if param in plateau_group.columns:
-            unique_values = plateau_group[param].unique()
-            if len(unique_values) == 1:  # Single-valued in this group
-                group_metadata[param] = unique_values[0]
-
-    return group_metadata
-
-
-def _find_matching_results(results_df, group_metadata):
-    """Find results row that matches the group metadata."""
-    if len(results_df) == 0:
-        return None
-
-    # Create mask to find matching results
-    results_mask = pd.Series([True] * len(results_df))
-
-    for param, value in group_metadata.items():
-        if param in results_df.columns:
-            results_mask &= results_df[param] == value
-
-    matching_results = results_df[results_mask]
-
-    if len(matching_results) == 0:
-        return None
-    elif len(matching_results) == 1:
-        return matching_results.iloc[0]  # Return as Series
-    else:
-        # Multiple matches - take the first one
-        return matching_results.iloc[0]
-
-
-# =============================================================================
-# PLOTTING FUNCTIONS
-# =============================================================================
-
-
-def create_linear_fit_line(x_range, slope, intercept, n_points=100):
+def create_linear_fit_line(
+    x_range: Tuple[float, float], slope: float, intercept: float, n_points: int = 100
+) -> Tuple[np.ndarray, np.ndarray]:
     """Create smooth linear fit line for plotting."""
     x_fit = np.linspace(x_range[0], x_range[1], n_points)
     y_fit = slope * x_fit + intercept
     return x_fit, y_fit
 
 
-def calculate_plot_ranges(plateau_data, results_data, analysis_type):
+def calculate_plot_ranges(
+    plateau_data: pd.DataFrame, results_data: pd.Series, analysis_type: str
+) -> Tuple[Tuple[float, float], Tuple[float, float]]:
     """Calculate appropriate plot ranges including extrapolation."""
-    bare_mass = plateau_data["Bare_mass"].values
+    bare_mass = plateau_data["Bare_mass"].to_numpy(dtype=float)
 
-    # Get plateau mass column
+    # Get plateau mass column (still hard-coded for functions using
+    # analysis_type)
     if analysis_type == "pcac":
-        plateau_mass = plateau_data["PCAC_plateau_mean"].values
+        plateau_mass = plateau_data["PCAC_plateau_mean"].to_numpy(dtype=float)
     else:
-        plateau_mass = plateau_data["pion_plateau_mean"].values
+        plateau_mass = plateau_data["pion_plateau_mean"].to_numpy(dtype=float)
 
     # X-range: extend beyond data to show extrapolation
     x_min = min(bare_mass.min(), results_data["critical_mass_mean"] * 1.2)
@@ -200,7 +68,12 @@ def calculate_plot_ranges(plateau_data, results_data, analysis_type):
     return x_range, y_range
 
 
-def annotate_critical_mass(ax, critical_mass_mean, critical_mass_error, styling):
+def annotate_critical_mass(
+    ax: Axes,
+    critical_mass_mean: float,
+    critical_mass_error: float,
+    styling: Dict[str, Any],
+) -> None:
     """Add critical mass annotation to plot."""
     # Add vertical line at critical mass
     ax.axvline(
@@ -227,7 +100,172 @@ def annotate_critical_mass(ax, critical_mass_mean, critical_mass_error, styling)
     )
 
 
-def create_critical_mass_plot(group_info, analysis_type, plateau_column_mapping):
+# =============================================================================
+# DATA GROUPING HELPER FUNCTIONS
+# =============================================================================
+
+
+def _extract_metadata_from_group_id(
+    group_id: str, plateau_group: pd.DataFrame
+) -> Dict[str, Any]:
+    """Extract group metadata from first row of plateau group."""
+    # Get the first row to extract parameter values
+    first_row = plateau_group.iloc[0]
+
+    # Import shared config to get grouping parameters
+    from src.analysis.critical_mass_extrapolation._critical_mass_shared_config import (
+        get_grouping_parameters,
+    )
+
+    grouping_params = get_grouping_parameters()
+
+    # Extract metadata for parameters that exist and are single-valued
+    # in this group
+    group_metadata = {}
+    for param in grouping_params:
+        if param in plateau_group.columns:
+            unique_values = plateau_group[param].unique()
+            if len(unique_values) == 1:  # Single-valued in this group
+                group_metadata[param] = unique_values[0]
+
+    return group_metadata
+
+
+def _find_matching_results(
+    results_df: pd.DataFrame, group_metadata: Dict[str, Any]
+) -> Optional[pd.Series]:
+    """Find results row that matches the group metadata."""
+    if len(results_df) == 0:
+        return None
+
+    # Create mask to find matching results
+    results_mask = pd.Series([True] * len(results_df))
+
+    for param, value in group_metadata.items():
+        if param in results_df.columns:
+            results_mask &= results_df[param] == value
+
+    matching_results = results_df[results_mask]
+
+    if len(matching_results) == 0:
+        return None
+    elif len(matching_results) == 1:
+        return matching_results.iloc[0]  # Return as Series
+    else:
+        # Multiple matches - take the first one
+        return matching_results.iloc[0]
+
+
+# =============================================================================
+# DATA LOADING AND VALIDATION FUNCTIONS
+# =============================================================================
+
+
+def load_and_validate_results_data(
+    csv_path: str, results_column_mapping: Dict[str, str]
+) -> pd.DataFrame:
+    """Load critical mass results CSV and validate columns."""
+    df = pd.read_csv(csv_path)
+
+    required_cols = list(results_column_mapping.values())
+    missing_cols = [col for col in required_cols if col not in df.columns]
+
+    if missing_cols:
+        raise ValueError(f"Results CSV missing required columns: {missing_cols}")
+
+    return df
+
+
+def load_and_validate_plateau_data(
+    csv_path: str, plateau_column_mapping: Dict[str, str]
+) -> pd.DataFrame:
+    """Load plateau mass CSV and validate columns."""
+    df = pd.read_csv(csv_path)
+
+    # Get column names from mapping
+    bare_mass_col = plateau_column_mapping["bare_mass"]
+    plateau_mean_col = plateau_column_mapping["plateau_mean"]
+    plateau_error_col = plateau_column_mapping["plateau_error"]
+
+    required_cols = [bare_mass_col, plateau_mean_col, plateau_error_col]
+    missing_cols = [col for col in required_cols if col not in df.columns]
+
+    if missing_cols:
+        raise ValueError(f"Plateau CSV missing required columns: {missing_cols}")
+
+    return df
+
+
+def group_data_for_visualization(
+    results_df: pd.DataFrame, plateau_df: pd.DataFrame, analysis_type: str
+) -> List[Dict[str, Any]]:
+    """Group results and plateau data for visualization using
+    DataFrameAnalyzer."""
+
+    # Import the analyzer and shared config
+    from src.analysis.critical_mass_extrapolation._critical_mass_shared_config import (
+        GROUPING_EXCLUDED_PARAMETERS,
+    )
+
+    # Use DataFrameAnalyzer on plateau data (more data points for better
+    # analysis)
+    analyzer = DataFrameAnalyzer(plateau_df)
+
+    # Filter exclusion list to only include parameters that exist in the
+    # list of multivalued parameters
+    available_multivalued_params = analyzer.list_of_multivalued_tunable_parameter_names
+    filtered_exclusions = [
+        param
+        for param in GROUPING_EXCLUDED_PARAMETERS
+        if param in available_multivalued_params
+    ]
+
+    # Group plateau data using analyzer's intelligence
+    grouped_plateau_data = analyzer.group_by_multivalued_tunable_parameters(
+        filter_out_parameters_list=filtered_exclusions
+    )
+
+    # Build grouped data for visualization
+    grouped_data = []
+
+    for group_identifier, plateau_group in grouped_plateau_data:
+        # Convert group_identifier to string if it's not already
+        if isinstance(group_identifier, tuple):
+            group_id = "_".join(str(val) for val in group_identifier)
+        else:
+            group_id = str(group_identifier)
+
+        # Extract group parameters from plateau_group directly
+        group_metadata = _extract_metadata_from_group_id(group_id, plateau_group)
+
+        # Find matching results row using the same grouping logic
+        matching_results = _find_matching_results(results_df, group_metadata)
+
+        if matching_results is None:
+            continue  # Skip if no matching results found
+
+        # Create group info structure expected by plotting functions
+        group_info = {
+            "group_id": group_id,
+            "plateau_data": plateau_group,
+            "results_data": matching_results,
+            "group_metadata": group_metadata,
+        }
+        grouped_data.append(group_info)
+
+    return grouped_data
+
+
+# =============================================================================
+# CORE PLOTTING FUNCTIONS
+# =============================================================================
+
+
+def create_critical_mass_plot(
+    group_info: Dict[str, Any],
+    analysis_type: str,
+    plateau_column_mapping: Dict[str, str],
+) -> Tuple[Figure, Axes]:
     """Create critical mass extrapolation plot using configurable column
     mapping."""
 
@@ -248,10 +286,6 @@ def create_critical_mass_plot(group_info, analysis_type, plateau_column_mapping)
     y_errors = plateau_data[plateau_error_col].values
 
     # Get y-axis label from config
-    from src.analysis.critical_mass_extrapolation._critical_mass_visualization_config import (
-        ANALYSIS_CONFIGS,
-    )
-
     y_label = ANALYSIS_CONFIGS[analysis_type]["default_y_label"]
 
     # Plot data points with error bars
@@ -313,13 +347,18 @@ def create_critical_mass_plot(group_info, analysis_type, plateau_column_mapping)
     return fig, ax
 
 
+# =============================================================================
+# TOP-LEVEL INTERFACE FUNCTIONS (Top of dependency chain)
+# =============================================================================
+
+
 def create_critical_mass_extrapolation_plots(
-    group_info,
-    title_builder,
-    file_manager,
-    plots_subdir_path,
-    analysis_type,
-):
+    group_info: Dict[str, Any],
+    title_builder: Any,
+    file_manager: Any,
+    plots_subdir_path: str,
+    analysis_type: str,
+) -> Optional[str]:
     """Create critical mass extrapolation plot for a parameter group."""
     try:
         # Get styling configuration
