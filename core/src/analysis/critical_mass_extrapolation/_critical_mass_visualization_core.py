@@ -228,7 +228,8 @@ def load_and_validate_results_data(
 
     Args:
         - csv_path: Path to results CSV file
-        - output_column_names: Dictionary from shared config OUTPUT_COLUMN_NAMES
+        - output_column_names: Dictionary from shared config
+          OUTPUT_COLUMN_NAMES
         - logger: Logger instance from custom logging system
 
     Returns:
@@ -236,7 +237,8 @@ def load_and_validate_results_data(
     """
     df = pd.read_csv(csv_path)
 
-    # Separate linear and quadratic columns using "quadratic" string in keys
+    # Separate linear and quadratic columns using "quadratic" string in
+    # keys
     linear_cols = []
     quadratic_cols = []
 
@@ -260,7 +262,8 @@ def load_and_validate_results_data(
         present_quadratic_cols = [col for col in quadratic_cols if col in df.columns]
         if present_quadratic_cols:  # Some quadratic cols present, some missing
             logger.warning(f"Quadratic fit columns missing: {missing_quadratic_cols}")
-        # If no quadratic columns present, that's normal (quadratic fitting disabled)
+        # If no quadratic columns present, that's normal (quadratic
+        # fitting disabled)
 
     return df
 
@@ -412,7 +415,8 @@ def create_critical_mass_plot(
     plateau_mass_power = get_plateau_mass_power(analysis_type)
     y_data = y_data_raw**plateau_mass_power
 
-    # Transform errors using error propagation: σ(y^n) = n * y^(n-1) * σ(y)
+    # Transform errors using error propagation: σ(y^n) = n * y^(n-1) *
+    # σ(y)
     if plateau_mass_power == 1:
         y_errors = y_errors_raw
     else:
