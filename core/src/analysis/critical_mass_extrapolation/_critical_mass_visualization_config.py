@@ -85,23 +85,16 @@ VISUALIZATION_CONFIG = {
     "enable_plot_validation": True,
 }
 
-# ADD PLATEAU MASS POWER CONFIGURATION
-PLATEAU_MASS_POWERS = {
-    "pcac": 1,  # Plot PCAC_mass^1 vs bare_mass
-    "pion": 2,  # Plot pion_mass^2 vs bare_mass
-}
 
 # UPDATE ANALYSIS CONFIGS TO REFLECT ACTUAL Y-AXIS LABELS
 ANALYSIS_CONFIGS = {
     "pcac": {
         "plot_subdirectory": "critical_mass_extrapolation_pcac",
-        "default_y_label": "PCAC Mass",
-        "data_label_prefix": "PCAC",
+        "default_y_label": "a$m_{PCAC}$",
     },
     "pion": {
         "plot_subdirectory": "critical_mass_extrapolation_pion",
-        "default_y_label": "Pion Mass²",
-        "data_label_prefix": "Pion",
+        "default_y_label": "$a^2 m^2_{\\pi}$",
     },
 }
 
@@ -176,7 +169,7 @@ def get_plateau_column_mapping(analysis_type: str) -> Dict[str, str]:
 
 def get_plateau_mass_power(analysis_type: str) -> int:
     """
-    Get plateau mass power for specified analysis type.
+    Get plateau mass power from analysis-specific config.
 
     Args:
         - analysis_type: Type of analysis ("pcac" or "pion")
@@ -184,7 +177,38 @@ def get_plateau_mass_power(analysis_type: str) -> int:
     Returns:
         Power to raise plateau mass values (1 for PCAC, 2 for pion)
     """
-    return PLATEAU_MASS_POWERS[analysis_type]
+    if analysis_type == "pcac":
+        from src.analysis.critical_mass_extrapolation._pcac_critical_mass_config import (
+            PLATEAU_MASS_POWER,
+        )
+
+        return PLATEAU_MASS_POWER
+    elif analysis_type == "pion":
+        from src.analysis.critical_mass_extrapolation._pion_critical_mass_config import (
+            PLATEAU_MASS_POWER,
+        )
+
+        return PLATEAU_MASS_POWER
+    else:
+        raise ValueError(f"Unsupported analysis_type: {analysis_type}")
+
+
+def get_analysis_prefix(analysis_type: str) -> str:
+    """Get analysis prefix from analysis-specific config."""
+    if analysis_type == "pcac":
+        from src.analysis.critical_mass_extrapolation._pcac_critical_mass_config import (
+            OUTPUT_COLUMN_PREFIX,
+        )
+
+        return OUTPUT_COLUMN_PREFIX
+    elif analysis_type == "pion":
+        from src.analysis.critical_mass_extrapolation._pion_critical_mass_config import (
+            OUTPUT_COLUMN_PREFIX,
+        )
+
+        return OUTPUT_COLUMN_PREFIX
+    else:
+        raise ValueError(f"Unsupported analysis_type: {analysis_type}")
 
 
 # =============================================================================
@@ -274,6 +298,3 @@ def validate_visualization_config():
 
         if not config["default_y_label"]:
             raise ValueError(f"default_y_label for {analysis_type} cannot be empty")
-
-        if not config["data_label_prefix"]:
-            raise ValueError(f"data_label_prefix for {analysis_type} cannot be empty")
