@@ -8,6 +8,9 @@ creating critical mass extrapolation plots.
 
 from typing import Dict
 
+from src.analysis.critical_mass_extrapolation._critical_mass_shared_config import (
+    OUTPUT_COLUMN_NAMES,
+)
 
 # =============================================================================
 # CONSTANTS
@@ -133,6 +136,16 @@ def get_analysis_config(analysis_type):
     if analysis_type not in ANALYSIS_CONFIGS:
         raise ValueError(f"Unknown analysis type: {analysis_type}")
     return ANALYSIS_CONFIGS[analysis_type].copy()
+
+
+def get_results_column_mapping() -> Dict[str, str]:
+    """
+    Get results column mapping from shared config.
+
+    Returns:
+        Dictionary mapping standard names to CSV column names
+    """
+    return OUTPUT_COLUMN_NAMES.copy()
 
 
 def get_plateau_column_mapping(analysis_type: str) -> Dict[str, str]:
