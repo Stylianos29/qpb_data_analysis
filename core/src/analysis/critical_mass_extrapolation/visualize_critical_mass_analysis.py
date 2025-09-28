@@ -39,20 +39,6 @@ from src.analysis.critical_mass_extrapolation._critical_mass_visualization_core 
 )
 
 
-def validate_input_data_consistency(results_df, plateau_df, logger):
-    """Validate that results and plateau data are consistent."""
-    # Check if we have matching parameter combinations
-    if len(results_df) == 0:
-        raise ValueError("Results data is empty")
-
-    if len(plateau_df) == 0:
-        raise ValueError("Plateau data is empty")
-
-    logger.info(
-        f"Loaded {len(results_df)} critical mass results and {len(plateau_df)} plateau data points"
-    )
-
-
 def process_critical_mass_visualization(
     results_csv_path,
     plateau_csv_path,
@@ -72,7 +58,6 @@ def process_critical_mass_visualization(
     plateau_df = load_and_validate_plateau_data(
         plateau_csv_path, plateau_column_mapping
     )
-    validate_input_data_consistency(results_df, plateau_df, logger)
 
     # Set up visualization infrastructure
     title_builder = PlotTitleBuilder(TITLE_LABELS_DICTIONARY)

@@ -237,6 +237,9 @@ def load_and_validate_results_data(
     """
     df = pd.read_csv(csv_path)
 
+    if len(df) == 0:
+        raise ValueError("Results CSV contains no data rows")
+
     # Separate linear and quadratic columns using "quadratic" string in
     # keys
     linear_cols = []
@@ -283,6 +286,9 @@ def load_and_validate_plateau_data(
         DataFrame containing validated plateau data
     """
     df = pd.read_csv(csv_path)
+
+    if len(df) == 0:
+        raise ValueError("Plateau CSV contains no data rows")
 
     # Get column names from mapping
     bare_mass_col = plateau_column_mapping["bare_mass"]
