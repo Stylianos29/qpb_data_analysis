@@ -6,28 +6,12 @@ This module contains styling, layout, and configuration parameters for
 creating critical mass extrapolation plots.
 """
 
+from typing import Dict
+
+
 # =============================================================================
 # CONSTANTS
 # =============================================================================
-
-# Analysis-specific plateau column mappings
-PLATEAU_COLUMN_MAPPINGS = {
-    "pcac": {
-        "bare_mass": "Bare_mass",
-        "plateau_mean": "PCAC_plateau_mean",
-        "plateau_error": "PCAC_plateau_error",
-    },
-    "pion": {
-        "bare_mass": "Bare_mass",
-        "plateau_mean": "pion_plateau_mean",
-        "plateau_error": "pion_plateau_error",
-    },
-}
-
-
-def get_plateau_column_mapping(analysis_type: str):
-    """Get plateau column mapping for specified analysis type."""
-    return PLATEAU_COLUMN_MAPPINGS[analysis_type].copy()
 
 
 # Plot styling configuration
@@ -98,39 +82,11 @@ VISUALIZATION_CONFIG = {
     "enable_plot_validation": True,
 }
 
-# Analysis-specific configurations
-ANALYSIS_CONFIGS = {
-    "pcac": {
-        "plot_subdirectory": "critical_mass_extrapolation_pcac",
-        "default_y_label": "PCAC Mass",
-        "data_label_prefix": "PCAC",
-    },
-    "pion": {
-        "plot_subdirectory": "critical_mass_extrapolation_pion",
-        "default_y_label": "Pion Effective Mass",
-        "data_label_prefix": "Pion",
-    },
-}
-
 # ADD PLATEAU MASS POWER CONFIGURATION
 PLATEAU_MASS_POWERS = {
     "pcac": 1,  # Plot PCAC_mass^1 vs bare_mass
     "pion": 2,  # Plot pion_mass^2 vs bare_mass
 }
-
-
-def get_plateau_mass_power(analysis_type: str) -> int:
-    """
-    Get plateau mass power for specified analysis type.
-
-    Args:
-        - analysis_type: Type of analysis ("pcac" or "pion")
-
-    Returns:
-        Power to raise plateau mass values (1 for PCAC, 2 for pion)
-    """
-    return PLATEAU_MASS_POWERS[analysis_type]
-
 
 # UPDATE ANALYSIS CONFIGS TO REFLECT ACTUAL Y-AXIS LABELS
 ANALYSIS_CONFIGS = {
@@ -177,6 +133,45 @@ def get_analysis_config(analysis_type):
     if analysis_type not in ANALYSIS_CONFIGS:
         raise ValueError(f"Unknown analysis type: {analysis_type}")
     return ANALYSIS_CONFIGS[analysis_type].copy()
+
+
+def get_plateau_column_mapping(analysis_type: str) -> Dict[str, str]:
+    """
+    Get plateau column mapping from analysis-specific config.
+
+    Args:
+        - analysis_type: Type of analysis ("pcac" or "pion")
+
+    Returns:
+        Dictionary mapping standard names to CSV column names
+    """
+    if analysis_type == "pcac":
+        from src.analysis.critical_mass_extrapolation._pcac_critical_mass_config import (
+            COLUMN_MAPPING,
+        )
+
+        return COLUMN_MAPPING.copy()
+    elif analysis_type == "pion":
+        from src.analysis.critical_mass_extrapolation._pion_critical_mass_config import (
+            COLUMN_MAPPING,
+        )
+
+        return COLUMN_MAPPING.copy()
+    else:
+        raise ValueError(f"Unsupported analysis_type: {analysis_type}")
+
+
+def get_plateau_mass_power(analysis_type: str) -> int:
+    """
+    Get plateau mass power for specified analysis type.
+
+    Args:
+        - analysis_type: Type of analysis ("pcac" or "pion")
+
+    Returns:
+        Power to raise plateau mass values (1 for PCAC, 2 for pion)
+    """
+    return PLATEAU_MASS_POWERS[analysis_type]
 
 
 # =============================================================================
