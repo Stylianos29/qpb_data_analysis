@@ -6,27 +6,9 @@ This module contains styling, layout, and configuration parameters for
 creating critical mass extrapolation plots.
 """
 
-from typing import Dict, Any
-
-
 # =============================================================================
 # CONSTANTS
 # =============================================================================
-
-# Results CSV column mapping (standard across all analysis types)
-RESULTS_COLUMN_MAPPING = {
-    "critical_mass_mean": "critical_mass_mean",
-    "critical_mass_error": "critical_mass_error",
-    "slope_mean": "slope_mean",
-    "intercept_mean": "intercept_mean",
-    "r_squared": "r_squared",
-}
-
-
-def get_results_column_mapping():
-    """Get results CSV column mapping."""
-    return RESULTS_COLUMN_MAPPING.copy()
-
 
 # Analysis-specific plateau column mappings
 PLATEAU_COLUMN_MAPPINGS = {

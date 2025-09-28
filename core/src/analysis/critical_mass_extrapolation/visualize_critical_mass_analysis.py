@@ -24,9 +24,11 @@ from library.visualization.builders.title_builder import PlotTitleBuilder
 from library.visualization.managers.file_manager import PlotFileManager
 from library.constants.labels import TITLE_LABELS_DICTIONARY
 
+from src.analysis.critical_mass_extrapolation._critical_mass_shared_config import (
+    OUTPUT_COLUMN_NAMES,
+)
 from src.analysis.critical_mass_extrapolation._critical_mass_visualization_config import (
     validate_visualization_config,
-    get_results_column_mapping,
     get_plateau_column_mapping,
 )
 from src.analysis.critical_mass_extrapolation._critical_mass_visualization_core import (
@@ -61,12 +63,11 @@ def process_critical_mass_visualization(
 ):
     """Process critical mass data and create visualizations."""
 
-    results_column_mapping = get_results_column_mapping()
     plateau_column_mapping = get_plateau_column_mapping(analysis_type)
 
     # Load and validate data using NEW configurable functions
     results_df = load_and_validate_results_data(
-        results_csv_path, results_column_mapping
+        results_csv_path, OUTPUT_COLUMN_NAMES, logger
     )
     plateau_df = load_and_validate_plateau_data(
         plateau_csv_path, plateau_column_mapping

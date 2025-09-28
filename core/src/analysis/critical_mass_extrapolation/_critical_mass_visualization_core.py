@@ -13,6 +13,7 @@ from typing import Dict, List, Tuple, Optional, Any
 
 import numpy as np
 import pandas as pd
+import logging
 import matplotlib
 
 matplotlib.use("Agg")
@@ -24,8 +25,14 @@ from library.data.analyzer import DataFrameAnalyzer
 from library.visualization.builders.filename_builder import PlotFilenameBuilder
 from library.constants.labels import FILENAME_LABELS_BY_COLUMN_NAME
 
+from src.analysis.critical_mass_extrapolation._critical_mass_shared_config import (
+    get_grouping_parameters,
+    GROUPING_EXCLUDED_PARAMETERS,
+)
 from src.analysis.critical_mass_extrapolation._critical_mass_visualization_config import (
     get_plot_styling,
+    get_plateau_mass_power,
+    get_plateau_column_mapping,
     ANALYSIS_CONFIGS,
 )
 
@@ -71,11 +78,6 @@ def calculate_plot_ranges(
         Tuple of (x_range, y_range) where each range is (min, max)
     """
     bare_mass = plateau_data["Bare_mass"].to_numpy(dtype=float)
-
-    # Get plateau mass column and apply power transformation
-    from src.analysis.critical_mass_extrapolation._critical_mass_visualization_config import (
-        get_plateau_mass_power,
-    )
 
     plateau_mass_power = get_plateau_mass_power(analysis_type)
 
@@ -164,11 +166,6 @@ def _extract_metadata_from_group_id(
     # Get the first row to extract parameter values
     first_row = plateau_group.iloc[0]
 
-    # Import shared config to get grouping parameters
-    from src.analysis.critical_mass_extrapolation._critical_mass_shared_config import (
-        get_grouping_parameters,
-    )
-
     grouping_params = get_grouping_parameters()
 
     # Extract metadata for parameters that exist and are single-valued
@@ -224,26 +221,46 @@ def _find_matching_results(
 
 
 def load_and_validate_results_data(
-    csv_path: str, results_column_mapping: Dict[str, str]
+    csv_path: str, output_column_names: Dict[str, str], logger: logging.Logger
 ) -> pd.DataFrame:
     """
     Load critical mass results CSV and validate required columns.
 
     Args:
         - csv_path: Path to results CSV file
-        - results_column_mapping: Dictionary mapping standard names to
-          CSV columns
+        - output_column_names: Dictionary from shared config OUTPUT_COLUMN_NAMES
+        - logger: Logger instance from custom logging system
 
     Returns:
         DataFrame containing validated results data
     """
     df = pd.read_csv(csv_path)
 
-    required_cols = list(results_column_mapping.values())
-    missing_cols = [col for col in required_cols if col not in df.columns]
+    # Separate linear and quadratic columns using "quadratic" string in keys
+    linear_cols = []
+    quadratic_cols = []
 
-    if missing_cols:
-        raise ValueError(f"Results CSV missing required columns: {missing_cols}")
+    for key, csv_col_name in output_column_names.items():
+        if "quadratic" in key:
+            quadratic_cols.append(csv_col_name)
+        else:
+            linear_cols.append(csv_col_name)
+
+    # Check linear columns (required) - raise error if missing
+    missing_linear_cols = [col for col in linear_cols if col not in df.columns]
+    if missing_linear_cols:
+        raise ValueError(
+            f"Results CSV missing required linear fit columns: {missing_linear_cols}"
+        )
+
+    # Check quadratic columns (optional) - only log warning if missing
+    missing_quadratic_cols = [col for col in quadratic_cols if col not in df.columns]
+    if missing_quadratic_cols:
+        # Only log if some (but not all) quadratic columns are missing
+        present_quadratic_cols = [col for col in quadratic_cols if col in df.columns]
+        if present_quadratic_cols:  # Some quadratic cols present, some missing
+            logger.warning(f"Quadratic fit columns missing: {missing_quadratic_cols}")
+        # If no quadratic columns present, that's normal (quadratic fitting disabled)
 
     return df
 
@@ -298,11 +315,6 @@ def group_data_for_visualization(
         List of dictionaries, each containing group metadata, plateau
         data, and matching results data for one parameter combination
     """
-
-    # Import the analyzer and shared config
-    from src.analysis.critical_mass_extrapolation._critical_mass_shared_config import (
-        GROUPING_EXCLUDED_PARAMETERS,
-    )
 
     # Use DataFrameAnalyzer on plateau data (more data points for better
     # analysis)
@@ -379,9 +391,6 @@ def create_critical_mass_plot(
     Returns:
         Tuple of (figure, axes) matplotlib objects
     """
-    from src.analysis.critical_mass_extrapolation._critical_mass_visualization_config import (
-        get_plateau_mass_power,
-    )
 
     styling = get_plot_styling()
     plateau_data = group_info["plateau_data"]
@@ -506,11 +515,6 @@ def create_critical_mass_extrapolation_plots(
     try:
         # Get styling configuration
         styling = get_plot_styling()
-
-        # Get column mapping for this analysis type
-        from src.analysis.critical_mass_extrapolation._critical_mass_visualization_config import (
-            get_plateau_column_mapping,
-        )
 
         plateau_column_mapping = get_plateau_column_mapping(analysis_type)
 
