@@ -1,18 +1,53 @@
 #!/usr/bin/env python3
 """
-Critical mass analysis visualization script.
+Critical Mass Analysis Visualization Script
 
-Usage: python visualize_critical_mass_analysis.py \
-    --analysis_type "pcac" \
-    -r results.csv \
-    -p plateau.csv \
-    -o plots_dir
+Creates linear extrapolation plots for critical mass analysis, showing
+plateau mass vs bare mass data with fitted lines and critical mass
+annotations. Supports both PCAC mass and pion effective mass analyses
+with automatic power transformation (PCAC: mass¹, Pion: mass²).
+
+The script combines critical mass calculation results with original
+plateau data to visualize the linear extrapolation to the chiral limit,
+generating publication-quality plots with comprehensive annotations, fit
+quality metrics, and error propagation.
+
+Features:
+    - Automatic analysis-type detection or manual specification
+    - Configurable plot clearing and directory management  
+    - Group-wise plotting for different lattice parameter combinations
+    - Professional styling with error bars, fit lines, and annotations
+    - Robust error handling with detailed logging
+
+Usage Examples:
+    # Basic PCAC analysis visualization
+    python visualize_critical_mass_analysis.py \
+        -t pcac \
+        -r critical_bare_mass_from_pcac.csv \
+        -p plateau_PCAC_mass_estimates.csv \
+        -o plots_output
+
+    # Pion analysis with plot clearing and logging
+    python visualize_critical_mass_analysis.py \
+        -t pion \
+        -r critical_bare_mass_from_pion.csv \
+        -p plateau_pion_mass_estimates.csv \
+        -o plots_output \
+        --clear_existing \
+        -log_on \
+        -log_dir logs
+
+Input Requirements:
+    - Results CSV: Output from
+      calculate_critical_mass_from_{pcac,pion}.py
+    - Plateau CSV: Output from extract_plateau_{PCAC,pion}_mass.py
+    - Analysis type: Must match the type used in calculation
 """
 
-from typing import Optional, List
 from pathlib import Path
 
 import click
+
 
 from library.validation.click_validators import (
     csv_file,
@@ -38,14 +73,63 @@ from src.analysis.critical_mass_extrapolation._critical_mass_visualization_core 
 
 
 def process_critical_mass_visualization(
-    results_csv_path,
-    plateau_csv_path,
-    plots_directory,
-    analysis_type,
-    clear_existing_plots,
+    results_csv_path: str,
+    plateau_csv_path: str,
+    plots_directory: str,
+    analysis_type: str,
+    clear_existing_plots: bool,
     logger,
-):
-    """Process critical mass data and create visualizations."""
+) -> int:
+    """
+    Process critical mass data and create comprehensive visualization
+    plots.
+
+    Loads critical mass calculation results and original plateau data,
+    groups by lattice parameters, and generates linear extrapolation
+    plots showing the determination of critical bare mass at the chiral
+    limit. Handles both PCAC and pion analyses with appropriate power
+    transformations.
+
+    Args:
+        - results_csv_path: Path to critical mass calculation results
+          CSV file
+        - plateau_csv_path: Path to plateau mass estimates CSV file
+        - plots_directory: Directory path for saving generated plots
+        - analysis_type: Type of analysis ("pcac" or "pion")
+        - clear_existing_plots: Whether to clear existing plots before
+          creation
+        - logger: Logger instance from custom logging system for
+          progress tracking
+
+    Returns:
+        Number of plots successfully created
+
+    Raises:
+        ValueError: If input files are empty, missing required columns,
+        or
+                   analysis_type is unsupported
+        FileNotFoundError: If input CSV files do not exist Exception:
+        For plot creation failures (logged as warnings, not fatal)
+
+    Process Flow:
+        1. Load and validate input CSV files with required columns
+        2. Group data by lattice parameters using intelligent analysis
+        3. Set up visualization infrastructure (file managers, title
+           builders)
+        4. Create individual plots for each parameter group combination
+        5. Apply analysis-specific transformations (pion: square values)
+        6. Generate plots with data points, fit lines, and critical mass
+           annotations
+        7. Save plots with descriptive filenames and return success
+           count
+
+    Plot Features:
+        - Linear extrapolation lines extending to chiral limit
+        - Data points with error bars from plateau estimates
+        - Critical mass vertical line and annotation with uncertainty
+        - Fit quality metrics (R²) displayed in legend
+        - Professional styling with grids and appropriate axis ranges
+    """
 
     results_column_mapping = get_results_column_mapping()
     plateau_column_mapping = get_plateau_column_mapping(analysis_type)

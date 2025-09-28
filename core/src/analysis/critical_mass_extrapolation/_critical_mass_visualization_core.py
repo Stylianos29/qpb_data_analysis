@@ -13,7 +13,6 @@ from typing import Dict, List, Tuple, Optional, Any
 
 import numpy as np
 import pandas as pd
-import logging
 import matplotlib
 
 matplotlib.use("Agg")
@@ -221,7 +220,7 @@ def _find_matching_results(
 
 
 def load_and_validate_results_data(
-    csv_path: str, output_column_names: Dict[str, str], logger: logging.Logger
+    csv_path: str, output_column_names: Dict[str, str], logger
 ) -> pd.DataFrame:
     """
     Load critical mass results CSV and validate required columns.
