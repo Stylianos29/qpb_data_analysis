@@ -269,11 +269,13 @@ def calculate_critical_mass_for_group(
         try:
             # Perform quadratic fit using linear results for initial
             # guess
-            quadratic_fit_result = perform_quadratic_fit(x_data, y_data, fit_result)
+            quadratic_fit_result = perform_quadratic_fit(
+                x_data, y_means_transformed, fit_result
+            )
 
             # Calculate quadratic fit quality metrics
             quadratic_quality_metrics = calculate_fit_quality_metrics(
-                quadratic_fit_result, x_data, y_data, quadratic_function
+                quadratic_fit_result, x_data, y_means_transformed, quadratic_function
             )
 
             # Calculate quadratic critical mass

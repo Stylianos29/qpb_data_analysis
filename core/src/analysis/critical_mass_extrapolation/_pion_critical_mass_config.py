@@ -33,7 +33,7 @@ PLATEAU_MASS_POWER = 2  # Fit pion_mass^2 vs bare_mass
 
 # Quadratic fitting configuration
 QUADRATIC_FIT_CONFIG = {
-    "enable_quadratic_fit": False,  # Enable quadratic fit for validation
+    "enable_quadratic_fit": True,  # Enable quadratic fit for validation
     "quadratic_coefficient_scale": 0.1,  # Scale factor for initial guess: |slope|/range * scale
 }
 
