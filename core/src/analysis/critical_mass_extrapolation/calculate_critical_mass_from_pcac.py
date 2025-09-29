@@ -25,6 +25,7 @@ from src.analysis.critical_mass_extrapolation._pcac_critical_mass_config import 
     PLATEAU_MASS_POWER,
     DEFAULT_OUTPUT_FILENAME,
     validate_pcac_critical_config,
+    get_fit_range_config,
 )
 from src.analysis.critical_mass_extrapolation._critical_mass_core import (
     process_critical_mass_analysis,
@@ -93,6 +94,9 @@ def main(input_csv, output_csv, enable_logging, log_directory, log_filename):
     try:
         logger.log_script_start("PCAC critical mass calculation")
 
+        # Get fit range configuration
+        fit_range_config = get_fit_range_config()
+
         output_path = process_critical_mass_analysis(
             input_csv,
             output_csv,
@@ -100,6 +104,7 @@ def main(input_csv, output_csv, enable_logging, log_directory, log_filename):
             COLUMN_MAPPING,
             REQUIRED_COLUMNS,
             QUADRATIC_FIT_CONFIG,
+            fit_range_config,
             PLATEAU_MASS_POWER,
             logger,
         )

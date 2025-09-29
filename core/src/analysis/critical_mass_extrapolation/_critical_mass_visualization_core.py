@@ -24,6 +24,7 @@ from matplotlib.figure import Figure
 from library.data.analyzer import DataFrameAnalyzer
 from library.visualization.builders.filename_builder import PlotFilenameBuilder
 from library.constants.labels import FILENAME_LABELS_BY_COLUMN_NAME
+from library.data import load_csv
 
 from src.analysis.critical_mass_extrapolation._critical_mass_shared_config import (
     get_grouping_parameters,
@@ -123,6 +124,36 @@ def calculate_plot_ranges(
     y_range = (y_min, y_max)
 
     return x_range, y_range
+
+
+# ============================================================================
+# FIT RANGE FORMATTING HELPER FUNCTION
+# =============================================================================
+
+
+def format_fit_range_for_legend(min_val: float, max_val: float) -> str:
+    """
+    Format fit range [min, max] with uniform precision for legend
+    display.
+
+    Args:
+        min_val: Minimum value of fit range max_val: Maximum value of
+        fit range
+
+    Returns:
+        Formatted string like "[0.010, 0.070]" with uniform precision
+    """
+    # Convert to strings and find decimal places
+    min_str = f"{min_val:.10f}".rstrip("0").rstrip(".")
+    max_str = f"{max_val:.10f}".rstrip("0").rstrip(".")
+
+    min_decimals = len(min_str.split(".")[-1]) if "." in min_str else 0
+    max_decimals = len(max_str.split(".")[-1]) if "." in max_str else 0
+
+    # Use max precision for both to ensure uniform formatting
+    precision = max(min_decimals, max_decimals)
+
+    return f"[{min_val:.{precision}f}, {max_val:.{precision}f}]"
 
 
 # =============================================================================
@@ -266,7 +297,7 @@ def load_and_validate_plateau_data(
     Returns:
         DataFrame containing validated plateau data
     """
-    df = pd.read_csv(csv_path)
+    df = load_csv(csv_path)
 
     if len(df) == 0:
         raise ValueError("Plateau CSV contains no data rows")
@@ -434,6 +465,10 @@ def create_critical_mass_plot(
     # LINEAR FIT
     #############
 
+    # Get fit ranges
+    fit_range_min = results_data.get("fit_range_min", x_data.min())
+    fit_range_max = results_data.get("fit_range_max", x_data.max())
+
     # Create linear fit using gvar for automatic error propagation
     x_fit = np.linspace(x_range[0], x_range[1], 100)
     slope_gv = gv.gvar(results_data["slope_mean"], results_data["slope_error"])
@@ -448,8 +483,12 @@ def create_critical_mass_plot(
     else:
         mass_symbol = "m^2_{\\pi}"
 
+    # Format fit range for legend
+    fit_range_str = format_fit_range_for_legend(fit_range_min, fit_range_max)
+
     linear_label = (
-        f"Linear fit:\n"
+        f"$\\mathbf{{Linear\\ fit:}}$\n"
+        f"  • Fitting range: $m \\in {fit_range_str}$\n"
         f"  • $a{mass_symbol} = {results_data['slope_mean']:.4f}\\,m "
         f"+ {results_data['intercept_mean']:.5f}$\n"
         f"  • χ²/dof = {results_data['chi2_reduced']:.3f}\n"
@@ -477,6 +516,25 @@ def create_critical_mass_plot(
         alpha=0.2,
     )
 
+    # Draw vertical lines for linear fit range (light gray, dotted)
+    ax.axvline(
+        fit_range_min,
+        ls=":",
+        lw=1.5,
+        color="gray",
+        alpha=0.8,
+        zorder=1,  # Behind other elements
+    )
+    ax.axvline(
+        fit_range_max,
+        ls=":",
+        lw=1.5,
+        color="gray",
+        alpha=0.8,
+        zorder=1,
+        label="Linear fit range",
+    )
+
     # QUADRATIC FIT (if available)
     #############
 
@@ -500,9 +558,19 @@ def create_critical_mass_plot(
         )
         y_quad_fit_gv = a_gv * x_fit**2 + b_gv * x_fit + c_gv
 
+        # Get quadratic fit ranges
+        quad_fit_range_min = results_data.get("quadratic_fit_range_min", x_data.min())
+        quad_fit_range_max = results_data.get("quadratic_fit_range_max", x_data.max())
+
+        # Format quadratic fit range for legend
+        quad_fit_range_str = format_fit_range_for_legend(
+            quad_fit_range_min, quad_fit_range_max
+        )
+
         # Format quadratic fit label
         quadratic_label = (
-            f"Quadratic fit:\n"
+            f"$\\mathbf{{Quadratic\\ fit:}}$\n"
+            f"  • Fitting range: $m \\in {quad_fit_range_str}$\n"
             f"  • $a{mass_symbol} = {results_data['quadratic_a_mean']:.4f}\\,m^2 "
             f"+ {results_data['quadratic_b_mean']:.4f}\\,m "
             f"+ {results_data['quadratic_c_mean']:.5f}$\n"
@@ -598,9 +666,9 @@ def create_critical_mass_plot(
             ax.annotate(
                 f"{int(count)}",
                 xy=(x, y),
-                xytext=(-15, 15),
+                xytext=(+15, -15),
                 textcoords="offset points",
-                fontsize=8,
+                fontsize=10,
                 ha="center",
                 bbox=dict(
                     boxstyle="round,pad=0.3",

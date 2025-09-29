@@ -37,6 +37,18 @@ QUADRATIC_FIT_CONFIG = {
     "quadratic_coefficient_scale": 0.1,  # Scale factor for initial guess: |slope|/range * scale
 }
 
+# Fitting range configuration
+FIT_RANGE_CONFIG = {
+    "linear": {
+        "bare_mass_min": 0,  # None = use actual data minimum
+        "bare_mass_max": None,  # None = use actual data maximum
+    },
+    "quadratic": {
+        "bare_mass_min": 0,  # None = use actual data minimum
+        "bare_mass_max": None,  # None = use actual data maximum
+    },
+}
+
 # Output file configuration
 DEFAULT_OUTPUT_FILENAME = "critical_bare_mass_from_pcac.csv"
 OUTPUT_COLUMN_PREFIX = "pcac"
@@ -66,6 +78,11 @@ def get_pcac_filters():
 def get_quadratic_fit_config():
     """Get quadratic fitting configuration for PCAC analysis."""
     return QUADRATIC_FIT_CONFIG.copy()
+
+
+def get_fit_range_config():
+    """Get fitting range configuration for PCAC analysis."""
+    return FIT_RANGE_CONFIG.copy()
 
 
 # =============================================================================
@@ -99,6 +116,18 @@ def validate_pcac_critical_config():
 
     if not isinstance(QUADRATIC_FIT_CONFIG["enable_quadratic_fit"], bool):
         raise ValueError("enable_quadratic_fit must be boolean")
+
+    # Validate fit range config
+    for fit_type in ["linear", "quadratic"]:
+        range_min = FIT_RANGE_CONFIG[fit_type]["bare_mass_min"]
+        range_max = FIT_RANGE_CONFIG[fit_type]["bare_mass_max"]
+
+        if range_min is not None and range_max is not None:
+            if range_min >= range_max:
+                raise ValueError(
+                    f"{fit_type} fit: bare_mass_min ({range_min}) must be "
+                    f"less than bare_mass_max ({range_max})"
+                )
 
     # Check output filename
     if not DEFAULT_OUTPUT_FILENAME or not DEFAULT_OUTPUT_FILENAME.endswith(".csv"):
