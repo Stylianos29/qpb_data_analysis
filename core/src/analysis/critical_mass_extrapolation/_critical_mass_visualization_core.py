@@ -426,7 +426,7 @@ def create_critical_mass_plot(
     )
 
     # Calculate plot ranges
-    x_range, y_range = calculate_plot_ranges(plateau_data, results_data, analysis_type)
+    x_range, _ = calculate_plot_ranges(plateau_data, results_data, analysis_type)
 
     # Create linear fit using gvar for automatic error propagation
     x_fit = np.linspace(x_range[0], x_range[1], 100)
@@ -444,7 +444,8 @@ def create_critical_mass_plot(
 
     linear_label = (
         f"Linear fit:\n"
-        f"  • $a{mass_symbol} = {results_data['slope_mean']:.4f}\\,m + {results_data['intercept_mean']:.5f}$\n"
+        f"  • $a{mass_symbol} = {results_data['slope_mean']:.4f}\\,m "
+        f"+ {results_data['intercept_mean']:.5f}$\n"
         f"  • χ²/dof = {results_data['chi2_reduced']:.3f}\n"
         f"  • R² = {results_data['r_squared']:.4f}\n"
         f"  • Q = {results_data['fit_quality']:.3f}"
@@ -493,7 +494,9 @@ def create_critical_mass_plot(
         # Format quadratic fit label
         quadratic_label = (
             f"Quadratic fit:\n"
-            f"  • $a{mass_symbol} = {results_data['quadratic_a_mean']:.4f}\\,m^2 + {results_data['quadratic_b_mean']:.4f}\\,m + {results_data['quadratic_c_mean']:.5f}$\n"
+            f"  • $a{mass_symbol} = {results_data['quadratic_a_mean']:.4f}\\,m^2 "
+            f"+ {results_data['quadratic_b_mean']:.4f}\\,m "
+            f"+ {results_data['quadratic_c_mean']:.5f}$\n"
             f"  • χ²/dof = {results_data['quadratic_chi2_reduced']:.3f}\n"
             f"  • R² = {results_data['quadratic_r_squared']:.4f}\n"
             f"  • Q = {results_data['quadratic_fit_quality']:.3f}"
@@ -537,7 +540,11 @@ def create_critical_mass_plot(
     )
 
     # Add critical mass vertical line WITH label (no annotation box)
-    critical_mass_label = f"$m_{{\\mathrm{{crit}}}} = {results_data['critical_mass_mean']:.6f} \\pm {results_data['critical_mass_error']:.6f}$"
+    critical_mass_label = (
+        f"a$m^{{\\mathrm{{critical}}}}_{{\\mathrm{{bare}}}} = "
+        f"{results_data['critical_mass_mean']:.6f} "
+        f"\\pm {results_data['critical_mass_error']:.6f}$"
+    )
     ax.axvline(
         results_data["critical_mass_mean"],
         color=styling["critical_mass_line_color"],
@@ -547,17 +554,63 @@ def create_critical_mass_plot(
         label=critical_mass_label,
     )
 
+    # Get sample count column name based on analysis type
+    if analysis_type == "pcac":
+        sample_count_col = "PCAC_n_total_samples"
+    else:
+        sample_count_col = "pion_n_total_samples"
+
+    # Check if sample count column exists
+    if sample_count_col in plateau_data.columns:
+        sample_counts = plateau_data[sample_count_col].values
+
+        # Annotate each data point with sample count
+        for i, (x, y, count) in enumerate(zip(x_data, y_data, sample_counts)):
+            ax.annotate(
+                f"{int(count)}",
+                xy=(x, y),
+                xytext=(-15, 15),
+                textcoords="offset points",
+                fontsize=8,
+                ha="center",
+                bbox=dict(
+                    boxstyle="round,pad=0.3",
+                    facecolor="white",
+                    edgecolor="gray",
+                    linewidth=0.5,
+                ),
+                arrowprops=dict(
+                    arrowstyle="-",
+                    color="gray",
+                    linewidth=0.5,
+                ),
+            )
+
+        # Add dummy entry to legend with box-shaped marker
+        ax.plot(
+            [],
+            [],
+            "s",  # Square marker
+            color="white",
+            markeredgecolor="gray",
+            markeredgewidth=0.5,
+            markersize=8,
+            label="Number of gauge configurations",
+        )
+
     # Configure axes with new x-axis label
     ax.set_xlabel("$m$", fontsize=styling["axis_label_font_size"])
     ax.set_ylabel(y_label, fontsize=styling["axis_label_font_size"])
-    ax.set_xlim(x_range)
-    ax.set_ylim(y_range)
 
     # Add grid
     ax.grid(True, alpha=styling["grid_alpha"], linestyle=styling["grid_style"])
 
     # Add legend
-    ax.legend(loc=styling["legend_location"], fontsize=styling["legend_font_size"])
+    ax.legend(
+        loc=styling["legend_location"],
+        fontsize=styling["legend_font_size"],
+        framealpha=styling["legend_frame_alpha"],
+    )
 
     return fig, ax
 
@@ -607,7 +660,7 @@ def create_critical_mass_extrapolation_plots(
         title_text = title_builder.build(
             metadata_dict=group_info["group_metadata"],
             tunable_params=list(group_info["group_metadata"].keys()),
-            leading_substring=f"Critical Mass Extrapolation ({analysis_type.upper()})",
+            leading_substring=f"Critical Mass Extrapolation:",
             wrapping_length=styling["title_width"],
         )
         ax.set_title(

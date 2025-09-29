@@ -34,7 +34,7 @@ PLOT_STYLING = {
     "fit_line_width": 2.5,
     "fit_line_style": "-",
     # Critical mass line styling
-    "critical_mass_line_color": "#28B463",
+    "critical_mass_line_color": "black",  # "#28B463",
     "critical_mass_line_style": "--",
     "critical_mass_line_width": 2.0,
     "critical_mass_line_alpha": 0.8,
@@ -53,6 +53,7 @@ PLOT_STYLING = {
     "axis_label_font_size": 12,
     "legend_font_size": 10,
     "legend_location": "upper left",
+    "legend_frame_alpha": 1,
     "annotation_font_size": 10,
     "annotation_bbox": {
         "boxstyle": "round,pad=0.3",
