@@ -48,11 +48,11 @@ PLOT_STYLING = {
     "grid_style": "--",
     # Text and annotations
     "title_font_size": 14,
-    "title_pad": 20,
+    "title_pad": 10,
     "title_width": 80,
     "axis_label_font_size": 12,
     "legend_font_size": 10,
-    "legend_location": "upper right",
+    "legend_location": "upper left",
     "annotation_font_size": 10,
     "annotation_bbox": {
         "boxstyle": "round,pad=0.3",

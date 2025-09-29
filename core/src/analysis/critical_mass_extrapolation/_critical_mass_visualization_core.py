@@ -13,6 +13,7 @@ from typing import Dict, List, Tuple, Optional, Any
 
 import numpy as np
 import pandas as pd
+import gvar as gv
 import matplotlib
 
 matplotlib.use("Agg")
@@ -61,6 +62,27 @@ def create_linear_fit_line(
     return x_fit, y_fit
 
 
+def create_quadratic_fit_line(
+    x_range: Tuple[float, float], a: float, b: float, c: float, n_points: int = 100
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Create smooth quadratic fit line for plotting.
+
+    Args:
+        - x_range: Tuple of (min, max) x values for line extent
+        - a: Quadratic coefficient (x² term)
+        - b: Linear coefficient (x term)
+        - c: Constant term
+        - n_points: Number of points for smooth line (default 100)
+
+    Returns:
+        Tuple of (x_fit, y_fit) arrays for plotting quadratic fit
+    """
+    x_fit = np.linspace(x_range[0], x_range[1], n_points)
+    y_fit = a * x_fit**2 + b * x_fit + c
+    return x_fit, y_fit
+
+
 def calculate_plot_ranges(
     plateau_data: pd.DataFrame, results_data: pd.Series, analysis_type: str
 ) -> Tuple[Tuple[float, float], Tuple[float, float]]:
@@ -101,46 +123,6 @@ def calculate_plot_ranges(
     y_range = (y_min, y_max)
 
     return x_range, y_range
-
-
-def annotate_critical_mass(
-    ax: Axes,
-    critical_mass_mean: float,
-    critical_mass_error: float,
-    styling: Dict[str, Any],
-) -> None:
-    """
-    Add critical mass vertical line and annotation to plot.
-
-    Args:
-        - ax: Matplotlib axes object for annotation
-        - critical_mass_mean: Critical mass central value
-        - critical_mass_error: Critical mass uncertainty
-        - styling: Plot styling configuration dictionary
-    """
-    # Add vertical line at critical mass
-    ax.axvline(
-        critical_mass_mean,
-        color=styling["critical_mass_line_color"],
-        linestyle=styling["critical_mass_line_style"],
-        alpha=styling["critical_mass_line_alpha"],
-        linewidth=styling["critical_mass_line_width"],
-    )
-
-    # Add annotation
-    annotation_text = (
-        f"Critical mass = {critical_mass_mean:.6f} ± {critical_mass_error:.6f}"
-    )
-    ax.annotate(
-        annotation_text,
-        xy=(critical_mass_mean, 0),
-        xytext=(0.05, 0.95),
-        textcoords="axes fraction",
-        bbox=styling["annotation_bbox"],
-        fontsize=styling["annotation_font_size"],
-        ha="left",
-        va="top",
-    )
 
 
 # =============================================================================
@@ -441,23 +423,100 @@ def create_critical_mass_plot(
         color=styling["data_color"],
         markersize=styling["data_marker_size"],
         capsize=styling["error_bar_cap_size"],
-        label="Plateau data",
     )
 
-    # Calculate and plot fit line
+    # Calculate plot ranges
     x_range, y_range = calculate_plot_ranges(plateau_data, results_data, analysis_type)
-    x_fit, y_fit = create_linear_fit_line(
-        x_range, results_data["slope_mean"], results_data["intercept_mean"]
+
+    # Create linear fit using gvar for automatic error propagation
+    x_fit = np.linspace(x_range[0], x_range[1], 100)
+    slope_gv = gv.gvar(results_data["slope_mean"], results_data["slope_error"])
+    intercept_gv = gv.gvar(
+        results_data["intercept_mean"], results_data["intercept_error"]
+    )
+    y_fit_gv = slope_gv * x_fit + intercept_gv
+
+    # Format linear fit label with equation and metrics
+    if analysis_type == "pcac":
+        mass_symbol = "m_{\\mathrm{PCAC}}"
+    else:
+        mass_symbol = "m^2_{\\pi}"
+
+    linear_label = (
+        f"Linear fit:\n"
+        f"  • $a{mass_symbol} = {results_data['slope_mean']:.4f}\\,m + {results_data['intercept_mean']:.5f}$\n"
+        f"  • χ²/dof = {results_data['chi2_reduced']:.3f}\n"
+        f"  • R² = {results_data['r_squared']:.4f}\n"
+        f"  • Q = {results_data['fit_quality']:.3f}"
     )
 
+    # Plot linear fit line
     ax.plot(
         x_fit,
-        y_fit,
+        gv.mean(y_fit_gv),
         color=styling["fit_line_color"],
         linewidth=styling["fit_line_width"],
         linestyle=styling["fit_line_style"],
-        label=f"Linear fit (R² = {results_data['r_squared']:.4f})",
+        label=linear_label,
     )
+
+    # Add linear fit uncertainty band (gvar automatically provides
+    # errors)
+    ax.fill_between(
+        x_fit,
+        gv.mean(y_fit_gv) - gv.sdev(y_fit_gv),
+        gv.mean(y_fit_gv) + gv.sdev(y_fit_gv),
+        color=styling["fit_line_color"],
+        alpha=0.2,
+    )
+
+    # Check if quadratic fit data exists and plot if available
+    has_quadratic = (
+        "quadratic_a_mean" in results_data
+        and "quadratic_b_mean" in results_data
+        and "quadratic_c_mean" in results_data
+    )
+
+    if has_quadratic:
+        # Create quadratic fit using gvar
+        a_gv = gv.gvar(
+            results_data["quadratic_a_mean"], results_data["quadratic_a_error"]
+        )
+        b_gv = gv.gvar(
+            results_data["quadratic_b_mean"], results_data["quadratic_b_error"]
+        )
+        c_gv = gv.gvar(
+            results_data["quadratic_c_mean"], results_data["quadratic_c_error"]
+        )
+        y_quad_fit_gv = a_gv * x_fit**2 + b_gv * x_fit + c_gv
+
+        # Format quadratic fit label
+        quadratic_label = (
+            f"Quadratic fit:\n"
+            f"  • $a{mass_symbol} = {results_data['quadratic_a_mean']:.4f}\\,m^2 + {results_data['quadratic_b_mean']:.4f}\\,m + {results_data['quadratic_c_mean']:.5f}$\n"
+            f"  • χ²/dof = {results_data['quadratic_chi2_reduced']:.3f}\n"
+            f"  • R² = {results_data['quadratic_r_squared']:.4f}\n"
+            f"  • Q = {results_data['quadratic_fit_quality']:.3f}"
+        )
+
+        # Plot quadratic fit line (green)
+        ax.plot(
+            x_fit,
+            gv.mean(y_quad_fit_gv),
+            color="#28B463",  # Green color
+            linewidth=styling["fit_line_width"],
+            linestyle=styling["fit_line_style"],
+            label=quadratic_label,
+        )
+
+        # Add quadratic fit uncertainty band (green)
+        ax.fill_between(
+            x_fit,
+            gv.mean(y_quad_fit_gv) - gv.sdev(y_quad_fit_gv),
+            gv.mean(y_quad_fit_gv) + gv.sdev(y_quad_fit_gv),
+            color="#28B463",  # Green color
+            alpha=0.2,
+        )
 
     # Add horizontal line at y=0
     ax.axhline(
@@ -468,16 +527,28 @@ def create_critical_mass_plot(
         linewidth=styling["zero_line_width"],
     )
 
-    # Add critical mass annotation
-    annotate_critical_mass(
-        ax,
-        results_data["critical_mass_mean"],
-        results_data["critical_mass_error"],
-        styling,
+    # Add vertical line at x=0
+    ax.axvline(
+        0,
+        color=styling["zero_line_color"],
+        linestyle=styling["zero_line_style"],
+        alpha=styling["zero_line_alpha"],
+        linewidth=styling["zero_line_width"],
     )
 
-    # Configure axes
-    ax.set_xlabel("Bare Mass", fontsize=styling["axis_label_font_size"])
+    # Add critical mass vertical line WITH label (no annotation box)
+    critical_mass_label = f"$m_{{\\mathrm{{crit}}}} = {results_data['critical_mass_mean']:.6f} \\pm {results_data['critical_mass_error']:.6f}$"
+    ax.axvline(
+        results_data["critical_mass_mean"],
+        color=styling["critical_mass_line_color"],
+        linestyle=styling["critical_mass_line_style"],
+        alpha=styling["critical_mass_line_alpha"],
+        linewidth=styling["critical_mass_line_width"],
+        label=critical_mass_label,
+    )
+
+    # Configure axes with new x-axis label
+    ax.set_xlabel("$m$", fontsize=styling["axis_label_font_size"])
     ax.set_ylabel(y_label, fontsize=styling["axis_label_font_size"])
     ax.set_xlim(x_range)
     ax.set_ylim(y_range)
