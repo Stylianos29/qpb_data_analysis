@@ -34,10 +34,10 @@ PLOT_STYLING = {
     "fit_line_width": 2.5,
     "fit_line_style": "-",
     # Critical mass line styling
-    "critical_mass_line_color": "black",  # "#28B463",
+    "critical_mass_line_color": "#1F4788",  # Dark blue
     "critical_mass_line_style": "--",
     "critical_mass_line_width": 2.0,
-    "critical_mass_line_alpha": 0.8,
+    "critical_mass_line_alpha": 0.6,
     # Zero line styling
     "zero_line_color": "#717D7E",
     "zero_line_style": "-",

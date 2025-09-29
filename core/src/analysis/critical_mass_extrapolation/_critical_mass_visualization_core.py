@@ -414,6 +414,9 @@ def create_critical_mass_plot(
     # Get y-axis label from config
     y_label = ANALYSIS_CONFIGS[analysis_type]["default_y_label"]
 
+    # DATA POINTS
+    #############
+
     # Plot data points with error bars
     ax.errorbar(
         x_data,
@@ -427,6 +430,9 @@ def create_critical_mass_plot(
 
     # Calculate plot ranges
     x_range, _ = calculate_plot_ranges(plateau_data, results_data, analysis_type)
+
+    # LINEAR FIT
+    #############
 
     # Create linear fit using gvar for automatic error propagation
     x_fit = np.linspace(x_range[0], x_range[1], 100)
@@ -470,6 +476,9 @@ def create_critical_mass_plot(
         color=styling["fit_line_color"],
         alpha=0.2,
     )
+
+    # QUADRATIC FIT (if available)
+    #############
 
     # Check if quadratic fit data exists and plot if available
     has_quadratic = (
@@ -521,6 +530,9 @@ def create_critical_mass_plot(
             alpha=0.2,
         )
 
+    # REFERENCE LINES
+    #############
+
     # Add horizontal line at y=0
     ax.axhline(
         0,
@@ -539,20 +551,37 @@ def create_critical_mass_plot(
         linewidth=styling["zero_line_width"],
     )
 
-    # Add critical mass vertical line WITH label (no annotation box)
+    # CRITICAL MASS LINE
+    #############
+
+    # Add critical mass vertical line with error band
+    critical_mass_mean = results_data["critical_mass_mean"]
+    critical_mass_error = results_data["critical_mass_error"]
     critical_mass_label = (
         f"a$m^{{\\mathrm{{critical}}}}_{{\\mathrm{{bare}}}} = "
-        f"{results_data['critical_mass_mean']:.6f} "
-        f"\\pm {results_data['critical_mass_error']:.6f}$"
+        f"{critical_mass_mean:.6f} "
+        f"\\pm {critical_mass_error:.6f}$"
+    )
+    # Add error band first (so it appears behind the line)
+    ax.axvspan(
+        critical_mass_mean - critical_mass_error,
+        critical_mass_mean + critical_mass_error,
+        alpha=styling["critical_mass_line_alpha"],
+        color=styling["critical_mass_line_color"],
+        zorder=1,  # Behind other elements
     )
     ax.axvline(
-        results_data["critical_mass_mean"],
+        critical_mass_mean,
         color=styling["critical_mass_line_color"],
         linestyle=styling["critical_mass_line_style"],
         alpha=styling["critical_mass_line_alpha"],
         linewidth=styling["critical_mass_line_width"],
         label=critical_mass_label,
+        zorder=2,  # In front of band
     )
+
+    # SAMPLE COUNT ANNOTATIONS
+    #############
 
     # Get sample count column name based on analysis type
     if analysis_type == "pcac":
