@@ -112,7 +112,6 @@ def main(
       8. Export results to CSV
     """
     # Validate configurations
-    validate_shared_cost_config()
     validate_pion_cost_config()
 
     # Determine output directory from output_csv
