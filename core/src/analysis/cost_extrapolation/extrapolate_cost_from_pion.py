@@ -37,13 +37,10 @@ from library.validation.click_validators import (
 from library.utils.logging_utilities import create_script_logger
 
 from src.analysis.cost_extrapolation._pion_cost_extrapolation_config import (
-    REQUIRED_COLUMNS,
     COLUMN_MAPPING,
     DEFAULT_OUTPUT_FILENAME,
     validate_pion_cost_config,
-)
-from src.analysis.cost_extrapolation._cost_extrapolation_shared_config import (
-    validate_shared_cost_config,
+    get_required_columns,
 )
 from src.analysis.cost_extrapolation._cost_extrapolation_core import (
     process_cost_extrapolation_analysis,
@@ -148,7 +145,7 @@ def main(
             output_csv_path=output_csv,
             analysis_type="pion",
             column_mapping=COLUMN_MAPPING,
-            required_columns=REQUIRED_COLUMNS,
+            required_columns=get_required_columns(),
             logger=logger,
         )
 

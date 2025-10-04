@@ -41,21 +41,12 @@ PION_FIT_CONFIG = {
 # INPUT COLUMN MAPPINGS
 # =============================================================================
 
-# Required columns in input CSV files
-REQUIRED_COLUMNS = [
-    "Bare_mass",  # Independent variable
-    "pion_plateau_mean",  # Pion mass estimate (central value)
-    "pion_plateau_error",  # Pion mass uncertainty
-]
-
-# Column name mapping (standard name -> CSV column name)
+# Column name mapping (standard name -> CSV column name) All columns
+# listed here are considered required
 COLUMN_MAPPING = {
     "bare_mass": "Bare_mass",
     "mass_mean": "pion_plateau_mean",
     "mass_error": "pion_plateau_error",
-    # Additional metadata columns (if present)
-    "configuration_label": "Configuration_label",
-    "trajectory": "Trajectory",
 }
 
 # Columns required in cost data CSV
@@ -108,8 +99,9 @@ def get_pion_fit_config() -> Dict[str, Any]:
 
 
 def get_required_columns() -> List[str]:
-    """Get list of required input columns."""
-    return REQUIRED_COLUMNS.copy()
+    """Get list of required input columns (derived from
+    COLUMN_MAPPING)."""
+    return list(COLUMN_MAPPING.values())
 
 
 def get_column_mapping() -> Dict[str, str]:
@@ -152,10 +144,6 @@ def validate_pion_cost_config():
     # Validate pion mass power
     if PION_MASS_POWER not in [1, 2]:
         raise ValueError("PION_MASS_POWER must be 1 (m_π) or 2 (m_π²)")
-
-    # Validate required columns
-    if not isinstance(REQUIRED_COLUMNS, list) or not REQUIRED_COLUMNS:
-        raise ValueError("REQUIRED_COLUMNS must be a non-empty list")
 
     # Validate column mapping
     required_mappings = ["bare_mass", "mass_mean", "mass_error"]
