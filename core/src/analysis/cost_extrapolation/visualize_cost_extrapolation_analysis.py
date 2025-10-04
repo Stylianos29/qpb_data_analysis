@@ -245,7 +245,7 @@ def main(
     log_dir = (
         log_directory
         if log_directory
-        else str(plots_directory) if enable_logging else None
+        else str(Path(results_csv).parent) if enable_logging else None
     )
 
     logger = create_script_logger(
