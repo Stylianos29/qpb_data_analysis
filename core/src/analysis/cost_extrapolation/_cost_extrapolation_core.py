@@ -139,9 +139,11 @@ def convert_mass_to_bare_mass(
       5. Return DataFrame with group keys and derived bare masses
 
     Args:
-        mass_csv_path: Path to mass data CSV analysis_type: "pcac" or
-        "pion" column_mapping: Column name mapping required_columns:
-        Required columns logger: Logger instance
+        - mass_csv_path: Path to mass data CSV
+        - analysis_type: "pcac" or "pion"
+        - column_mapping: Column name mapping
+        - required_columns: Required columns
+        - logger: Logger instance
 
     Returns:
         DataFrame with group parameters and derived bare masses (value,
@@ -305,8 +307,10 @@ def fit_mass_vs_bare_mass(
     Fit: mass^n = a * bare_mass + b
 
     Args:
-        group_df: Group data column_mapping: Column names mass_power:
-        Power for mass (1 or 2) logger: Logger instance
+        - group_df: Group data
+        - column_mapping: Column names
+        - mass_power: Power for mass (1 or 2)
+        - logger: Logger instance
 
     Returns:
         Dictionary with fit results or None if fit fails
@@ -407,8 +411,10 @@ def invert_mass_fit(
     (mass_ref^n - b) / a
 
     Args:
-        fit_result: Fit parameters reference_mass: Target mass value
-        mass_power: Power used in fit logger: Logger instance
+        - fit_result: Fit parameters
+        - reference_mass: Target mass value
+        - mass_power: Power used in fit
+        - logger: Logger instance
 
     Returns:
         GVar with derived bare mass (value ± error) or None
@@ -486,17 +492,16 @@ def extrapolate_computational_costs(
     Process:
       1. Load cost data
       2. Average costs across configurations per group
-      3. Group cost data by parameter groups (collect all bare mass
-         points per group)
-      4. For each mass group: find matching cost group, fit shifted
-         power law
+      3. Group cost data by parameter groups (collect all bare mass points per group)
+      4. For each mass group: find matching cost group, fit shifted power law
       5. Extrapolate cost at derived bare mass for that group
       6. Combine with mass conversion results
 
     Args:
-        cost_csv_path: Path to cost data CSV derived_bare_mass_df:
-        DataFrame with derived bare masses per group analysis_type:
-        "pcac" or "pion" logger: Logger instance
+        - cost_csv_path: Path to cost data CSV
+        - derived_bare_mass_df: DataFrame with derived bare masses per group
+        - analysis_type: "pcac" or "pion"
+        - logger: Logger instance
 
     Returns:
         DataFrame with complete results (mass + cost)
@@ -514,9 +519,12 @@ def extrapolate_computational_costs(
     )
 
     # Group cost data by parameter groups (excluding Bare_mass)
-    cost_groups_dict = _group_cost_data_by_parameters(averaged_cost_df, logger)
+    cost_groups_dict, grouping_param_names = _group_cost_data_by_parameters(
+        averaged_cost_df, logger
+    )
 
     logger.info(f"Cost data grouped into {len(cost_groups_dict)} parameter groups")
+    logger.info(f"Grouping parameters used: {grouping_param_names}")
 
     # Match groups and extrapolate
     results = []
@@ -531,7 +539,7 @@ def extrapolate_computational_costs(
         logger.info(f"=" * 60)
 
         # Get group identifier for this mass row
-        group_key = _build_group_key(mass_row)
+        group_key = _build_group_key(mass_row, grouping_param_names, logger)
         logger.info(f"Processing cost extrapolation for group: {group_key}")
 
         # Find matching cost group
@@ -787,53 +795,77 @@ def fit_and_extrapolate_cost(
 def _group_cost_data_by_parameters(
     averaged_cost_df: pd.DataFrame,
     logger,
-) -> Dict[Tuple, pd.DataFrame]:
+) -> Tuple[Dict[Tuple, pd.DataFrame], List[str]]:
     """
     Group cost data by parameter groups (excluding Bare_mass).
 
-    Returns dictionary mapping group_key -> DataFrame with all bare mass
-    points for that group.
+    Uses DataFrameAnalyzer to intelligently discover multivalued parameters
+    and group the data accordingly.
+
+    Returns:
+        Tuple of (grouped_dict, grouping_param_names) where:
+        - grouped_dict: Dictionary mapping group_key -> DataFrame
+        - grouping_param_names: List of parameter names used for grouping
     """
-    # Get grouping parameters
-    grouping_params = get_grouping_parameters()
+    # Create analyzer
+    analyzer = DataFrameAnalyzer(averaged_cost_df)
 
-    # Find which grouping parameters exist in the dataframe
-    available_grouping = [p for p in grouping_params if p in averaged_cost_df.columns]
+    # Get exclusion list (parameters to average over, not group by)
+    excluded_params = get_grouping_excluded_parameters()
 
-    if not available_grouping:
-        logger.warning(
-            "No grouping parameters found in cost data, treating as single group"
-        )
-        return {(): averaged_cost_df}
+    # Filter to only parameters that exist and are multivalued
+    available_params = analyzer.list_of_multivalued_tunable_parameter_names
+    filtered_exclusions = [p for p in excluded_params if p in available_params]
 
-    logger.info(f"Grouping cost data by: {available_grouping}")
+    logger.info(f"Cost data multivalued parameters: {available_params}")
+    logger.info(f"Excluding from grouping: {filtered_exclusions}")
 
-    # Group the data
+    # Group using DataFrameAnalyzer
+    grouped = analyzer.group_by_multivalued_tunable_parameters(
+        filter_out_parameters_list=filtered_exclusions
+    )
+
+    # Get the actual grouping parameter names used
+    grouping_param_names = analyzer.reduced_multivalued_tunable_parameter_names_list
+
+    logger.info(f"Grouping cost data by: {grouping_param_names}")
+
+    # Convert generator to dictionary
     grouped_dict = {}
-    for group_keys, group_df in averaged_cost_df.groupby(available_grouping):
+    for group_keys, group_df in grouped:
         # Ensure group_keys is a tuple
         if not isinstance(group_keys, tuple):
             group_keys = (group_keys,)
-
         grouped_dict[group_keys] = group_df
 
-    return grouped_dict
+    return grouped_dict, grouping_param_names
 
 
-def _build_group_key(row: pd.Series) -> Tuple:
+def _build_group_key(row: pd.Series, grouping_param_names: List[str], logger) -> Tuple:
     """
-    Build a hashable group key from a row's grouping parameters.
-    """
-    grouping_params = get_grouping_parameters()
+    Build a hashable group key from a row using specified parameter names.
 
+    Args:
+        row: Data row (from mass results DataFrame)
+        grouping_param_names: List of parameter names to use for grouping
+
+    Returns:
+        Tuple of parameter values for this group
+    """
     key_values = []
-    for param in grouping_params:
+
+    for param in grouping_param_names:
         if param in row.index:
             value = row[param]
             # Convert numpy types to Python types for hashing
             if hasattr(value, "item"):
                 value = value.item()
             key_values.append(value)
+        else:
+            # If parameter not in row, cannot build valid key
+            # This shouldn't happen if data is consistent
+            logger.warning(f"Parameter '{param}' not found in mass row, using None")
+            key_values.append(None)
 
     return tuple(key_values)
 
