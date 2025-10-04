@@ -99,12 +99,20 @@ EXTRAPOLATION_LINES_STYLE = {
 # =============================================================================
 
 LEGEND_CONFIG = {
-    "loc": "best",  # "lower right",
-    "frameon": True,
-    "framealpha": 1.0,
-    "edgecolor": "black",
-    "fancybox": False,
-    "fontsize": 10,
+    "mass_fit": {
+        "loc": "lower right",
+        "fontsize": 10,
+        "framealpha": 0.9,
+        "edgecolor": "gray",
+        "fancybox": True,
+    },
+    "cost_fit": {
+        "loc": "upper right",
+        "fontsize": 10,
+        "framealpha": 0.9,
+        "edgecolor": "gray",
+        "fancybox": True,
+    },
 }
 
 # =============================================================================
@@ -287,9 +295,19 @@ def get_extrapolation_lines_style() -> Dict[str, Any]:
     return EXTRAPOLATION_LINES_STYLE.copy()
 
 
-def get_legend_config() -> Dict[str, Any]:
-    """Get legend configuration."""
-    return LEGEND_CONFIG.copy()
+def get_legend_config(plot_type: str = "mass_fit") -> Dict[str, Any]:
+    """
+    Get legend configuration for specific plot type.
+
+    Args:
+        plot_type: "mass_fit" or "cost_fit"
+
+    Returns:
+        Dictionary with legend configuration
+    """
+    if plot_type not in LEGEND_CONFIG:
+        raise ValueError(f"Unknown plot type: {plot_type}")
+    return LEGEND_CONFIG[plot_type].copy()
 
 
 def get_axis_labels() -> Dict[str, Dict[str, Any]]:

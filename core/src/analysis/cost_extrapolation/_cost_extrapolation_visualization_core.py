@@ -519,7 +519,7 @@ def create_mass_fit_plot(
         ax.grid(True, alpha=fig_cfg["grid_alpha"], linestyle=fig_cfg["grid_linestyle"])
 
     # Add legend
-    legend_cfg = get_legend_config()
+    legend_cfg = get_legend_config(plot_type="mass_fit")
     ax.legend(**legend_cfg)
 
     # Generate title using PlotTitleBuilder
@@ -597,7 +597,6 @@ def create_cost_fit_plot(
         markersize=data_style["marker_size"],
         color=data_style["color"],
         linestyle="",
-        label="Data",
     )
 
     # Extract fit parameters (shifted power law: a/(x-b) + c)
@@ -716,7 +715,7 @@ def create_cost_fit_plot(
         ax.grid(True, alpha=fig_cfg["grid_alpha"], linestyle=fig_cfg["grid_linestyle"])
 
     # Add legend
-    legend_cfg = get_legend_config()
+    legend_cfg = get_legend_config(plot_type="cost_fit")
     ax.legend(**legend_cfg)
 
     # Generate title using PlotTitleBuilder
