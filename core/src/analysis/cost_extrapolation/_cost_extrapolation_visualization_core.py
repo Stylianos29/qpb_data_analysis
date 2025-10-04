@@ -41,6 +41,62 @@ from src.analysis.cost_extrapolation._cost_extrapolation_visualization_config im
 # =============================================================================
 
 
+def _average_cost_data_for_group(
+    cost_df: pd.DataFrame, grouping_params: List[str]
+) -> pd.DataFrame:
+    """
+    Average cost data across configurations for each (bare_mass, group)
+    combination.
+
+    Args:
+        cost_df: Raw cost DataFrame grouping_params: List of grouping
+        parameter names
+
+    Returns:
+        DataFrame with averaged costs and uncertainties
+    """
+    # Group by bare mass + grouping parameters, excluding
+    # Configuration_label
+    group_cols = ["Bare_mass"] + grouping_params
+
+    # Filter to only existing columns
+    group_cols = [col for col in group_cols if col in cost_df.columns]
+
+    if not group_cols:
+        return cost_df
+
+    # Group and aggregate
+    averaged_data: List[Dict[str, Any]] = []  # Explicit type annotation
+
+    for group_keys, group_data in cost_df.groupby(group_cols, observed=False):
+        # Extract cost values for this group
+        costs = group_data["Average_core_hours_per_spinor"].to_numpy()
+
+        # Calculate mean and standard error
+        cost_mean = float(np.mean(costs))  # Explicit cast to float
+        cost_error = (
+            float(np.std(costs, ddof=1) / np.sqrt(len(costs)))
+            if len(costs) > 1
+            else 0.0
+        )
+
+        # Build result row - explicitly typed as Dict[str, Any]
+        result: Dict[str, Any] = {}
+
+        if isinstance(group_keys, tuple):
+            result.update(dict(zip(group_cols, group_keys)))
+        else:
+            result[group_cols[0]] = group_keys
+
+        result["cost_mean"] = cost_mean
+        result["cost_error"] = cost_error
+        result["n_configurations"] = int(len(costs))  # Explicit cast to int
+
+        averaged_data.append(result)
+
+    return pd.DataFrame(averaged_data)
+
+
 def load_and_validate_results_data(
     results_csv_path: str,
     logger,
@@ -207,19 +263,43 @@ def group_data_for_visualization(
 
         # Match mass and cost data for this group
         mass_data = _filter_data_for_group(mass_df, grouping_params, group_keys)
-        cost_data = _filter_data_for_group(cost_df, grouping_params, group_keys)
+        # cost_data = _filter_data_for_group(cost_df, grouping_params,
+        # group_keys)
 
         if mass_data.empty:
             logger.warning(f"Skipping group {group_id} - no matching mass data")
             continue
 
+        # if cost_data.empty: logger.warning(f"Skipping group {group_id}
+        #     - no matching cost data") continue
+
+        # logger.debug( f"Group {group_id}: {len(mass_data)} mass
+        #     points, " f"{len(cost_data)} cost points" )
+
+        # grouped_data.append( { "group_id": group_id, "group_metadata":
+        #     group_metadata, "grouping_params": grouping_params,
+        #         "all_tunable_params": all_tunable_params,  # NEW: All
+        #         params for title "analysis_type": analysis_type,
+        #         "results_row": results_row, "mass_data": mass_data,
+        #         "cost_data": cost_data, } )
+
+        # Match cost data for this group
+        cost_data = _filter_data_for_group(cost_df, grouping_params, group_keys)
+
         if cost_data.empty:
             logger.warning(f"Skipping group {group_id} - no matching cost data")
             continue
 
+        # Average cost data across configurations
+        cost_data_averaged = _average_cost_data_for_group(cost_data, grouping_params)
+
+        if cost_data_averaged.empty:
+            logger.warning(f"Skipping group {group_id} - cost averaging failed")
+            continue
+
         logger.debug(
             f"Group {group_id}: {len(mass_data)} mass points, "
-            f"{len(cost_data)} cost points"
+            f"{len(cost_data_averaged)} averaged cost points"
         )
 
         grouped_data.append(
@@ -227,11 +307,11 @@ def group_data_for_visualization(
                 "group_id": group_id,
                 "group_metadata": group_metadata,
                 "grouping_params": grouping_params,
-                "all_tunable_params": all_tunable_params,  # NEW: All params for title
+                "all_tunable_params": all_tunable_params,
                 "analysis_type": analysis_type,
                 "results_row": results_row,
                 "mass_data": mass_data,
-                "cost_data": cost_data,
+                "cost_data": cost_data_averaged,  # Use averaged data
             }
         )
 
@@ -577,26 +657,42 @@ def create_cost_fit_plot(
     mass_df = group_info["mass_data"]  # For sample count annotations
     results_row = group_info["results_row"]
 
-    cost_col_mapping = get_cost_data_column_mapping()
+    # cost_col_mapping = get_cost_data_column_mapping()
 
-    x_data = cost_df[cost_col_mapping["bare_mass"]].values
-    y_data = cost_df[cost_col_mapping["cost_mean"]].values
+    # x_data = cost_df[cost_col_mapping["bare_mass"]].values y_data =
+    # cost_df[cost_col_mapping["cost_mean"]].values
 
     # Create figure
     fig_cfg = get_figure_config()
     fig, ax = plt.subplots(figsize=fig_cfg["figure_size"], dpi=fig_cfg["dpi"])
 
-    # Plot data points
+    # # Plot data points
+    # data_style = get_data_point_style() data_style["color"] =
+    # analysis_cfg["data_color"]
+
+    # ax.plot( x_data, y_data, marker=data_style["marker"],
+    #     markersize=data_style["marker_size"],
+    #     color=data_style["color"], linestyle="", )
+
+    # Extract averaged cost data
+    x_data = cost_df["Bare_mass"].values
+    y_data = cost_df["cost_mean"].values
+    y_error = cost_df["cost_error"].values
+
+    # Plot data points with error bars
     data_style = get_data_point_style()
     data_style["color"] = analysis_cfg["data_color"]
 
-    ax.plot(
+    ax.errorbar(
         x_data,
         y_data,
-        marker=data_style["marker"],
+        yerr=y_error,
+        fmt=data_style["marker"],
         markersize=data_style["marker_size"],
         color=data_style["color"],
-        linestyle="",
+        capsize=data_style["capsize"],
+        capthick=data_style["capthick"],
+        elinewidth=data_style["error_linewidth"],
     )
 
     # Extract fit parameters (shifted power law: a/(x-b) + c)
@@ -676,22 +772,35 @@ def create_cost_fit_plot(
         alpha=extrap_lines["alpha"],
     )
 
-    # Add sample count annotations (using mass data) Note: We need to
-    # match cost x_data with mass data bare mass values to get correct
-    # annotations for the cost plot points
+    # # Add sample count annotations (using mass data) Note: We need to
+    # # match cost x_data with mass data bare mass values to get correct
+    # # annotations for the cost plot points
+    # mass_col_mapping =
+    # get_mass_data_column_mapping(analysis_type=analysis_type)
+    # mass_bare_mass = mass_df[mass_col_mapping["bare_mass"]].values
+
+    # # Create mapping from bare mass to cost for annotation positioning
+    # # Only annotate points that exist in both datasets
+    # for cost_x, cost_y in zip(x_data, y_data): # Find matching bare
+    #     mass in mass_df (with tolerance for # floating point) mass_idx
+    #     = np.where(np.abs(mass_bare_mass - cost_x) < 1e-10)[0] if
+    #     len(mass_idx) > 0: # Use the first matched index for
+    #     annotation _add_sample_count_annotations( ax, [cost_x],
+    #         [cost_y], mass_df.iloc[mass_idx[0:1]], analysis_type )
+
+    # Add sample count annotations (using mass data) Match by bare mass
+    # values
     mass_col_mapping = get_mass_data_column_mapping(analysis_type=analysis_type)
     mass_bare_mass = mass_df[mass_col_mapping["bare_mass"]].values
 
-    # Create mapping from bare mass to cost for annotation positioning
-    # Only annotate points that exist in both datasets
     for cost_x, cost_y in zip(x_data, y_data):
-        # Find matching bare mass in mass_df (with tolerance for
-        # floating point)
-        mass_idx = np.where(np.abs(mass_bare_mass - cost_x) < 1e-10)[0]
-        if len(mass_idx) > 0:
-            # Use the first matched index for annotation
+        # Find matching bare mass in mass_df
+        mass_matches = mass_df[
+            np.abs(mass_df[mass_col_mapping["bare_mass"]] - cost_x) < 1e-10
+        ]
+        if not mass_matches.empty:
             _add_sample_count_annotations(
-                ax, [cost_x], [cost_y], mass_df.iloc[mass_idx[0:1]], analysis_type
+                ax, [cost_x], [cost_y], mass_matches.iloc[0:1], analysis_type
             )
 
     # Add fitting range markers

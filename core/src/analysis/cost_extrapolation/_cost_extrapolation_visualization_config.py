@@ -78,7 +78,7 @@ FIT_LINE_STYLE = {
 EXTRAPOLATION_MARKER_STYLE = {
     # Marker for extrapolated point
     "marker": "D",  # Diamond
-    "marker_size": 12,
+    "marker_size": 6,
     "color": "green",
     "edge_color": "darkgreen",
     "edge_width": 2,
