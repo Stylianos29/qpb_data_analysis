@@ -27,6 +27,7 @@ from src.analysis.cost_extrapolation._cost_extrapolation_visualization_config im
     get_extrapolation_lines_style,
     get_legend_config,
     get_axis_labels,
+    get_title_styling,
     get_analysis_config,
     get_results_column_mapping,
     get_mass_data_column_mapping,
@@ -164,100 +165,107 @@ def group_data_for_visualization(
     logger,
 ) -> List[Dict[str, Any]]:
     """
-    Group data by parameter groups for visualization.
+    Group data for visualization by matching results with mass and cost
+    data.
 
-    Args:
-        results_df: Results DataFrame mass_df: Mass data DataFrame
-        cost_df: Cost data DataFrame analysis_type: "pcac" or "pion"
-        logger: Logger instance
-
-    Returns:
-        List of group dictionaries with all data needed for plotting
+    Uses DataFrameAnalyzer to intelligently detect grouping parameters
+    and extracts metadata for title generation.
     """
-    col_mapping = get_results_column_mapping()
-    grouping_params = col_mapping["grouping_params"]
+    from library import DataFrameAnalyzer
 
-    # Filter to only grouping params that exist in results
-    available_grouping = [p for p in grouping_params if p in results_df.columns]
+    # Analyze results DataFrame
+    analyzer = DataFrameAnalyzer(results_df)
+    grouping_params = analyzer.reduced_multivalued_tunable_parameter_names_list
+    single_valued_params = analyzer.list_of_single_valued_tunable_parameter_names
 
-    if not available_grouping:
-        logger.warning("No grouping parameters found, treating as single group")
-        available_grouping = []
+    # Combine for complete title
+    all_tunable_params = grouping_params + single_valued_params
 
-    logger.info(
-        f"Grouping by: {available_grouping if available_grouping else 'single group'}"
-    )
+    logger.info(f"Grouping parameters (multivalued): {grouping_params}")
+    logger.info(f"Single-valued parameters: {single_valued_params}")
+    logger.info(f"Processing {len(results_df)} result groups")
 
     grouped_data = []
 
-    if available_grouping:
-        # Group by available parameters
-        for group_keys, group_df in results_df.groupby(
-            available_grouping, observed=False
-        ):
-            if not isinstance(group_keys, tuple):
-                group_keys = (group_keys,)
+    for idx, results_row in results_df.iterrows():
+        # Extract group metadata - multivalued parameters
+        group_metadata = {
+            param: results_row[param]
+            for param in grouping_params
+            if param in results_row.index
+        }
 
-            group_info = _build_group_info(
-                group_keys,
-                available_grouping,
-                group_df.iloc[0],
-                mass_df,
-                cost_df,
-                analysis_type,
-            )
+        # Add single-valued parameters to metadata
+        group_metadata.update(analyzer.unique_value_columns_dictionary)
 
-            if group_info:
-                grouped_data.append(group_info)
-    else:
-        # Single group
-        group_info = _build_group_info(
-            (),
-            [],
-            results_df.iloc[0],
-            mass_df,
-            cost_df,
-            analysis_type,
+        # Build group identifier for logging/filenames (only
+        # multivalued)
+        group_id = "_".join([str(results_row[param]) for param in grouping_params])
+
+        # Get group keys as tuple for filtering
+        group_keys = tuple(results_row[param] for param in grouping_params)
+
+        # Match mass and cost data for this group
+        mass_data = _filter_data_for_group(mass_df, grouping_params, group_keys)
+        cost_data = _filter_data_for_group(cost_df, grouping_params, group_keys)
+
+        if mass_data.empty:
+            logger.warning(f"Skipping group {group_id} - no matching mass data")
+            continue
+
+        if cost_data.empty:
+            logger.warning(f"Skipping group {group_id} - no matching cost data")
+            continue
+
+        logger.debug(
+            f"Group {group_id}: {len(mass_data)} mass points, "
+            f"{len(cost_data)} cost points"
         )
-        if group_info:
-            grouped_data.append(group_info)
 
-    logger.info(f"Created {len(grouped_data)} visualization groups")
+        grouped_data.append(
+            {
+                "group_id": group_id,
+                "group_metadata": group_metadata,
+                "grouping_params": grouping_params,
+                "all_tunable_params": all_tunable_params,  # NEW: All params for title
+                "analysis_type": analysis_type,
+                "results_row": results_row,
+                "mass_data": mass_data,
+                "cost_data": cost_data,
+            }
+        )
+
+    logger.info(f"Successfully grouped {len(grouped_data)} parameter combinations")
 
     return grouped_data
 
 
-def _build_group_info(
-    group_keys: Tuple,
+def _filter_data_for_group(
+    df: pd.DataFrame,
     grouping_params: List[str],
-    results_row: pd.Series,
-    mass_df: pd.DataFrame,
-    cost_df: pd.DataFrame,
-    analysis_type: str,
-) -> Optional[Dict[str, Any]]:
-    """Build group information dictionary for visualization."""
+    group_keys: Tuple,
+) -> pd.DataFrame:
+    """
+    Filter DataFrame to rows matching specific group parameter values.
 
-    # Match mass and cost data to this group
-    mass_group_df = _match_group_data(mass_df, group_keys, grouping_params)
-    cost_group_df = _match_group_data(cost_df, group_keys, grouping_params)
+    Args:
+        df: DataFrame to filter grouping_params: List of parameter names
+        used for grouping group_keys: Tuple of values corresponding to
+        grouping_params
 
-    if mass_group_df.empty or cost_group_df.empty:
-        return None
+    Returns:
+        Filtered DataFrame
+    """
+    if not grouping_params:
+        return df
 
-    # Build group identifier string
-    group_id = "_".join([str(k) for k in group_keys]) if group_keys else "all_data"
+    mask = pd.Series([True] * len(df))
 
-    group_info = {
-        "group_id": group_id,
-        "group_keys": group_keys,
-        "grouping_params": grouping_params,
-        "results_row": results_row,
-        "mass_data": mass_group_df,
-        "cost_data": cost_group_df,
-        "analysis_type": analysis_type,
-    }
+    for param, value in zip(grouping_params, group_keys):
+        if param in df.columns:
+            mask &= df[param] == value
 
-    return group_info
+    return df[mask]
 
 
 def _match_group_data(
@@ -352,43 +360,56 @@ def create_mass_fit_plot(
     mass_df = group_info["mass_data"]
     results_row = group_info["results_row"]
 
-    mass_col_mapping = get_mass_data_column_mapping(analysis_type)
+    # Get column mappings
+    col_mapping = get_results_column_mapping()
+    mass_col_mapping = get_mass_data_column_mapping(analysis_type=analysis_type)
 
+    # Determine mass column based on analysis type
+    if analysis_type == "pion":
+        mass_mean_col = analysis_cfg["mass_column_mean"]
+        mass_error_col = analysis_cfg["mass_column_error"]
+        mass_power = analysis_cfg["mass_power"]
+    else:  # pcac
+        mass_mean_col = analysis_cfg["mass_column_mean"]
+        mass_error_col = analysis_cfg["mass_column_error"]
+        mass_power = 1
+
+    # Extract data
     x_data = mass_df[mass_col_mapping["bare_mass"]].values
-    y_mean = mass_df[mass_col_mapping["mass_mean"]].values
-    y_error = mass_df[mass_col_mapping["mass_error"]].values
+    y_mean = mass_df[mass_mean_col].values
+    y_error = mass_df[mass_error_col].values
 
-    # Apply mass power transformation
-    mass_power = analysis_cfg["mass_power"]
-    y_mean_transformed = y_mean**mass_power
-    y_error_transformed = mass_power * (y_mean ** (mass_power - 1)) * y_error
+    # Apply power transformation
+    y_data = y_mean**mass_power
+    y_data_error = mass_power * (y_mean ** (mass_power - 1)) * y_error
 
     # Create figure
     fig_cfg = get_figure_config()
     fig, ax = plt.subplots(figsize=fig_cfg["figure_size"], dpi=fig_cfg["dpi"])
 
-    # Plot data points
+    # Plot data points with error bars
     data_style = get_data_point_style()
     data_style["color"] = analysis_cfg["data_color"]
 
     ax.errorbar(
         x_data,
-        y_mean_transformed,
-        yerr=y_error_transformed,
+        y_data,
+        yerr=y_data_error,
         fmt=data_style["marker"],
         markersize=data_style["marker_size"],
         color=data_style["color"],
         capsize=data_style["capsize"],
+        capthick=data_style["capthick"],
+        elinewidth=data_style["error_linewidth"],
         label="Data",
     )
 
     # Plot fit line
-    col_mapping = get_results_column_mapping()
     slope = results_row[col_mapping["mass_fit"]["slope_mean"]]
     intercept = results_row[col_mapping["mass_fit"]["intercept_mean"]]
     r_squared = results_row[col_mapping["mass_fit"]["r_squared"]]
 
-    x_fit = np.linspace(x_data.min() * 0.95, x_data.max() * 1.05, 100)
+    x_fit = np.linspace(x_data.min() * 0.95, x_data.max() * 1.05, 200)
     y_fit = slope * x_fit + intercept
 
     fit_style = get_fit_line_style()
@@ -405,24 +426,29 @@ def create_mass_fit_plot(
 
     # Mark derived bare mass
     derived_bare_mass = results_row[col_mapping["derived_bare_mass_mean"]]
+
+    extrap_marker = get_extrapolation_marker_style()
+
     ax.axvline(
         derived_bare_mass,
-        color="green",
+        color=extrap_marker["color"],
         linestyle="--",
         linewidth=1.5,
         alpha=0.7,
-        label=f"Derived bare mass = {derived_bare_mass:.6f}",
+        label=f"Derived bare mass: {derived_bare_mass:.6f}",
     )
 
     # Styling
     axis_labels = get_axis_labels()
     ax.set_xlabel(
-        axis_labels["bare_mass"]["label"], fontsize=axis_labels["bare_mass"]["fontsize"]
+        axis_labels["bare_mass"]["label"],
+        fontsize=axis_labels["bare_mass"]["fontsize"],
     )
 
     y_label_key = "pion_mass_squared" if analysis_type == "pion" else "pcac_mass"
     ax.set_ylabel(
-        axis_labels[y_label_key]["label"], fontsize=axis_labels[y_label_key]["fontsize"]
+        axis_labels[y_label_key]["label"],
+        fontsize=axis_labels[y_label_key]["fontsize"],
     )
 
     if fig_cfg["grid"]:
@@ -431,11 +457,19 @@ def create_mass_fit_plot(
     legend_cfg = get_legend_config()
     ax.legend(**legend_cfg)
 
-    title = f"{analysis_cfg['plot_title_prefix']}: Mass Fit - {group_info['group_id']}"
-    ax.set_title(title, fontsize=14, pad=20)
+    # Generate title using PlotTitleBuilder
+    title_style = get_title_styling()
+    title = title_builder.build(
+        metadata_dict=group_info["group_metadata"],
+        tunable_params=group_info["all_tunable_params"],
+        leading_substring="Bare Mass Extrapolation at Fixed Plateau Mass:",
+        wrapping_length=80,
+    )
+    ax.set_title(title, fontsize=title_style["fontsize"], pad=title_style["pad"])
 
     plt.tight_layout()
 
+    # Save to sub-subdirectory
     plot_subdirs = get_plot_type_subdirectories()
     mass_subdir = plots_directory / plot_subdirs["mass_fit"]
     mass_subdir.mkdir(parents=True, exist_ok=True)
@@ -446,6 +480,7 @@ def create_mass_fit_plot(
     plt.close(fig)
 
     logger.info(f"  Saved mass fit plot: {plot_path}")
+
     return plot_path
 
 
@@ -553,10 +588,12 @@ def create_cost_fit_plot(
     # Styling
     axis_labels = get_axis_labels()
     ax.set_xlabel(
-        axis_labels["bare_mass"]["label"], fontsize=axis_labels["bare_mass"]["fontsize"]
+        axis_labels["bare_mass"]["label"],
+        fontsize=axis_labels["bare_mass"]["fontsize"],
     )
     ax.set_ylabel(
-        axis_labels["cost"]["label"], fontsize=axis_labels["cost"]["fontsize"]
+        axis_labels["cost"]["label"],
+        fontsize=axis_labels["cost"]["fontsize"],
     )
 
     if fig_cfg["grid"]:
@@ -565,11 +602,19 @@ def create_cost_fit_plot(
     legend_cfg = get_legend_config()
     ax.legend(**legend_cfg)
 
-    title = f"{analysis_cfg['plot_title_prefix']}: Cost Extrapolation - {group_info['group_id']}"
-    ax.set_title(title, fontsize=14, pad=20)
+    # Generate title using PlotTitleBuilder
+    title_style = get_title_styling()
+    title = title_builder.build(
+        metadata_dict=group_info["group_metadata"],
+        tunable_params=group_info["all_tunable_params"],
+        leading_substring="Cost Extrapolation at Fixed Bare Mass:",
+        wrapping_length=80,
+    )
+    ax.set_title(title, fontsize=title_style["fontsize"], pad=title_style["pad"])
 
     plt.tight_layout()
 
+    # Save to sub-subdirectory
     plot_subdirs = get_plot_type_subdirectories()
     cost_subdir = plots_directory / plot_subdirs["cost_fit"]
     cost_subdir.mkdir(parents=True, exist_ok=True)
@@ -580,4 +625,5 @@ def create_cost_fit_plot(
     plt.close(fig)
 
     logger.info(f"  Saved cost fit plot: {plot_path}")
+
     return plot_path

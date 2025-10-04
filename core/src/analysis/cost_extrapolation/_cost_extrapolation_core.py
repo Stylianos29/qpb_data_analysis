@@ -25,6 +25,11 @@ import gvar as gv
 import lsqfit
 
 from library import load_csv, DataFrameAnalyzer
+from library.constants.data_types import (
+    PARAMETERS_WITH_EXPONENTIAL_FORMAT,
+    PARAMETERS_OF_INTEGER_VALUE,
+)
+
 
 from src.analysis.cost_extrapolation._cost_extrapolation_shared_config import (
     get_grouping_parameters,
@@ -882,20 +887,45 @@ def export_cost_extrapolation_results(
     output_csv_path: str,
     logger,
 ):
-    """Export cost extrapolation results to CSV."""
+    """
+    Export cost extrapolation results to CSV with proper formatting.
+
+    Applies exponential notation to small parameters and standard
+    notation to physics results.
+    """
     csv_config = get_csv_output_config()
+    precision = csv_config["float_precision"]
+
+    # Create a copy to avoid modifying original
+    export_df = results_df.copy()
+
+    # Format columns based on their type
+    for col in export_df.columns:
+        if col in export_df.select_dtypes(include=["float64", "float32"]).columns:
+            if col in PARAMETERS_WITH_EXPONENTIAL_FORMAT:
+                # Exponential format for small parameters
+                export_df[col] = export_df[col].apply(
+                    lambda x: f"{x:.{precision}e}" if pd.notna(x) else x
+                )
+            else:
+                # Standard float format for physics results
+                export_df[col] = export_df[col].apply(
+                    lambda x: f"{x:.{precision}f}" if pd.notna(x) else x
+                )
+        elif col in PARAMETERS_OF_INTEGER_VALUE:
+            # Ensure integer columns stay as integers
+            export_df[col] = export_df[col].astype("Int64")  # Nullable integer type
 
     # Reorder columns (physics parameters first)
-    results_df = _reorder_columns_for_export(results_df)
+    export_df = _reorder_columns_for_export(export_df)
 
-    # Export
-    results_df.to_csv(
+    # Export without float_format (we've already formatted)
+    export_df.to_csv(
         output_csv_path,
         index=csv_config["index"],
-        float_format=f"%.{csv_config['float_precision']}f",
     )
 
-    logger.info(f"Exported {len(results_df)} results to {output_csv_path}")
+    logger.info(f"Exported {len(export_df)} results to {output_csv_path}")
 
 
 def _reorder_columns_for_export(df: pd.DataFrame) -> pd.DataFrame:

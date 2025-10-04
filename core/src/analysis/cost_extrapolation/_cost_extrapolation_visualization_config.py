@@ -113,21 +113,30 @@ LEGEND_CONFIG = {
 
 AXIS_LABELS = {
     "bare_mass": {
-        "label": "Bare Mass",
+        "label": r"$am$",
         "fontsize": 12,
     },
     "pcac_mass": {
-        "label": "PCAC Mass",
+        "label": r"$am_{\mathrm{PCAC}}$",
         "fontsize": 12,
     },
     "pion_mass_squared": {
-        "label": r"$m_\pi^2$",
+        "label": r"$a^2m^2_{\pi}$",
         "fontsize": 12,
     },
     "cost": {
-        "label": "Core-hours per spinor per configuration",
+        "label": "Computational cost (core-hours/spinor/config)",
         "fontsize": 12,
     },
+}
+
+# =============================================================================
+# TITLE STYLING
+# =============================================================================
+
+TITLE_STYLING = {
+    "fontsize": 14,
+    "pad": 10,  # Vertical space between title and plot
 }
 
 # =============================================================================
@@ -245,6 +254,11 @@ def get_legend_config() -> Dict[str, Any]:
 def get_axis_labels() -> Dict[str, Dict[str, Any]]:
     """Get axis labels."""
     return AXIS_LABELS.copy()
+
+
+def get_title_styling() -> Dict[str, Any]:
+    """Get title styling configuration."""
+    return TITLE_STYLING.copy()
 
 
 def get_analysis_config(analysis_type: str) -> Dict[str, Any]:
