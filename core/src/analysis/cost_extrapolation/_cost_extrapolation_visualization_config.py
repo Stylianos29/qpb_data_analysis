@@ -99,7 +99,7 @@ EXTRAPOLATION_LINES_STYLE = {
 # =============================================================================
 
 LEGEND_CONFIG = {
-    "loc": "lower right",  # Use 'loc' not 'location'
+    "loc": "best",  # "lower right",
     "frameon": True,
     "framealpha": 1.0,
     "edgecolor": "black",
@@ -168,8 +168,16 @@ REFERENCE_AXES_STYLE = {
 
 # Sample count column names by analysis type
 SAMPLE_COUNT_COLUMNS = {
-    "pcac": "pcac_n_successful_samples",
+    "pcac": "PCAC_n_successful_samples",
     "pion": "pion_n_successful_samples",
+}
+
+# Fit line extension configuration
+FIT_LINE_EXTENSION = {
+    "mass_fit_y_min": -0.001,  # Extend to slightly below y=0
+    "mass_fit_x_max_factor": 1.05,  # 5% beyond max data on right
+    "cost_fit_x_min_factor": 0.95,  # 5% before min data
+    "cost_fit_x_max_factor": 1.05,  # 5% beyond max data
 }
 
 # =============================================================================
@@ -348,6 +356,26 @@ def get_mass_data_column_mapping(analysis_type: str) -> Dict[str, str]:
 def get_cost_data_column_mapping() -> Dict[str, str]:
     """Get column mapping for cost data CSV."""
     return COST_DATA_COLUMN_MAPPING.copy()
+
+
+def get_annotation_style() -> Dict[str, Any]:
+    """Get annotation styling configuration."""
+    return ANNOTATION_STYLE.copy()
+
+
+def get_reference_axes_style() -> Dict[str, Any]:
+    """Get reference axes styling."""
+    return REFERENCE_AXES_STYLE.copy()
+
+
+def get_sample_count_columns() -> Dict[str, str]:
+    """Get sample count column names by analysis type."""
+    return SAMPLE_COUNT_COLUMNS.copy()
+
+
+def get_fit_line_extension() -> Dict[str, Any]:
+    """Get fit line extension configuration."""
+    return FIT_LINE_EXTENSION.copy()
 
 
 # =============================================================================

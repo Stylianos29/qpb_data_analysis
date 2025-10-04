@@ -351,7 +351,15 @@ def create_mass_fit_plot(
     title_builder,
     logger,
 ) -> Optional[Path]:
-    """Create mass vs bare mass fit plot."""
+    """
+    Create mass vs bare mass fit plot.
+
+    Shows linear fit of plateau mass vs bare mass with: - Data points
+    with error bars - Linear fit line with detailed parameters - Derived
+    bare mass vertical marker - Reference plateau mass horizontal line -
+    Sample count annotations - Fitting range markers - Reference axes at
+    origin
+    """
 
     analysis_type = group_info["analysis_type"]
     analysis_cfg = get_analysis_config(analysis_type)
@@ -364,15 +372,10 @@ def create_mass_fit_plot(
     col_mapping = get_results_column_mapping()
     mass_col_mapping = get_mass_data_column_mapping(analysis_type=analysis_type)
 
-    # Determine mass column based on analysis type
-    if analysis_type == "pion":
-        mass_mean_col = analysis_cfg["mass_column_mean"]
-        mass_error_col = analysis_cfg["mass_column_error"]
-        mass_power = analysis_cfg["mass_power"]
-    else:  # pcac
-        mass_mean_col = analysis_cfg["mass_column_mean"]
-        mass_error_col = analysis_cfg["mass_column_error"]
-        mass_power = 1
+    # Determine mass columns and power based on analysis type
+    mass_mean_col = analysis_cfg["mass_column_mean"]
+    mass_error_col = analysis_cfg["mass_column_error"]
+    mass_power = analysis_cfg["mass_power"]
 
     # Extract data
     x_data = mass_df[mass_col_mapping["bare_mass"]].values
@@ -403,27 +406,53 @@ def create_mass_fit_plot(
         elinewidth=data_style["error_linewidth"],
     )
 
-    # Plot fit line
+    # Extract fit parameters
     slope = results_row[col_mapping["mass_fit"]["slope_mean"]]
     intercept = results_row[col_mapping["mass_fit"]["intercept_mean"]]
     r_squared = results_row[col_mapping["mass_fit"]["r_squared"]]
     chi2_reduced = results_row[col_mapping["mass_fit"]["chi2_reduced"]]
     q_value = results_row[col_mapping["mass_fit"]["q_value"]]
 
-    x_fit = np.linspace(x_data.min() * 0.95, x_data.max() * 1.05, 200)
+    # Create fit line extending to y=0 (and slightly below)
+    from src.analysis.cost_extrapolation._cost_extrapolation_visualization_config import (
+        get_fit_line_extension,
+    )
+
+    fit_extension = get_fit_line_extension()
+
+    # Calculate x value where fit line reaches target y value
+    y_min_target = fit_extension["mass_fit_y_min"]
+    if slope != 0:
+        x_fit_min = (y_min_target - intercept) / slope
+    else:
+        x_fit_min = x_data.min() * 0.95  # Fallback if slope is zero
+
+    # Extend right side beyond data
+    x_fit_max = x_data.max() * fit_extension["mass_fit_x_max_factor"]
+
+    # Create fit line
+    x_fit = np.linspace(x_fit_min, x_fit_max, 200)
     y_fit = slope * x_fit + intercept
 
-    fit_style = get_fit_line_style()
-    fit_style["color"] = analysis_cfg["fit_color"]
+    # Determine y-label for fit equation based on analysis type
+    if analysis_type == "pion":
+        y_label_fit = "a^2m^2_{\\pi}"
+    else:
+        y_label_fit = "am_{\\mathrm{PCAC}}"
 
+    # Create detailed fit label
     fit_label = (
         f"$\\mathbf{{Linear\\ fit:}}$\n"
         f"  • Fitting range: $m$ ∈ [{x_data.min():.2f}, {x_data.max():.2f}]\n"
-        f"  • $am_{{PCAC}}$ = {slope:.4f}$m$ + {intercept:.5f}\n"
+        f"  • ${y_label_fit}$ = {slope:.4f}$m$ + {intercept:.5f}\n"
         f"  • χ²/dof = {chi2_reduced:.3f}\n"
         f"  • R² = {r_squared:.4f}\n"
         f"  • Q = {q_value:.3f}"
     )
+
+    # Plot fit line
+    fit_style = get_fit_line_style()
+    fit_style["color"] = analysis_cfg["fit_color"]
 
     ax.plot(
         x_fit,
@@ -432,51 +461,48 @@ def create_mass_fit_plot(
         linewidth=fit_style["linewidth"],
         linestyle=fit_style["linestyle"],
         label=fit_label,
-        # label=f"Linear fit (R²={r_squared:.4f})",
     )
 
-    # Mark derived bare mass
-    derived_bare_mass = results_row[col_mapping["derived_bare_mass_mean"]]
+    # Mark derived bare mass with uncertainty band (like critical mass
+    # does)
+    derived_bare_mass_mean = results_row[col_mapping["derived_bare_mass_mean"]]
+    derived_bare_mass_error = results_row[col_mapping["derived_bare_mass_error"]]
 
     extrap_marker = get_extrapolation_marker_style()
 
-    # Determine sample count column based on analysis type
-    if analysis_type == "pion":
-        sample_count_col = "pion_n_successful_samples"
-    else:
-        sample_count_col = "pcac_n_successful_samples"
+    # Add error band first (behind the line)
+    ax.axvspan(
+        derived_bare_mass_mean - derived_bare_mass_error,
+        derived_bare_mass_mean + derived_bare_mass_error,
+        alpha=0.2,
+        color=extrap_marker["color"],
+        zorder=1,
+    )
 
-    if sample_count_col in mass_df.columns:
-        sample_counts = mass_df[sample_count_col].values
-
-        # Annotate each point
-        for i, (x, y, count) in enumerate(zip(x_data, y_data, sample_counts)):
-            ax.annotate(
-                f"{int(count)}",
-                xy=(x, y),
-                xytext=(15, -15),
-                textcoords="offset points",
-                fontsize=10,
-                ha="center",
-                bbox=dict(
-                    boxstyle="round,pad=0.3",
-                    facecolor="white",
-                    edgecolor="gray",
-                    linewidth=0.5,
-                ),
-                arrowprops=dict(arrowstyle="-", color="gray", linewidth=0.5),
-            )
-
+    # Add vertical line on top
     ax.axvline(
-        derived_bare_mass,
+        derived_bare_mass_mean,
         color=extrap_marker["color"],
         linestyle="--",
         linewidth=1.5,
         alpha=0.7,
-        label=f"Reference bare mass: {derived_bare_mass:.6f}",
+        label=f"Derived bare mass: {derived_bare_mass_mean:.6f} ± {derived_bare_mass_error:.6f}",
+        zorder=2,
     )
 
-    # Styling
+    # Add reference plateau mass (horizontal line)
+    _add_reference_plateau_mass_line(ax, analysis_type)
+
+    # Add sample count annotations
+    _add_sample_count_annotations(ax, x_data, y_data, mass_df, analysis_type)
+
+    # Add fitting range markers
+    _add_fitting_range_markers(ax, x_data.min(), x_data.max())
+
+    # Add reference axes at origin
+    _add_reference_axes(ax)
+
+    # Configure axes
     axis_labels = get_axis_labels()
     ax.set_xlabel(
         axis_labels["bare_mass"]["label"],
@@ -492,10 +518,7 @@ def create_mass_fit_plot(
     if fig_cfg["grid"]:
         ax.grid(True, alpha=fig_cfg["grid_alpha"], linestyle=fig_cfg["grid_linestyle"])
 
-    # Add reference axes
-    ax.axhline(0, color="black", linestyle="-", linewidth=1.2, alpha=0.8, zorder=1)
-    ax.axvline(0, color="black", linestyle="-", linewidth=1.2, alpha=0.8, zorder=1)
-
+    # Add legend
     legend_cfg = get_legend_config()
     ax.legend(**legend_cfg)
 
@@ -510,17 +533,6 @@ def create_mass_fit_plot(
     ax.set_title(title, fontsize=title_style["fontsize"], pad=title_style["pad"])
 
     plt.tight_layout()
-
-    # Mark fitting range
-    ax.axvline(
-        x_data.min(),
-        color="gray",
-        linestyle=":",
-        linewidth=1,
-        alpha=0.6,
-        label="Fitting range",
-    )
-    ax.axvline(x_data.max(), color="gray", linestyle=":", linewidth=1, alpha=0.6)
 
     # Save to sub-subdirectory
     plot_subdirs = get_plot_type_subdirectories()
@@ -544,13 +556,25 @@ def create_cost_fit_plot(
     title_builder,
     logger,
 ) -> Optional[Path]:
-    """Create cost vs bare mass fit plot with extrapolation."""
+    """
+    Create cost vs bare mass fit plot with extrapolation.
+
+    Shows shifted power law fit of computational cost vs bare mass with:
+        - Data points - Shifted power law fit line with detailed
+          parameters
+        - Extrapolation point at derived bare mass - Extrapolation guide
+          lines
+        - Sample count annotations (from mass data) - Fitting range
+          markers
+        - Reference axes at origin
+    """
 
     analysis_type = group_info["analysis_type"]
     analysis_cfg = get_analysis_config(analysis_type)
 
     # Get data
     cost_df = group_info["cost_data"]
+    mass_df = group_info["mass_data"]  # For sample count annotations
     results_row = group_info["results_row"]
 
     cost_col_mapping = get_cost_data_column_mapping()
@@ -573,20 +597,35 @@ def create_cost_fit_plot(
         markersize=data_style["marker_size"],
         color=data_style["color"],
         linestyle="",
+        label="Data",
     )
 
-    # Plot fit line (shifted power law)
+    # Extract fit parameters (shifted power law: a/(x-b) + c)
     col_mapping = get_results_column_mapping()
     a = results_row[col_mapping["cost_fit"]["param_a_mean"]]
     b = results_row[col_mapping["cost_fit"]["param_b_mean"]]
     c = results_row[col_mapping["cost_fit"]["param_c_mean"]]
     r_squared = results_row[col_mapping["cost_fit"]["r_squared"]]
+    chi2_reduced = results_row[col_mapping["cost_fit"]["chi2_reduced"]]
+    q_value = results_row[col_mapping["cost_fit"]["q_value"]]
 
+    # Create fit line
     x_fit = np.linspace(x_data.min() * 0.95, x_data.max() * 1.05, 200)
     # Avoid singularity
     x_fit = x_fit[np.abs(x_fit - b) > 1e-6]
     y_fit = a / (x_fit - b) + c
 
+    # Create detailed fit label
+    fit_label = (
+        f"$\\mathbf{{Shifted\\ power\\ law:}}$\n"
+        f"  • Fitting range: $m$ ∈ [{x_data.min():.2f}, {x_data.max():.2f}]\n"
+        f"  • Cost = {a:.2f}/($m$ - {b:.5f}) + {c:.2f}\n"
+        f"  • χ²/dof = {chi2_reduced:.3f}\n"
+        f"  • R² = {r_squared:.4f}\n"
+        f"  • Q = {q_value:.3f}"
+    )
+
+    # Plot fit line
     fit_style = get_fit_line_style()
     fit_style["color"] = analysis_cfg["fit_color"]
 
@@ -596,12 +635,13 @@ def create_cost_fit_plot(
         color=fit_style["color"],
         linewidth=fit_style["linewidth"],
         linestyle=fit_style["linestyle"],
-        label=f"Shifted power law (R²={r_squared:.4f})",
+        label=fit_label,
     )
 
     # Mark extrapolation point
     derived_bare_mass = results_row[col_mapping["derived_bare_mass_mean"]]
     extrapolated_cost = results_row[col_mapping["extrapolated_cost_mean"]]
+    extrapolated_cost_error = results_row[col_mapping["extrapolated_cost_error"]]
 
     extrap_marker = get_extrapolation_marker_style()
 
@@ -615,10 +655,10 @@ def create_cost_fit_plot(
         markeredgewidth=extrap_marker["edge_width"],
         alpha=extrap_marker["alpha"],
         zorder=extrap_marker["zorder"],
-        label=f"Extrapolation: {extrapolated_cost:.1f} core-hrs",
+        label=f"Extrapolation: {extrapolated_cost:.1f} ± {extrapolated_cost_error:.1f} core-hrs",
     )
 
-    # Add extrapolation lines
+    # Add extrapolation guide lines
     extrap_lines = get_extrapolation_lines_style()
 
     ax.axvline(
@@ -637,7 +677,31 @@ def create_cost_fit_plot(
         alpha=extrap_lines["alpha"],
     )
 
-    # Styling
+    # Add sample count annotations (using mass data) Note: We need to
+    # match cost x_data with mass data bare mass values to get correct
+    # annotations for the cost plot points
+    mass_col_mapping = get_mass_data_column_mapping(analysis_type=analysis_type)
+    mass_bare_mass = mass_df[mass_col_mapping["bare_mass"]].values
+
+    # Create mapping from bare mass to cost for annotation positioning
+    # Only annotate points that exist in both datasets
+    for cost_x, cost_y in zip(x_data, y_data):
+        # Find matching bare mass in mass_df (with tolerance for
+        # floating point)
+        mass_idx = np.where(np.abs(mass_bare_mass - cost_x) < 1e-10)[0]
+        if len(mass_idx) > 0:
+            # Use the first matched index for annotation
+            _add_sample_count_annotations(
+                ax, [cost_x], [cost_y], mass_df.iloc[mass_idx[0:1]], analysis_type
+            )
+
+    # Add fitting range markers
+    _add_fitting_range_markers(ax, x_data.min(), x_data.max())
+
+    # Add reference axes at origin
+    _add_reference_axes(ax)
+
+    # Configure axes
     axis_labels = get_axis_labels()
     ax.set_xlabel(
         axis_labels["bare_mass"]["label"],
@@ -651,6 +715,7 @@ def create_cost_fit_plot(
     if fig_cfg["grid"]:
         ax.grid(True, alpha=fig_cfg["grid_alpha"], linestyle=fig_cfg["grid_linestyle"])
 
+    # Add legend
     legend_cfg = get_legend_config()
     ax.legend(**legend_cfg)
 
@@ -679,3 +744,122 @@ def create_cost_fit_plot(
     logger.info(f"  Saved cost fit plot: {plot_path}")
 
     return plot_path
+
+
+# =============================================================================
+# HELPER FUNCTIONS FOR PLOT ELEMENTS
+# =============================================================================
+
+
+def _add_reference_axes(ax):
+    """Add reference axes at x=0 and y=0."""
+    from src.analysis.cost_extrapolation._cost_extrapolation_visualization_config import (
+        get_reference_axes_style,
+    )
+
+    ref_style = get_reference_axes_style()
+    ax.axhline(0, **ref_style)
+    ax.axvline(0, **ref_style)
+
+
+def _add_sample_count_annotations(ax, x_data, y_data, mass_df, analysis_type):
+    """
+    Add gauge configuration count annotations to data points.
+
+    Args:
+        ax: Matplotlib axes object x_data: X coordinates for annotations
+        y_data: Y coordinates for annotations mass_df: DataFrame
+        containing sample count column analysis_type: "pcac" or "pion"
+    """
+    from src.analysis.cost_extrapolation._cost_extrapolation_visualization_config import (
+        get_sample_count_columns,
+        get_annotation_style,
+    )
+
+    sample_cols = get_sample_count_columns()
+    sample_count_col = sample_cols.get(analysis_type)
+
+    if not sample_count_col or sample_count_col not in mass_df.columns:
+        return  # Skip if column doesn't exist
+
+    sample_counts = mass_df[sample_count_col].values
+    annot_style = get_annotation_style()
+
+    for x, y, count in zip(x_data, y_data, sample_counts):
+        ax.annotate(
+            f"{int(count)}",
+            xy=(x, y),
+            xytext=(annot_style["offset_x"], annot_style["offset_y"]),
+            textcoords="offset points",
+            fontsize=annot_style["fontsize"],
+            ha=annot_style["ha"],
+            bbox=dict(
+                boxstyle=annot_style["bbox_style"],
+                facecolor=annot_style["bbox_facecolor"],
+                edgecolor=annot_style["bbox_edgecolor"],
+                linewidth=annot_style["bbox_linewidth"],
+            ),
+            arrowprops=dict(
+                arrowstyle="-",
+                color=annot_style["arrow_color"],
+                linewidth=annot_style["arrow_linewidth"],
+            ),
+        )
+
+
+def _add_fitting_range_markers(ax, x_min, x_max):
+    """
+    Add vertical lines marking the fitting range.
+
+    Args:
+        ax: Matplotlib axes object x_min: Minimum x value of fitting
+        range x_max: Maximum x value of fitting range
+    """
+    ax.axvline(
+        x_min,
+        color="gray",
+        linestyle=":",
+        linewidth=1,
+        alpha=0.6,
+        label="Fitting range",
+    )
+    ax.axvline(x_max, color="gray", linestyle=":", linewidth=1, alpha=0.6)
+
+
+def _add_reference_plateau_mass_line(ax, analysis_type):
+    """
+    Add horizontal line for reference plateau mass.
+
+    Args:
+        ax: Matplotlib axes object analysis_type: "pcac" or "pion"
+    """
+    if analysis_type == "pcac":
+        from src.analysis.cost_extrapolation._pcac_cost_extrapolation_config import (
+            get_reference_pcac_mass,
+        )
+
+        ref_mass = get_reference_pcac_mass()
+        # Apply power transformation (PCAC uses power=1, so just the
+        # value)
+        ref_mass_transformed = ref_mass
+        label = f"Reference PCAC mass: {ref_mass:.6f}"
+    else:  # pion
+        from src.analysis.cost_extrapolation._pion_cost_extrapolation_config import (
+            get_reference_pion_mass,
+            get_pion_mass_power,
+        )
+
+        ref_mass = get_reference_pion_mass()
+        mass_power = get_pion_mass_power()
+        # Apply power transformation (pion uses power=2 typically)
+        ref_mass_transformed = ref_mass**mass_power
+        label = f"Reference pion mass: {ref_mass:.6f}"
+
+    ax.axhline(
+        ref_mass_transformed,
+        color="orange",
+        linestyle="--",
+        linewidth=1.5,
+        alpha=0.7,
+        label=label,
+    )
