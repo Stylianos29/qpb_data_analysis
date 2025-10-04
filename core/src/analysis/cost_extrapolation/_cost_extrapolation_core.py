@@ -33,6 +33,7 @@ from src.analysis.cost_extrapolation._cost_extrapolation_shared_config import (
     get_validation_config,
     get_fit_quality_config,
     get_physical_validation_config,
+    get_cost_data_columns,
     get_cost_fit_config,
     get_csv_output_config,
     get_output_column_mapping,
@@ -492,14 +493,17 @@ def extrapolate_computational_costs(
     Process:
       1. Load cost data
       2. Average costs across configurations per group
-      3. Group cost data by parameter groups (collect all bare mass points per group)
-      4. For each mass group: find matching cost group, fit shifted power law
+      3. Group cost data by parameter groups (collect all bare mass
+         points per group)
+      4. For each mass group: find matching cost group, fit shifted
+         power law
       5. Extrapolate cost at derived bare mass for that group
       6. Combine with mass conversion results
 
     Args:
         - cost_csv_path: Path to cost data CSV
-        - derived_bare_mass_df: DataFrame with derived bare masses per group
+        - derived_bare_mass_df: DataFrame with derived bare masses per
+          group
         - analysis_type: "pcac" or "pion"
         - logger: Logger instance
 
@@ -600,11 +604,7 @@ def load_and_average_cost_data(cost_csv_path: str, logger) -> pd.DataFrame:
     cost_df = load_csv(cost_csv_path, apply_categorical=True)
 
     # Check required columns
-    required_cost_cols = [
-        "Bare_mass",
-        "Configuration_label",
-        "Average_core_hours_per_spinor",
-    ]
+    required_cost_cols = get_cost_data_columns()
     missing = [col for col in required_cost_cols if col not in cost_df.columns]
     if missing:
         raise ValueError(f"Missing required cost columns: {missing}")
@@ -799,13 +799,13 @@ def _group_cost_data_by_parameters(
     """
     Group cost data by parameter groups (excluding Bare_mass).
 
-    Uses DataFrameAnalyzer to intelligently discover multivalued parameters
-    and group the data accordingly.
+    Uses DataFrameAnalyzer to intelligently discover multivalued
+    parameters and group the data accordingly.
 
     Returns:
-        Tuple of (grouped_dict, grouping_param_names) where:
-        - grouped_dict: Dictionary mapping group_key -> DataFrame
-        - grouping_param_names: List of parameter names used for grouping
+        Tuple of (grouped_dict, grouping_param_names) where: -
+        grouped_dict: Dictionary mapping group_key -> DataFrame -
+        grouping_param_names: List of parameter names used for grouping
     """
     # Create analyzer
     analyzer = DataFrameAnalyzer(averaged_cost_df)
@@ -843,11 +843,13 @@ def _group_cost_data_by_parameters(
 
 def _build_group_key(row: pd.Series, grouping_param_names: List[str], logger) -> Tuple:
     """
-    Build a hashable group key from a row using specified parameter names.
+    Build a hashable group key from a row using specified parameter
+    names.
 
     Args:
         row: Data row (from mass results DataFrame)
-        grouping_param_names: List of parameter names to use for grouping
+        grouping_param_names: List of parameter names to use for
+        grouping
 
     Returns:
         Tuple of parameter values for this group
@@ -862,8 +864,8 @@ def _build_group_key(row: pd.Series, grouping_param_names: List[str], logger) ->
                 value = value.item()
             key_values.append(value)
         else:
-            # If parameter not in row, cannot build valid key
-            # This shouldn't happen if data is consistent
+            # If parameter not in row, cannot build valid key This
+            # shouldn't happen if data is consistent
             logger.warning(f"Parameter '{param}' not found in mass row, using None")
             key_values.append(None)
 

@@ -90,6 +90,13 @@ PHYSICAL_VALIDATION = {
 # COST FITTING CONFIGURATION
 # =============================================================================
 
+# Required columns in cost data CSV
+COST_DATA_COLUMNS = [
+    "Bare_mass",
+    "Configuration_label",
+    "Average_core_hours_per_spinor",
+]
+
 COST_FIT_CONFIG = {
     "fit_function": "shifted_power_law",  # Function type for cost vs bare mass
     "initial_guess": None,  # Let DataPlotter auto-determine
@@ -190,6 +197,11 @@ def get_fit_quality_config() -> Dict[str, Any]:
 def get_physical_validation_config() -> Dict[str, Any]:
     """Get physical validation configuration."""
     return PHYSICAL_VALIDATION.copy()
+
+
+def get_cost_data_columns() -> List[str]:
+    """Get required cost data columns."""
+    return COST_DATA_COLUMNS.copy()
 
 
 def get_cost_fit_config() -> Dict[str, Any]:
