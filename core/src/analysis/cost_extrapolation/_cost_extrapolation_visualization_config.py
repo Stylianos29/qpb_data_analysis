@@ -49,7 +49,7 @@ FIGURE_CONFIG = {
 DATA_POINT_STYLE = {
     # Markers
     "marker": "o",
-    "marker_size": 8,
+    "marker_size": 4,
     "marker_edge_width": 1.5,
     # Error bars
     "capsize": 5,
@@ -99,9 +99,9 @@ EXTRAPOLATION_LINES_STYLE = {
 # =============================================================================
 
 LEGEND_CONFIG = {
-    "loc": "best",  # Use 'loc' not 'location'
+    "loc": "lower right",  # Use 'loc' not 'location'
     "frameon": True,
-    "framealpha": 0.9,
+    "framealpha": 1.0,
     "edgecolor": "black",
     "fancybox": False,
     "fontsize": 10,
@@ -137,6 +137,39 @@ AXIS_LABELS = {
 TITLE_STYLING = {
     "fontsize": 14,
     "pad": 10,  # Vertical space between title and plot
+}
+
+# =============================================================================
+# ANNOTATION STYLING
+# =============================================================================
+
+# Annotation styling
+ANNOTATION_STYLE = {
+    "fontsize": 10,
+    "ha": "center",
+    "bbox_style": "round,pad=0.3",
+    "bbox_facecolor": "white",
+    "bbox_edgecolor": "gray",
+    "bbox_linewidth": 0.5,
+    "arrow_color": "gray",
+    "arrow_linewidth": 0.5,
+    "offset_x": 15,
+    "offset_y": -15,
+}
+
+# Reference axes styling
+REFERENCE_AXES_STYLE = {
+    "color": "black",
+    "linestyle": "-",
+    "linewidth": 1.2,
+    "alpha": 0.8,
+    "zorder": 1,
+}
+
+# Sample count column names by analysis type
+SAMPLE_COUNT_COLUMNS = {
+    "pcac": "pcac_n_successful_samples",
+    "pion": "pion_n_successful_samples",
 }
 
 # =============================================================================

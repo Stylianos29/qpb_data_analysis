@@ -401,13 +401,14 @@ def create_mass_fit_plot(
         capsize=data_style["capsize"],
         capthick=data_style["capthick"],
         elinewidth=data_style["error_linewidth"],
-        label="Data",
     )
 
     # Plot fit line
     slope = results_row[col_mapping["mass_fit"]["slope_mean"]]
     intercept = results_row[col_mapping["mass_fit"]["intercept_mean"]]
     r_squared = results_row[col_mapping["mass_fit"]["r_squared"]]
+    chi2_reduced = results_row[col_mapping["mass_fit"]["chi2_reduced"]]
+    q_value = results_row[col_mapping["mass_fit"]["q_value"]]
 
     x_fit = np.linspace(x_data.min() * 0.95, x_data.max() * 1.05, 200)
     y_fit = slope * x_fit + intercept
@@ -415,13 +416,23 @@ def create_mass_fit_plot(
     fit_style = get_fit_line_style()
     fit_style["color"] = analysis_cfg["fit_color"]
 
+    fit_label = (
+        f"$\\mathbf{{Linear\\ fit:}}$\n"
+        f"  • Fitting range: $m$ ∈ [{x_data.min():.2f}, {x_data.max():.2f}]\n"
+        f"  • $am_{{PCAC}}$ = {slope:.4f}$m$ + {intercept:.5f}\n"
+        f"  • χ²/dof = {chi2_reduced:.3f}\n"
+        f"  • R² = {r_squared:.4f}\n"
+        f"  • Q = {q_value:.3f}"
+    )
+
     ax.plot(
         x_fit,
         y_fit,
         color=fit_style["color"],
         linewidth=fit_style["linewidth"],
         linestyle=fit_style["linestyle"],
-        label=f"Linear fit (R²={r_squared:.4f})",
+        label=fit_label,
+        # label=f"Linear fit (R²={r_squared:.4f})",
     )
 
     # Mark derived bare mass
@@ -429,13 +440,40 @@ def create_mass_fit_plot(
 
     extrap_marker = get_extrapolation_marker_style()
 
+    # Determine sample count column based on analysis type
+    if analysis_type == "pion":
+        sample_count_col = "pion_n_successful_samples"
+    else:
+        sample_count_col = "pcac_n_successful_samples"
+
+    if sample_count_col in mass_df.columns:
+        sample_counts = mass_df[sample_count_col].values
+
+        # Annotate each point
+        for i, (x, y, count) in enumerate(zip(x_data, y_data, sample_counts)):
+            ax.annotate(
+                f"{int(count)}",
+                xy=(x, y),
+                xytext=(15, -15),
+                textcoords="offset points",
+                fontsize=10,
+                ha="center",
+                bbox=dict(
+                    boxstyle="round,pad=0.3",
+                    facecolor="white",
+                    edgecolor="gray",
+                    linewidth=0.5,
+                ),
+                arrowprops=dict(arrowstyle="-", color="gray", linewidth=0.5),
+            )
+
     ax.axvline(
         derived_bare_mass,
         color=extrap_marker["color"],
         linestyle="--",
         linewidth=1.5,
         alpha=0.7,
-        label=f"Derived bare mass: {derived_bare_mass:.6f}",
+        label=f"Reference bare mass: {derived_bare_mass:.6f}",
     )
 
     # Styling
@@ -454,6 +492,10 @@ def create_mass_fit_plot(
     if fig_cfg["grid"]:
         ax.grid(True, alpha=fig_cfg["grid_alpha"], linestyle=fig_cfg["grid_linestyle"])
 
+    # Add reference axes
+    ax.axhline(0, color="black", linestyle="-", linewidth=1.2, alpha=0.8, zorder=1)
+    ax.axvline(0, color="black", linestyle="-", linewidth=1.2, alpha=0.8, zorder=1)
+
     legend_cfg = get_legend_config()
     ax.legend(**legend_cfg)
 
@@ -468,6 +510,17 @@ def create_mass_fit_plot(
     ax.set_title(title, fontsize=title_style["fontsize"], pad=title_style["pad"])
 
     plt.tight_layout()
+
+    # Mark fitting range
+    ax.axvline(
+        x_data.min(),
+        color="gray",
+        linestyle=":",
+        linewidth=1,
+        alpha=0.6,
+        label="Fitting range",
+    )
+    ax.axvline(x_data.max(), color="gray", linestyle=":", linewidth=1, alpha=0.6)
 
     # Save to sub-subdirectory
     plot_subdirs = get_plot_type_subdirectories()
@@ -520,7 +573,6 @@ def create_cost_fit_plot(
         markersize=data_style["marker_size"],
         color=data_style["color"],
         linestyle="",
-        label="Data",
     )
 
     # Plot fit line (shifted power law)
