@@ -31,6 +31,7 @@ from src.analysis.cost_extrapolation._cost_extrapolation_visualization_config im
     get_results_column_mapping,
     get_mass_data_column_mapping,
     get_cost_data_column_mapping,
+    get_plot_type_subdirectories,
 )
 
 
@@ -435,14 +436,16 @@ def create_mass_fit_plot(
 
     plt.tight_layout()
 
-    # Save plot
+    plot_subdirs = get_plot_type_subdirectories()
+    mass_subdir = plots_directory / plot_subdirs["mass_fit"]
+    mass_subdir.mkdir(parents=True, exist_ok=True)
+
     filename = f"mass_fit_{group_info['group_id']}.png"
-    plot_path = plots_directory / filename
+    plot_path = mass_subdir / filename
     fig.savefig(plot_path, dpi=fig_cfg["dpi"], bbox_inches="tight")
     plt.close(fig)
 
     logger.info(f"  Saved mass fit plot: {plot_path}")
-
     return plot_path
 
 
@@ -567,12 +570,14 @@ def create_cost_fit_plot(
 
     plt.tight_layout()
 
-    # Save plot
+    plot_subdirs = get_plot_type_subdirectories()
+    cost_subdir = plots_directory / plot_subdirs["cost_fit"]
+    cost_subdir.mkdir(parents=True, exist_ok=True)
+
     filename = f"cost_fit_{group_info['group_id']}.png"
-    plot_path = plots_directory / filename
+    plot_path = cost_subdir / filename
     fig.savefig(plot_path, dpi=fig_cfg["dpi"], bbox_inches="tight")
     plt.close(fig)
 
     logger.info(f"  Saved cost fit plot: {plot_path}")
-
     return plot_path

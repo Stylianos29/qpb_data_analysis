@@ -17,6 +17,12 @@ PLOT_SUBDIRECTORIES = {
     "pion": "cost_extrapolation_pion",
 }
 
+# Plot type sub-subdirectories
+PLOT_TYPE_SUBDIRECTORIES = {
+    "mass_fit": "plateau_mass_vs_bare_mass",
+    "cost_fit": "cost_vs_bare_mass",
+}
+
 # =============================================================================
 # FIGURE CONFIGURATION
 # =============================================================================
@@ -261,6 +267,11 @@ def get_plot_subdirectory(analysis_type: str) -> str:
     if analysis_type not in PLOT_SUBDIRECTORIES:
         raise ValueError(f"Unknown analysis type: {analysis_type}")
     return PLOT_SUBDIRECTORIES[analysis_type]
+
+
+def get_plot_type_subdirectories() -> Dict[str, str]:
+    """Get plot type subdirectory names."""
+    return PLOT_TYPE_SUBDIRECTORIES.copy()
 
 
 def get_results_column_mapping() -> Dict[str, Any]:
