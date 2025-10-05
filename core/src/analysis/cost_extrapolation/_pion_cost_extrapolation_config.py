@@ -63,12 +63,12 @@ COST_DATA_COLUMNS = [
 # Fitting range configuration for mass and cost fits
 FIT_RANGE_CONFIG = {
     "mass_fit": {
-        "bare_mass_min": 0.005,  # None = use actual data minimum
-        "bare_mass_max": 0.055,  # None = use actual data maximum
+        "bare_mass_min": None,  # None = use actual data minimum
+        "bare_mass_max": None,  # None = use actual data maximum
     },
     "cost_fit": {
-        "bare_mass_min": 0.005,  # None = use actual data minimum
-        "bare_mass_max": 0.055,  # None = use actual data maximum
+        "bare_mass_min": None,  # None = use actual data minimum
+        "bare_mass_max": None,  # None = use actual data maximum
     },
 }
 
@@ -134,7 +134,7 @@ def get_fit_range_config() -> Dict[str, Dict[str, float | None]]:
     return {
         "mass_fit": FIT_RANGE_CONFIG["mass_fit"].copy(),
         "cost_fit": FIT_RANGE_CONFIG["cost_fit"].copy(),
-    }
+    }  # type: ignore
 
 
 def get_pion_validation_config() -> Dict[str, Any]:

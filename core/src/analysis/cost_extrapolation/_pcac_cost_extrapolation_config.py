@@ -6,7 +6,7 @@ the intermediate physics observable. Uses linear fit for PCAC mass vs
 bare mass relationship.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Mapping
 
 from src.analysis.cost_extrapolation._cost_extrapolation_shared_config import (
     validate_shared_cost_config,
@@ -60,12 +60,12 @@ COST_DATA_COLUMNS = [
 # Fitting range configuration for mass and cost fits
 FIT_RANGE_CONFIG = {
     "mass_fit": {
-        "bare_mass_min": 0.005,  # None = use actual data minimum
-        "bare_mass_max": 0.055,  # None = use actual data maximum
+        "bare_mass_min": None,  # None = use actual data minimum
+        "bare_mass_max": None,  # None = use actual data maximum
     },
     "cost_fit": {
-        "bare_mass_min": 0.005,  # None = use actual data minimum
-        "bare_mass_max": 0.055,  # None = use actual data maximum
+        "bare_mass_min": None,  # None = use actual data minimum
+        "bare_mass_max": None,  # None = use actual data maximum
     },
 }
 
@@ -121,12 +121,12 @@ def get_cost_data_columns() -> List[str]:
     return COST_DATA_COLUMNS.copy()
 
 
-def get_fit_range_config() -> Dict[str, Dict[str, float | None]]:
+def get_fit_range_config() -> Dict[str, Dict[str, float]]:
     """Get fitting range configuration."""
     return {
         "mass_fit": FIT_RANGE_CONFIG["mass_fit"].copy(),
         "cost_fit": FIT_RANGE_CONFIG["cost_fit"].copy(),
-    }
+    }  # type: ignore
 
 
 def get_pcac_validation_config() -> Dict[str, Any]:
