@@ -47,6 +47,50 @@ from src.analysis.cost_extrapolation._cost_extrapolation_shared_config import (
 
 
 # =============================================================================
+# FITTING RANGE FILTERING
+# =============================================================================
+
+
+def filter_data_by_fit_range(
+    df: pd.DataFrame,
+    bare_mass_col: str,
+    range_min: Optional[float],
+    range_max: Optional[float],
+) -> Tuple[pd.DataFrame, Tuple[Optional[float], Optional[float]]]:
+    """
+    Filter dataframe to fitting range and return actual discrete bounds
+    used.
+
+    Args:
+        df: Input dataframe bare_mass_col: Name of bare mass column
+        range_min: Minimum bound (None = use data minimum) range_max:
+        Maximum bound (None = use data maximum)
+
+    Returns:
+        Tuple of (filtered_df, (actual_min, actual_max)) where
+        actual_min/max are the discrete data values included in the
+        fitting range
+    """
+    filtered_df = df.copy()
+
+    # Apply user-specified constraints
+    if range_min is not None:
+        filtered_df = filtered_df[filtered_df[bare_mass_col] >= range_min]
+    if range_max is not None:
+        filtered_df = filtered_df[filtered_df[bare_mass_col] <= range_max]
+
+    # Extract actual discrete bounds from filtered data
+    if len(filtered_df) > 0:
+        actual_min = float(filtered_df[bare_mass_col].min())
+        actual_max = float(filtered_df[bare_mass_col].max())
+    else:
+        # Will be caught by validation later
+        actual_min, actual_max = None, None
+
+    return filtered_df, (actual_min, actual_max)
+
+
+# =============================================================================
 # MAIN PROCESSING FUNCTION
 # =============================================================================
 
@@ -84,7 +128,21 @@ def process_cost_extrapolation_analysis(
     Returns:
         Path to output CSV file
     """
+
     logger.info(f"=== {analysis_type.upper()} Cost Extrapolation Analysis ===")
+
+    # Get fit range configuration
+    if analysis_type == "pcac":
+        from src.analysis.cost_extrapolation._pcac_cost_extrapolation_config import (
+            get_fit_range_config,
+        )
+    else:  # pion
+        from src.analysis.cost_extrapolation._pion_cost_extrapolation_config import (
+            get_fit_range_config,
+        )
+
+    fit_range_config = get_fit_range_config()
+    logger.info(f"Fit range configuration: {fit_range_config}")
 
     # STAGE 1: Mass to Bare Mass Conversion
     logger.info("Stage 1: Converting mass to bare mass")
@@ -92,7 +150,7 @@ def process_cost_extrapolation_analysis(
         mass_csv_path,
         analysis_type,
         column_mapping,
-        required_columns,
+        fit_range_config,  # Pass fit_range_config
         logger,
     )
 
@@ -107,6 +165,7 @@ def process_cost_extrapolation_analysis(
         cost_csv_path,
         derived_bare_mass_df,
         analysis_type,
+        fit_range_config,  # Pass fit_range_config
         logger,
     )
 
@@ -131,7 +190,7 @@ def convert_mass_to_bare_mass(
     mass_csv_path: str,
     analysis_type: str,
     column_mapping: Dict[str, str],
-    required_columns: List[str],
+    fit_range_config: Dict[str, Dict[str, Optional[float]]],
     logger,
 ) -> pd.DataFrame:
     """
@@ -140,77 +199,74 @@ def convert_mass_to_bare_mass(
     Process:
       1. Load mass plateau data
       2. Group by lattice parameters
-      3. For each group: fit mass^n vs bare mass (linear)
-      4. Invert fit: bare_mass = (mass_ref^n - b) / a
-      5. Return DataFrame with group keys and derived bare masses
+      3. Apply fitting range filter
+      4. For each group: fit mass^n vs bare mass (linear)
+      5. Invert fit: bare_mass = (mass_ref^n - b) / a
+      6. Store results with fit range information
 
     Args:
-        - mass_csv_path: Path to mass data CSV
-        - analysis_type: "pcac" or "pion"
-        - column_mapping: Column name mapping
-        - required_columns: Required columns
-        - logger: Logger instance
+        mass_csv_path: Path to mass plateau estimates CSV analysis_type:
+        "pcac" or "pion" column_mapping: Column name mappings
+        fit_range_config: Fitting range configuration logger: Logger
+        instance
 
     Returns:
-        DataFrame with group parameters and derived bare masses (value,
-        error)
+        DataFrame with derived bare mass and fit info per group
     """
-    # Load mass data
-    logger.info(f"Loading {analysis_type.upper()} mass data from {mass_csv_path}")
-    try:
-        mass_df = load_csv(
-            mass_csv_path,
-            validate_required_columns=set(required_columns),
-            apply_categorical=True,
-        )
-        logger.info(f"Loaded {len(mass_df)} rows of mass data")
-        logger.info(f"Columns: {list(mass_df.columns)}")
-    except Exception as e:
-        logger.error(f"Failed to load mass data: {e}")
-        raise
+    logger.info(f"Loading mass data from {mass_csv_path}")
 
-    # Get mass power (1 for PCAC, 2 for pion)
+    # Load data
+    mass_df = load_csv(mass_csv_path, apply_categorical=True)
+
+    if mass_df.empty:
+        logger.error("Mass data is empty")
+        return pd.DataFrame()
+
+    logger.info(f"Loaded {len(mass_df)} mass data points")
+
+    # Validate required columns
+    for col in column_mapping.values():
+        if col not in mass_df.columns:
+            raise ValueError(f"Required column '{col}' not found in mass CSV")
+
+    # Get reference mass and power based on analysis type
     if analysis_type == "pcac":
-        mass_power = 1
         reference_mass = _get_reference_mass_pcac()
-    elif analysis_type == "pion":
-        mass_power = _get_pion_mass_power()
+        mass_power = 1
+    else:  # pion
         reference_mass = _get_reference_mass_pion()
-    else:
-        raise ValueError(f"Unknown analysis type: {analysis_type}")
+        mass_power = _get_pion_mass_power()
 
-    logger.info(f"Mass power: {mass_power}, Reference mass: {reference_mass}")
-
-    # Group data
-    analyzer = DataFrameAnalyzer(mass_df)
-    logger.info(f"DataFrameAnalyzer created")
     logger.info(
-        f"Multivalued parameters: {analyzer.list_of_multivalued_tunable_parameter_names}"
-    )
-    logger.info(
-        f"Single-valued parameters: {analyzer.list_of_single_valued_tunable_parameter_names}"
+        f"Reference mass: {reference_mass}, power: {mass_power} "
+        f"(fitting mass^{mass_power} vs bare mass)"
     )
 
-    excluded_params = get_grouping_excluded_parameters()
-
-    # Filter exclusions to only existing parameters
-    available_params = analyzer.list_of_multivalued_tunable_parameter_names
-    filtered_exclusions = [p for p in excluded_params if p in available_params]
-
-    logger.info(f"Will exclude from grouping: {filtered_exclusions}")
-    logger.info(f"Grouping by remaining multivalued parameters...")
-
+    # Group data by parameters
     try:
-        grouped_data = analyzer.group_by_multivalued_tunable_parameters(
-            filter_out_parameters_list=filtered_exclusions
+        # Use DataFrameAnalyzer to detect grouping parameters
+        analyzer = DataFrameAnalyzer(mass_df)
+
+        # Get all multivalued parameters
+        all_grouping_params = analyzer.reduced_multivalued_tunable_parameter_names_list
+
+        # Manually exclude unwanted parameters
+        excluded = get_grouping_excluded_parameters()
+        grouping_params = [p for p in all_grouping_params if p not in excluded]
+
+        # Group by the filtered parameters
+        grouped_list = list(
+            mass_df.groupby(grouping_params, observed=True, dropna=False)
         )
-        # Convert generator to list to count groups
-        grouped_list = list(grouped_data)
-        logger.info(f"Created {len(grouped_list)} parameter groups")
+
+        logger.info(f"All multivalued params: {all_grouping_params}")
+        logger.info(f"Excluded params: {excluded}")
+        logger.info(f"Data grouped by: {grouping_params}")
+        logger.info(f"Found {len(grouped_list)} parameter groups")
 
         if len(grouped_list) == 0:
             logger.error(
-                "No groups created! Check if data has appropriate multivalued parameters."
+                "No groups found. Check if data has appropriate multivalued parameters."
             )
             return pd.DataFrame()
 
@@ -232,17 +288,32 @@ def convert_mass_to_bare_mass(
         logger.info(f"Processing mass group: {group_keys}")
         logger.info(f"Group has {len(group_df)} data points")
 
-        if len(group_df) < min_points:
+        # Apply fitting range filter for mass fit
+        mass_range = fit_range_config["mass_fit"]
+        filtered_df, (mass_fit_min, mass_fit_max) = filter_data_by_fit_range(
+            group_df,
+            column_mapping["bare_mass"],
+            mass_range["bare_mass_min"],
+            mass_range["bare_mass_max"],
+        )
+
+        if len(filtered_df) < min_points:
             logger.warning(
-                f"  ✗ Insufficient data: {len(group_df)} < {min_points}, skipping"
+                f"  ✗ Insufficient data after range filtering: "
+                f"{len(filtered_df)} < {min_points}, skipping"
             )
             continue
 
+        logger.info(
+            f"  Mass fit range: [{mass_fit_min:.6f}, {mass_fit_max:.6f}] "
+            f"({len(filtered_df)} points)"
+        )
+
         try:
-            # Perform fit
+            # Perform fit on filtered data
             logger.info(f"  Attempting fit for group...")
             fit_result = fit_mass_vs_bare_mass(
-                group_df,
+                filtered_df,
                 column_mapping,
                 mass_power,
                 logger,
@@ -253,7 +324,8 @@ def convert_mass_to_bare_mass(
                 continue
 
             logger.info(
-                f"  ✓ Fit successful: R²={fit_result['r_squared']:.3f}, χ²/dof={fit_result['chi2_reduced']:.3f}"
+                f"  ✓ Fit successful: R²={fit_result['r_squared']:.3f}, "
+                f"χ²/dof={fit_result['chi2_reduced']:.3f}"
             )
 
             # Invert fit to get bare mass
@@ -274,10 +346,15 @@ def convert_mass_to_bare_mass(
             # Build result dictionary
             result = _build_mass_conversion_result(
                 group_keys,
+                grouping_params,  # Pass the filtered grouping_params
                 analyzer,
                 derived_bare_mass,
                 fit_result,
             )
+
+            # Add mass fit range to result
+            result["mass_fit_range_min"] = mass_fit_min
+            result["mass_fit_range_max"] = mass_fit_max
 
             results.append(result)
             logger.info(f"  ✓ Group successfully processed")
@@ -448,14 +525,12 @@ def invert_mass_fit(
 
 def _build_mass_conversion_result(
     group_keys: Tuple,
+    grouping_params: List[str],
     analyzer: DataFrameAnalyzer,
     derived_bare_mass: gv.GVar,
     fit_result: Dict[str, Any],
 ) -> Dict[str, Any]:
     """Build result dictionary for mass conversion."""
-    # Get grouping parameter names
-    grouping_params = analyzer.reduced_multivalued_tunable_parameter_names_list
-
     # Create result with group parameters
     result = dict(zip(grouping_params, group_keys))
 
@@ -490,6 +565,7 @@ def extrapolate_computational_costs(
     cost_csv_path: str,
     derived_bare_mass_df: pd.DataFrame,
     analysis_type: str,
+    fit_range_config: Dict[str, Dict[str, Optional[float]]],
     logger,
 ) -> pd.DataFrame:
     """
@@ -549,6 +625,9 @@ def extrapolate_computational_costs(
 
         # Get group identifier for this mass row
         group_key = _build_group_key(mass_row, grouping_param_names, logger)
+        if group_key is None:
+            logger.warning(f"  Skipping row due to missing grouping parameters")
+            continue
         logger.info(f"Processing cost extrapolation for group: {group_key}")
 
         # Find matching cost group
@@ -578,6 +657,7 @@ def extrapolate_computational_costs(
         extrapolation_result = fit_and_extrapolate_cost(
             cost_group_df,
             derived_bare_mass,
+            fit_range_config["cost_fit"],  # Pass cost fit range
             logger,
         )
 
@@ -664,27 +744,45 @@ def load_and_average_cost_data(cost_csv_path: str, logger) -> pd.DataFrame:
 def fit_and_extrapolate_cost(
     cost_group_df: pd.DataFrame,
     derived_bare_mass: gv.GVar,
+    fit_range_config: Dict[str, Optional[float]],
     logger,
 ) -> Optional[Dict[str, Any]]:
     """
-    Fit shifted power law to cost data and extrapolate to derived bare
-    mass.
+    Fit cost vs bare mass and extrapolate to derived bare mass.
 
     Fit: cost = a / (bare_mass - b) + c
 
     Args:
         cost_group_df: Cost data for this group (multiple bare masses)
         derived_bare_mass: Target bare mass for extrapolation (with
-        uncertainty) logger: Logger instance
+        uncertainty) fit_range_config: Fitting range configuration for
+        cost fit logger: Logger instance
 
     Returns:
         Dictionary with extrapolation results or None if fit fails
     """
     try:
-        # Extract data
-        x_data = cost_group_df["Bare_mass"].to_numpy()
-        y_mean = cost_group_df["cost_mean"].to_numpy()
-        y_error = cost_group_df["cost_error"].to_numpy()
+        # Apply fitting range filter for cost fit
+        filtered_df, (cost_fit_min, cost_fit_max) = filter_data_by_fit_range(
+            cost_group_df,
+            "Bare_mass",
+            fit_range_config["bare_mass_min"],
+            fit_range_config["bare_mass_max"],
+        )
+
+        if len(filtered_df) == 0:
+            logger.warning("  No data points in specified cost fit range")
+            return None
+
+        logger.info(
+            f"  Cost fit range: [{cost_fit_min:.6f}, {cost_fit_max:.6f}] "
+            f"({len(filtered_df)} points)"
+        )
+
+        # Extract data from filtered DataFrame
+        x_data = filtered_df["Bare_mass"].to_numpy()
+        y_mean = filtered_df["cost_mean"].to_numpy()
+        y_error = filtered_df["cost_error"].to_numpy()
 
         logger.info(f"    Cost fitting data:")
         logger.info(f"      Bare mass range: [{x_data.min():.6f}, {x_data.max():.6f}]")
@@ -716,7 +814,6 @@ def fit_and_extrapolate_cost(
         logger.info(
             f"    Prior estimates: a≈{prior['a']}, b≈{prior['b']}, c≈{prior['c']}"
         )
-        logger.info(f"    Fitting shifted power law: cost = a/(bare_mass - b) + c")
 
         # Perform fit
         fit = lsqfit.nonlinear_fit(
@@ -725,48 +822,29 @@ def fit_and_extrapolate_cost(
             prior=prior,
         )
 
-        logger.info(f"    Fit converged:")
-        logger.info(f"      a = {fit.p['a']}")
-        logger.info(f"      b = {fit.p['b']}")
-        logger.info(f"      c = {fit.p['c']}")
+        logger.info(
+            f"    Fit converged: a={fit.p['a']}, b={fit.p['b']}, c={fit.p['c']}"
+        )
 
         # Calculate fit quality
         quality = _calculate_fit_quality(fit, x_data, y_data)
 
         logger.info(
-            f"    Fit quality: R²={quality['r_squared']:.3f}, χ²/dof={quality['chi2_reduced']:.3f}, Q={quality['q_value']:.3f}"
+            f"    Fit quality: R²={quality['r_squared']:.3f}, "
+            f"χ²/dof={quality['chi2_reduced']:.3f}, Q={quality['q_value']:.3f}"
         )
 
-        # Validate fit quality
-        fit_quality_config = get_fit_quality_config()
-        if quality["r_squared"] < fit_quality_config["min_r_squared"]:
-            logger.warning(
-                f"    ⚠ Low R²: {quality['r_squared']:.3f} < {fit_quality_config['min_r_squared']}"
-            )
-        if quality["q_value"] < fit_quality_config["min_q_value"]:
-            logger.warning(
-                f"    ⚠ Low Q-value: {quality['q_value']:.3f} < {fit_quality_config['min_q_value']}"
-            )
-
-        # Extrapolate to derived bare mass
-        logger.info(f"    Extrapolating to bare mass: {derived_bare_mass}")
-
-        # Check if derived bare mass is within reasonable range
+        # Check for physical validity of shift parameter
         bare_mass_value = float(gv.mean(derived_bare_mass))
         shift_value = float(gv.mean(fit.p["b"]))
 
-        if abs(bare_mass_value - shift_value) < 1e-6:
-            logger.error(
-                f"    ✗ Bare mass too close to singularity: {bare_mass_value} ≈ {shift_value}"
-            )
-            return None
-
-        if bare_mass_value < shift_value:
+        if bare_mass_value <= shift_value:
             logger.warning(
-                f"    ⚠ Bare mass {bare_mass_value} < shift {shift_value} (negative denominator)"
+                f"    ⚠ Bare mass {bare_mass_value} <= shift {shift_value}, "
+                f"extrapolation may be unreliable"
             )
 
-        # Evaluate fit at derived bare mass
+        # Extrapolate to derived bare mass
         extrapolated_cost = shifted_power_law(derived_bare_mass, fit.p)
 
         logger.info(f"    Extrapolated cost: {extrapolated_cost} core-hours")
@@ -784,6 +862,8 @@ def fit_and_extrapolate_cost(
             "cost_fit_r_squared": quality["r_squared"],
             "cost_fit_chi2_reduced": quality["chi2_reduced"],
             "cost_fit_q_value": quality["q_value"],
+            "cost_fit_range_min": cost_fit_min,
+            "cost_fit_range_max": cost_fit_max,
             "n_configurations": int(cost_group_df["n_configurations"].sum()),
         }
 
@@ -846,33 +926,32 @@ def _group_cost_data_by_parameters(
     return grouped_dict, grouping_param_names
 
 
-def _build_group_key(row: pd.Series, grouping_param_names: List[str], logger) -> Tuple:
+def _build_group_key(
+    mass_row: pd.Series,
+    grouping_param_names: List[str],
+    logger,
+) -> Tuple | None:
     """
-    Build a hashable group key from a row using specified parameter
-    names.
+    Build group key tuple from mass results row.
 
     Args:
-        row: Data row (from mass results DataFrame)
-        grouping_param_names: List of parameter names to use for
-        grouping
+        mass_row: Row from derived_bare_mass_df
+        grouping_param_names: List of grouping parameter names in correct order
+        logger: Logger instance
 
     Returns:
-        Tuple of parameter values for this group
+        Tuple of parameter values in the same order as grouping_param_names
     """
     key_values = []
 
     for param in grouping_param_names:
-        if param in row.index:
-            value = row[param]
-            # Convert numpy types to Python types for hashing
-            if hasattr(value, "item"):
-                value = value.item()
-            key_values.append(value)
+        if param in mass_row.index:
+            key_values.append(mass_row[param])
         else:
-            # If parameter not in row, cannot build valid key This
-            # shouldn't happen if data is consistent
-            logger.warning(f"Parameter '{param}' not found in mass row, using None")
-            key_values.append(None)
+            logger.warning(
+                f"Parameter '{param}' not found in mass row, skipping this group"
+            )
+            return None
 
     return tuple(key_values)
 

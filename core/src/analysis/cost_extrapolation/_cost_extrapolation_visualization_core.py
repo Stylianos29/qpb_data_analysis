@@ -520,10 +520,15 @@ def create_mass_fit_plot(
     else:
         y_label_fit = "am_{\\mathrm{PCAC}}"
 
+    # Add fitting range markers from results
+    mass_fit_min = results_row.get("mass_fit_range_min", x_data.min())
+    mass_fit_max = results_row.get("mass_fit_range_max", x_data.max())
+    _add_fitting_range_markers(ax, mass_fit_min, mass_fit_max)
+
     # Create detailed fit label
     fit_label = (
         f"$\\mathbf{{Linear\\ fit:}}$\n"
-        f"  • Fitting range: $m$ ∈ [{x_data.min():.2f}, {x_data.max():.2f}]\n"
+        f"  • Fitting range: $m$ ∈ [{mass_fit_min:.2f}, {mass_fit_max:.2f}]\n"
         f"  • ${y_label_fit}$ = {slope:.4f}$m$ + {intercept:.5f}\n"
         f"  • χ²/dof = {chi2_reduced:.3f}\n"
         f"  • R² = {r_squared:.4f}\n"
@@ -575,9 +580,6 @@ def create_mass_fit_plot(
 
     # Add sample count annotations
     _add_sample_count_annotations(ax, x_data, y_data, mass_df, analysis_type)
-
-    # Add fitting range markers
-    _add_fitting_range_markers(ax, x_data.min(), x_data.max())
 
     # Add reference axes at origin
     _add_reference_axes(ax)
@@ -710,10 +712,15 @@ def create_cost_fit_plot(
     x_fit = x_fit[np.abs(x_fit - b) > 1e-6]
     y_fit = a / (x_fit - b) + c
 
+    # Add fitting range markers from results
+    cost_fit_min = results_row.get("cost_fit_range_min", x_data.min())
+    cost_fit_max = results_row.get("cost_fit_range_max", x_data.max())
+    _add_fitting_range_markers(ax, cost_fit_min, cost_fit_max)
+
     # Create detailed fit label
     fit_label = (
         f"$\\mathbf{{Shifted\\ power\\ law:}}$\n"
-        f"  • Fitting range: $m$ ∈ [{x_data.min():.2f}, {x_data.max():.2f}]\n"
+        f"  • Fitting range: $m$ ∈ [{cost_fit_min:.2f}, {cost_fit_max:.2f}]\n"
         f"  • Cost = {a:.2f}/($m$ - {b:.5f}) + {c:.2f}\n"
         f"  • χ²/dof = {chi2_reduced:.3f}\n"
         f"  • R² = {r_squared:.4f}\n"
@@ -772,22 +779,6 @@ def create_cost_fit_plot(
         alpha=extrap_lines["alpha"],
     )
 
-    # # Add sample count annotations (using mass data) Note: We need to
-    # # match cost x_data with mass data bare mass values to get correct
-    # # annotations for the cost plot points
-    # mass_col_mapping =
-    # get_mass_data_column_mapping(analysis_type=analysis_type)
-    # mass_bare_mass = mass_df[mass_col_mapping["bare_mass"]].values
-
-    # # Create mapping from bare mass to cost for annotation positioning
-    # # Only annotate points that exist in both datasets
-    # for cost_x, cost_y in zip(x_data, y_data): # Find matching bare
-    #     mass in mass_df (with tolerance for # floating point) mass_idx
-    #     = np.where(np.abs(mass_bare_mass - cost_x) < 1e-10)[0] if
-    #     len(mass_idx) > 0: # Use the first matched index for
-    #     annotation _add_sample_count_annotations( ax, [cost_x],
-    #         [cost_y], mass_df.iloc[mass_idx[0:1]], analysis_type )
-
     # Add sample count annotations (using mass data) Match by bare mass
     # values
     mass_col_mapping = get_mass_data_column_mapping(analysis_type=analysis_type)
@@ -802,9 +793,6 @@ def create_cost_fit_plot(
             _add_sample_count_annotations(
                 ax, [cost_x], [cost_y], mass_matches.iloc[0:1], analysis_type
             )
-
-    # Add fitting range markers
-    _add_fitting_range_markers(ax, x_data.min(), x_data.max())
 
     # Add reference axes at origin
     _add_reference_axes(ax)

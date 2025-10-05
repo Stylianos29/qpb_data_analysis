@@ -56,6 +56,21 @@ COST_DATA_COLUMNS = [
     "Average_core_hours_per_spinor",
 ]
 
+# =============================================================================
+# FITTING RANGE CONFIGURATION
+# =============================================================================
+
+# Fitting range configuration for mass and cost fits
+FIT_RANGE_CONFIG = {
+    "mass_fit": {
+        "bare_mass_min": 0.005,  # None = use actual data minimum
+        "bare_mass_max": 0.055,  # None = use actual data maximum
+    },
+    "cost_fit": {
+        "bare_mass_min": 0.005,  # None = use actual data minimum
+        "bare_mass_max": 0.055,  # None = use actual data maximum
+    },
+}
 
 # =============================================================================
 # PION-SPECIFIC VALIDATION
@@ -114,6 +129,14 @@ def get_cost_data_columns() -> List[str]:
     return COST_DATA_COLUMNS.copy()
 
 
+def get_fit_range_config() -> Dict[str, Dict[str, float | None]]:
+    """Get fitting range configuration."""
+    return {
+        "mass_fit": FIT_RANGE_CONFIG["mass_fit"].copy(),
+        "cost_fit": FIT_RANGE_CONFIG["cost_fit"].copy(),
+    }
+
+
 def get_pion_validation_config() -> Dict[str, Any]:
     """Get pion-specific validation configuration."""
     return PION_VALIDATION.copy()
@@ -154,6 +177,18 @@ def validate_pion_cost_config():
     # Validate pion fit configuration
     if PION_FIT_CONFIG["fit_function"] != "linear":
         raise ValueError("Pion fit function must be 'linear'")
+
+    # Validate fitting range configuration
+    for fit_type in ["mass_fit", "cost_fit"]:
+        range_min = FIT_RANGE_CONFIG[fit_type]["bare_mass_min"]
+        range_max = FIT_RANGE_CONFIG[fit_type]["bare_mass_max"]
+
+        if range_min is not None and range_max is not None:
+            if range_min >= range_max:
+                raise ValueError(
+                    f"{fit_type}: bare_mass_min ({range_min}) must be "
+                    f"less than bare_mass_max ({range_max})"
+                )
 
     # Validate pion validation settings
     if PION_VALIDATION["min_pion_mass"] <= 0:

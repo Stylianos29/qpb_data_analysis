@@ -6,7 +6,7 @@ the intermediate physics observable. Uses linear fit for PCAC mass vs
 bare mass relationship.
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from src.analysis.cost_extrapolation._cost_extrapolation_shared_config import (
     validate_shared_cost_config,
@@ -53,6 +53,21 @@ COST_DATA_COLUMNS = [
     "Average_core_hours_per_spinor",
 ]
 
+# =============================================================================
+# FITTING RANGE CONFIGURATION
+# =============================================================================
+
+# Fitting range configuration for mass and cost fits
+FIT_RANGE_CONFIG = {
+    "mass_fit": {
+        "bare_mass_min": 0.005,  # None = use actual data minimum
+        "bare_mass_max": 0.055,  # None = use actual data maximum
+    },
+    "cost_fit": {
+        "bare_mass_min": 0.005,  # None = use actual data minimum
+        "bare_mass_max": 0.055,  # None = use actual data maximum
+    },
+}
 
 # =============================================================================
 # PCAC-SPECIFIC VALIDATION
@@ -106,6 +121,14 @@ def get_cost_data_columns() -> List[str]:
     return COST_DATA_COLUMNS.copy()
 
 
+def get_fit_range_config() -> Dict[str, Dict[str, float | None]]:
+    """Get fitting range configuration."""
+    return {
+        "mass_fit": FIT_RANGE_CONFIG["mass_fit"].copy(),
+        "cost_fit": FIT_RANGE_CONFIG["cost_fit"].copy(),
+    }
+
+
 def get_pcac_validation_config() -> Dict[str, Any]:
     """Get PCAC-specific validation configuration."""
     return PCAC_VALIDATION.copy()
@@ -130,6 +153,9 @@ def validate_pcac_cost_config():
     if not isinstance(REFERENCE_PCAC_MASS, (int, float)):
         raise ValueError("REFERENCE_PCAC_MASS must be numeric")
 
+    if REFERENCE_PCAC_MASS <= 0:
+        raise ValueError("REFERENCE_PCAC_MASS must be positive")
+
     # Validate column mapping
     required_mappings = ["bare_mass", "mass_mean", "mass_error"]
     for key in required_mappings:
@@ -140,6 +166,14 @@ def validate_pcac_cost_config():
     if PCAC_FIT_CONFIG["fit_function"] != "linear":
         raise ValueError("PCAC fit function must be 'linear'")
 
-    # Validate PCAC validation settings
-    if PCAC_VALIDATION["max_pcac_magnitude"] <= 0:
-        raise ValueError("max_pcac_magnitude must be positive")
+    # Validate fitting range configuration
+    for fit_type in ["mass_fit", "cost_fit"]:
+        range_min = FIT_RANGE_CONFIG[fit_type]["bare_mass_min"]
+        range_max = FIT_RANGE_CONFIG[fit_type]["bare_mass_max"]
+
+        if range_min is not None and range_max is not None:
+            if range_min >= range_max:
+                raise ValueError(
+                    f"{fit_type}: bare_mass_min ({range_min}) must be "
+                    f"less than bare_mass_max ({range_max})"
+                )
