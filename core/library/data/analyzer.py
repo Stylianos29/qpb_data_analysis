@@ -601,13 +601,21 @@ class DataFrameAnalyzer(_DataFrameInspector):
     def restrict_dataframe(self, condition=None, filter_func=None):
         """Deprecated: Use restrict_data() instead."""
         import warnings
-        warnings.warn("restrict_dataframe() is deprecated. Use restrict_data() instead.", 
-                    DeprecationWarning, stacklevel=2)
+
+        warnings.warn(
+            "restrict_dataframe() is deprecated. Use restrict_data() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self.restrict_data(condition=condition, filter_func=filter_func)
 
     def restore_original_dataframe(self):
         """Deprecated: Use restore_original_data() instead."""
         import warnings
-        warnings.warn("restore_original_dataframe() is deprecated. Use restore_original_data() instead.", 
-                    DeprecationWarning, stacklevel=2)
+
+        warnings.warn(
+            "restore_original_dataframe() is deprecated. Use restore_original_data() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self.restore_original_data()
