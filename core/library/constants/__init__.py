@@ -1,8 +1,23 @@
 """
-Constants package for the QPB data analysis library.
+Constants Package
+================
 
-This package organizes constants into thematic modules while maintaining
-backward compatibility by exposing all constants at the package level.
+Central repository for all constants used throughout the QPB data
+analysis library.
+
+This package organizes constants into thematic modules for better
+maintainability:
+    - **paths**: File system paths and directory structures
+    - **patterns**: Regular expressions for data extraction
+    - **data_types**: Type mappings and converters
+    - **labels**: UI labels and display strings
+    - **visualization**: Plot styling constants
+    - **domain**: QPB-specific parameter definitions
+
+All constants are exposed at the package level for backward
+compatibility, allowing both:
+    >>> from library.constants import ROOT
+    >>> from library.constants.paths import ROOT
 """
 
 # Import all constants from submodules
@@ -13,7 +28,7 @@ from .labels import *
 from .visualization import *
 from .domain import *
 
-# Define what gets exported when someone does "from library.constants import *"
+# Define explicit exports for clarity
 __all__ = [
     # Paths
     "ROOT",

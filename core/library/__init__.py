@@ -2,57 +2,120 @@
 QPB Data Analysis Library
 ========================
 
-A comprehensive toolkit for processing, analyzing, and visualizing qpb data
+A comprehensive toolkit for processing, analyzing, and visualizing
+quantum physics data from the QPB (Quantum Physics Benchmark) project.
 
-Main Components:
----------------
-- Data Analysis: Tools for manipulating and analyzing pandas DataFrames
-- Visualization: Plotting utilities for data visualization
-- I/O: Utilities for handling various file formats and filesystem operations
-TODO: Update docustring
+This library provides modular components for:
 
-For more information, see the documentation at: docs/api
+Data Processing
+--------------
+    - **DataFrameAnalyzer**: Advanced pandas DataFrame analysis with
+      automatic parameter categorization
+    - **HDF5Analyzer**: Specialized HDF5 file handling with gvar support
+    - **TableGenerator**: Formatted table creation for reports
+    - **load_csv**: Robust CSV loading with validation and type
+      conversion
+
+Visualization
+------------
+    - **DataPlotter**: Comprehensive plotting interface for grouped data
+    - **HDF5Plotter**: Direct plotting from HDF5 files
+
+Validation & I/O
+----------------
+    - File and directory validation utilities
+    - Click-based CLI validators for robust command-line interfaces
+    - Filesystem checking and path validation
+
+Utilities
+---------
+    - **QPBLogger**: Specialized logging system for QPB workflows
+    - **LoggingWrapper**: Flexible logging configuration
+
+Constants
+--------
+    - Project-wide constants for paths, patterns, and configurations
+    - Domain-specific parameter definitions
+
+Examples
+--------
+Basic data analysis workflow:
+
+    >>> from library import load_csv, DataFrameAnalyzer, DataPlotter
+    >>> 
+    >>> # Load and analyze data
+    >>> df = load_csv('experiment_data.csv')
+    >>> analyzer = DataFrameAnalyzer(df)
+    >>> 
+    >>> # Visualize results
+    >>> plotter = DataPlotter(df, output_dir='plots/')
+    >>> plotter.plot_grouped_data('parameter', 'measurement')
+
+HDF5 workflow:
+
+    >>> from library import HDF5Analyzer, HDF5Plotter
+    >>> 
+    >>> # Analyze HDF5 structure
+    >>> h5_analyzer = HDF5Analyzer('data.h5')
+    >>> print(h5_analyzer.list_of_output_quantity_names_from_hdf5)
+    >>> 
+    >>> # Plot directly from HDF5
+    >>> h5_plotter = HDF5Plotter('data.h5', output_dir='plots/')
+
+For detailed documentation, see: docs/api/
 """
 
-# Import from data module
-from .data import DataFrameAnalyzer, TableGenerator, HDF5Analyzer, load_csv
+# ============================================================================
+# IMPORTS - Organized by category
+# ============================================================================
 
-# Import from visualization module
-from .visualization import DataPlotter, HDF5Plotter
-
-# Import constants
-from .constants import ROOT, RAW_DATA_FILES_DIRECTORY, PROCESSED_DATA_FILES_DIRECTORY
-
-# Import input validation functions
-from .filesystem_utilities import (
-    validate_file,
-    # validate_output_directory,
-    # validate_input_directory,
-    validate_input_script_log_filename,
-    # is_valid_file,
-    # is_valid_directory
+# Data Processing Components
+from .data import (
+    DataFrameAnalyzer,
+    HDF5Analyzer,
+    TableGenerator,
+    load_csv,
 )
 
-# Import
-from .data_files_checks import get_yes_or_no_user_response
+# Visualization Components
+from .visualization import (
+    DataPlotter,
+    HDF5Plotter,
+)
 
-# Import
-from .specialized import generate_config_labels
+# Core Constants
+from .constants import (
+    ROOT,
+    RAW_DATA_FILES_DIRECTORY,
+    PROCESSED_DATA_FILES_DIRECTORY,
+)
 
+# Validation Utilities
 from .validation import (
+    # Click validators for CLI
     validate_input_directory,
     validate_output_directory,
     validate_input_file,
     validate_output_file,
 )
 
-# Import 
-from .validation.filesystem import is_valid_directory, is_valid_file
+# Filesystem validation utilities
+from .validation.filesystem import (
+    is_valid_directory,
+    is_valid_file,
+)
 
-from .utils import LoggingWrapper, QPBLogger
+# Logging Utilities
+from .utils import (
+    LoggingWrapper,
+    QPBLogger,
+)
 
 
-# Define public API
+# ============================================================================
+# PUBLIC API
+# ============================================================================
+
 __all__ = [
     # Data components
     "DataFrameAnalyzer",
@@ -62,28 +125,26 @@ __all__ = [
     # Visualization components
     "DataPlotter",
     "HDF5Plotter",
-    # Important constants
+    # Core constants
     "ROOT",
     "RAW_DATA_FILES_DIRECTORY",
     "PROCESSED_DATA_FILES_DIRECTORY",
-    # Input validation functions
-    "validate_input_directory",
-    "validate_file",
-    "validate_output_directory",
-    "validate_input_script_log_filename",
-    # Filesystem validation utilities
-    "is_valid_file",
-    "is_valid_directory",
-    # User input
-    "get_yes_or_no_user_response",
-    # Specialized functions
-    "generate_config_labels",
-    # Click Validators
+    # Validation functions
     "validate_input_directory",
     "validate_output_directory",
     "validate_input_file",
     "validate_output_file",
+    "is_valid_directory",
+    "is_valid_file",
     # Logging system
     "LoggingWrapper",
     "QPBLogger",
 ]
+
+# ============================================================================
+# VERSION INFORMATION
+# ============================================================================
+
+__version__ = "0.1.0"
+__author__ = "Stylianos Gregoriou"
+__email__ = "s.gregoriou@cyi.ac.cy"
