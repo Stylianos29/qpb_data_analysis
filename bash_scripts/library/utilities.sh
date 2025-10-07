@@ -9,7 +9,7 @@ UTILITIES_SH_INCLUDED=1
 
 # CUSTOM FUNCTIONS DEFINITIONS
 
-check_if_directory_exists() {
+function check_if_directory_exists() {
     # Function to check if a directory exists with additional options.
     # Supports:
     #   -s|--silent : Suppress all output
@@ -94,7 +94,7 @@ check_if_directory_exists() {
 }
 
 
-check_if_file_exists() {
+function check_if_file_exists() {
     # Function to check if a given file is a regular file.
     # Supports -s (silent) and -c (create) flags in any order.
 
@@ -147,7 +147,7 @@ check_if_file_exists() {
 }
 
 
-check_directory_exists() {
+function check_directory_exists() {
     # Function to check if directory exists
     
     local directory="$1"
@@ -159,7 +159,7 @@ check_directory_exists() {
 }
 
 
-replace_parent_directory() {
+function replace_parent_directory() {
     # Function to replace the parent directory of a subdirectory with a new
     # parent directory
     # 
@@ -201,7 +201,7 @@ log()
 }
 
 
-set_script_termination_message() {
+function set_script_termination_message() {
     # Accepts a variable name as an argument
     local -n termination_message_ref="$1"
     
@@ -217,7 +217,7 @@ set_script_termination_message() {
 }
 
 
-termination_output() {
+function termination_output() {
     local error_message="$1"
     local script_termination_message="$2"
     set_script_termination_message script_termination_message
@@ -232,7 +232,7 @@ termination_output() {
 }
 
 
-failed_python_script() {
+function failed_python_script() {
     local python_script_path="$1"
 
     error_message="!! Executing '$(basename $python_script_path)' failed!"

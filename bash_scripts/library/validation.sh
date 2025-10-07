@@ -9,7 +9,7 @@ VALIDATION_SH_INCLUDED=1
 
 # CUSTOM FUNCTIONS DEFINITIONS
 
-get_timestamp_file_path() {
+function get_timestamp_file_path() {
     
     local DATA_FILES_SET_DIRECTORY="$1"
     local TIMESTAMP_DIRECTORY="$2"
@@ -32,7 +32,7 @@ get_timestamp_file_path() {
     echo "$TIMESTAMP_FILE"
 }
 
-check_directory_for_changes() {
+function check_directory_for_changes() {
 
     local DATA_FILES_SET_DIRECTORY="$1"
     local TIMESTAMP_FILE="$2"
@@ -64,7 +64,7 @@ check_directory_for_changes() {
 }
 
 
-update_timestamp() {
+function update_timestamp() {
     # TODO: description
 
     local DATA_FILES_SET_DIRECTORY="$1"
@@ -88,7 +88,7 @@ update_timestamp() {
 
 
 
-find_matching_qpb_log_files() {
+function find_matching_qpb_log_files() {
     # Function to find qpb log files matching specific patterns
     # Parameters: 
     #   $1: Name of the array containing paths to qpb log files
