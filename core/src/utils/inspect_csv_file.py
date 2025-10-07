@@ -72,8 +72,9 @@ import os
 import pandas as pd
 import click
 
+from library.filesystem_utilities import validate_file
+
 from library import (
-    validate_file,
     validate_output_directory,
     load_csv,
     DataFrameAnalyzer,
@@ -442,7 +443,7 @@ def main(
 
                 output = io.StringIO()
                 with redirect_stdout(output):
-                    analyzer.unique_values(show_unique_values_for, print_output=True)
+                    print(analyzer.unique_values(show_unique_values_for))
 
                 write_content(output.getvalue())
             except Exception as e:
