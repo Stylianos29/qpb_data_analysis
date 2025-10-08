@@ -29,68 +29,21 @@
 # USAGE:
 #   ./run_complete_pipeline.sh -i <raw_data_set_dir> [options]
 #
-# REQUIRED ARGUMENTS:
-#   -i, --input_directory       Path to raw data file set directory
-#                               (must contain .txt log files)
-#
-# OPTIONAL ARGUMENTS:
-#   -o, --output_directory      Output directory for processed data
-#                               (default: mirrors raw path in processed/)
-#   -log_dir, --log_directory   Directory for log files
-#                               (default: output directory)
-#   -viz, --enable_visualization Enable visualization in processing stage
-#   --skip_checks               Skip intermediate file validation
-#   --skip_summaries            Skip generation of summary files
-#   -h, --help                  Display this help message
-#
-# EXAMPLES:
-#   # Basic usage - auto-detects output location
-#   ./run_complete_pipeline.sh \
-#       -i ../data_files/raw/invert/Chebyshev_experiment/
-#
-#   # Custom output location
-#   ./run_complete_pipeline.sh \
-#       -i ../data_files/raw/experiment1/ \
-#       -o ../data_files/processed/experiment1/
-#
-#   # With visualization enabled
-#   ./run_complete_pipeline.sh \
-#       -i raw_data/ \
-#       -viz
-#
-#   # Skip validation for faster execution
-#   ./run_complete_pipeline.sh \
-#       -i raw_data/ \
-#       --skip_checks --skip_summaries
-#
-# DEPENDENCIES:
-# - Workflow scripts: run_parsing_pipeline.sh, run_processing_pipeline.sh
-# - Library scripts in bash_scripts/library/
-# - Python scripts in core/src/parsing/ and core/src/processing/
-#
-# OUTPUT STRUCTURE:
-# output_directory/
-# ├── single_valued_parameters.csv
-# ├── multivalued_parameters.h5
-# ├── correlators_raw_data.h5          (if correlators present)
-# ├── processed_parameter_values.csv   (if correlators present)
-# ├── correlators_jackknife_analysis.h5 (if correlators present)
-# ├── jackknife_plots/                 (if visualization enabled)
-# └── logs/
-#     ├── run_parsing_pipeline.log
-#     ├── run_processing_pipeline.log
-#     └── run_complete_pipeline.log
+# For detailed usage information, run with -h or --help
 #
 ################################################################################
 
 # =============================================================================
-# ENVIRONMENT SETUP
+# SECTION 1: BASIC PATH SETUP (Minimal, no side effects)
 # =============================================================================
 
-# Determine script paths
 SCRIPT_PATH="$(realpath "$0")"
 SCRIPT_NAME="$(basename "$SCRIPT_PATH")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+
+# =============================================================================
+# SECTION 2: LIBRARY PATH SETUP AND SOURCING
+# =============================================================================
 
 # Setup library path
 if [[ -z "$LIBRARY_SCRIPTS_DIRECTORY_PATH" ]]; then
@@ -109,7 +62,7 @@ for library_script in "${LIBRARY_SCRIPTS_DIRECTORY_PATH}"/*.sh; do
 done
 
 # =============================================================================
-# CONFIGURATION AND CONSTANTS
+# SECTION 3: CONSTANTS AND CONFIGURATION
 # =============================================================================
 
 # Workflow scripts directory
@@ -128,11 +81,13 @@ PROCESSING_PIPELINE_SCRIPT="${WORKFLOWS_DIR}/run_processing_pipeline.sh"
 # Script log filename
 SCRIPT_LOG_FILENAME="${SCRIPT_NAME%.sh}.log"
 
-# Export termination message for logging utilities
-export SCRIPT_TERMINATION_MESSAGE="\n\t\t$(echo "$SCRIPT_NAME" | tr '[:lower:]' '[:upper:]') EXECUTION TERMINATED"
+# Expected output filenames from parsing stage
+PARSED_CSV_FILENAME="single_valued_parameters.csv"
+PARSED_HDF5_LOG_FILENAME="multivalued_parameters.h5"
+PARSED_HDF5_CORR_FILENAME="correlators_raw_data.h5"
 
 # =============================================================================
-# UTILITY FUNCTIONS
+# SECTION 4: FUNCTION DEFINITIONS
 # =============================================================================
 
 function usage() {
@@ -156,6 +111,8 @@ EXAMPLES:
   $SCRIPT_NAME -i raw_data/ -viz --skip_checks
 
 EOF
+    # Clear any exit handlers before exiting
+    trap - EXIT
     exit 0
 }
 
@@ -172,398 +129,358 @@ function detect_correlator_files() {
     local input_directory="$1"
     
     if find "$input_directory" -maxdepth 1 -type f -name "*.dat" -print -quit | grep -q .; then
-        return 0  # Found correlators
+        return 0
     else
-        return 1  # No correlators
+        return 1
     fi
 }
 
 function validate_prerequisites() {
-    local input_dir="$1"
-    
-    log_info "Validating prerequisites..."
-    
-    # Check for .txt log files (required)
-    local txt_count=$(find "$input_dir" -maxdepth 1 -type f -name "*.txt" | wc -l)
-    if [[ $txt_count -eq 0 ]]; then
-        log_error "No .txt log files found in input directory"
-        echo "ERROR: No .txt log files found in: $input_dir" >&2
-        return 1
-    fi
-    log_info "Found $txt_count .txt log file(s)"
-    
-    # Check for .dat correlator files (optional, informational)
-    local dat_count=$(find "$input_dir" -maxdepth 1 -type f -name "*.dat" | wc -l)
-    if [[ $dat_count -gt 0 ]]; then
-        log_info "Found $dat_count .dat correlator file(s)"
-        echo "  → Correlator data detected - full pipeline will execute"
-    else
-        log_info "No .dat files found"
-        echo "  → No correlator data - pipeline will stop after parsing stage"
-    fi
-    
-    # Validate workflow scripts exist
-    if [[ ! -f "$PARSING_PIPELINE_SCRIPT" ]]; then
-        log_error "Workflow script not found: $PARSING_PIPELINE_SCRIPT"
-        echo "ERROR: run_parsing_pipeline.sh not found" >&2
-        return 1
-    fi
-    
-    if [[ ! -f "$PROCESSING_PIPELINE_SCRIPT" ]]; then
-        log_error "Workflow script not found: $PROCESSING_PIPELINE_SCRIPT"
-        echo "ERROR: run_processing_pipeline.sh not found" >&2
-        return 1
-    fi
-    
-    log_info "All prerequisites validated successfully"
-    echo "All prerequisites validated successfully"
-    return 0
-}
-
-function check_stage_outputs() {
-    # Check if required outputs from a stage exist
+    # Validate that required workflow scripts exist
     #
     # Arguments:
-    #   $1 - stage_name    : Name of stage for error messages
-    #   $@ - file_paths... : Paths to files that should exist
+    #   $1 - input_directory : Directory to validate (for file checks)
+    #
+    # Returns:
+    #   0 - All prerequisites valid
+    #   1 - Validation failed
     
-    local stage_name="$1"
-    shift
-    local files=("$@")
+    local input_directory="$1"
     
-    for file_path in "${files[@]}"; do
-        if [[ ! -f "$file_path" ]]; then
-            log_error "$stage_name did not produce expected output: $file_path"
-            echo "ERROR: $stage_name failed - missing output: $(basename "$file_path")" >&2
-            return 1
-        fi
-    done
+    # Check for .txt log files (required)
+    if ! find "$input_directory" -maxdepth 1 -type f -name "*.txt" -print -quit | grep -q .; then
+        echo "ERROR: No .txt log files found in $input_directory" >&2
+        log_error "No .txt log files found in input directory"
+        return 1
+    fi
     
+    # Validate parsing pipeline script exists
+    if [[ ! -f "$PARSING_PIPELINE_SCRIPT" ]]; then
+        echo "ERROR: Parsing pipeline script not found: $PARSING_PIPELINE_SCRIPT" >&2
+        log_error "Missing parsing pipeline script"
+        return 1
+    fi
+    
+    # Validate processing pipeline script exists
+    if [[ ! -f "$PROCESSING_PIPELINE_SCRIPT" ]]; then
+        echo "ERROR: Processing pipeline script not found: $PROCESSING_PIPELINE_SCRIPT" >&2
+        log_error "Missing processing pipeline script"
+        return 1
+    fi
+    
+    echo "✓ All prerequisites validated"
+    log_info "Prerequisites validation completed successfully"
     return 0
 }
 
-function cleanup() {
-    # Cleanup function called on exit via trap
-    log_info "Cleanup completed"
-}
-
-# =============================================================================
-# MAIN FUNCTION
-# =============================================================================
-
-function main() {
-    # Parse command line arguments
-    local input_directory=""
-    local output_directory=""
-    local log_directory=""
-    local enable_visualization=false
-    local skip_checks=false
-    local skip_summaries=false
-    
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            -i|--input_directory)
-                input_directory="$2"
-                shift 2
-                ;;
-            -o|--output_directory)
-                output_directory="$2"
-                shift 2
-                ;;
-            -log_dir|--log_directory)
-                log_directory="$2"
-                shift 2
-                ;;
-            -viz|--enable_visualization)
-                enable_visualization=true
-                shift
-                ;;
-            --skip_checks)
-                skip_checks=true
-                shift
-                ;;
-            --skip_summaries)
-                skip_summaries=true
-                shift
-                ;;
-            -h|--help)
-                usage
-                ;;
-            *)
-                echo "ERROR: Unknown argument '$1'" >&2
-                usage
-                ;;
-        esac
-    done
-    
-    # Validate required arguments
-    if [[ -z "$input_directory" ]]; then
-        echo "ERROR: Input directory not specified. Use -i <directory>" >&2
-        usage
-    fi
-    
-    # Validate input directory exists using validation helper
-    validate_input_directory "$input_directory" || return 1
-    
-    # Convert to absolute path
-    input_directory="$(realpath "$input_directory")"
-    local input_dir_name="$(basename "$input_directory")"
-    
-    # Set default output directory if not specified
-    # Mirror the raw data structure in processed/
-    if [[ -z "$output_directory" ]]; then
-        # Try to replace 'raw' with 'processed' in path
-        if [[ "$input_directory" == *"/data_files/raw/"* ]]; then
-            output_directory="${input_directory/\/raw\//\/processed\/}"
-            echo "INFO: Auto-detected output directory: $output_directory"
-        else
-            # Fallback: use input directory
-            output_directory="$input_directory"
-            echo "INFO: Using input directory as output directory"
-        fi
-    fi
-    
-    # Ensure output directory exists using validation helper
-    validate_output_directory "$output_directory" -c || return 1
-    output_directory="$(realpath "$output_directory")"
-    
-    # Set default log directory to output directory if not specified
-    if [[ -z "$log_directory" ]]; then
-        log_directory="$output_directory"
-    fi
-    
-    # Ensure log directory exists using validation helper
-    validate_log_directory "$log_directory" || return 1
-    log_directory="$(realpath "$log_directory")"
-    
-    # Initialize logging using init_logging helper
-    local log_file="${log_directory}/${SCRIPT_LOG_FILENAME}"
-    init_logging "$log_file" -c || return 1
-    
-    log_info "=== COMPLETE PIPELINE EXECUTION ==="
-    log_info "Script: $SCRIPT_NAME"
-    log_info "Data file set: $input_dir_name"
-    log_info "Input directory: $input_directory"
-    log_info "Output directory: $output_directory"
-    log_info "Log directory: $log_directory"
-    log_info "Visualization: $enable_visualization"
-    
-    # Display banner
-    echo ""
-    echo "==================================================================="
-    echo "   QPB DATA ANALYSIS - COMPLETE PIPELINE"
-    echo "==================================================================="
-    echo "Data file set: $input_dir_name"
-    echo "Input:  $input_directory"
-    echo "Output: $output_directory"
-    echo "==================================================================="
-    
-    # Validate prerequisites
-    echo ""
-    echo "=== VALIDATING PREREQUISITES ==="
-    validate_prerequisites "$input_directory" || return 1
-    
-    # Detect if data set has correlator files
-    local has_correlators=false
-    if detect_correlator_files "$input_directory"; then
-        has_correlators=true
-        log_info "Correlator files detected - full pipeline will execute"
-    else
-        log_info "No correlator files detected - pipeline will stop after parsing"
-    fi
-    
-    # =========================================================================
-    # STAGE 1: PARSING
-    # =========================================================================
+function run_parsing_stage() {
+    # Execute Stage 1: Parsing pipeline
+    #
+    # Returns:
+    #   0 - Success
+    #   1 - Failure
     
     echo ""
     echo "==================================================================="
     echo "   STAGE 1: PARSING"
     echo "==================================================================="
-    log_info "Starting Stage 1: Parsing"
+    echo "Parsing .txt log files and .dat correlator files (if present)..."
     
-    # Build arguments for parsing pipeline
-    local parsing_args=(
-        "-i" "$input_directory"
-        "-o" "$output_directory"
-        "-log_dir" "$log_directory"
-    )
+    log_info "=== STAGE 1: PARSING STAGE ==="
+    log_info "Executing parsing pipeline script"
     
-    # Add optional flags
-    $skip_checks && parsing_args+=("--skip_checks")
-    $skip_summaries && parsing_args+=("--skip_summaries")
+    # Build parsing command
+    local parsing_cmd="$PARSING_PIPELINE_SCRIPT"
+    parsing_cmd+=" -i \"$input_directory\""
+    parsing_cmd+=" -o \"$output_directory\""
+    parsing_cmd+=" -log_dir \"$log_directory\""
+    
+    if $skip_checks; then
+        parsing_cmd+=" --skip_checks"
+    fi
+    
+    if $skip_summaries; then
+        parsing_cmd+=" --skip_summaries"
+    fi
+    
+    log_info "Command: $parsing_cmd"
     
     # Execute parsing pipeline
-    "$PARSING_PIPELINE_SCRIPT" "${parsing_args[@]}" || {
-        log_error "Parsing pipeline failed"
-        echo ""
-        echo "${PROGRESS_FAILED} Stage 1 FAILED - Pipeline terminated"
-        return 1
-    }
-    
-    # Verify parsing outputs
-    if ! $skip_checks; then
-        local csv_output="${output_directory}/${PARSING_CSV_SINGLE_VALUED}"
-        local hdf5_output="${output_directory}/${PARSING_HDF5_MULTIVALUED}"
-        
-        check_stage_outputs "Parsing stage" "$csv_output" "$hdf5_output" || return 1
-    fi
-    
-    log_info "Stage 1 completed successfully"
-    echo ""
-    echo "${PROGRESS_SUCCESS} Stage 1 COMPLETED"
-    
-    # =========================================================================
-    # STAGE 2: PROCESSING (CONDITIONAL)
-    # =========================================================================
-    
-    if $has_correlators; then
-        echo ""
-        echo "==================================================================="
-        echo "   STAGE 2: PROCESSING"
-        echo "==================================================================="
-        log_info "Starting Stage 2: Processing"
-        
-        # Define input files for processing stage
-        local csv_input="${output_directory}/${PARSING_CSV_SINGLE_VALUED}"
-        local hdf5_input="${output_directory}/${PARSING_HDF5_CORRELATORS}"
-        
-        # Build arguments for processing pipeline
-        local processing_args=(
-            "-csv" "$csv_input"
-            "-hdf5" "$hdf5_input"
-            "-o" "$output_directory"
-            "-log_dir" "$log_directory"
-        )
-        
-        # Add optional flags
-        $enable_visualization && processing_args+=("-viz")
-        $skip_checks && processing_args+=("--skip_checks")
-        $skip_summaries && processing_args+=("--skip_summaries")
-        
-        # Execute processing pipeline
-        "$PROCESSING_PIPELINE_SCRIPT" "${processing_args[@]}" || {
-            log_error "Processing pipeline failed"
-            echo ""
-            echo "${PROGRESS_FAILED} Stage 2 FAILED - Pipeline terminated"
-            return 1
-        }
-        
-        # Verify processing outputs
-        if ! $skip_checks; then
-            local processed_csv="${output_directory}/${PROCESSING_CSV_PROCESSED}"
-            local jackknife_hdf5="${output_directory}/${PROCESSING_HDF5_JACKKNIFE}"
-            
-            check_stage_outputs "Processing stage" "$processed_csv" "$jackknife_hdf5" || return 1
-        fi
-        
-        log_info "Stage 2 completed successfully"
-        echo ""
-        echo "${PROGRESS_SUCCESS} Stage 2 COMPLETED"
+    if eval "$parsing_cmd"; then
+        echo "✓ Parsing stage completed successfully"
+        log_info "Parsing stage completed successfully"
+        return 0
     else
-        echo ""
-        echo "==================================================================="
-        echo "${PROGRESS_SKIPPED} Stage 2: PROCESSING - SKIPPED (no correlator data)"
-        echo "==================================================================="
-        log_info "Stage 2 skipped - no correlator files in data set"
+        echo "ERROR: Parsing stage failed" >&2
+        log_error "Parsing stage failed"
+        return 1
     fi
-    
-    # =========================================================================
-    # STAGE 3: ANALYSIS (FUTURE - NOT YET IMPLEMENTED)
-    # =========================================================================
-    
-    # TODO: Implement Stage 3 analysis workflows
-    # This will include:
-    # - Correlator calculations (PCAC/Pion)
-    # - Plateau extraction
-    # - Critical mass extrapolation
-    # - Cost extrapolation
+}
+
+function run_processing_stage() {
+    # Execute Stage 2: Processing pipeline
     #
-    # if $has_correlators; then
-    #     echo ""
-    #     echo "==================================================================="
-    #     echo "   STAGE 3: ANALYSIS"
-    #     echo "==================================================================="
-    #     
-    #     # Stage 3.1: Correlator Calculations
-    #     "$CORRELATOR_ANALYSIS_SCRIPT" [args] || return 1
-    #     
-    #     # Stage 3.2: Plateau Extraction
-    #     "$PLATEAU_ANALYSIS_SCRIPT" [args] || return 1
-    #     
-    #     # Stage 3.3: Critical Mass Extrapolation
-    #     "$CRITICAL_MASS_SCRIPT" [args] || return 1
-    #     
-    #     # Stage 3.4: Cost Extrapolation
-    #     "$COST_ANALYSIS_SCRIPT" [args] || return 1
-    # fi
-    
-    # =========================================================================
-    # PIPELINE COMPLETION
-    # =========================================================================
+    # Returns:
+    #   0 - Success
+    #   1 - Failure
     
     echo ""
     echo "==================================================================="
-    echo "   PIPELINE EXECUTION COMPLETED"
+    echo "   STAGE 2: PROCESSING"
     echo "==================================================================="
+    echo "Processing raw parameters and applying jackknife analysis..."
     
-    # Summary
-    echo ""
-    echo "Summary:"
-    echo "  - Data file set:  $input_dir_name"
-    echo "  - Stages completed: $(( has_correlators ? 2 : 1 ))"
-    echo "  - Correlator data: $(( has_correlators ? "YES" : "NO" ))"
-    echo "  - Output location: $output_directory"
-    echo ""
+    log_info "=== STAGE 2: PROCESSING STAGE ==="
+    log_info "Executing processing pipeline script"
     
-    # List key output files
-    echo "Output files generated:"
-    echo "  ${PROGRESS_SUCCESS} ${PARSING_CSV_SINGLE_VALUED}"
-    echo "  ${PROGRESS_SUCCESS} ${PARSING_HDF5_MULTIVALUED}"
+    # Define paths to parsed files from Stage 1
+    local parsed_csv_path="${output_directory}/${PARSED_CSV_FILENAME}"
+    local parsed_hdf5_path="${output_directory}/${PARSED_HDF5_CORR_FILENAME}"
     
-    if $has_correlators; then
-        echo "  ${PROGRESS_SUCCESS} ${PARSING_HDF5_CORRELATORS}"
-        echo "  ${PROGRESS_SUCCESS} ${PROCESSING_CSV_PROCESSED}"
-        echo "  ${PROGRESS_SUCCESS} ${PROCESSING_HDF5_JACKKNIFE}"
-        
-        if $enable_visualization; then
-            echo "  ${PROGRESS_SUCCESS} jackknife_plots/"
-        fi
+    # Validate that parsed files exist
+    if [[ ! -f "$parsed_csv_path" ]]; then
+        echo "ERROR: Parsed CSV file not found: $parsed_csv_path" >&2
+        log_error "Missing parsed CSV file from Stage 1"
+        return 1
     fi
     
-    echo ""
-    echo "Log file: $log_file"
-    echo "==================================================================="
+    if [[ ! -f "$parsed_hdf5_path" ]]; then
+        echo "ERROR: Parsed HDF5 correlator file not found: $parsed_hdf5_path" >&2
+        log_error "Missing parsed HDF5 correlator file from Stage 1"
+        return 1
+    fi
     
-    # Final logging
-    local log_msg="COMPLETE PIPELINE EXECUTION FINISHED"
-    log_msg+="\n  - Data file set: $input_dir_name"
-    log_msg+="\n  - Stages completed: $(( has_correlators ? 2 : 1 ))"
-    log_msg+="\n  - Correlator data: $(( has_correlators ? "YES" : "NO" ))"
-    log_msg+="\n  - Output directory: $output_directory"
-    log_info "$log_msg"
+    # Build processing command
+    local processing_cmd="$PROCESSING_PIPELINE_SCRIPT"
+    processing_cmd+=" -csv \"$parsed_csv_path\""
+    processing_cmd+=" -hdf5 \"$parsed_hdf5_path\""
+    processing_cmd+=" -out_dir \"$output_directory\""
+    processing_cmd+=" -log_dir \"$log_directory\""
     
-    # Terminate logging properly using close_logging
-    log_info "Complete pipeline execution finished successfully"
-    close_logging
+    if $enable_visualization; then
+        processing_cmd+=" -viz"
+    fi
     
-    echo ""
-    echo "${PROGRESS_SUCCESS} Complete pipeline execution finished successfully!"
-    return 0
+    if $skip_checks; then
+        processing_cmd+=" --skip_checks"
+    fi
+    
+    log_info "Command: $processing_cmd"
+    
+    # Execute processing pipeline
+    if eval "$processing_cmd"; then
+        echo "✓ Processing stage completed successfully"
+        log_info "Processing stage completed successfully"
+        return 0
+    else
+        echo "ERROR: Processing stage failed" >&2
+        log_error "Processing stage failed"
+        return 1
+    fi
 }
 
 # =============================================================================
-# SCRIPT EXECUTION
+# SECTION 5: ARGUMENT PARSING
 # =============================================================================
 
-# Set up trap handlers for robust error handling
-trap 'handle_interrupt' INT TERM
-trap 'cleanup_on_exit' EXIT
+# Initialize variables
+input_directory=""
+output_directory=""
+log_directory=""
+enable_visualization=false
+skip_checks=false
+skip_summaries=false
 
-# Only execute main if script is run directly (not sourced)
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    main "$@"
-    exit_code=$?
-    
-    exit $exit_code
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -i|--input_directory)
+            input_directory="$2"
+            shift 2
+            ;;
+        -o|--output_directory)
+            output_directory="$2"
+            shift 2
+            ;;
+        -log_dir|--log_directory)
+            log_directory="$2"
+            shift 2
+            ;;
+        -viz|--enable_visualization)
+            enable_visualization=true
+            shift
+            ;;
+        --skip_checks)
+            skip_checks=true
+            shift
+            ;;
+        --skip_summaries)
+            skip_summaries=true
+            shift
+            ;;
+        -h|--help)
+            usage
+            ;;
+        *)
+            echo "ERROR: Unknown option: $1" >&2
+            usage
+            ;;
+    esac
+done
+
+# =============================================================================
+# SECTION 6: HELP CHECK (Before any logging setup!)
+# =============================================================================
+
+# Note: Help is already handled in argument parsing above
+# This section is here for clarity in the structure
+
+# =============================================================================
+# SECTION 7: INPUT VALIDATION AND LOGGING SETUP
+# =============================================================================
+
+# Validate required input
+if [[ -z "$input_directory" ]]; then
+    echo "ERROR: Input directory not specified. Use -i <directory>" >&2
+    usage
 fi
+
+# Validate input directory exists
+if [[ ! -d "$input_directory" ]]; then
+    echo "ERROR: Input directory does not exist: $input_directory" >&2
+    exit 1
+fi
+
+# Convert to absolute path
+input_directory="$(realpath "$input_directory")"
+local input_dir_name="$(basename "$input_directory")"
+
+# Set default output directory if not specified
+# Mirror the raw data structure in processed/
+if [[ -z "$output_directory" ]]; then
+    # Try to replace 'raw' with 'processed' in path
+    if [[ "$input_directory" == *"/data_files/raw/"* ]]; then
+        output_directory="${input_directory/\/raw\//\/processed\/}"
+        echo "INFO: Auto-detected output directory: $output_directory"
+    else
+        # Fallback: use input directory
+        output_directory="$input_directory"
+        echo "INFO: Using input directory as output directory"
+    fi
+fi
+
+# Ensure output directory exists
+if [[ ! -d "$output_directory" ]]; then
+    mkdir -p "$output_directory" || {
+        echo "ERROR: Failed to create output directory: $output_directory" >&2
+        exit 1
+    }
+    echo "INFO: Created output directory: $output_directory"
+fi
+output_directory="$(realpath "$output_directory")"
+
+# Set default log directory to output directory if not specified
+if [[ -z "$log_directory" ]]; then
+    log_directory="$output_directory"
+fi
+
+# Ensure log directory exists
+if [[ ! -d "$log_directory" ]]; then
+    mkdir -p "$log_directory" || {
+        echo "ERROR: Failed to create log directory: $log_directory" >&2
+        exit 1
+    }
+fi
+log_directory="$(realpath "$log_directory")"
+
+# NOW setup logging infrastructure (after help check and validation)
+export SCRIPT_TERMINATION_MESSAGE="\n\t\t$(echo "$SCRIPT_NAME" | tr '[:lower:]' '[:upper:]') EXECUTION TERMINATED"
+
+# Initialize logging
+SCRIPT_LOG_FILE_PATH="${log_directory}/${SCRIPT_LOG_FILENAME}"
+export SCRIPT_LOG_FILE_PATH
+
+echo -e "\t\t$(echo "$SCRIPT_NAME" | tr '[:lower:]' '[:upper:]') EXECUTION INITIATED\n" > "$SCRIPT_LOG_FILE_PATH"
+
+log_info "=== COMPLETE PIPELINE EXECUTION ==="
+log_info "Script: $SCRIPT_NAME"
+log_info "Data file set: $input_dir_name"
+log_info "Input directory: $input_directory"
+log_info "Output directory: $output_directory"
+log_info "Log directory: $log_directory"
+log_info "Visualization: $enable_visualization"
+log_info "Skip checks: $skip_checks"
+log_info "Skip summaries: $skip_summaries"
+
+# =============================================================================
+# SECTION 8: MAIN EXECUTION
+# =============================================================================
+
+# Display banner
+echo ""
+echo "==================================================================="
+echo "   QPB DATA ANALYSIS - COMPLETE PIPELINE"
+echo "==================================================================="
+echo "Data file set: $input_dir_name"
+echo "Input:  $input_directory"
+echo "Output: $output_directory"
+echo "==================================================================="
+
+# Validate prerequisites
+echo ""
+echo "=== VALIDATING PREREQUISITES ==="
+if ! validate_prerequisites "$input_directory"; then
+    echo "ERROR: Prerequisites validation failed" >&2
+    exit 1
+fi
+
+# Detect if data set has correlator files
+has_correlators=false
+if detect_correlator_files "$input_directory"; then
+    has_correlators=true
+    echo "✓ Correlator files (.dat) detected - Full pipeline will execute"
+    log_info "Correlator files detected - enabling processing stage"
+else
+    echo "ℹ Only log files (.txt) detected - Processing stage will be skipped"
+    log_info "No correlator files detected - processing stage will be skipped"
+fi
+
+# Execute Stage 1: Parsing
+if ! run_parsing_stage; then
+    echo ""
+    echo "PIPELINE FAILED: Error in parsing stage" >&2
+    log_error "Pipeline terminated: Parsing stage failed"
+    exit 1
+fi
+
+# Execute Stage 2: Processing (only if correlators present)
+if $has_correlators; then
+    if ! run_processing_stage; then
+        echo ""
+        echo "PIPELINE FAILED: Error in processing stage" >&2
+        log_error "Pipeline terminated: Processing stage failed"
+        exit 1
+    fi
+else
+    echo ""
+    echo "==================================================================="
+    echo "   STAGE 2: PROCESSING - SKIPPED"
+    echo "==================================================================="
+    echo "No correlator files detected - processing stage not applicable"
+    log_info "Processing stage skipped (no correlator files)"
+fi
+
+# Pipeline completion
+echo ""
+echo "==================================================================="
+echo "   PIPELINE COMPLETED SUCCESSFULLY"
+echo "==================================================================="
+echo "All applicable stages completed"
+echo "Output location: $output_directory"
+echo "Log file: $SCRIPT_LOG_FILE_PATH"
+echo "==================================================================="
+
+log_info "=== PIPELINE EXECUTION COMPLETED SUCCESSFULLY ==="
+log_info "All stages completed without errors"
+
+exit 0
