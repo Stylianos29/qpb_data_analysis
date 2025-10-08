@@ -39,16 +39,6 @@
 LOGGING_SH_INCLUDED=1
 
 # =============================================================================
-# LOGGING CONFIGURATION
-# =============================================================================
-
-# Default date format for timestamps
-readonly LOG_DATE_FORMAT="%Y-%m-%d %H:%M:%S"
-
-# Default message wrap width
-readonly LOG_WRAP_WIDTH=80
-
-# =============================================================================
 # CORE LOGGING FUNCTIONS
 # =============================================================================
 
