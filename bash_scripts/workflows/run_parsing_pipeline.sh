@@ -181,17 +181,18 @@ function validate_prerequisites() {
     fi
     
     # Validate Python scripts exist using validation helper
-    validate_python_script "$PARSE_LOG_FILES_SCRIPT" || {
+    validate_python_script "$PARSE_LOG_FILES_SCRIPT" -s || {
         echo "ERROR: parse_log_files.py not found" >&2
         return 1
     }
     
-    validate_python_script "$PARSE_CORRELATOR_FILES_SCRIPT" || {
+    validate_python_script "$PARSE_CORRELATOR_FILES_SCRIPT" -s || {
         echo "ERROR: parse_correlator_files.py not found" >&2
         return 1
     }
     
     log_info "All prerequisites validated successfully"
+    echo "All prerequisites validated successfully"
     return 0
 }
 
@@ -508,13 +509,10 @@ function main() {
     log "INFO" "$log_msg"
     
     # Terminate logging properly
-    if command -v termination_output &> /dev/null; then
-        termination_output "Parsing pipeline completed successfully"
-    else
-        echo -e "$SCRIPT_TERMINATION_MESSAGE" >> "$SCRIPT_LOG_FILE_PATH"
-    fi
-    
-    echo "Parsing pipeline execution completed successfully!"
+    log "INFO" "Parsing pipeline completed successfully"
+    echo -e "$SCRIPT_TERMINATION_MESSAGE" >> "$SCRIPT_LOG_FILE_PATH"
+
+    echo -e "\n${PROGRESS_SUCCESS} Parsing pipeline execution completed successfully!"
     return 0
 }
 
