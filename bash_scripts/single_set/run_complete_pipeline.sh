@@ -13,11 +13,16 @@
 #   - Parses .dat correlator files (if present)
 #   - Calls: run_parsing_pipeline.sh
 #
-# Stage 2 (Processing) - CONDITIONAL (only if correlators present):
-#   - Processes raw parameters
-#   - Applies jackknife analysis
-#   - Optional visualization
-#   - Calls: run_processing_pipeline.sh
+# Stage 2 (Processing) - CONDITIONAL:
+#   Stage 2A (Process Raw Parameters) - ALWAYS runs:
+#     - Processes raw parameters
+#     - Validates and transforms data
+#     - Calculates derived quantities
+#   Stage 2B (Jackknife Analysis) - Only if correlators present:
+#     - Applies jackknife resampling
+#     - Generates statistical samples
+#   Stage 2C (Visualization) - Optional (only if correlators present):
+#     - Optional visualization of jackknife samples
 #
 # Stage 3 (Analysis) - FUTURE:
 #   - Correlator calculations (PCAC/Pion)
@@ -70,6 +75,8 @@ WORKFLOWS_DIR="$(realpath "${SCRIPT_DIR}/../workflows")"
 
 # Workflow script paths
 PARSING_PIPELINE_SCRIPT="${WORKFLOWS_DIR}/run_parsing_pipeline.sh"
+# Note: Processing stages (2A, 2B, 2C) are implemented directly in this script
+# PROCESSING_PIPELINE_SCRIPT is no longer used but kept for reference
 PROCESSING_PIPELINE_SCRIPT="${WORKFLOWS_DIR}/run_processing_pipeline.sh"
 
 # Future workflow scripts (not yet implemented)
@@ -217,8 +224,8 @@ function run_parsing_stage() {
     fi
 }
 
-function run_processing_stage() {
-    # Execute Stage 2: Processing pipeline
+function run_processing_stage_2a() {
+    # Execute Stage 2A: Process raw parameters (ALWAYS runs)
     #
     # Returns:
     #   0 - Success
@@ -226,56 +233,181 @@ function run_processing_stage() {
     
     echo ""
     echo "==================================================================="
-    echo "   STAGE 2: PROCESSING"
+    echo "   STAGE 2A: PROCESSING RAW PARAMETERS"
     echo "==================================================================="
-    echo "Processing raw parameters and applying jackknife analysis..."
+    echo "Processing and validating raw parameters..."
     
-    log_info "=== STAGE 2: PROCESSING STAGE ==="
-    log_info "Executing processing pipeline script"
+    log_info "=== STAGE 2A: PROCESS RAW PARAMETERS ==="
+    log_info "This stage always runs regardless of correlator presence"
     
     # Define paths to parsed files from Stage 1
     local parsed_csv_path="${output_directory}/${PARSED_CSV_FILENAME}"
-    local parsed_hdf5_path="${output_directory}/${PARSED_HDF5_CORR_FILENAME}"
+    local parsed_hdf5_log_path="${output_directory}/${PARSED_HDF5_LOG_FILENAME}"
     
-    # Validate that parsed files exist
+    # Validate that parsed CSV file exists
     if [[ ! -f "$parsed_csv_path" ]]; then
         echo "ERROR: Parsed CSV file not found: $parsed_csv_path" >&2
         log_error "Missing parsed CSV file from Stage 1"
         return 1
     fi
     
-    if [[ ! -f "$parsed_hdf5_path" ]]; then
-        echo "ERROR: Parsed HDF5 correlator file not found: $parsed_hdf5_path" >&2
-        log_error "Missing parsed HDF5 correlator file from Stage 1"
+    # Validate that parsed HDF5 log file exists
+    if [[ ! -f "$parsed_hdf5_log_path" ]]; then
+        echo "ERROR: Parsed HDF5 log file not found: $parsed_hdf5_log_path" >&2
+        log_error "Missing parsed HDF5 log file from Stage 1"
         return 1
     fi
     
-    # Build processing command
-    local processing_cmd="$PROCESSING_PIPELINE_SCRIPT"
-    processing_cmd+=" -csv \"$parsed_csv_path\""
-    processing_cmd+=" -hdf5 \"$parsed_hdf5_path\""
-    processing_cmd+=" -out_dir \"$output_directory\""
-    processing_cmd+=" -log_dir \"$log_directory\""
+    # Define Python scripts directory
+    local python_scripts_dir="$(realpath "${SCRIPT_DIR}/../../core/src")"
+    local process_raw_script="${python_scripts_dir}/processing/process_raw_parameters.py"
     
-    if $enable_visualization; then
-        processing_cmd+=" -viz"
+    # Validate script exists
+    if [[ ! -f "$process_raw_script" ]]; then
+        echo "ERROR: Python script not found: $process_raw_script" >&2
+        log_error "Missing process_raw_parameters.py script"
+        return 1
     fi
     
-    if $skip_checks; then
-        processing_cmd+=" --skip_checks"
-    fi
+    # Build command
+    local cmd="python \"$process_raw_script\""
+    cmd+=" --input_single_valued_csv_file_path \"$parsed_csv_path\""
+    cmd+=" --input_multivalued_hdf5_file_path \"$parsed_hdf5_log_path\""
+    cmd+=" --output_directory \"$output_directory\""
+    cmd+=" --output_csv_filename \"processed_parameter_values.csv\""
+    cmd+=" --enable_logging"
+    cmd+=" --log_directory \"$log_directory\""
     
-    log_info "Command: $processing_cmd"
+    log_info "Command: $cmd"
     
-    # Execute processing pipeline
-    if eval "$processing_cmd"; then
-        echo "✓ Processing stage completed successfully"
-        log_info "Processing stage completed successfully"
+    # Execute
+    if eval "$cmd"; then
+        echo "✓ Stage 2A completed: Raw parameters processed"
+        log_info "Stage 2A completed successfully"
         return 0
     else
-        echo "ERROR: Processing stage failed" >&2
-        log_error "Processing stage failed"
+        echo "ERROR: Stage 2A failed" >&2
+        log_error "Stage 2A failed"
         return 1
+    fi
+}
+
+function run_processing_stage_2b() {
+    # Execute Stage 2B: Jackknife analysis (only if correlators exist)
+    #
+    # Returns:
+    #   0 - Success
+    #   1 - Failure
+    
+    echo ""
+    echo "==================================================================="
+    echo "   STAGE 2B: JACKKNIFE ANALYSIS"
+    echo "==================================================================="
+    echo "Applying jackknife resampling for error estimation..."
+    
+    log_info "=== STAGE 2B: JACKKNIFE ANALYSIS ==="
+    
+    # Define path to correlator file from Stage 1
+    local correlator_hdf5_path="${output_directory}/${PARSED_HDF5_CORR_FILENAME}"
+    
+    # Validate that correlator file exists
+    if [[ ! -f "$correlator_hdf5_path" ]]; then
+        echo "ERROR: Correlator HDF5 file not found: $correlator_hdf5_path" >&2
+        log_error "Missing correlator HDF5 file from Stage 1"
+        return 1
+    fi
+    
+    # Define Python scripts directory
+    local python_scripts_dir="$(realpath "${SCRIPT_DIR}/../../core/src")"
+    local jackknife_script="${python_scripts_dir}/processing/apply_jackknife_analysis.py"
+    
+    # Validate script exists
+    if [[ ! -f "$jackknife_script" ]]; then
+        echo "ERROR: Python script not found: $jackknife_script" >&2
+        log_error "Missing apply_jackknife_analysis.py script"
+        return 1
+    fi
+    
+    # Build command
+    local cmd="python \"$jackknife_script\""
+    cmd+=" --input_hdf5_file_path \"$correlator_hdf5_path\""
+    cmd+=" --output_directory \"$output_directory\""
+    cmd+=" --output_hdf5_filename \"correlators_jackknife_analysis.h5\""
+    cmd+=" --enable_logging"
+    cmd+=" --log_directory \"$log_directory\""
+    
+    if $skip_checks; then
+        cmd+=" --skip_validation"
+    fi
+    
+    log_info "Command: $cmd"
+    
+    # Execute
+    if eval "$cmd"; then
+        echo "✓ Stage 2B completed: Jackknife analysis applied"
+        log_info "Stage 2B completed successfully"
+        return 0
+    else
+        echo "ERROR: Stage 2B failed" >&2
+        log_error "Stage 2B failed"
+        return 1
+    fi
+}
+
+function run_processing_stage_2c() {
+    # Execute Stage 2C: Visualization (optional, only if correlators exist)
+    #
+    # Returns:
+    #   0 - Success
+    #   1 - Failure
+    
+    echo ""
+    echo "==================================================================="
+    echo "   STAGE 2C: VISUALIZATION (OPTIONAL)"
+    echo "==================================================================="
+    echo "Generating jackknife sample diagnostic plots..."
+    
+    log_info "=== STAGE 2C: VISUALIZATION ==="
+    
+    # Define path to jackknife results from Stage 2B
+    local jackknife_hdf5_path="${output_directory}/correlators_jackknife_analysis.h5"
+    
+    # Validate that jackknife file exists
+    if [[ ! -f "$jackknife_hdf5_path" ]]; then
+        echo "ERROR: Jackknife HDF5 file not found: $jackknife_hdf5_path" >&2
+        log_error "Missing jackknife HDF5 file from Stage 2B"
+        return 1
+    fi
+    
+    # Define Python scripts directory
+    local python_scripts_dir="$(realpath "${SCRIPT_DIR}/../../core/src")"
+    local viz_script="${python_scripts_dir}/processing/visualize_jackknife_samples.py"
+    
+    # Validate script exists
+    if [[ ! -f "$viz_script" ]]; then
+        echo "ERROR: Python script not found: $viz_script" >&2
+        log_error "Missing visualize_jackknife_samples.py script"
+        return 1
+    fi
+    
+    # Build command
+    local cmd="python \"$viz_script\""
+    cmd+=" --input_hdf5_file_path \"$jackknife_hdf5_path\""
+    cmd+=" --output_directory \"$output_directory\""
+    cmd+=" --enable_logging"
+    cmd+=" --log_directory \"$log_directory\""
+    
+    log_info "Command: $cmd"
+    
+    # Execute
+    if eval "$cmd"; then
+        echo "✓ Stage 2C completed: Visualizations generated"
+        log_info "Stage 2C completed successfully"
+        return 0
+    else
+        echo "WARNING: Stage 2C failed (visualization is optional)" >&2
+        log_warning "Stage 2C failed but continuing (visualization is optional)"
+        return 0  # Don't fail pipeline for optional visualization
     fi
 }
 
@@ -353,7 +485,7 @@ fi
 
 # Convert to absolute path
 input_directory="$(realpath "$input_directory")"
-local input_dir_name="$(basename "$input_directory")"
+input_dir_name="$(basename "$input_directory")"
 
 # Set default output directory if not specified
 # Mirror the raw data structure in processed/
@@ -453,21 +585,40 @@ if ! run_parsing_stage; then
     exit 1
 fi
 
-# Execute Stage 2: Processing (only if correlators present)
+# Execute Stage 2A: Process Raw Parameters (ALWAYS runs)
+if ! run_processing_stage_2a; then
+    echo ""
+    echo "PIPELINE FAILED: Error in Stage 2A (process raw parameters)" >&2
+    log_error "Pipeline terminated: Stage 2A failed"
+    exit 1
+fi
+
+# Execute Stage 2B & 2C: Jackknife Analysis (only if correlators present)
 if $has_correlators; then
-    if ! run_processing_stage; then
+    # Stage 2B: Jackknife Analysis
+    if ! run_processing_stage_2b; then
         echo ""
-        echo "PIPELINE FAILED: Error in processing stage" >&2
-        log_error "Pipeline terminated: Processing stage failed"
+        echo "PIPELINE FAILED: Error in Stage 2B (jackknife analysis)" >&2
+        log_error "Pipeline terminated: Stage 2B failed"
         exit 1
+    fi
+    
+    # Stage 2C: Visualization (optional, only if enabled)
+    if $enable_visualization; then
+        run_processing_stage_2c
+        # Note: This stage is optional and won't fail the pipeline
+    else
+        echo ""
+        echo "○ Stage 2C skipped: Visualization not enabled"
+        log_info "Stage 2C skipped (visualization not enabled)"
     fi
 else
     echo ""
     echo "==================================================================="
-    echo "   STAGE 2: PROCESSING - SKIPPED"
+    echo "   STAGES 2B & 2C: SKIPPED"
     echo "==================================================================="
-    echo "No correlator files detected - processing stage not applicable"
-    log_info "Processing stage skipped (no correlator files)"
+    echo "No correlator files detected - jackknife analysis not applicable"
+    log_info "Stages 2B and 2C skipped (no correlator files)"
 fi
 
 # Pipeline completion
