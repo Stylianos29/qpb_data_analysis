@@ -188,7 +188,7 @@ class JackknifeProcessor:
                 t_stencil = t_center + j - len(coefficients) // 2
                 derivative_value += coeff * correlator_samples[:, t_stencil]
 
-            derivative_samples[:, i] = - derivative_value / denominator
+            derivative_samples[:, i] = -derivative_value / denominator
 
         return derivative_samples
 
