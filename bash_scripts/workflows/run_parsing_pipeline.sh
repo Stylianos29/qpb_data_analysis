@@ -483,22 +483,22 @@ function main() {
     echo "All parsing stages completed successfully!"
     echo ""
     echo "Output files:"
-    echo "  - Parameters CSV:  $csv_output_path"
-    echo "  - Parameters HDF5: $hdf5_log_output_path"
+    echo "  - Parameters CSV:  $(get_display_path "$csv_output_path")"
+    echo "  - Parameters HDF5: $(get_display_path "$hdf5_log_output_path")"
     if $dat_files_found; then
-        echo "  - Correlators HDF5: $hdf5_corr_output_path"
+        echo "  - Correlators HDF5: $(get_display_path "$hdf5_corr_output_path")"
     fi
     if ! $skip_summaries; then
         echo ""
         echo "Summary files:"
-        echo "  - CSV summary:     ${csv_output_path%.csv}_uniqueness_report.txt"
-        echo "  - HDF5 tree (log): ${hdf5_log_output_path%.h5}_tree.txt"
+        echo "  - CSV summary:     $(get_display_path "${csv_output_path%.csv}_uniqueness_report.txt")"
+        echo "  - HDF5 tree (log): $(get_display_path "${hdf5_log_output_path%.h5}_tree.txt")"
         if $dat_files_found; then
-            echo "  - HDF5 tree (corr): ${hdf5_corr_output_path%.h5}_tree.txt"
+            echo "  - HDF5 tree (corr): $(get_display_path "${hdf5_corr_output_path%.h5}_tree.txt")"
         fi
     fi
     echo ""
-    echo "Log file: $log_file"
+    echo "Log file: $(get_display_path "$log_file")"
     
     # Final logging
     local log_msg="PARSING PIPELINE COMPLETED SUCCESSFULLY"

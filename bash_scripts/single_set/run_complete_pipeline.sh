@@ -554,8 +554,8 @@ echo "==================================================================="
 echo "   QPB DATA ANALYSIS - COMPLETE PIPELINE"
 echo "==================================================================="
 echo "Data file set: $input_dir_name"
-echo "Input:  $input_directory"
-echo "Output: $output_directory"
+echo "Input:  $(get_display_path "$input_directory")"
+echo "Output: $(get_display_path "$output_directory")"
 echo "==================================================================="
 
 # Validate prerequisites
@@ -570,11 +570,11 @@ fi
 has_correlators=false
 if detect_correlator_files "$input_directory"; then
     has_correlators=true
-    echo "✓ Correlator files (.dat) detected - Full pipeline will execute"
-    log_info "Correlator files detected - enabling processing stage"
+    echo "✓ Correlator files (.dat) detected - Full pipeline will execute (Stages 1, 2A, 2B, 2C)"
+    log_info "Correlator files detected - all processing stages will run"
 else
-    echo "ℹ Only log files (.txt) detected - Processing stage will be skipped"
-    log_info "No correlator files detected - processing stage will be skipped"
+    echo "ℹ Only log files (.txt) detected - Stages 2B & 2C will be skipped"
+    log_info "No correlator files detected - only Stages 1 and 2A will run"
 fi
 
 # Execute Stage 1: Parsing
@@ -627,8 +627,8 @@ echo "==================================================================="
 echo "   PIPELINE COMPLETED SUCCESSFULLY"
 echo "==================================================================="
 echo "All applicable stages completed"
-echo "Output location: $output_directory"
-echo "Log file: $SCRIPT_LOG_FILE_PATH"
+echo "Output location: $(get_display_path "$output_directory")"
+echo "Log file: $(get_display_path "$SCRIPT_LOG_FILE_PATH")"
 echo "==================================================================="
 
 log_info "=== PIPELINE EXECUTION COMPLETED SUCCESSFULLY ==="

@@ -308,6 +308,55 @@ function replace_parent_directory() {
     echo "${subdirectory_path/$old_parent_directory/$new_parent_directory}"
 }
 
+
+function get_display_path() {
+    # Convert absolute path to display-friendly relative path
+    #
+    # Shortens absolute paths by stripping the prefix up to and including
+    # the project base directory parent. This makes console output cleaner
+    # and more readable.
+    #
+    # The function searches for "qpb_data_analysis" in the path and returns
+    # everything from that point onwards. If the project directory is not
+    # found in the path, returns the original path unchanged.
+    #
+    # Arguments:
+    #   $1 - path : Absolute path to shorten
+    #
+    # Returns:
+    #   Prints shortened path to stdout
+    #   Return code: 0 (always succeeds)
+    #
+    # Examples:
+    #   # Long absolute path
+    #   long_path="/home/user/projects/qpb_data_analysis/data_files/raw/experiment1"
+    #   short_path=$(get_display_path "$long_path")
+    #   echo "$short_path"  
+    #   # Output: qpb_data_analysis/data_files/raw/experiment1
+    #
+    #   # Path without project directory (returns unchanged)
+    #   other_path="/tmp/some/other/path"
+    #   display_path=$(get_display_path "$other_path")
+    #   echo "$display_path"
+    #   # Output: /tmp/some/other/path
+    #
+    # Usage in scripts:
+    #   echo "Input:  $(get_display_path "$input_directory")"
+    #   echo "Output: $(get_display_path "$output_directory")"
+    
+    local path="$1"
+    local project_dir="qpb_data_analysis"
+    
+    # Check if path contains the project directory
+    if [[ "$path" == *"$project_dir"* ]]; then
+        # Extract everything from project_dir onwards using sed
+        echo "$path" | sed "s|.*\(${project_dir}/.*\)|\1|"
+    else
+        # Return original path if project directory not found
+        echo "$path"
+    fi
+}
+
 # =============================================================================
 # END OF FILE
 # =============================================================================
