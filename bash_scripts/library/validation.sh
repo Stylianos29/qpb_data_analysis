@@ -614,5 +614,200 @@ function validate_required_tools() {
 }
 
 # =============================================================================
+# PIPELINE-SPECIFIC VALIDATION FUNCTIONS
+# =============================================================================
+
+function validate_output_file() {
+    # Validate that an expected output file was created successfully
+    #
+    # This function checks if a file exists and is not empty after a processing
+    # step. Useful for validating that Python scripts produced expected outputs.
+    #
+    # Arguments:
+    #   $1 - file_path     : Path to the output file to validate
+    #   $2 - description   : Human-readable description for error messages
+    #
+    # Returns:
+    #   0 - File exists and is not empty
+    #   1 - File missing or empty
+    #
+    # Examples:
+    #   validate_output_file "$csv_path" "CSV output" || return 1
+    #   validate_output_file "$hdf5_path" "HDF5 correlators" || exit 1
+    #
+    # Output:
+    #   Prints validation messages to stdout
+    #   Prints errors to stderr
+    #   Logs messages if logging is initialized
+    
+    local file_path="$1"
+    local description="$2"
+    
+    # Check if file exists
+    if [[ ! -f "$file_path" ]]; then
+        echo "ERROR: Expected $description file not found: $file_path" >&2
+        [[ -n "$SCRIPT_LOG_FILE_PATH" ]] && log_error "Missing $description: $file_path"
+        return 1
+    fi
+    
+    # Check if file is not empty
+    if [[ ! -s "$file_path" ]]; then
+        echo "WARNING: $description file is empty: $file_path" >&2
+        [[ -n "$SCRIPT_LOG_FILE_PATH" ]] && log_warning "$description file is empty: $file_path"
+        return 1
+    fi
+    
+    echo "  ✓ $description validated: $(basename "$file_path")"
+    [[ -n "$SCRIPT_LOG_FILE_PATH" ]] && log_info "$description validated successfully"
+    return 0
+}
+
+function setup_pipeline_directories() {
+    # Setup and validate input, output, and log directories for pipeline scripts
+    #
+    # This function handles the common pattern of:
+    # 1. Validating input directory exists
+    # 2. Setting default output directory (to input if not specified)
+    # 3. Setting default log directory (to output if not specified)
+    # 4. Creating output/log directories if they don't exist
+    # 5. Converting all paths to absolute paths
+    #
+    # Arguments:
+    #   $1 - input_directory  : Input directory path (required, must exist)
+    #   $2 - output_directory : Output directory path (optional, defaults to input)
+    #   $3 - log_directory    : Log directory path (optional, defaults to output)
+    #
+    # Returns:
+    #   0 - Success, all directories validated/created
+    #   1 - Failure (input doesn't exist or creation failed)
+    #
+    # Output:
+    #   Sets global variables:
+    #     - input_directory  : Absolute path to input
+    #     - output_directory : Absolute path to output
+    #     - log_directory    : Absolute path to logs
+    #
+    # Examples:
+    #   # All three specified
+    #   setup_pipeline_directories "$input" "$output" "$logs" || return 1
+    #
+    #   # Only input specified (output and logs default to input)
+    #   setup_pipeline_directories "$input" "" "" || return 1
+    #
+    #   # Input and output specified (logs default to output)
+    #   setup_pipeline_directories "$input" "$output" "" || return 1
+    
+    local input_dir="$1"
+    local output_dir="$2"
+    local log_dir="$3"
+    
+    # Validate input directory exists
+    if [[ -z "$input_dir" ]]; then
+        echo "ERROR: Input directory not specified" >&2
+        return 1
+    fi
+    
+    if [[ ! -d "$input_dir" ]]; then
+        echo "ERROR: Input directory does not exist: $input_dir" >&2
+        return 1
+    fi
+    
+    # Convert to absolute path
+    input_directory="$(realpath "$input_dir")"
+    
+    # Set default output directory to input directory if not specified
+    if [[ -z "$output_dir" ]]; then
+        output_directory="$input_directory"
+        echo "INFO: Using input directory as output directory"
+    else
+        output_directory="$output_dir"
+    fi
+    
+    # Ensure output directory exists
+    if [[ ! -d "$output_directory" ]]; then
+        mkdir -p "$output_directory" || {
+            echo "ERROR: Failed to create output directory: $output_directory" >&2
+            return 1
+        }
+        echo "INFO: Created output directory: $output_directory"
+    fi
+    output_directory="$(realpath "$output_directory")"
+    
+    # Set default log directory to output directory if not specified
+    if [[ -z "$log_dir" ]]; then
+        log_directory="$output_directory"
+    else
+        log_directory="$log_dir"
+    fi
+    
+    # Ensure log directory exists
+    if [[ ! -d "$log_directory" ]]; then
+        mkdir -p "$log_directory" || {
+            echo "ERROR: Failed to create log directory: $log_directory" >&2
+            return 1
+        }
+        echo "INFO: Created log directory: $log_directory"
+    fi
+    log_directory="$(realpath "$log_directory")"
+    
+    # Log the setup if logging is initialized
+    if [[ -n "$SCRIPT_LOG_FILE_PATH" ]]; then
+        log_info "Directories configured:"
+        log_info "  Input:  $input_directory"
+        log_info "  Output: $output_directory"
+        log_info "  Logs:   $log_directory"
+    fi
+    
+    return 0
+}
+
+function validate_workflow_script() {
+    # Validate that a workflow script exists and is executable
+    #
+    # This function checks if a script file exists, is a regular file,
+    # and has execute permissions. Used by orchestrator scripts to validate
+    # that required workflow scripts are available before execution.
+    #
+    # Arguments:
+    #   $1 - script_path   : Path to the workflow script
+    #   $2 - script_name   : Human-readable name for error messages
+    #
+    # Returns:
+    #   0 - Script exists and is executable
+    #   1 - Script missing or not executable
+    #
+    # Examples:
+    #   validate_workflow_script "$PARSING_PIPELINE_SCRIPT" "parsing pipeline" || exit 1
+    #   validate_workflow_script "$PROCESSING_PIPELINE_SCRIPT" "processing pipeline" || return 1
+    #
+    # Output:
+    #   Prints validation messages to stdout
+    #   Prints errors to stderr
+    #   Logs messages if logging is initialized
+    
+    local script_path="$1"
+    local script_name="$2"
+    
+    # Check if script exists
+    if [[ ! -f "$script_path" ]]; then
+        echo "ERROR: ${script_name} script not found: $script_path" >&2
+        [[ -n "$SCRIPT_LOG_FILE_PATH" ]] && log_error "Missing ${script_name} script: $script_path"
+        return 1
+    fi
+    
+    # Check if script is executable
+    if [[ ! -x "$script_path" ]]; then
+        echo "ERROR: ${script_name} script is not executable: $script_path" >&2
+        echo "  Fix with: chmod +x $script_path" >&2
+        [[ -n "$SCRIPT_LOG_FILE_PATH" ]] && log_error "${script_name} script not executable: $script_path"
+        return 1
+    fi
+    
+    echo "  ✓ ${script_name} script validated"
+    [[ -n "$SCRIPT_LOG_FILE_PATH" ]] && log_info "${script_name} script validated: $script_path"
+    return 0
+}
+
+# =============================================================================
 # END OF FILE
 # =============================================================================
