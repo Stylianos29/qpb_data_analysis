@@ -354,11 +354,10 @@ class HDF5ParameterProcessor:
         This method implements the business logic for these special
         columns that's too complex for configuration-driven processing.
         """
-        main_program_type = (
-            self.dataframe.get("Main_program_type", pd.Series()).iloc[0]
-            if len(self.dataframe) > 0
-            else None
-        )
+        # Safely get Main_program_type with proper column existence check
+        main_program_type = None
+        if "Main_program_type" in self.dataframe.columns and len(self.dataframe) > 0:
+            main_program_type = self.dataframe["Main_program_type"].iloc[0]
 
         # Handle Number_of_spinors (only for invert cases)
         if main_program_type == "invert":
