@@ -303,7 +303,7 @@ function run_processing_stage_2b() {
     echo "==================================================================="
     echo "   STAGE 2B: JACKKNIFE ANALYSIS"
     echo "==================================================================="
-    echo "Applying jackknife resampling for error estimation..."
+    echo "Applying jackknife resampling to correlator data..."
     
     log_info "=== STAGE 2B: JACKKNIFE ANALYSIS ==="
     
@@ -330,9 +330,9 @@ function run_processing_stage_2b() {
     
     # Build command
     local cmd="python \"$jackknife_script\""
-    cmd+=" --input_hdf5_file_path \"$correlator_hdf5_path\""
+    cmd+=" --input_hdf5_file \"$correlator_hdf5_path\""
     cmd+=" --output_directory \"$output_directory\""
-    cmd+=" --output_hdf5_filename \"correlators_jackknife_analysis.h5\""
+    cmd+=" --output_hdf5_file \"correlators_jackknife_analysis.h5\""
     cmd+=" --enable_logging"
     cmd+=" --log_directory \"$log_directory\""
     
