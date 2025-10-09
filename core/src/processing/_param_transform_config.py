@@ -37,7 +37,7 @@ MATH_TRANSFORMATIONS = {
         "Condition_number": ("Maximum_eigenvalue_squared", "Minimum_eigenvalue_squared")
     },
     # Type conversions
-    "type_conversions": {"Clover_coefficient": "int"},
+    "type_conversions": {"Clover_coefficient": int},
 }
 
 
@@ -48,8 +48,8 @@ MATH_TRANSFORMATIONS = {
 EXTRACTION_RULES = {
     "Lattice_geometry": {
         "extract_to": {
-            "Temporal_lattice_size": {"index": 0, "type": "int"},
-            "Spatial_lattice_size": {"index": 1, "type": "int"},
+            "Temporal_lattice_size": {"index": 0, "type": int},
+            "Spatial_lattice_size": {"index": 1, "type": int},
         },
         "parser": "ast_literal_eval",
         "remove_source": True,
