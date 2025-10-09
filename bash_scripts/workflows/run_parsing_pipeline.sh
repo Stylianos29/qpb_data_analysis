@@ -124,155 +124,77 @@ DEFAULT_HDF5_CORR_FILENAME="$PARSING_HDF5_CORRELATORS"
 # Script log filename
 SCRIPT_LOG_FILENAME="${SCRIPT_NAME%.sh}.log"
 
-# Export termination message for logging utilities
-export SCRIPT_TERMINATION_MESSAGE="\n\t\t$(echo "$SCRIPT_NAME" | tr '[:lower:]' '[:upper:]') EXECUTION TERMINATED"
-
 # =============================================================================
 # UTILITY FUNCTIONS
 # =============================================================================
 
 function usage() {
     cat << EOF
-Usage: $SCRIPT_NAME -i <input_directory> [options]
+Usage: $SCRIPT_NAME -i <raw_data_directory> [options]
 
 REQUIRED ARGUMENTS:
-  -i,  --input_directory      Directory containing raw QPB data files
+  -i, --input_directory      Directory containing raw QPB data files
 
 OPTIONAL ARGUMENTS:
-  -o,  --output_directory     Output directory for parsed files (default: input dir)
-  -log_dir, --log_directory   Log files directory (default: output dir)
-  --csv_name                  Output CSV filename (default: $DEFAULT_CSV_FILENAME)
-  --hdf5_log_name            Log params HDF5 filename (default: $DEFAULT_HDF5_LOG_FILENAME)
-  --hdf5_corr_name           Correlators HDF5 filename (default: $DEFAULT_HDF5_CORR_FILENAME)
-  --skip_checks              Skip intermediate file validation
-  --skip_summaries           Skip generation of summary files (HDF5 trees and CSV reports)
-  -h,  --help                Display this help message
+  -o, --output_directory     Output directory (default: input directory)
+  -log_dir, --log_directory  Log files directory (default: output directory)
+  --csv_name                 Custom CSV filename (default: $DEFAULT_CSV_FILENAME)
+  --hdf5_log_name           Custom log HDF5 filename (default: $DEFAULT_HDF5_LOG_FILENAME)
+  --hdf5_corr_name          Custom correlators HDF5 filename (default: $DEFAULT_HDF5_CORR_FILENAME)
+  --skip_checks             Skip intermediate file validation
+  --skip_summaries          Skip summary file generation
+  -h, --help                Display this help message
 
 EXAMPLES:
   $SCRIPT_NAME -i ../data_files/raw/my_experiment/
   $SCRIPT_NAME -i raw_data/ -o processed_data/
-  $SCRIPT_NAME -i raw_data/ --csv_name params.csv
   $SCRIPT_NAME -i raw_data/ --skip_summaries
 
 EOF
+    # Clear exit handlers before exiting
+    trap - EXIT
     exit 0
 }
 
 function validate_prerequisites() {
+    # Validate that required files and scripts exist
+    #
+    # Returns:
+    #   0 - All prerequisites valid
+    #   1 - Validation failed
+    
     local input_dir="$1"
     
-    log_info "Validating prerequisites..."
-    
     # Check for .txt log files (required)
-    local txt_count=$(find "$input_dir" -maxdepth 1 -type f -name "*.txt" | wc -l)
-    if [[ $txt_count -eq 0 ]]; then
+    if ! find "$input_dir" -maxdepth 1 -type f -name "*.txt" -print -quit | grep -q .; then
+        echo "ERROR: No .txt log files found in $input_dir" >&2
         log_error "No .txt log files found in input directory"
-        echo "ERROR: No .txt log files found in: $input_dir" >&2
         return 1
     fi
-    log_info "Found $txt_count .txt log file(s)"
     
-    # Check for .dat correlator files (optional, informational only)
-    local dat_count=$(find "$input_dir" -maxdepth 1 -type f -name "*.dat" | wc -l)
-    if [[ $dat_count -gt 0 ]]; then
-        log_info "Found $dat_count .dat correlator file(s) - will parse correlator data"
-    else
-        log_info "No .dat files found - will skip correlator parsing"
-    fi
+    # Validate Python scripts exist
+    validate_python_script "$PARSE_LOG_FILES_SCRIPT" -s || return 1
+    validate_python_script "$PARSE_CORRELATOR_FILES_SCRIPT" -s || return 1
     
-    # Validate Python scripts exist using validation helper
-    validate_python_script "$PARSE_LOG_FILES_SCRIPT" -s || {
-        echo "ERROR: parse_log_files.py not found" >&2
-        return 1
-    }
-    
-    validate_python_script "$PARSE_CORRELATOR_FILES_SCRIPT" -s || {
-        echo "ERROR: parse_correlator_files.py not found" >&2
-        return 1
-    }
-    
-    log_info "All prerequisites validated successfully"
     echo "All prerequisites validated successfully"
+    log_info "Prerequisites validation completed successfully"
     return 0
 }
 
-function check_intermediate_output() {
-    local file_path="$1"
-    local stage_name="$2"
+function detect_correlator_files() {
+    # Check if correlator files (.dat) are present
+    #
+    # Returns:
+    #   0 - Correlator files found
+    #   1 - No correlator files found
     
-    if [[ ! -f "$file_path" ]]; then
-        local error_msg="$stage_name did not produce expected output: $file_path"
-        log_error "$error_msg"
-        echo "ERROR: $error_msg" >&2
-        return 1
-    fi
+    local input_dir="$1"
     
-    # Check if file is not empty
-    if [[ ! -s "$file_path" ]]; then
-        local error_msg="$stage_name produced empty output: $file_path"
-        log_error "$error_msg"
-        echo "ERROR: $error_msg" >&2
-        return 1
-    fi
-    
-    log_info "Validated output: $(basename "$file_path")"
-    return 0
-}
-
-function cleanup() {
-    # Cleanup function called on exit via trap
-    # Add any cleanup tasks here (e.g., removing temp files)
-    log_info "Cleanup completed"
-}
-
-function generate_hdf5_tree() {
-    local hdf5_file_path="$1"
-    local stage_name="$2"
-    
-    if ! command -v h5glance &> /dev/null; then
-        log_warning "h5glance not found - skipping HDF5 tree generation"
-        echo "  $PROGRESS_WARNING h5glance not available - skipping tree generation"
+    if find "$input_dir" -maxdepth 1 -type f -name "*.dat" -print -quit | grep -q .; then
         return 0
-    fi
-    
-    local tree_file_path="${hdf5_file_path%.h5}_tree.txt"
-    
-    h5glance "$hdf5_file_path" > "$tree_file_path" 2>&1 || {
-        log_warning "Failed to generate HDF5 tree for $(basename "$hdf5_file_path")"
-        echo "  $PROGRESS_WARNING Failed to generate HDF5 tree"
+    else
         return 1
-    }
-    
-    log_info "Generated HDF5 tree: $(basename "$tree_file_path")"
-    echo "  → HDF5 tree: $(basename "$tree_file_path")"
-    return 0
-}
-
-function generate_csv_summary() {
-    local csv_file_path="$1"
-    local output_directory="$2"
-    
-    local inspect_script="${PYTHON_SCRIPTS_DIRECTORY}/utils/inspect_csv_file.py"
-    
-    if [[ ! -f "$inspect_script" ]]; then
-        log_warning "inspect_csv_file.py not found - skipping CSV summary"
-        echo "  $PROGRESS_WARNING CSV inspection script not available"
-        return 0
     fi
-    
-    python "$inspect_script" \
-        --csv_file_path "$csv_file_path" \
-        --output_directory "$output_directory" \
-        --uniqueness_report \
-        || {
-            log_warning "Failed to generate CSV summary for $(basename "$csv_file_path")"
-            echo "  $PROGRESS_WARNING Failed to generate CSV summary"
-            return 1
-        }
-    
-    log_info "Generated CSV summary for $(basename "$csv_file_path")"
-    echo "  → CSV summary generated"
-    return 0
 }
 
 # =============================================================================
@@ -281,9 +203,9 @@ function generate_csv_summary() {
 
 function main() {
     # Parse command line arguments
-    local input_directory=""
-    local output_directory=""
-    local log_directory=""
+    local input_dir=""
+    local output_dir=""
+    local log_dir=""
     local csv_filename="$DEFAULT_CSV_FILENAME"
     local hdf5_log_filename="$DEFAULT_HDF5_LOG_FILENAME"
     local hdf5_corr_filename="$DEFAULT_HDF5_CORR_FILENAME"
@@ -293,15 +215,15 @@ function main() {
     while [[ $# -gt 0 ]]; do
         case $1 in
             -i|--input_directory)
-                input_directory="$2"
+                input_dir="$2"
                 shift 2
                 ;;
             -o|--output_directory)
-                output_directory="$2"
+                output_dir="$2"
                 shift 2
                 ;;
             -log_dir|--log_directory)
-                log_directory="$2"
+                log_dir="$2"
                 shift 2
                 ;;
             --csv_name)
@@ -334,40 +256,14 @@ function main() {
         esac
     done
     
-    # Validate required arguments
-    if [[ -z "$input_directory" ]]; then
-        echo "ERROR: Input directory not specified. Use -i <directory>" >&2
-        usage
-    fi
+    # Setup and validate directories using library function
+    setup_pipeline_directories "$input_dir" "$output_dir" "$log_dir" || return 1
     
-    # Validate input directory exists using validation helper
-    validate_input_directory "$input_directory" || return 1
-    
-    # Convert to absolute path
-    input_directory="$(realpath "$input_directory")"
-    
-    # Set default output directory to input directory if not specified
-    if [[ -z "$output_directory" ]]; then
-        output_directory="$input_directory"
-        echo "INFO: Using input directory as output directory"
-    fi
-    
-    # Ensure output directory exists using validation helper
-    validate_output_directory "$output_directory" -c || return 1
-    output_directory="$(realpath "$output_directory")"
-    
-    # Set default log directory to output directory if not specified
-    if [[ -z "$log_directory" ]]; then
-        log_directory="$output_directory"
-    fi
-    
-    # Ensure log directory exists using validation helper
-    validate_log_directory "$log_directory" || return 1
-    log_directory="$(realpath "$log_directory")"
-    
-    # Initialize logging using init_logging helper
+    # Initialize logging
     local log_file="${log_directory}/${SCRIPT_LOG_FILENAME}"
-    init_logging "$log_file" -c || return 1
+    export SCRIPT_LOG_FILE_PATH="$log_file"
+    echo -e "\t\t$(echo "$SCRIPT_NAME" | tr '[:lower:]' '[:upper:]') EXECUTION INITIATED\n" > "$SCRIPT_LOG_FILE_PATH"
+    export SCRIPT_TERMINATION_MESSAGE="\n\t\t$(echo "$SCRIPT_NAME" | tr '[:lower:]' '[:upper:]') EXECUTION TERMINATED"
     
     log_info "Script: $SCRIPT_NAME"
     log_info "Input directory: $input_directory"
@@ -378,6 +274,15 @@ function main() {
     echo ""
     echo "=== VALIDATING PREREQUISITES ==="
     validate_prerequisites "$input_directory" || return 1
+    
+    # Detect correlator files
+    local dat_files_found=false
+    if detect_correlator_files "$input_directory"; then
+        dat_files_found=true
+        log_info "Correlator files (.dat) detected"
+    else
+        log_info "No correlator files detected - Stage 1B will be skipped"
+    fi
     
     # Define output file paths
     local csv_output_path="${output_directory}/${csv_filename}"
@@ -393,7 +298,7 @@ function main() {
     echo "Processing .txt log files..."
     log_info "STAGE 1A: Starting log file parsing"
     
-    python "$PARSE_LOG_FILES_SCRIPT" \
+    execute_python_script "$PARSE_LOG_FILES_SCRIPT" "parse_log_files" \
         --qpb_log_files_directory "$input_directory" \
         --output_files_directory "$output_directory" \
         --output_csv_filename "$csv_filename" \
@@ -401,39 +306,31 @@ function main() {
         --enable_logging \
         --log_file_directory "$log_directory" \
         || {
-            log_error "parse_log_files.py execution failed"
-            echo "ERROR: Log file parsing failed" >&2
+            log_error "Stage 1A: Log file parsing failed"
             return 1
         }
     
     # Validate outputs
     if ! $skip_checks; then
-        check_intermediate_output "$csv_output_path" "Log file parsing (CSV)" || return 1
-        check_intermediate_output "$hdf5_log_output_path" "Log file parsing (HDF5)" || return 1
+        validate_output_file "$csv_output_path" "CSV output" || return 1
+        validate_output_file "$hdf5_log_output_path" "HDF5 log output" || return 1
     fi
     
-    log_info "STAGE 1A COMPLETED: Log files parsed successfully"
-    echo "$PROGRESS_SUCCESS Stage 1A completed: Log files parsed"
-    echo "  - CSV output: $csv_filename"
-    echo "  - HDF5 output: $hdf5_log_filename"
+    echo "${PROGRESS_SUCCESS} Stage 1A completed: Log files parsed"
+    echo "  - CSV output: $(basename "$csv_output_path")"
+    echo "  - HDF5 output: $(basename "$hdf5_log_output_path")"
     
-    # Generate summary files for Stage 1A outputs
+    # Generate summary files for Stage 1A
     if ! $skip_summaries; then
         echo ""
         echo "Generating summary files..."
         generate_csv_summary "$csv_output_path" "$output_directory"
-        generate_hdf5_tree "$hdf5_log_output_path" "Stage 1A"
+        generate_hdf5_tree "$hdf5_log_output_path" "$output_directory"
     fi
     
     # =========================================================================
-    # STAGE 1B: PARSE CORRELATOR FILES (CONDITIONAL)
+    # STAGE 1B: PARSE CORRELATOR FILES (if present)
     # =========================================================================
-    
-    # Check if .dat files exist
-    local dat_files_found=false
-    if find "$input_directory" -maxdepth 1 -type f -name "*.dat" -print -quit | grep -q .; then
-        dat_files_found=true
-    fi
     
     if $dat_files_found; then
         echo ""
@@ -441,41 +338,38 @@ function main() {
         echo "Processing .dat correlator files..."
         log_info "STAGE 1B: Starting correlator file parsing"
         
-        python "$PARSE_CORRELATOR_FILES_SCRIPT" \
+        execute_python_script "$PARSE_CORRELATOR_FILES_SCRIPT" "parse_correlator_files" \
             --qpb_correlators_files_directory "$input_directory" \
             --output_files_directory "$output_directory" \
             --output_hdf5_filename "$hdf5_corr_filename" \
             --enable_logging \
             --log_file_directory "$log_directory" \
             || {
-                log_error "parse_correlator_files.py execution failed"
-                echo "ERROR: Correlator file parsing failed" >&2
+                log_error "Stage 1B: Correlator file parsing failed"
                 return 1
             }
         
         # Validate output
         if ! $skip_checks; then
-            check_intermediate_output "$hdf5_corr_output_path" "Correlator file parsing" || return 1
+            validate_output_file "$hdf5_corr_output_path" "HDF5 correlators output" || return 1
         fi
         
-        log_info "STAGE 1B COMPLETED: Correlator files parsed successfully"
-        echo "$PROGRESS_SUCCESS Stage 1B completed: Correlator files parsed"
-        echo "  - HDF5 output: $hdf5_corr_filename"
+        echo "${PROGRESS_SUCCESS} Stage 1B completed: Correlator files parsed"
+        echo "  - HDF5 output: $(basename "$hdf5_corr_output_path")"
         
-        # Generate summary file for Stage 1B output
+        # Generate summary for correlators
         if ! $skip_summaries; then
             echo ""
             echo "Generating HDF5 tree..."
-            generate_hdf5_tree "$hdf5_corr_output_path" "Stage 1B"
+            generate_hdf5_tree "$hdf5_corr_output_path" "$output_directory"
         fi
     else
         echo ""
-        echo "$PROGRESS_SKIPPED Stage 1B skipped: No correlator files found"
-        log_info "STAGE 1B SKIPPED: No .dat files found in input directory"
+        echo "${PROGRESS_SKIPPED} Stage 1B skipped: No correlator files found"
     fi
     
     # =========================================================================
-    # PIPELINE COMPLETION
+    # COMPLETION
     # =========================================================================
     
     echo ""
@@ -488,6 +382,7 @@ function main() {
     if $dat_files_found; then
         echo "  - Correlators HDF5: $(get_display_path "$hdf5_corr_output_path")"
     fi
+    
     if ! $skip_summaries; then
         echo ""
         echo "Summary files:"
@@ -497,22 +392,21 @@ function main() {
             echo "  - HDF5 tree (corr): $(get_display_path "${hdf5_corr_output_path%.h5}_tree.txt")"
         fi
     fi
+    
     echo ""
     echo "Log file: $(get_display_path "$log_file")"
     
     # Final logging
-    local log_msg="PARSING PIPELINE COMPLETED SUCCESSFULLY"
-    log_msg+="\n  - Input directory: $input_directory"
-    log_msg+="\n  - Output files created: $(( dat_files_found ? 3 : 2 ))"
-    log_msg+="\n  - Correlator data: $(( dat_files_found ? "YES" : "NO" ))"
-    log_msg+="\n  - Summary files: $(( skip_summaries ? "SKIPPED" : "GENERATED" ))"
-    log "INFO" "$log_msg"
+    log_info "PARSING PIPELINE COMPLETED SUCCESSFULLY"
+    log_info "  Input directory: $input_directory"
+    log_info "  Output files created: $(( dat_files_found ? 3 : 2 ))"
+    log_info "  Correlator data: $(( dat_files_found ? "YES" : "NO" ))"
+    log_info "  Summary files: $(( skip_summaries ? "SKIPPED" : "GENERATED" ))"
     
-    # Terminate logging properly
-    log "INFO" "Parsing pipeline completed successfully"
     echo -e "$SCRIPT_TERMINATION_MESSAGE" >> "$SCRIPT_LOG_FILE_PATH"
-
-    echo -e "\n${PROGRESS_SUCCESS} Parsing pipeline execution completed successfully!"
+    echo ""
+    echo "${PROGRESS_SUCCESS} Parsing pipeline execution completed successfully!"
+    
     return 0
 }
 
@@ -528,6 +422,5 @@ trap 'cleanup_on_exit' EXIT
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     main "$@"
     exit_code=$?
-    
     exit $exit_code
 fi
