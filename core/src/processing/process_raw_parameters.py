@@ -21,6 +21,7 @@ from typing import Optional
 import click
 
 # Import library components
+from library import ROOT
 from library.validation.click_validators import (
     hdf5_file,
     csv_file,
@@ -139,9 +140,9 @@ def main(
         click.echo(
             "✓ Processing extracted values from QPB log files completed successfully."
         )
-        click.echo(
-            f"✓ Results saved to: {os.path.join(output_directory, output_csv_filename)}"
-        )
+        full_path = os.path.join(output_directory, output_csv_filename)
+        relative_path = os.path.relpath(full_path, ROOT)
+        click.echo(f"✓ Results saved to: {relative_path}")
         click.echo(
             f"✓ Final dataset: {result_dataframe.shape[0]} rows, "
             f"{result_dataframe.shape[1]} columns"
