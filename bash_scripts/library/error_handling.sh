@@ -377,5 +377,140 @@ function cleanup_on_exit() {
 }
 
 # =============================================================================
+# PYTHON SCRIPT EXECUTION FUNCTIONS
+# =============================================================================
+
+function execute_python_script() {
+    # Execute a Python script with standardized error handling and logging
+    #
+    # This function provides a consistent interface for executing Python scripts
+    # in the pipeline with proper error handling, logging, and validation.
+    #
+    # Arguments:
+    #   $1 - script_path     : Path to the Python script to execute
+    #   $2 - script_name     : Human-readable name for logging
+    #   $@ - script_args     : Additional arguments to pass to the Python script
+    #
+    # Returns:
+    #   0 - Script executed successfully
+    #   1 - Script execution failed
+    #
+    # Examples:
+    #   # Simple execution
+    #   execute_python_script "$PARSE_LOG_FILES_SCRIPT" "parse_log_files" \
+    #       --input_directory "$input_dir" \
+    #       --output_directory "$output_dir" \
+    #       || return 1
+    #
+    #   # With logging enabled
+    #   execute_python_script "$PROCESS_RAW_SCRIPT" "process_raw_parameters" \
+    #       --input_csv "$csv_file" \
+    #       --output_directory "$output_dir" \
+    #       --enable_logging \
+    #       --log_directory "$log_dir" \
+    #       || exit 1
+    #
+    # Usage Pattern:
+    #   local script_path="$1"
+    #   local script_name="$2"
+    #   shift 2  # Remove first two arguments
+    #   local script_args=("$@")  # Remaining args are for the Python script
+    #
+    # Output:
+    #   Prints execution status to stdout
+    #   Prints errors to stderr
+    #   Logs execution details if logging is initialized
+    
+    local script_path="$1"
+    local script_name="$2"
+    shift 2
+    local script_args=("$@")
+    
+    # Validate Python script exists
+    if [[ ! -f "$script_path" ]]; then
+        echo "ERROR: Python script not found: $script_path" >&2
+        [[ -n "$SCRIPT_LOG_FILE_PATH" ]] && log_error "Python script not found: $script_path"
+        return 1
+    fi
+    
+    # Log execution start
+    [[ -n "$SCRIPT_LOG_FILE_PATH" ]] && log_info "Executing Python script: $script_name"
+    [[ -n "$SCRIPT_LOG_FILE_PATH" ]] && log_info "Command: python $script_path ${script_args[*]}"
+    
+    # Execute Python script
+    python "$script_path" "${script_args[@]}"
+    local exit_code=$?
+    
+    # Check execution result
+    if [[ $exit_code -eq 0 ]]; then
+        echo "  ✓ $script_name completed successfully"
+        [[ -n "$SCRIPT_LOG_FILE_PATH" ]] && log_info "$script_name execution successful"
+        return 0
+    else
+        echo "ERROR: $script_name failed with exit code $exit_code" >&2
+        [[ -n "$SCRIPT_LOG_FILE_PATH" ]] && log_error "$script_name failed with exit code $exit_code"
+        return 1
+    fi
+}
+
+function execute_python_script_with_command_building() {
+    # Execute a Python script by building command string (alternative approach)
+    #
+    # This is an alternative to execute_python_script() that builds a command
+    # string first, which can be useful for logging the exact command or when
+    # you need to use eval for complex command construction.
+    #
+    # Arguments:
+    #   $1 - script_path     : Path to the Python script
+    #   $2 - script_name     : Human-readable name
+    #   $3 - command_string  : Pre-built command string (without 'python' prefix)
+    #
+    # Returns:
+    #   0 - Success
+    #   1 - Failure
+    #
+    # Example:
+    #   local cmd="\"$script_path\" --input \"$input\" --output \"$output\""
+    #   execute_python_script_with_command_building \
+    #       "$script_path" "my_script" "$cmd" || return 1
+    #
+    # Note: This function is less commonly needed but provided for compatibility
+    #       with existing code patterns that build command strings.
+    
+    local script_path="$1"
+    local script_name="$2"
+    local command_string="$3"
+    
+    # Validate Python script exists
+    if [[ ! -f "$script_path" ]]; then
+        echo "ERROR: Python script not found: $script_path" >&2
+        [[ -n "$SCRIPT_LOG_FILE_PATH" ]] && log_error "Python script not found: $script_path"
+        return 1
+    fi
+    
+    # Build full command
+    local full_command="python $command_string"
+    
+    # Log execution
+    [[ -n "$SCRIPT_LOG_FILE_PATH" ]] && log_info "Executing: $script_name"
+    [[ -n "$SCRIPT_LOG_FILE_PATH" ]] && log_info "Command: $full_command"
+    
+    # Execute using eval to handle quoted arguments
+    eval "$full_command"
+    local exit_code=$?
+    
+    # Check result
+    if [[ $exit_code -eq 0 ]]; then
+        echo "  ✓ $script_name completed successfully"
+        [[ -n "$SCRIPT_LOG_FILE_PATH" ]] && log_info "$script_name execution successful"
+        return 0
+    else
+        echo "ERROR: $script_name failed with exit code $exit_code" >&2
+        [[ -n "$SCRIPT_LOG_FILE_PATH" ]] && log_error "$script_name failed with exit code $exit_code"
+        return 1
+    fi
+}
+
+# =============================================================================
 # END OF FILE
 # =============================================================================
