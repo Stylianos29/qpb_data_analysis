@@ -69,7 +69,7 @@ from src.processing._jackknife_visualization_config import (
 )
 @click.option(
     "-o",
-    "--output_directory",
+    "--output_directory", # TODO: Change to --plots_direcotry
     required=True,
     callback=directory.must_exist,
     help="Directory for output plots.",
