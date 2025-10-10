@@ -23,6 +23,7 @@
 #     - Generates statistical samples
 #   Stage 2C (Visualization) - Optional (only if correlators present):
 #     - Optional visualization of jackknife samples
+#   - Calls: run_processing_pipeline.sh
 #
 # Stage 3 (Analysis) - FUTURE:
 #   - Correlator calculations (PCAC/Pion)
@@ -75,8 +76,6 @@ WORKFLOWS_DIR="$(realpath "${SCRIPT_DIR}/../workflows")"
 
 # Workflow script paths
 PARSING_PIPELINE_SCRIPT="${WORKFLOWS_DIR}/run_parsing_pipeline.sh"
-# Note: Processing stages (2A, 2B, 2C) are implemented directly in this script
-# PROCESSING_PIPELINE_SCRIPT is no longer used but kept for reference
 PROCESSING_PIPELINE_SCRIPT="${WORKFLOWS_DIR}/run_processing_pipeline.sh"
 
 # Future workflow scripts (not yet implemented)
@@ -93,6 +92,11 @@ PARSED_CSV_FILENAME="single_valued_parameters.csv"
 PARSED_HDF5_LOG_FILENAME="multivalued_parameters.h5"
 PARSED_HDF5_CORR_FILENAME="correlators_raw_data.h5"
 
+# Auxiliary directory structure
+AUXILIARY_DIR_NAME="auxiliary"
+AUXILIARY_LOGS_SUBDIR="logs"
+AUXILIARY_SUMMARIES_SUBDIR="summaries"
+
 # =============================================================================
 # SECTION 4: FUNCTION DEFINITIONS
 # =============================================================================
@@ -106,7 +110,8 @@ REQUIRED ARGUMENTS:
 
 OPTIONAL ARGUMENTS:
   -o, --output_directory       Output directory (default: mirrors raw in processed/)
-  -log_dir, --log_directory    Log files directory (default: output directory)
+  -plots_dir, --plots_directory Plots directory (optional, default: output_directory)
+  -log_dir, --log_directory    Log files directory (default: output_directory)
   -viz, --enable_visualization Enable visualization in processing stage
   --skip_checks                Skip intermediate file validation
   --skip_summaries             Skip generation of summary files
@@ -115,10 +120,11 @@ OPTIONAL ARGUMENTS:
 EXAMPLES:
   $SCRIPT_NAME -i ../data_files/raw/invert/Chebyshev_experiment/
   $SCRIPT_NAME -i raw_data/ -o processed_data/
+  $SCRIPT_NAME -i raw_data/ -plots_dir output/plots/ -viz
   $SCRIPT_NAME -i raw_data/ -viz --skip_checks
 
 EOF
-    # Clear any exit handlers before exiting
+    # Clear exit handlers before exiting
     trap - EXIT
     exit 0
 }
@@ -143,7 +149,7 @@ function detect_correlator_files() {
 }
 
 function validate_prerequisites() {
-    # Validate that required workflow scripts exist
+    # Validate that required workflow scripts exist and are executable
     #
     # Arguments:
     #   $1 - input_directory : Directory to validate (for file checks)
@@ -161,19 +167,9 @@ function validate_prerequisites() {
         return 1
     fi
     
-    # Validate parsing pipeline script exists
-    if [[ ! -f "$PARSING_PIPELINE_SCRIPT" ]]; then
-        echo "ERROR: Parsing pipeline script not found: $PARSING_PIPELINE_SCRIPT" >&2
-        log_error "Missing parsing pipeline script"
-        return 1
-    fi
-    
-    # Validate processing pipeline script exists
-    if [[ ! -f "$PROCESSING_PIPELINE_SCRIPT" ]]; then
-        echo "ERROR: Processing pipeline script not found: $PROCESSING_PIPELINE_SCRIPT" >&2
-        log_error "Missing processing pipeline script"
-        return 1
-    fi
+    # Validate workflow scripts exist and are executable
+    validate_workflow_script "$PARSING_PIPELINE_SCRIPT" "parsing pipeline" || return 1
+    validate_workflow_script "$PROCESSING_PIPELINE_SCRIPT" "processing pipeline" || return 1
     
     echo "✓ All prerequisites validated"
     log_info "Prerequisites validation completed successfully"
@@ -224,8 +220,8 @@ function run_parsing_stage() {
     fi
 }
 
-function run_processing_stage_2a() {
-    # Execute Stage 2A: Process raw parameters (ALWAYS runs)
+function run_processing_stage() {
+    # Execute Stage 2: Processing pipeline (2A always, 2B/2C conditional)
     #
     # Returns:
     #   0 - Success
@@ -233,182 +229,116 @@ function run_processing_stage_2a() {
     
     echo ""
     echo "==================================================================="
-    echo "   STAGE 2A: PROCESSING RAW PARAMETERS"
+    echo "   STAGE 2: PROCESSING"
     echo "==================================================================="
-    echo "Processing and validating raw parameters..."
+    echo "Processing parameters and applying analysis..."
     
-    log_info "=== STAGE 2A: PROCESS RAW PARAMETERS ==="
-    log_info "This stage always runs regardless of correlator presence"
+    log_info "=== STAGE 2: PROCESSING STAGE ==="
+    log_info "Executing processing pipeline script"
     
     # Define paths to parsed files from Stage 1
     local parsed_csv_path="${output_directory}/${PARSED_CSV_FILENAME}"
     local parsed_hdf5_log_path="${output_directory}/${PARSED_HDF5_LOG_FILENAME}"
+    local parsed_hdf5_corr_path="${output_directory}/${PARSED_HDF5_CORR_FILENAME}"
     
-    # Validate that parsed CSV file exists
-    if [[ ! -f "$parsed_csv_path" ]]; then
-        echo "ERROR: Parsed CSV file not found: $parsed_csv_path" >&2
-        log_error "Missing parsed CSV file from Stage 1"
-        return 1
+    # Build processing command
+    local processing_cmd="$PROCESSING_PIPELINE_SCRIPT"
+    processing_cmd+=" -csv \"$parsed_csv_path\""
+    processing_cmd+=" -hdf5_param \"$parsed_hdf5_log_path\""
+    
+    # Add correlator file if it exists
+    if $has_correlators && [[ -f "$parsed_hdf5_corr_path" ]]; then
+        processing_cmd+=" -hdf5_corr \"$parsed_hdf5_corr_path\""
     fi
     
-    # Validate that parsed HDF5 log file exists
-    if [[ ! -f "$parsed_hdf5_log_path" ]]; then
-        echo "ERROR: Parsed HDF5 log file not found: $parsed_hdf5_log_path" >&2
-        log_error "Missing parsed HDF5 log file from Stage 1"
-        return 1
+    # Add output directories
+    processing_cmd+=" -out_dir \"$output_directory\""
+    
+    # Add plots directory only if user specified it
+    if [[ -n "$plots_directory" ]]; then
+        processing_cmd+=" -plots_dir \"$plots_directory\""
+    fi
+    # Otherwise, processing pipeline will use its default (output_directory)
+    
+    processing_cmd+=" -log_dir \"$log_directory\""
+    
+    # Add visualization flag
+    if $enable_visualization; then
+        processing_cmd+=" -viz"
     fi
     
-    # Define Python scripts directory
-    local python_scripts_dir="$(realpath "${SCRIPT_DIR}/../../core/src")"
-    local process_raw_script="${python_scripts_dir}/processing/process_raw_parameters.py"
-    
-    # Validate script exists
-    if [[ ! -f "$process_raw_script" ]]; then
-        echo "ERROR: Python script not found: $process_raw_script" >&2
-        log_error "Missing process_raw_parameters.py script"
-        return 1
-    fi
-    
-    # Build command
-    local cmd="python \"$process_raw_script\""
-    cmd+=" --input_single_valued_csv_file_path \"$parsed_csv_path\""
-    cmd+=" --input_multivalued_hdf5_file_path \"$parsed_hdf5_log_path\""
-    cmd+=" --output_directory \"$output_directory\""
-    cmd+=" --output_csv_filename \"processed_parameter_values.csv\""
-    cmd+=" --enable_logging"
-    cmd+=" --log_directory \"$log_directory\""
-    
-    log_info "Command: $cmd"
-    
-    # Execute
-    if eval "$cmd"; then
-        echo "✓ Stage 2A completed: Raw parameters processed"
-        log_info "Stage 2A completed successfully"
-        return 0
-    else
-        echo "ERROR: Stage 2A failed" >&2
-        log_error "Stage 2A failed"
-        return 1
-    fi
-}
-
-function run_processing_stage_2b() {
-    # Execute Stage 2B: Jackknife analysis (only if correlators exist)
-    #
-    # Returns:
-    #   0 - Success
-    #   1 - Failure
-    
-    echo ""
-    echo "==================================================================="
-    echo "   STAGE 2B: JACKKNIFE ANALYSIS"
-    echo "==================================================================="
-    echo "Applying jackknife resampling to correlator data..."
-    
-    log_info "=== STAGE 2B: JACKKNIFE ANALYSIS ==="
-    
-    # Define path to correlator file from Stage 1
-    local correlator_hdf5_path="${output_directory}/${PARSED_HDF5_CORR_FILENAME}"
-    
-    # Validate that correlator file exists
-    if [[ ! -f "$correlator_hdf5_path" ]]; then
-        echo "ERROR: Correlator HDF5 file not found: $correlator_hdf5_path" >&2
-        log_error "Missing correlator HDF5 file from Stage 1"
-        return 1
-    fi
-    
-    # Define Python scripts directory
-    local python_scripts_dir="$(realpath "${SCRIPT_DIR}/../../core/src")"
-    local jackknife_script="${python_scripts_dir}/processing/apply_jackknife_analysis.py"
-    
-    # Validate script exists
-    if [[ ! -f "$jackknife_script" ]]; then
-        echo "ERROR: Python script not found: $jackknife_script" >&2
-        log_error "Missing apply_jackknife_analysis.py script"
-        return 1
-    fi
-    
-    # Build command
-    local cmd="python \"$jackknife_script\""
-    cmd+=" --input_hdf5_file \"$correlator_hdf5_path\""
-    cmd+=" --output_directory \"$output_directory\""
-    cmd+=" --output_hdf5_file \"correlators_jackknife_analysis.h5\""
-    cmd+=" --enable_logging"
-    cmd+=" --log_directory \"$log_directory\""
-    
+    # Add skip checks flag
     if $skip_checks; then
-        cmd+=" --skip_validation"
+        processing_cmd+=" --skip_checks"
     fi
     
-    log_info "Command: $cmd"
+    log_info "Command: $processing_cmd"
     
-    # Execute
-    if eval "$cmd"; then
-        echo "✓ Stage 2B completed: Jackknife analysis applied"
-        log_info "Stage 2B completed successfully"
+    # Execute processing pipeline
+    if eval "$processing_cmd"; then
+        echo "✓ Processing stage completed successfully"
+        log_info "Processing stage completed successfully"
         return 0
     else
-        echo "ERROR: Stage 2B failed" >&2
-        log_error "Stage 2B failed"
+        echo "ERROR: Processing stage failed" >&2
+        log_error "Processing stage failed"
         return 1
     fi
 }
 
-function run_processing_stage_2c() {
-    # Execute Stage 2C: Visualization (optional, only if correlators exist)
+function organize_auxiliary_files() {
+    # Organize auxiliary files (logs and summaries) into subdirectories
+    #
+    # Moves log files and summary files from output_directory into
+    # auxiliary/logs/ and auxiliary/summaries/ subdirectories.
     #
     # Returns:
     #   0 - Success
     #   1 - Failure
     
     echo ""
-    echo "==================================================================="
-    echo "   STAGE 2C: VISUALIZATION (OPTIONAL)"
-    echo "==================================================================="
-    echo "Generating jackknife sample diagnostic plots..."
+    echo "=== ORGANIZING AUXILIARY FILES ==="
+    log_info "Organizing auxiliary files into subdirectories"
     
-    log_info "=== STAGE 2C: VISUALIZATION ==="
+    # Create auxiliary directory structure
+    local aux_base="${output_directory}/${AUXILIARY_DIR_NAME}"
+    local aux_logs="${aux_base}/${AUXILIARY_LOGS_SUBDIR}"
+    local aux_summaries="${aux_base}/${AUXILIARY_SUMMARIES_SUBDIR}"
     
-    # Define path to jackknife results from Stage 2B
-    local jackknife_hdf5_path="${output_directory}/correlators_jackknife_analysis.h5"
-    
-    # Validate that jackknife file exists
-    if [[ ! -f "$jackknife_hdf5_path" ]]; then
-        echo "ERROR: Jackknife HDF5 file not found: $jackknife_hdf5_path" >&2
-        log_error "Missing jackknife HDF5 file from Stage 2B"
+    mkdir -p "$aux_logs" || {
+        echo "WARNING: Failed to create auxiliary logs directory" >&2
+        log_warning "Failed to create auxiliary logs directory"
         return 1
-    fi
+    }
     
-    # Define Python scripts directory
-    local python_scripts_dir="$(realpath "${SCRIPT_DIR}/../../core/src")"
-    local viz_script="${python_scripts_dir}/processing/visualize_jackknife_samples.py"
-    
-    # Validate script exists
-    if [[ ! -f "$viz_script" ]]; then
-        echo "ERROR: Python script not found: $viz_script" >&2
-        log_error "Missing visualize_jackknife_samples.py script"
+    mkdir -p "$aux_summaries" || {
+        echo "WARNING: Failed to create auxiliary summaries directory" >&2
+        log_warning "Failed to create auxiliary summaries directory"
         return 1
-    fi
+    }
     
-    # Build command
-    local cmd="python \"$viz_script\""
-    cmd+=" --input_hdf5_file_path \"$jackknife_hdf5_path\""
-    cmd+=" --output_directory \"$output_directory\""
-    cmd+=" --enable_logging"
-    cmd+=" --log_directory \"$log_directory\""
+    # Move log files (excluding the orchestrator's own log)
+    local logs_moved=0
+    for log_file in "${output_directory}"/*_python_script.log "${output_directory}"/run_parsing_pipeline.log "${output_directory}"/run_processing_pipeline.log; do
+        if [[ -f "$log_file" ]]; then
+            mv "$log_file" "$aux_logs/" 2>/dev/null && ((logs_moved++))
+        fi
+    done
+    # Note: run_complete_pipeline.log stays in root as the main orchestrator log
     
-    log_info "Command: $cmd"
+    # Move summary files
+    local summaries_moved=0
+    for summary_file in "${output_directory}"/*_summary.txt "${output_directory}"/*_tree.txt "${output_directory}"/*_report.txt; do
+        if [[ -f "$summary_file" ]]; then
+            mv "$summary_file" "$aux_summaries/" 2>/dev/null && ((summaries_moved++))
+        fi
+    done
     
-    # Execute
-    if eval "$cmd"; then
-        echo "✓ Stage 2C completed: Visualizations generated"
-        log_info "Stage 2C completed successfully"
-        return 0
-    else
-        echo "WARNING: Stage 2C failed (visualization is optional)" >&2
-        log_warning "Stage 2C failed but continuing (visualization is optional)"
-        return 0  # Don't fail pipeline for optional visualization
-    fi
+    echo "  → Moved $logs_moved log files to auxiliary/logs/"
+    echo "  → Moved $summaries_moved summary files to auxiliary/summaries/"
+    log_info "Organized auxiliary files: $logs_moved logs, $summaries_moved summaries"
+    
+    return 0
 }
 
 # =============================================================================
@@ -418,6 +348,7 @@ function run_processing_stage_2c() {
 # Initialize variables
 input_directory=""
 output_directory=""
+plots_directory=""
 log_directory=""
 enable_visualization=false
 skip_checks=false
@@ -432,6 +363,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -o|--output_directory)
             output_directory="$2"
+            shift 2
+            ;;
+        -plots_dir|--plots_directory)
+            plots_directory="$2"
             shift 2
             ;;
         -log_dir|--log_directory)
@@ -493,7 +428,7 @@ if [[ -z "$output_directory" ]]; then
     # Try to replace 'raw' with 'processed' in path
     if [[ "$input_directory" == *"/data_files/raw/"* ]]; then
         output_directory="${input_directory/\/raw\//\/processed\/}"
-        echo "INFO: Auto-detected output directory: $output_directory"
+        echo "INFO: Auto-detected output directory: $(get_display_path "$output_directory")"
     else
         # Fallback: use input directory
         output_directory="$input_directory"
@@ -507,7 +442,7 @@ if [[ ! -d "$output_directory" ]]; then
         echo "ERROR: Failed to create output directory: $output_directory" >&2
         exit 1
     }
-    echo "INFO: Created output directory: $output_directory"
+    echo "INFO: Created output directory: $(get_display_path "$output_directory")"
 fi
 output_directory="$(realpath "$output_directory")"
 
@@ -525,6 +460,21 @@ if [[ ! -d "$log_directory" ]]; then
 fi
 log_directory="$(realpath "$log_directory")"
 
+# Handle plots directory if specified
+if [[ -n "$plots_directory" ]]; then
+    # Ensure plots directory exists if user specified it
+    if [[ ! -d "$plots_directory" ]]; then
+        mkdir -p "$plots_directory" || {
+            echo "ERROR: Failed to create plots directory: $plots_directory" >&2
+            exit 1
+        }
+        echo "INFO: Created plots directory: $(get_display_path "$plots_directory")"
+    fi
+    plots_directory="$(realpath "$plots_directory")"
+    echo "INFO: Using plots directory: $(get_display_path "$plots_directory")"
+fi
+# If not specified, processing pipeline will use its own default (output_directory)
+
 # NOW setup logging infrastructure (after help check and validation)
 export SCRIPT_TERMINATION_MESSAGE="\n\t\t$(echo "$SCRIPT_NAME" | tr '[:lower:]' '[:upper:]') EXECUTION TERMINATED"
 
@@ -539,6 +489,9 @@ log_info "Script: $SCRIPT_NAME"
 log_info "Data file set: $input_dir_name"
 log_info "Input directory: $input_directory"
 log_info "Output directory: $output_directory"
+if [[ -n "$plots_directory" ]]; then
+    log_info "Plots directory: $plots_directory"
+fi
 log_info "Log directory: $log_directory"
 log_info "Visualization: $enable_visualization"
 log_info "Skip checks: $skip_checks"
@@ -556,6 +509,9 @@ echo "==================================================================="
 echo "Data file set: $input_dir_name"
 echo "Input:  $(get_display_path "$input_directory")"
 echo "Output: $(get_display_path "$output_directory")"
+if [[ -n "$plots_directory" ]]; then
+    echo "Plots:  $(get_display_path "$plots_directory")"
+fi
 echo "==================================================================="
 
 # Validate prerequisites
@@ -585,41 +541,16 @@ if ! run_parsing_stage; then
     exit 1
 fi
 
-# Execute Stage 2A: Process Raw Parameters (ALWAYS runs)
-if ! run_processing_stage_2a; then
+# Execute Stage 2: Processing (always runs 2A, conditionally runs 2B/2C)
+if ! run_processing_stage; then
     echo ""
-    echo "PIPELINE FAILED: Error in Stage 2A (process raw parameters)" >&2
-    log_error "Pipeline terminated: Stage 2A failed"
+    echo "PIPELINE FAILED: Error in processing stage" >&2
+    log_error "Pipeline terminated: Processing stage failed"
     exit 1
 fi
 
-# Execute Stage 2B & 2C: Jackknife Analysis (only if correlators present)
-if $has_correlators; then
-    # Stage 2B: Jackknife Analysis
-    if ! run_processing_stage_2b; then
-        echo ""
-        echo "PIPELINE FAILED: Error in Stage 2B (jackknife analysis)" >&2
-        log_error "Pipeline terminated: Stage 2B failed"
-        exit 1
-    fi
-    
-    # Stage 2C: Visualization (optional, only if enabled)
-    if $enable_visualization; then
-        run_processing_stage_2c
-        # Note: This stage is optional and won't fail the pipeline
-    else
-        echo ""
-        echo "○ Stage 2C skipped: Visualization not enabled"
-        log_info "Stage 2C skipped (visualization not enabled)"
-    fi
-else
-    echo ""
-    echo "==================================================================="
-    echo "   STAGES 2B & 2C: SKIPPED"
-    echo "==================================================================="
-    echo "No correlator files detected - jackknife analysis not applicable"
-    log_info "Stages 2B and 2C skipped (no correlator files)"
-fi
+# Organize auxiliary files into subdirectories
+organize_auxiliary_files
 
 # Pipeline completion
 echo ""
@@ -627,11 +558,21 @@ echo "==================================================================="
 echo "   PIPELINE COMPLETED SUCCESSFULLY"
 echo "==================================================================="
 echo "All applicable stages completed"
-echo "Output location: $(get_display_path "$output_directory")"
-echo "Log file: $(get_display_path "$SCRIPT_LOG_FILE_PATH")"
+echo ""
+echo "Output structure:"
+echo "  Data files:    $(get_display_path "$output_directory")"
+if [[ -n "$plots_directory" ]]; then
+    echo "  Plots:         $(get_display_path "$plots_directory")"
+fi
+echo "  Auxiliary:"
+echo "    - Logs:      $(get_display_path "${output_directory}/${AUXILIARY_DIR_NAME}/${AUXILIARY_LOGS_SUBDIR}")"
+echo "    - Summaries: $(get_display_path "${output_directory}/${AUXILIARY_DIR_NAME}/${AUXILIARY_SUMMARIES_SUBDIR}")"
+echo ""
+echo "Main log file: $(get_display_path "$SCRIPT_LOG_FILE_PATH")"
 echo "==================================================================="
 
 log_info "=== PIPELINE EXECUTION COMPLETED SUCCESSFULLY ==="
 log_info "All stages completed without errors"
+log_info "Auxiliary files organized successfully"
 
 exit 0
