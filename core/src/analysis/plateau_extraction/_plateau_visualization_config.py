@@ -33,7 +33,7 @@ ANALYSIS_CONFIGS = {
         "time_offset": 2,  # PCAC mass starts at t=2
         "y_label": r"$am_{\mathrm{PCAC}}$",
         "title_prefix": "PCAC Mass Plateau Extraction",
-        "plot_subdirectory": "plateau_extraction_pcac",
+        "plot_subdirectory": "Plateau_extraction_pcac",
         "column_prefix": "PCAC",
         "description": "PCAC mass",
         # PCAC-mass-specific trimming settings
@@ -53,7 +53,7 @@ ANALYSIS_CONFIGS = {
         "time_offset": 1,  # Effective mass starts at t=1
         "y_label": r"$am_{\pi}^{\mathrm{eff}}$",
         "title_prefix": "Pion Effective Mass Plateau Extraction",
-        "plot_subdirectory": "plateau_extraction_pion",
+        "plot_subdirectory": "Plateau_extraction_pion",
         "column_prefix": "pion",
         "description": "pion effective mass",
         # Pion-mass-specific trimming settings
