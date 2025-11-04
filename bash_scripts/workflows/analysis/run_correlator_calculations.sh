@@ -29,8 +29,7 @@
 #                               (default: not created unless visualization enabled)
 #   -log_dir, --log_directory   Directory for log files
 #                               (default: input_directory/auxiliary/logs/)
-#   --enable-pcac-viz           Generate PCAC correlator visualization plots
-#   --enable-pion-viz           Generate pion correlator visualization plots
+#   --enable-viz                Generate visualizations for both branches
 #   --pcac-only                 Run only PCAC branch (skip pion)
 #   --pion-only                 Run only Pion branch (skip PCAC)
 #   --skip-checks               Skip intermediate file validation
@@ -121,13 +120,12 @@ fi
 # =============================================================================
 
 # Python script paths
-ANALYSIS_SCRIPTS_DIR="${PYTHON_SCRIPTS_DIRECTORY}/analysis/correlator_calculations"
-PCAC_MASS_SCRIPT="${ANALYSIS_SCRIPTS_DIR}/calculate_PCAC_mass.py"
-PION_MASS_SCRIPT="${ANALYSIS_SCRIPTS_DIR}/calculate_effective_mass.py"
-VIZ_SCRIPT="${ANALYSIS_SCRIPTS_DIR}/visualize_correlator_analysis.py"
+CORRELATOR_SCRIPTS_DIR="${PYTHON_SCRIPTS_DIRECTORY}/analysis/correlator_calculations"
+PCAC_MASS_SCRIPT="${CORRELATOR_SCRIPTS_DIR}/calculate_PCAC_mass.py"
+PION_MASS_SCRIPT="${CORRELATOR_SCRIPTS_DIR}/calculate_effective_mass.py"
+VIZ_SCRIPT="${CORRELATOR_SCRIPTS_DIR}/visualize_correlator_analysis.py"
 
-# Input/Output filenames (using constants from constants.sh)
-JACKKNIFE_HDF5_FILENAME="$PROCESSING_HDF5_JACKKNIFE"
+# Output filenames (using constants from constants.sh)
 PCAC_OUTPUT_HDF5="$ANALYSIS_HDF5_PCAC_MASS"
 PION_OUTPUT_HDF5="$ANALYSIS_HDF5_PION_MASS"
 
@@ -150,20 +148,20 @@ Usage: $SCRIPT_NAME -hdf5_jack <jackknife_hdf5_file> [options]
 
 REQUIRED ARGUMENTS:
   -hdf5_jack, --input_hdf5_jackknife  Path to jackknife HDF5 file
-                                      (from apply_jackknife_analysis.py)
 
 OPTIONAL ARGUMENTS:
   -o, --output_directory          Output directory for analysis files
                                   (default: parent dir of input HDF5)
   -p, --plots_directory           Directory for visualization plots
-                                  (default: not created)
   -log_dir, --log_directory       Directory for log files
                                   (default: output_dir/auxiliary/logs/)
   
+  VISUALIZATION:
+  --enable-viz                    Generate visualizations for both branches
+  
   BRANCH CONTROL:
-  --enable-viz                    Generate correlator visualization plots
-  --pcac-only                     Run only PCAC branch
-  --pion-only                     Run only Pion branch
+  --pcac-only                     Run only PCAC branch (skip pion)
+  --pion-only                     Run only Pion branch (skip PCAC)
   
   OTHER OPTIONS:
   --skip-checks                   Skip intermediate validation
@@ -171,16 +169,14 @@ OPTIONAL ARGUMENTS:
   -h, --help                      Display this help message
 
 EXAMPLES:
-  # Basic usage
+  # Both branches
   $SCRIPT_NAME -hdf5_jack correlators_jackknife_analysis.h5
 
   # With visualization
-  $SCRIPT_NAME -hdf5_jack data/correlators_jackknife_analysis.h5 \\
-      -p plots/ --enable-viz
+  $SCRIPT_NAME -hdf5_jack data.h5 -p plots/ --enable-viz
 
-  # PCAC branch only with visualization
-  $SCRIPT_NAME -hdf5_jack correlators_jackknife_analysis.h5 \\
-      -p plots/ --pcac-only --enable-viz
+  # PCAC only
+  $SCRIPT_NAME -hdf5_jack data.h5 --pcac-only
 
 For more information, see the script header documentation.
 EOF
@@ -304,14 +300,17 @@ function main() {
     fi
     output_directory="$(realpath "$output_directory")"
     
-    # Convert plots directory to absolute path if specified
-    [[ -n "$plots_directory" ]] && plots_directory="$(realpath "$plots_directory")"
+    # Handle plots directory - use realpath -m to canonicalize even if it doesn't exist yet
+    if [[ -n "$plots_directory" ]]; then
+        plots_directory="$(realpath -m "$plots_directory")"
+    fi
     
     # Default log directory
     if [[ -z "$log_directory" ]]; then
         log_directory="${output_directory}/${AUXILIARY_DIR_NAME}/${AUXILIARY_LOGS_SUBDIR}"
     fi
-    log_directory="$(realpath "$log_directory")"
+    # Use realpath -m to handle the path even if it doesn't exist yet
+    log_directory="$(realpath -m "$log_directory")"
     
     # Validate conflicting flags
     if [[ "$pcac_only" == "true" && "$pion_only" == "true" ]]; then
@@ -319,17 +318,14 @@ function main() {
         exit 1
     fi
     
-    # Setup directories
-    validate_output_directory "$output_directory" -c || {
-        echo "ERROR: Failed to create output directory: $output_directory" >&2
+    # Validate output directory exists (user must create it)
+    if [[ ! -d "$output_directory" ]]; then
+        echo "ERROR: Output directory does not exist: $output_directory" >&2
+        echo "Please create it before running this script." >&2
         exit 1
-    }
+    fi
     
-    validate_output_directory "$log_directory" -c || {
-        echo "ERROR: Failed to create log directory: $log_directory" >&2
-        exit 1
-    }
-    
+    # Setup auxiliary directories (auto-created if needed)
     setup_auxiliary_directories "$output_directory" || exit 1
     
     # Initialize logging
@@ -351,6 +347,9 @@ function main() {
     local pcac_skipped="false"
     local pion_skipped="false"
     
+    # Auxiliary directories
+    local summary_dir="${output_directory}/${AUXILIARY_DIR_NAME}/${AUXILIARY_SUMMARIES_SUBDIR}"
+    
     # =========================================================================
     # PCAC BRANCH
     # =========================================================================
@@ -370,14 +369,14 @@ function main() {
             exit 1
         fi
         
-        # Construct full output path
-        local pcac_output_file="${output_directory}/${PCAC_OUTPUT_HDF5}"
+        # Construct output path
+        local pcac_output_hdf5="${output_directory}/${PCAC_OUTPUT_HDF5}"
         
         # Execute PCAC mass calculation
         echo "  → Running calculate_PCAC_mass.py..."
         execute_python_script "$PCAC_MASS_SCRIPT" "calculate_PCAC_mass" \
             --input_hdf5_file "$input_hdf5_jackknife" \
-            --output_hdf5_file "$pcac_output_file" \
+            --output_hdf5_file "$pcac_output_hdf5" \
             --enable_logging \
             --log_directory "$log_directory"
         
@@ -387,29 +386,26 @@ function main() {
             log_info "PCAC mass calculation successful"
             
             # Validate output file
-            local pcac_output_file="${output_directory}/${PCAC_OUTPUT_HDF5}"
             if [[ "$skip_checks" != "true" ]]; then
-                if [[ ! -f "$pcac_output_file" ]]; then
-                    echo "ERROR: PCAC output file not created: $pcac_output_file" >&2
-                    log_error "PCAC output file missing: $pcac_output_file"
+                if [[ ! -f "$pcac_output_hdf5" ]]; then
+                    echo "ERROR: PCAC HDF5 file not created: $pcac_output_hdf5" >&2
+                    log_error "PCAC HDF5 file missing: $pcac_output_hdf5"
                     close_logging
                     exit 1
                 fi
-                echo "  ✓ Output file validated: $PCAC_OUTPUT_HDF5"
+                echo "  ✓ Output file validated"
             fi
             
-            # Generate HDF5 summary
+            # Generate HDF5 tree summary
             if [[ "$skip_summaries" != "true" ]]; then
-                echo "  → Generating HDF5 structure summary..."
-                local summary_dir="${output_directory}/${AUXILIARY_DIR_NAME}/${AUXILIARY_SUMMARIES_SUBDIR}"
-                
-                generate_hdf5_tree "$pcac_output_file" "$summary_dir"
+                echo "  → Generating HDF5 tree summary..."
+                generate_hdf5_tree_summary "$pcac_output_hdf5" "$summary_dir"
                 if [[ $? -eq 0 ]]; then
-                    echo "  ✓ HDF5 summary generated"
-                    log_info "PCAC HDF5 summary created in: $summary_dir"
+                    echo "  ✓ HDF5 tree summary generated"
+                    log_info "PCAC HDF5 tree summary created in: $summary_dir"
                 else
-                    echo "  ⚠ Warning: HDF5 summary generation failed" >&2
-                    log_warning "Failed to generate PCAC HDF5 summary"
+                    echo "  ⚠ Warning: HDF5 tree summary generation failed" >&2
+                    log_warning "Failed to generate PCAC HDF5 tree summary"
                 fi
             fi
             
@@ -422,25 +418,28 @@ function main() {
                     echo "  ⚠ Warning: Visualization script not found: $VIZ_SCRIPT" >&2
                     log_warning "Visualization script not found"
                 else
-                    echo "  → Generating PCAC correlator visualizations..."
-                    validate_output_directory "$plots_directory" -c || {
-                        echo "  ⚠ Warning: Failed to create plots directory" >&2
-                        log_warning "Failed to create plots directory"
-                    }
+                    echo "  → Generating PCAC visualizations..."
                     
-                    execute_python_script "$VIZ_SCRIPT" "visualize_correlator_analysis" \
-                        --analysis_type pcac_mass \
-                        --input_hdf5_file "$pcac_output_file" \
-                        --plots_directory "$plots_directory" \
-                        --enable_logging \
-                        --log_directory "$log_directory"
-                    
-                    if [[ $? -eq 0 ]]; then
-                        echo "  ✓ PCAC visualizations generated"
-                        log_info "PCAC visualization completed"
+                    # Validate plots directory exists (user must create it)
+                    if [[ ! -d "$plots_directory" ]]; then
+                        echo "  ⚠ Warning: Plots directory does not exist: $plots_directory" >&2
+                        echo "  → Please create it to enable visualization" >&2
+                        log_warning "PCAC visualization skipped: plots directory does not exist"
                     else
-                        echo "  ⚠ Warning: PCAC visualization failed" >&2
-                        log_warning "PCAC visualization failed"
+                        execute_python_script "$VIZ_SCRIPT" "visualize_correlator_analysis" \
+                            --analysis_type pcac \
+                            --results_hdf5 "$pcac_output_hdf5" \
+                            --plots_directory "$plots_directory" \
+                            --enable_logging \
+                            --log_directory "$log_directory"
+                        
+                        if [[ $? -eq 0 ]]; then
+                            echo "  ✓ PCAC visualizations generated"
+                            log_info "PCAC visualization completed"
+                        else
+                            echo "  ⚠ Warning: PCAC visualization failed" >&2
+                            log_warning "PCAC visualization failed"
+                        fi
                     fi
                 fi
             fi
@@ -470,19 +469,19 @@ function main() {
         # Validate Python script
         if [[ ! -f "$PION_MASS_SCRIPT" ]]; then
             echo "ERROR: Pion effective mass script not found: $PION_MASS_SCRIPT" >&2
-            log_error "Pion mass script not found: $PION_MASS_SCRIPT"
+            log_error "Pion effective mass script not found: $PION_MASS_SCRIPT"
             close_logging
             exit 1
         fi
         
-        # Construct full output path
-        local pion_output_file="${output_directory}/${PION_OUTPUT_HDF5}"
+        # Construct output path
+        local pion_output_hdf5="${output_directory}/${PION_OUTPUT_HDF5}"
         
         # Execute pion effective mass calculation
         echo "  → Running calculate_effective_mass.py..."
         execute_python_script "$PION_MASS_SCRIPT" "calculate_effective_mass" \
             --input_hdf5_file "$input_hdf5_jackknife" \
-            --output_hdf5_file "$pion_output_file" \
+            --output_hdf5_file "$pion_output_hdf5" \
             --enable_logging \
             --log_directory "$log_directory"
         
@@ -492,29 +491,26 @@ function main() {
             log_info "Pion effective mass calculation successful"
             
             # Validate output file
-            local pion_output_file="${output_directory}/${PION_OUTPUT_HDF5}"
             if [[ "$skip_checks" != "true" ]]; then
-                if [[ ! -f "$pion_output_file" ]]; then
-                    echo "ERROR: Pion output file not created: $pion_output_file" >&2
-                    log_error "Pion output file missing: $pion_output_file"
+                if [[ ! -f "$pion_output_hdf5" ]]; then
+                    echo "ERROR: Pion HDF5 file not created: $pion_output_hdf5" >&2
+                    log_error "Pion HDF5 file missing: $pion_output_hdf5"
                     close_logging
                     exit 1
                 fi
-                echo "  ✓ Output file validated: $PION_OUTPUT_HDF5"
+                echo "  ✓ Output file validated"
             fi
             
-            # Generate HDF5 summary
+            # Generate HDF5 tree summary
             if [[ "$skip_summaries" != "true" ]]; then
-                echo "  → Generating HDF5 structure summary..."
-                local summary_dir="${output_directory}/${AUXILIARY_DIR_NAME}/${AUXILIARY_SUMMARIES_SUBDIR}"
-                
-                generate_hdf5_tree "$pion_output_file" "$summary_dir"
+                echo "  → Generating HDF5 tree summary..."
+                generate_hdf5_tree_summary "$pion_output_hdf5" "$summary_dir"
                 if [[ $? -eq 0 ]]; then
-                    echo "  ✓ HDF5 summary generated"
-                    log_info "Pion HDF5 summary created in: $summary_dir"
+                    echo "  ✓ HDF5 tree summary generated"
+                    log_info "Pion HDF5 tree summary created in: $summary_dir"
                 else
-                    echo "  ⚠ Warning: HDF5 summary generation failed" >&2
-                    log_warning "Failed to generate Pion HDF5 summary"
+                    echo "  ⚠ Warning: HDF5 tree summary generation failed" >&2
+                    log_warning "Failed to generate Pion HDF5 tree summary"
                 fi
             fi
             
@@ -527,25 +523,28 @@ function main() {
                     echo "  ⚠ Warning: Visualization script not found: $VIZ_SCRIPT" >&2
                     log_warning "Visualization script not found"
                 else
-                    echo "  → Generating pion correlator visualizations..."
-                    validate_output_directory "$plots_directory" -c || {
-                        echo "  ⚠ Warning: Failed to create plots directory" >&2
-                        log_warning "Failed to create plots directory"
-                    }
+                    echo "  → Generating pion visualizations..."
                     
-                    execute_python_script "$VIZ_SCRIPT" "visualize_correlator_analysis" \
-                        --analysis_type effective_mass \
-                        --input_hdf5_file "$pion_output_file" \
-                        --plots_directory "$plots_directory" \
-                        --enable_logging \
-                        --log_directory "$log_directory"
-                    
-                    if [[ $? -eq 0 ]]; then
-                        echo "  ✓ Pion visualizations generated"
-                        log_info "Pion visualization completed"
+                    # Validate plots directory exists (user must create it)
+                    if [[ ! -d "$plots_directory" ]]; then
+                        echo "  ⚠ Warning: Plots directory does not exist: $plots_directory" >&2
+                        echo "  → Please create it to enable visualization" >&2
+                        log_warning "Pion visualization skipped: plots directory does not exist"
                     else
-                        echo "  ⚠ Warning: Pion visualization failed" >&2
-                        log_warning "Pion visualization failed"
+                        execute_python_script "$VIZ_SCRIPT" "visualize_correlator_analysis" \
+                            --analysis_type pion \
+                            --results_hdf5 "$pion_output_hdf5" \
+                            --plots_directory "$plots_directory" \
+                            --enable_logging \
+                            --log_directory "$log_directory"
+                        
+                        if [[ $? -eq 0 ]]; then
+                            echo "  ✓ Pion visualizations generated"
+                            log_info "Pion visualization completed"
+                        else
+                            echo "  ⚠ Warning: Pion visualization failed" >&2
+                            log_warning "Pion visualization failed"
+                        fi
                     fi
                 fi
             fi
