@@ -327,26 +327,26 @@ function main() {
     fi
     output_directory="$(realpath "$output_directory")"
     
-    # Convert plots directory to absolute path if specified
-    [[ -n "$plots_directory" ]] && plots_directory="$(realpath "$plots_directory")"
+    # Handle plots directory - use realpath -m to canonicalize even if it doesn't exist yet
+    if [[ -n "$plots_directory" ]]; then
+        plots_directory="$(realpath -m "$plots_directory")"
+    fi
     
     # Default log directory
     if [[ -z "$log_directory" ]]; then
         log_directory="${output_directory}/${AUXILIARY_DIR_NAME}/${AUXILIARY_LOGS_SUBDIR}"
     fi
-    log_directory="$(realpath "$log_directory")"
+    # Use realpath -m to handle the path even if it doesn't exist yet
+    log_directory="$(realpath -m "$log_directory")"
     
-    # Setup directories
-    validate_output_directory "$output_directory" -c || {
-        echo "ERROR: Failed to create output directory: $output_directory" >&2
+    # Validate output directory exists (user must create it)
+    if [[ ! -d "$output_directory" ]]; then
+        echo "ERROR: Output directory does not exist: $output_directory" >&2
+        echo "Please create it before running this script." >&2
         exit 1
-    }
+    fi
     
-    validate_output_directory "$log_directory" -c || {
-        echo "ERROR: Failed to create log directory: $log_directory" >&2
-        exit 1
-    }
-    
+    # Setup auxiliary directories (auto-created if needed)
     setup_auxiliary_directories "$output_directory" || exit 1
     
     # Initialize logging
@@ -446,22 +446,24 @@ function main() {
                 # CSV summary
                 generate_csv_summary "$pcac_csv_file" "$summary_dir"
                 if [[ $? -eq 0 ]]; then
-                    echo "  ✓ CSV summary generated"
+                    echo "  → CSV summary generated"
                     log_info "PCAC CSV summary created in: $summary_dir"
                 else
                     echo "  ⚠ Warning: CSV summary generation failed" >&2
                     log_warning "Failed to generate PCAC CSV summary"
                 fi
                 
-                # HDF5 summary
-                generate_hdf5_tree "$pcac_hdf5_viz" "$summary_dir"
+                # HDF5 tree summary
+                generate_hdf5_tree_summary "$pcac_hdf5_viz" "$summary_dir"
                 if [[ $? -eq 0 ]]; then
-                    echo "  ✓ HDF5 summary generated"
-                    log_info "PCAC HDF5 summary created in: $summary_dir"
+                    echo "  → HDF5 tree summary generated"
+                    log_info "PCAC HDF5 tree summary created in: $summary_dir"
                 else
-                    echo "  ⚠ Warning: HDF5 summary generation failed" >&2
-                    log_warning "Failed to generate PCAC HDF5 summary"
+                    echo "  ⚠ Warning: HDF5 tree summary generation failed" >&2
+                    log_warning "Failed to generate PCAC HDF5 tree summary"
                 fi
+                
+                echo "  ✓ Summaries generated"
             fi
             
             # Optional visualization
@@ -474,24 +476,27 @@ function main() {
                     log_warning "Visualization script not found"
                 else
                     echo "  → Generating PCAC plateau visualizations..."
-                    validate_output_directory "$plots_directory" -c || {
-                        echo "  ⚠ Warning: Failed to create plots directory" >&2
-                        log_warning "Failed to create plots directory"
-                    }
                     
-                    execute_python_script "$VIZ_SCRIPT" "visualize_plateau_extraction" \
-                        --analysis_type pcac_mass \
-                        --input_hdf5_file "$pcac_hdf5_viz" \
-                        --plots_directory "$plots_directory" \
-                        --enable_logging \
-                        --log_directory "$log_directory"
-                    
-                    if [[ $? -eq 0 ]]; then
-                        echo "  ✓ PCAC visualizations generated"
-                        log_info "PCAC visualization completed"
+                    # Validate plots directory exists (user must create it)
+                    if [[ ! -d "$plots_directory" ]]; then
+                        echo "  ⚠ Warning: Plots directory does not exist: $plots_directory" >&2
+                        echo "  → Please create it to enable visualization" >&2
+                        log_warning "PCAC visualization skipped: plots directory does not exist"
                     else
-                        echo "  ⚠ Warning: PCAC visualization failed" >&2
-                        log_warning "PCAC visualization failed"
+                        execute_python_script "$VIZ_SCRIPT" "visualize_plateau_extraction" \
+                            --analysis_type pcac \
+                            --results_hdf5 "$pcac_hdf5_viz" \
+                            --plots_directory "$plots_directory" \
+                            --enable_logging \
+                            --log_directory "$log_directory"
+                        
+                        if [[ $? -eq 0 ]]; then
+                            echo "  ✓ PCAC visualizations generated"
+                            log_info "PCAC visualization completed"
+                        else
+                            echo "  ⚠ Warning: PCAC visualization failed" >&2
+                            log_warning "PCAC visualization failed"
+                        fi
                     fi
                 fi
             fi
@@ -580,22 +585,24 @@ function main() {
                 # CSV summary
                 generate_csv_summary "$pion_csv_file" "$summary_dir"
                 if [[ $? -eq 0 ]]; then
-                    echo "  ✓ CSV summary generated"
+                    echo "  → CSV summary generated"
                     log_info "Pion CSV summary created in: $summary_dir"
                 else
                     echo "  ⚠ Warning: CSV summary generation failed" >&2
                     log_warning "Failed to generate Pion CSV summary"
                 fi
                 
-                # HDF5 summary
-                generate_hdf5_tree "$pion_hdf5_viz" "$summary_dir"
+                # HDF5 tree summary
+                generate_hdf5_tree_summary "$pion_hdf5_viz" "$summary_dir"
                 if [[ $? -eq 0 ]]; then
-                    echo "  ✓ HDF5 summary generated"
-                    log_info "Pion HDF5 summary created in: $summary_dir"
+                    echo "  → HDF5 tree summary generated"
+                    log_info "Pion HDF5 tree summary created in: $summary_dir"
                 else
-                    echo "  ⚠ Warning: HDF5 summary generation failed" >&2
-                    log_warning "Failed to generate Pion HDF5 summary"
+                    echo "  ⚠ Warning: HDF5 tree summary generation failed" >&2
+                    log_warning "Failed to generate Pion HDF5 tree summary"
                 fi
+                
+                echo "  ✓ Summaries generated"
             fi
             
             # Optional visualization
@@ -608,24 +615,27 @@ function main() {
                     log_warning "Visualization script not found"
                 else
                     echo "  → Generating pion plateau visualizations..."
-                    validate_output_directory "$plots_directory" -c || {
-                        echo "  ⚠ Warning: Failed to create plots directory" >&2
-                        log_warning "Failed to create plots directory"
-                    }
                     
-                    execute_python_script "$VIZ_SCRIPT" "visualize_plateau_extraction" \
-                        --analysis_type pion_mass \
-                        --input_hdf5_file "$pion_hdf5_viz" \
-                        --plots_directory "$plots_directory" \
-                        --enable_logging \
-                        --log_directory "$log_directory"
-                    
-                    if [[ $? -eq 0 ]]; then
-                        echo "  ✓ Pion visualizations generated"
-                        log_info "Pion visualization completed"
+                    # Validate plots directory exists (user must create it)
+                    if [[ ! -d "$plots_directory" ]]; then
+                        echo "  ⚠ Warning: Plots directory does not exist: $plots_directory" >&2
+                        echo "  → Please create it to enable visualization" >&2
+                        log_warning "Pion visualization skipped: plots directory does not exist"
                     else
-                        echo "  ⚠ Warning: Pion visualization failed" >&2
-                        log_warning "Pion visualization failed"
+                        execute_python_script "$VIZ_SCRIPT" "visualize_plateau_extraction" \
+                            --analysis_type pion \
+                            --results_hdf5 "$pion_hdf5_viz" \
+                            --plots_directory "$plots_directory" \
+                            --enable_logging \
+                            --log_directory "$log_directory"
+                        
+                        if [[ $? -eq 0 ]]; then
+                            echo "  ✓ Pion visualizations generated"
+                            log_info "Pion visualization completed"
+                        else
+                            echo "  ⚠ Warning: Pion visualization failed" >&2
+                            log_warning "Pion visualization failed"
+                        fi
                     fi
                 fi
             fi
@@ -664,7 +674,6 @@ function main() {
     
     echo ""
     echo "Output files location: $output_directory"
-    echo "Visualization HDF5 files: ${output_directory}/auxiliary/visualization/"
     [[ -n "$plots_directory" ]] && echo "Plots location: $plots_directory"
     echo "Log file: $log_file"
     
