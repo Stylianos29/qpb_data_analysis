@@ -399,7 +399,7 @@ function main() {
             # Generate HDF5 tree summary
             if [[ "$skip_summaries" != "true" ]]; then
                 echo "  → Generating HDF5 tree summary..."
-                generate_hdf5_tree_summary "$pcac_output_hdf5" "$summary_dir"
+                generate_hdf5_tree "$pcac_output_hdf5" "$summary_dir"
                 if [[ $? -eq 0 ]]; then
                     echo "  ✓ HDF5 tree summary generated"
                     log_info "PCAC HDF5 tree summary created in: $summary_dir"
@@ -504,7 +504,7 @@ function main() {
             # Generate HDF5 tree summary
             if [[ "$skip_summaries" != "true" ]]; then
                 echo "  → Generating HDF5 tree summary..."
-                generate_hdf5_tree_summary "$pion_output_hdf5" "$summary_dir"
+                generate_hdf5_tree "$pion_output_hdf5" "$summary_dir"
                 if [[ $? -eq 0 ]]; then
                     echo "  ✓ HDF5 tree summary generated"
                     log_info "Pion HDF5 tree summary created in: $summary_dir"
