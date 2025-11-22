@@ -29,21 +29,27 @@
 #   Stage 3.1 (Correlator Calculations):
 #     - PCAC mass time series calculation
 #     - Pion effective mass calculation
-#     - Optional visualization
+#     - Optional visualization (if plots directory provided)
 #   Stage 3.2 (Plateau Extraction):
 #     - PCAC mass plateau extraction
 #     - Pion mass plateau extraction
-#     - Optional visualization
+#     - Optional visualization (if plots directory provided)
 #   Stage 3.3 (Critical Mass Extrapolation):
 #     - Critical mass from PCAC
 #     - Critical mass from Pion
-#     - Optional visualization
+#     - Optional visualization (if plots directory provided)
+#     - Note: Requires multiple bare mass values; skips gracefully if insufficient
 #   Stage 3.4 (Cost Extrapolation):
 #     - Cost extrapolation from PCAC
 #     - Cost extrapolation from Pion
-#     - Optional visualization
+#     - Optional visualization (if plots directory provided)
+#     - Note: Only runs if Stage 3.3 produces results
 #   - Calls: run_correlator_calculations.sh, run_plateau_extraction.sh,
 #            run_critical_mass.sh, run_cost_extrapolation.sh
+#
+# VISUALIZATION:
+#   Visualization is automatically enabled for all stages when a plots directory
+#   is provided via -plots_dir option.
 #
 # USAGE:
 #   ./run_complete_pipeline.sh -i <raw_data_set_dir> [options]
@@ -147,44 +153,48 @@ REQUIRED ARGUMENTS:
 
 OPTIONAL ARGUMENTS:
   -o, --output_directory       Output directory (default: mirrors raw in processed/)
-  -plots_dir, --plots_directory Plots directory (optional, default: output_directory)
+  -plots_dir, --plots_directory Plots directory (enables visualization for all stages)
   -log_dir, --log_directory    Log files directory (default: output_directory)
-  -viz, --enable_visualization Enable visualization in all stages
   --skip_checks                Skip intermediate file validation
   --skip_summaries             Skip generation of summary files
   -h, --help                   Display this help message
 
 PIPELINE BEHAVIOR:
   With correlator files (.dat):
-    - Executes Stages 1, 2A, 2B, 2C (optional), 3.1, 3.2, 3.3, 3.4
+    - Executes Stages 1, 2A, 2B, 2C (if plots), 3.1, 3.2, 3.3, 3.4
     - Complete end-to-end analysis including cost extrapolation
+    - Stage 3.3/3.4 may skip if insufficient bare mass variation
   
   Without correlator files:
     - Executes Stages 1A, 2A only
     - Parameters-only processing
 
+VISUALIZATION:
+  Visualization is automatically enabled when -plots_dir is provided.
+  Applies to: Stage 2C, Stage 3.1, Stage 3.2, Stage 3.3, Stage 3.4
+
 EXAMPLES:
-  # Basic usage - auto-detects data type and runs appropriate stages
+  # Basic usage - no visualization
   $SCRIPT_NAME -i ../data_files/raw/invert/Chebyshev_experiment/
   
-  # With custom output directory
-  $SCRIPT_NAME -i raw_data/ -o processed_data/
+  # With visualization (auto-enabled by providing plots directory)
+  $SCRIPT_NAME -i raw_data/ -plots_dir output/plots/
   
-  # Enable visualization for all stages (2C + all Stage 3 substages)
-  $SCRIPT_NAME -i raw_data/ -plots_dir output/plots/ -viz
+  # Custom output and plots directories
+  $SCRIPT_NAME -i raw_data/ -o processed_data/ -plots_dir plots/
   
-  # Minimal processing (skip validation and summaries for speed)
+  # Fast processing (skip validation and summaries)
   $SCRIPT_NAME -i raw_data/ --skip_checks --skip_summaries
 
 STAGES EXECUTED:
   Stage 1:  Parsing (always)
   Stage 2A: Processing parameters (always)
   Stage 2B: Jackknife analysis (if correlators present)
-  Stage 2C: Jackknife visualization (if correlators + -viz)
+  Stage 2C: Jackknife visualization (if correlators + plots_dir)
   Stage 3.1: Correlator calculations (if correlators present)
   Stage 3.2: Plateau extraction (if correlators present)
-  Stage 3.3: Critical mass extrapolation (if correlators present)
-  Stage 3.4: Cost extrapolation (if correlators present)
+  Stage 3.3: Critical mass extrapolation (if correlators + sufficient data)
+  Stage 3.4: Cost extrapolation (if 3.3 produces results)
 
 EOF
     # Clear exit handlers before exiting
@@ -328,15 +338,12 @@ function run_processing_stage() {
     # Add plots directory only if user specified it
     if [[ -n "$plots_directory" ]]; then
         processing_cmd+=" -plots_dir \"$plots_directory\""
+        # Enable visualization in Stage 2 if plots directory provided
+        processing_cmd+=" -viz"
     fi
     # Otherwise, processing pipeline will use its default (output_directory)
     
     processing_cmd+=" -log_dir \"$log_directory\""
-    
-    # Add visualization flag
-    if $enable_visualization; then
-        processing_cmd+=" -viz"
-    fi
     
     # Add skip checks flag
     if $skip_checks; then
@@ -381,17 +388,15 @@ function run_stage_3_1() {
     cmd+=" -hdf5_jack \"$jackknife_hdf5\""
     cmd+=" -o \"$output_directory\""
     
-    # Add plots directory if specified
+    # Add plots directory if specified (visualization auto-enabled in substage)
     if [[ -n "$plots_directory" ]]; then
         cmd+=" -p \"$plots_directory\""
     fi
     
     cmd+=" -log_dir \"$log_directory\""
     
-    # Add visualization flag
-    if $enable_visualization; then
-        cmd+=" --enable-viz"
-    fi
+    # Note: Visualization is auto-enabled in substage if plots_directory provided
+    # Not passing --enable-viz flag to avoid compatibility issues
     
     # Add skip flags
     if $skip_checks; then
@@ -442,17 +447,15 @@ function run_stage_3_2() {
     cmd+=" -i_pion \"$pion_mass_hdf5\""
     cmd+=" -o \"$output_directory\""
     
-    # Add plots directory if specified
+    # Add plots directory if specified (visualization auto-enabled in substage)
     if [[ -n "$plots_directory" ]]; then
         cmd+=" -p \"$plots_directory\""
     fi
     
     cmd+=" -log_dir \"$log_directory\""
     
-    # Add visualization flag
-    if $enable_visualization; then
-        cmd+=" --enable-viz"
-    fi
+    # Note: Visualization is auto-enabled in substage if plots_directory provided
+    # Not passing --enable-viz flag to avoid compatibility issues
     
     # Add skip flags
     if $skip_checks; then
@@ -481,8 +484,9 @@ function run_stage_3_3() {
     # Execute Stage 3.3: Critical Mass Extrapolation
     #
     # Returns:
-    #   0 - Success
-    #   1 - Failure
+    #   0 - Success (at least one branch succeeded OR both gracefully skipped)
+    #   1 - Failure (hard error occurred)
+    #   2 - Success but no output (both branches skipped gracefully)
     
     echo ""
     echo "==================================================================="
@@ -503,17 +507,15 @@ function run_stage_3_3() {
     cmd+=" -i_pion \"$pion_plateau_csv\""
     cmd+=" -o \"$output_directory\""
     
-    # Add plots directory if specified
+    # Add plots directory if specified (visualization auto-enabled in substage)
     if [[ -n "$plots_directory" ]]; then
         cmd+=" -p \"$plots_directory\""
     fi
     
     cmd+=" -log_dir \"$log_directory\""
     
-    # Add visualization flag
-    if $enable_visualization; then
-        cmd+=" --enable-viz"
-    fi
+    # Note: Visualization is auto-enabled in substage if plots_directory provided
+    # Not passing --enable-viz flag to avoid compatibility issues
     
     # Add skip flags
     if $skip_checks; then
@@ -530,6 +532,21 @@ function run_stage_3_3() {
     if eval "$cmd"; then
         echo "✓ Stage 3.3 completed successfully"
         log_info "Stage 3.3 completed successfully"
+        
+        # Check if any critical mass files were created
+        local pcac_critical_csv="${output_directory}/${CRITICAL_PCAC_CSV_FILENAME}"
+        local pion_critical_csv="${output_directory}/${CRITICAL_PION_CSV_FILENAME}"
+        
+        if [[ ! -f "$pcac_critical_csv" && ! -f "$pion_critical_csv" ]]; then
+            echo ""
+            echo "⚠ WARNING: No critical mass results produced"
+            echo "  → Insufficient bare mass variation for extrapolation"
+            echo "  → Skipping Stage 3.4 (Cost Extrapolation)"
+            log_warning "Stage 3.3 produced no results - insufficient data variation"
+            log_info "Stage 3.4 will be skipped"
+            return 2  # Special return code: success but no output
+        fi
+        
         return 0
     else
         echo "ERROR: Stage 3.3 failed" >&2
@@ -566,17 +583,15 @@ function run_stage_3_4() {
     cmd+=" -i_cost \"$processed_csv\""
     cmd+=" -o \"$output_directory\""
     
-    # Add plots directory if specified
+    # Add plots directory if specified (visualization auto-enabled in substage)
     if [[ -n "$plots_directory" ]]; then
         cmd+=" -p \"$plots_directory\""
     fi
     
     cmd+=" -log_dir \"$log_directory\""
     
-    # Add visualization flag
-    if $enable_visualization; then
-        cmd+=" --enable-viz"
-    fi
+    # Note: Visualization is auto-enabled in substage if plots_directory provided
+    # Not passing --enable-viz flag to avoid compatibility issues
     
     # Add skip flags
     if $skip_checks; then
@@ -604,6 +619,7 @@ function run_stage_3_4() {
 function run_analysis_stage() {
     # Execute Stage 3: Complete Analysis Pipeline
     # Runs all four substages sequentially: 3.1 → 3.2 → 3.3 → 3.4
+    # Stops gracefully if Stage 3.3 produces no results (insufficient data)
     #
     # Returns:
     #   0 - Success
@@ -613,7 +629,7 @@ function run_analysis_stage() {
     echo "==================================================================="
     echo "   STAGE 3: ANALYSIS"
     echo "==================================================================="
-    echo "Running complete analysis pipeline (4 substages)..."
+    echo "Running complete analysis pipeline (up to 4 substages)..."
     
     log_info "=== STAGE 3: ANALYSIS STAGE ==="
     log_info "Executing all analysis substages"
@@ -635,14 +651,25 @@ function run_analysis_stage() {
     fi
     
     # Stage 3.3: Critical Mass Extrapolation
-    if ! run_stage_3_3; then
+    run_stage_3_3
+    local stage_3_3_result=$?
+    
+    if [[ $stage_3_3_result -eq 1 ]]; then
+        # Hard failure
         echo ""
         echo "PIPELINE FAILED: Error in Stage 3.3" >&2
         log_error "Pipeline terminated: Stage 3.3 failed"
         return 1
+    elif [[ $stage_3_3_result -eq 2 ]]; then
+        # Graceful skip - no results produced
+        echo ""
+        echo "○ Stage 3.4 skipped: No critical mass results from Stage 3.3"
+        log_info "Stage 3.4 skipped: insufficient data for critical mass extrapolation"
+        log_info "Stage 3 completed successfully (Stages 3.1 and 3.2 only)"
+        return 0
     fi
     
-    # Stage 3.4: Cost Extrapolation
+    # Stage 3.4: Cost Extrapolation (only if 3.3 produced results)
     if ! run_stage_3_4; then
         echo ""
         echo "PIPELINE FAILED: Error in Stage 3.4" >&2
@@ -720,7 +747,6 @@ input_directory=""
 output_directory=""
 plots_directory=""
 log_directory=""
-enable_visualization=false
 skip_checks=false
 skip_summaries=false
 
@@ -742,10 +768,6 @@ while [[ $# -gt 0 ]]; do
         -log_dir|--log_directory)
             log_directory="$2"
             shift 2
-            ;;
-        -viz|--enable_visualization)
-            enable_visualization=true
-            shift
             ;;
         --skip_checks)
             skip_checks=true
@@ -841,9 +863,8 @@ if [[ -n "$plots_directory" ]]; then
         echo "INFO: Created plots directory: $(get_display_path "$plots_directory")"
     fi
     plots_directory="$(realpath "$plots_directory")"
-    echo "INFO: Using plots directory: $(get_display_path "$plots_directory")"
+    echo "INFO: Plots directory provided - visualization will be enabled for all stages"
 fi
-# If not specified, processing pipeline will use its own default (output_directory)
 
 # NOW setup logging infrastructure (after help check and validation)
 export SCRIPT_TERMINATION_MESSAGE="\n\t\t$(echo "$SCRIPT_NAME" | tr '[:lower:]' '[:upper:]') EXECUTION TERMINATED"
@@ -860,10 +881,11 @@ log_info "Data file set: $input_dir_name"
 log_info "Input directory: $input_directory"
 log_info "Output directory: $output_directory"
 if [[ -n "$plots_directory" ]]; then
-    log_info "Plots directory: $plots_directory"
+    log_info "Plots directory: $plots_directory (visualization enabled)"
+else
+    log_info "Plots directory: not specified (visualization disabled)"
 fi
 log_info "Log directory: $log_directory"
-log_info "Visualization: $enable_visualization"
 log_info "Skip checks: $skip_checks"
 log_info "Skip summaries: $skip_summaries"
 
@@ -880,7 +902,7 @@ echo "Data file set: $input_dir_name"
 echo "Input:  $(get_display_path "$input_directory")"
 echo "Output: $(get_display_path "$output_directory")"
 if [[ -n "$plots_directory" ]]; then
-    echo "Plots:  $(get_display_path "$plots_directory")"
+    echo "Plots:  $(get_display_path "$plots_directory") (visualization enabled)"
 fi
 echo "==================================================================="
 
@@ -953,13 +975,20 @@ if $has_correlators; then
     echo "  Stage 1:   Parsing ✓"
     echo "  Stage 2A:  Processing parameters ✓"
     echo "  Stage 2B:  Jackknife analysis ✓"
-    if $enable_visualization; then
+    if [[ -n "$plots_directory" ]]; then
         echo "  Stage 2C:  Jackknife visualization ✓"
     fi
     echo "  Stage 3.1: Correlator calculations ✓"
     echo "  Stage 3.2: Plateau extraction ✓"
-    echo "  Stage 3.3: Critical mass extrapolation ✓"
-    echo "  Stage 3.4: Cost extrapolation ✓"
+    
+    # Check if Stage 3.3/3.4 ran
+    if [[ -f "${output_directory}/${CRITICAL_PCAC_CSV_FILENAME}" || -f "${output_directory}/${CRITICAL_PION_CSV_FILENAME}" ]]; then
+        echo "  Stage 3.3: Critical mass extrapolation ✓"
+        echo "  Stage 3.4: Cost extrapolation ✓"
+    else
+        echo "  Stage 3.3: Critical mass extrapolation ○ (skipped - insufficient data)"
+        echo "  Stage 3.4: Cost extrapolation ○ (skipped - no Stage 3.3 results)"
+    fi
 else
     echo "Parameters-only pipeline executed:"
     echo "  Stage 1:  Parsing ✓"
@@ -981,7 +1010,11 @@ echo "==================================================================="
 
 log_info "=== PIPELINE EXECUTION COMPLETED SUCCESSFULLY ==="
 if $has_correlators; then
-    log_info "Full pipeline executed: All stages (1, 2A, 2B, 2C, 3.1-3.4) completed"
+    if [[ -f "${output_directory}/${CRITICAL_PCAC_CSV_FILENAME}" || -f "${output_directory}/${CRITICAL_PION_CSV_FILENAME}" ]]; then
+        log_info "Full pipeline executed: All stages (1, 2A, 2B, 2C, 3.1-3.4) completed"
+    else
+        log_info "Partial pipeline executed: Stages 1, 2A, 2B, 2C, 3.1, 3.2 completed (3.3/3.4 skipped)"
+    fi
 else
     log_info "Parameters-only pipeline executed: Stages 1, 2A completed"
 fi
