@@ -390,7 +390,7 @@ function run_stage_3_1() {
     
     # Add plots directory if specified (visualization auto-enabled in substage)
     if [[ -n "$plots_directory" ]]; then
-        cmd+=" -p \"$plots_directory\""
+        cmd+=" -p \"$plots_directory\" --enable-viz"
     fi
     
     cmd+=" -log_dir \"$log_directory\""
@@ -449,7 +449,7 @@ function run_stage_3_2() {
     
     # Add plots directory if specified (visualization auto-enabled in substage)
     if [[ -n "$plots_directory" ]]; then
-        cmd+=" -p \"$plots_directory\""
+        cmd+=" -p \"$plots_directory\" --enable-viz"
     fi
     
     cmd+=" -log_dir \"$log_directory\""
@@ -509,7 +509,7 @@ function run_stage_3_3() {
     
     # Add plots directory if specified (visualization auto-enabled in substage)
     if [[ -n "$plots_directory" ]]; then
-        cmd+=" -p \"$plots_directory\""
+        cmd+=" -p \"$plots_directory\" --enable-viz"
     fi
     
     cmd+=" -log_dir \"$log_directory\""
@@ -585,7 +585,7 @@ function run_stage_3_4() {
     
     # Add plots directory if specified (visualization auto-enabled in substage)
     if [[ -n "$plots_directory" ]]; then
-        cmd+=" -p \"$plots_directory\""
+        cmd+=" -p \"$plots_directory\" --enable-viz"
     fi
     
     cmd+=" -log_dir \"$log_directory\""

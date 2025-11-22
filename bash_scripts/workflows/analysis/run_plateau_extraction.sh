@@ -484,8 +484,8 @@ function main() {
                         log_warning "PCAC visualization skipped: plots directory does not exist"
                     else
                         execute_python_script "$VIZ_SCRIPT" "visualize_plateau_extraction" \
-                            --analysis_type pcac \
-                            --results_hdf5 "$pcac_hdf5_viz" \
+                            --analysis_type pcac_mass \
+                            --input_hdf5_file "$pcac_hdf5_viz" \
                             --plots_directory "$plots_directory" \
                             --enable_logging \
                             --log_directory "$log_directory"
@@ -623,8 +623,8 @@ function main() {
                         log_warning "Pion visualization skipped: plots directory does not exist"
                     else
                         execute_python_script "$VIZ_SCRIPT" "visualize_plateau_extraction" \
-                            --analysis_type pion \
-                            --results_hdf5 "$pion_hdf5_viz" \
+                            --analysis_type pion_mass \
+                            --input_hdf5_file "$pion_hdf5_viz" \
                             --plots_directory "$plots_directory" \
                             --enable_logging \
                             --log_directory "$log_directory"
