@@ -25,12 +25,25 @@
 #     - Optional visualization of jackknife samples
 #   - Calls: run_processing_pipeline.sh
 #
-# Stage 3 (Analysis) - FUTURE:
-#   - Correlator calculations (PCAC/Pion)
-#   - Plateau extraction
-#   - Critical mass extrapolation
-#   - Cost extrapolation
-#   - [Not yet implemented - placeholders included]
+# Stage 3 (Analysis) - Only if correlators present:
+#   Stage 3.1 (Correlator Calculations):
+#     - PCAC mass time series calculation
+#     - Pion effective mass calculation
+#     - Optional visualization
+#   Stage 3.2 (Plateau Extraction):
+#     - PCAC mass plateau extraction
+#     - Pion mass plateau extraction
+#     - Optional visualization
+#   Stage 3.3 (Critical Mass Extrapolation):
+#     - Critical mass from PCAC
+#     - Critical mass from Pion
+#     - Optional visualization
+#   Stage 3.4 (Cost Extrapolation):
+#     - Cost extrapolation from PCAC
+#     - Cost extrapolation from Pion
+#     - Optional visualization
+#   - Calls: run_correlator_calculations.sh, run_plateau_extraction.sh,
+#            run_critical_mass.sh, run_cost_extrapolation.sh
 #
 # USAGE:
 #   ./run_complete_pipeline.sh -i <raw_data_set_dir> [options]
@@ -74,23 +87,47 @@ done
 # Workflow scripts directory
 WORKFLOWS_DIR="$(realpath "${SCRIPT_DIR}/../workflows")"
 
-# Workflow script paths
+# Workflow script paths - Stages 1 and 2
 PARSING_PIPELINE_SCRIPT="${WORKFLOWS_DIR}/run_parsing_pipeline.sh"
 PROCESSING_PIPELINE_SCRIPT="${WORKFLOWS_DIR}/run_processing_pipeline.sh"
 
-# Future workflow scripts (not yet implemented)
-# CORRELATOR_ANALYSIS_SCRIPT="${WORKFLOWS_DIR}/run_correlator_analysis_pipeline.sh"
-# PLATEAU_ANALYSIS_SCRIPT="${WORKFLOWS_DIR}/run_plateau_analysis_pipeline.sh"
-# CRITICAL_MASS_SCRIPT="${WORKFLOWS_DIR}/run_critical_mass_pipeline.sh"
-# COST_ANALYSIS_SCRIPT="${WORKFLOWS_DIR}/run_cost_analysis_pipeline.sh"
+# Workflow script paths - Stage 3 (Analysis)
+ANALYSIS_WORKFLOWS_DIR="${WORKFLOWS_DIR}/analysis"
+CORRELATOR_CALCULATIONS_SCRIPT="${ANALYSIS_WORKFLOWS_DIR}/run_correlator_calculations.sh"
+PLATEAU_EXTRACTION_SCRIPT="${ANALYSIS_WORKFLOWS_DIR}/run_plateau_extraction.sh"
+CRITICAL_MASS_SCRIPT="${ANALYSIS_WORKFLOWS_DIR}/run_critical_mass.sh"
+COST_EXTRAPOLATION_SCRIPT="${ANALYSIS_WORKFLOWS_DIR}/run_cost_extrapolation.sh"
 
 # Script log filename
 SCRIPT_LOG_FILENAME="${SCRIPT_NAME%.sh}.log"
 
-# Expected output filenames from parsing stage
+# Expected output filenames from parsing stage (Stage 1)
 PARSED_CSV_FILENAME="single_valued_parameters.csv"
 PARSED_HDF5_LOG_FILENAME="multivalued_parameters.h5"
 PARSED_HDF5_CORR_FILENAME="correlators_raw_data.h5"
+
+# Expected output filenames from processing stage (Stage 2)
+PROCESSED_CSV_FILENAME="processed_parameter_values.csv"
+JACKKNIFE_HDF5_FILENAME="correlators_jackknife_analysis.h5"
+
+# Expected output filenames from analysis stage (Stage 3)
+# Stage 3.1 outputs
+PCAC_MASS_HDF5_FILENAME="PCAC_mass_analysis.h5"
+PION_MASS_HDF5_FILENAME="pion_effective_mass_analysis.h5"
+
+# Stage 3.2 outputs
+PCAC_PLATEAU_CSV_FILENAME="plateau_PCAC_mass_estimates.csv"
+PCAC_PLATEAU_HDF5_FILENAME="plateau_PCAC_mass_estimates.h5"
+PION_PLATEAU_CSV_FILENAME="plateau_pion_mass_estimates.csv"
+PION_PLATEAU_HDF5_FILENAME="plateau_pion_mass_estimates.h5"
+
+# Stage 3.3 outputs
+CRITICAL_PCAC_CSV_FILENAME="critical_bare_mass_from_pcac.csv"
+CRITICAL_PION_CSV_FILENAME="critical_bare_mass_from_pion.csv"
+
+# Stage 3.4 outputs
+COST_PCAC_CSV_FILENAME="cost_extrapolation_from_pcac.csv"
+COST_PION_CSV_FILENAME="cost_extrapolation_from_pion.csv"
 
 # Auxiliary directory structure
 AUXILIARY_DIR_NAME="auxiliary"
@@ -112,16 +149,42 @@ OPTIONAL ARGUMENTS:
   -o, --output_directory       Output directory (default: mirrors raw in processed/)
   -plots_dir, --plots_directory Plots directory (optional, default: output_directory)
   -log_dir, --log_directory    Log files directory (default: output_directory)
-  -viz, --enable_visualization Enable visualization in processing stage
+  -viz, --enable_visualization Enable visualization in all stages
   --skip_checks                Skip intermediate file validation
   --skip_summaries             Skip generation of summary files
   -h, --help                   Display this help message
 
+PIPELINE BEHAVIOR:
+  With correlator files (.dat):
+    - Executes Stages 1, 2A, 2B, 2C (optional), 3.1, 3.2, 3.3, 3.4
+    - Complete end-to-end analysis including cost extrapolation
+  
+  Without correlator files:
+    - Executes Stages 1A, 2A only
+    - Parameters-only processing
+
 EXAMPLES:
+  # Basic usage - auto-detects data type and runs appropriate stages
   $SCRIPT_NAME -i ../data_files/raw/invert/Chebyshev_experiment/
+  
+  # With custom output directory
   $SCRIPT_NAME -i raw_data/ -o processed_data/
+  
+  # Enable visualization for all stages (2C + all Stage 3 substages)
   $SCRIPT_NAME -i raw_data/ -plots_dir output/plots/ -viz
-  $SCRIPT_NAME -i raw_data/ -viz --skip_checks
+  
+  # Minimal processing (skip validation and summaries for speed)
+  $SCRIPT_NAME -i raw_data/ --skip_checks --skip_summaries
+
+STAGES EXECUTED:
+  Stage 1:  Parsing (always)
+  Stage 2A: Processing parameters (always)
+  Stage 2B: Jackknife analysis (if correlators present)
+  Stage 2C: Jackknife visualization (if correlators + -viz)
+  Stage 3.1: Correlator calculations (if correlators present)
+  Stage 3.2: Plateau extraction (if correlators present)
+  Stage 3.3: Critical mass extrapolation (if correlators present)
+  Stage 3.4: Cost extrapolation (if correlators present)
 
 EOF
     # Clear exit handlers before exiting
@@ -170,6 +233,14 @@ function validate_prerequisites() {
     # Validate workflow scripts exist and are executable
     validate_workflow_script "$PARSING_PIPELINE_SCRIPT" "parsing pipeline" || return 1
     validate_workflow_script "$PROCESSING_PIPELINE_SCRIPT" "processing pipeline" || return 1
+    
+    # Validate Stage 3 scripts if correlators are present
+    if $has_correlators; then
+        validate_workflow_script "$CORRELATOR_CALCULATIONS_SCRIPT" "correlator calculations" || return 1
+        validate_workflow_script "$PLATEAU_EXTRACTION_SCRIPT" "plateau extraction" || return 1
+        validate_workflow_script "$CRITICAL_MASS_SCRIPT" "critical mass extraction" || return 1
+        validate_workflow_script "$COST_EXTRAPOLATION_SCRIPT" "cost extrapolation" || return 1
+    fi
     
     echo "✓ All prerequisites validated"
     log_info "Prerequisites validation completed successfully"
@@ -286,6 +357,305 @@ function run_processing_stage() {
     fi
 }
 
+function run_stage_3_1() {
+    # Execute Stage 3.1: Correlator Calculations
+    #
+    # Returns:
+    #   0 - Success
+    #   1 - Failure
+    
+    echo ""
+    echo "==================================================================="
+    echo "   STAGE 3.1: CORRELATOR CALCULATIONS"
+    echo "==================================================================="
+    echo "Calculating PCAC mass and pion effective mass..."
+    
+    log_info "=== STAGE 3.1: CORRELATOR CALCULATIONS ==="
+    log_info "Executing correlator calculations script"
+    
+    # Define input file from Stage 2B
+    local jackknife_hdf5="${output_directory}/${JACKKNIFE_HDF5_FILENAME}"
+    
+    # Build command
+    local cmd="$CORRELATOR_CALCULATIONS_SCRIPT"
+    cmd+=" -hdf5_jack \"$jackknife_hdf5\""
+    cmd+=" -o \"$output_directory\""
+    
+    # Add plots directory if specified
+    if [[ -n "$plots_directory" ]]; then
+        cmd+=" -p \"$plots_directory\""
+    fi
+    
+    cmd+=" -log_dir \"$log_directory\""
+    
+    # Add visualization flag
+    if $enable_visualization; then
+        cmd+=" --enable-viz"
+    fi
+    
+    # Add skip flags
+    if $skip_checks; then
+        cmd+=" --skip-checks"
+    fi
+    
+    if $skip_summaries; then
+        cmd+=" --skip-summaries"
+    fi
+    
+    log_info "Command: $cmd"
+    
+    # Execute
+    if eval "$cmd"; then
+        echo "✓ Stage 3.1 completed successfully"
+        log_info "Stage 3.1 completed successfully"
+        return 0
+    else
+        echo "ERROR: Stage 3.1 failed" >&2
+        log_error "Stage 3.1 failed"
+        return 1
+    fi
+}
+
+function run_stage_3_2() {
+    # Execute Stage 3.2: Plateau Extraction
+    #
+    # Returns:
+    #   0 - Success
+    #   1 - Failure
+    
+    echo ""
+    echo "==================================================================="
+    echo "   STAGE 3.2: PLATEAU EXTRACTION"
+    echo "==================================================================="
+    echo "Extracting PCAC and pion mass plateaus..."
+    
+    log_info "=== STAGE 3.2: PLATEAU EXTRACTION ==="
+    log_info "Executing plateau extraction script"
+    
+    # Define input files from Stage 3.1
+    local pcac_mass_hdf5="${output_directory}/${PCAC_MASS_HDF5_FILENAME}"
+    local pion_mass_hdf5="${output_directory}/${PION_MASS_HDF5_FILENAME}"
+    
+    # Build command
+    local cmd="$PLATEAU_EXTRACTION_SCRIPT"
+    cmd+=" -i_pcac \"$pcac_mass_hdf5\""
+    cmd+=" -i_pion \"$pion_mass_hdf5\""
+    cmd+=" -o \"$output_directory\""
+    
+    # Add plots directory if specified
+    if [[ -n "$plots_directory" ]]; then
+        cmd+=" -p \"$plots_directory\""
+    fi
+    
+    cmd+=" -log_dir \"$log_directory\""
+    
+    # Add visualization flag
+    if $enable_visualization; then
+        cmd+=" --enable-viz"
+    fi
+    
+    # Add skip flags
+    if $skip_checks; then
+        cmd+=" --skip-checks"
+    fi
+    
+    if $skip_summaries; then
+        cmd+=" --skip-summaries"
+    fi
+    
+    log_info "Command: $cmd"
+    
+    # Execute
+    if eval "$cmd"; then
+        echo "✓ Stage 3.2 completed successfully"
+        log_info "Stage 3.2 completed successfully"
+        return 0
+    else
+        echo "ERROR: Stage 3.2 failed" >&2
+        log_error "Stage 3.2 failed"
+        return 1
+    fi
+}
+
+function run_stage_3_3() {
+    # Execute Stage 3.3: Critical Mass Extrapolation
+    #
+    # Returns:
+    #   0 - Success
+    #   1 - Failure
+    
+    echo ""
+    echo "==================================================================="
+    echo "   STAGE 3.3: CRITICAL MASS EXTRAPOLATION"
+    echo "==================================================================="
+    echo "Extrapolating critical bare mass from PCAC and pion..."
+    
+    log_info "=== STAGE 3.3: CRITICAL MASS EXTRAPOLATION ==="
+    log_info "Executing critical mass extraction script"
+    
+    # Define input files from Stage 3.2
+    local pcac_plateau_csv="${output_directory}/${PCAC_PLATEAU_CSV_FILENAME}"
+    local pion_plateau_csv="${output_directory}/${PION_PLATEAU_CSV_FILENAME}"
+    
+    # Build command
+    local cmd="$CRITICAL_MASS_SCRIPT"
+    cmd+=" -i_pcac \"$pcac_plateau_csv\""
+    cmd+=" -i_pion \"$pion_plateau_csv\""
+    cmd+=" -o \"$output_directory\""
+    
+    # Add plots directory if specified
+    if [[ -n "$plots_directory" ]]; then
+        cmd+=" -p \"$plots_directory\""
+    fi
+    
+    cmd+=" -log_dir \"$log_directory\""
+    
+    # Add visualization flag
+    if $enable_visualization; then
+        cmd+=" --enable-viz"
+    fi
+    
+    # Add skip flags
+    if $skip_checks; then
+        cmd+=" --skip-checks"
+    fi
+    
+    if $skip_summaries; then
+        cmd+=" --skip-summaries"
+    fi
+    
+    log_info "Command: $cmd"
+    
+    # Execute
+    if eval "$cmd"; then
+        echo "✓ Stage 3.3 completed successfully"
+        log_info "Stage 3.3 completed successfully"
+        return 0
+    else
+        echo "ERROR: Stage 3.3 failed" >&2
+        log_error "Stage 3.3 failed"
+        return 1
+    fi
+}
+
+function run_stage_3_4() {
+    # Execute Stage 3.4: Cost Extrapolation
+    #
+    # Returns:
+    #   0 - Success
+    #   1 - Failure
+    
+    echo ""
+    echo "==================================================================="
+    echo "   STAGE 3.4: COST EXTRAPOLATION"
+    echo "==================================================================="
+    echo "Extrapolating computational costs..."
+    
+    log_info "=== STAGE 3.4: COST EXTRAPOLATION ==="
+    log_info "Executing cost extrapolation script"
+    
+    # Define input files
+    local pcac_plateau_csv="${output_directory}/${PCAC_PLATEAU_CSV_FILENAME}"
+    local pion_plateau_csv="${output_directory}/${PION_PLATEAU_CSV_FILENAME}"
+    local processed_csv="${output_directory}/${PROCESSED_CSV_FILENAME}"
+    
+    # Build command
+    local cmd="$COST_EXTRAPOLATION_SCRIPT"
+    cmd+=" -i_pcac \"$pcac_plateau_csv\""
+    cmd+=" -i_pion \"$pion_plateau_csv\""
+    cmd+=" -i_cost \"$processed_csv\""
+    cmd+=" -o \"$output_directory\""
+    
+    # Add plots directory if specified
+    if [[ -n "$plots_directory" ]]; then
+        cmd+=" -p \"$plots_directory\""
+    fi
+    
+    cmd+=" -log_dir \"$log_directory\""
+    
+    # Add visualization flag
+    if $enable_visualization; then
+        cmd+=" --enable-viz"
+    fi
+    
+    # Add skip flags
+    if $skip_checks; then
+        cmd+=" --skip-checks"
+    fi
+    
+    if $skip_summaries; then
+        cmd+=" --skip-summaries"
+    fi
+    
+    log_info "Command: $cmd"
+    
+    # Execute
+    if eval "$cmd"; then
+        echo "✓ Stage 3.4 completed successfully"
+        log_info "Stage 3.4 completed successfully"
+        return 0
+    else
+        echo "ERROR: Stage 3.4 failed" >&2
+        log_error "Stage 3.4 failed"
+        return 1
+    fi
+}
+
+function run_analysis_stage() {
+    # Execute Stage 3: Complete Analysis Pipeline
+    # Runs all four substages sequentially: 3.1 → 3.2 → 3.3 → 3.4
+    #
+    # Returns:
+    #   0 - Success
+    #   1 - Failure
+    
+    echo ""
+    echo "==================================================================="
+    echo "   STAGE 3: ANALYSIS"
+    echo "==================================================================="
+    echo "Running complete analysis pipeline (4 substages)..."
+    
+    log_info "=== STAGE 3: ANALYSIS STAGE ==="
+    log_info "Executing all analysis substages"
+    
+    # Stage 3.1: Correlator Calculations
+    if ! run_stage_3_1; then
+        echo ""
+        echo "PIPELINE FAILED: Error in Stage 3.1" >&2
+        log_error "Pipeline terminated: Stage 3.1 failed"
+        return 1
+    fi
+    
+    # Stage 3.2: Plateau Extraction
+    if ! run_stage_3_2; then
+        echo ""
+        echo "PIPELINE FAILED: Error in Stage 3.2" >&2
+        log_error "Pipeline terminated: Stage 3.2 failed"
+        return 1
+    fi
+    
+    # Stage 3.3: Critical Mass Extrapolation
+    if ! run_stage_3_3; then
+        echo ""
+        echo "PIPELINE FAILED: Error in Stage 3.3" >&2
+        log_error "Pipeline terminated: Stage 3.3 failed"
+        return 1
+    fi
+    
+    # Stage 3.4: Cost Extrapolation
+    if ! run_stage_3_4; then
+        echo ""
+        echo "PIPELINE FAILED: Error in Stage 3.4" >&2
+        log_error "Pipeline terminated: Stage 3.4 failed"
+        return 1
+    fi
+    
+    echo ""
+    echo "✓ Stage 3 (Analysis) completed successfully"
+    log_info "Stage 3 completed successfully - all substages executed"
+    return 0
+}
+
 function organize_auxiliary_files() {
     # Organize auxiliary files (logs and summaries) into subdirectories
     #
@@ -319,12 +689,12 @@ function organize_auxiliary_files() {
     
     # Move log files (excluding the orchestrator's own log)
     local logs_moved=0
-    for log_file in "${output_directory}"/*_python_script.log "${output_directory}"/run_parsing_pipeline.log "${output_directory}"/run_processing_pipeline.log; do
-        if [[ -f "$log_file" ]]; then
+    for log_file in "${output_directory}"/*_python_script.log "${output_directory}"/run_*.log; do
+        # Skip the main orchestrator log
+        if [[ -f "$log_file" && "$log_file" != "$SCRIPT_LOG_FILE_PATH" ]]; then
             mv "$log_file" "$aux_logs/" 2>/dev/null && ((logs_moved++))
         fi
     done
-    # Note: run_complete_pipeline.log stays in root as the main orchestrator log
     
     # Move summary files
     local summaries_moved=0
@@ -514,23 +884,25 @@ if [[ -n "$plots_directory" ]]; then
 fi
 echo "==================================================================="
 
+# Detect if data set has correlator files (determines pipeline path)
+has_correlators=false
+if detect_correlator_files "$input_directory"; then
+    has_correlators=true
+    echo "✓ Correlator files (.dat) detected"
+    echo "  → Full pipeline will execute: Stages 1, 2A, 2B, 2C, 3.1, 3.2, 3.3, 3.4"
+    log_info "Correlator files detected - full pipeline execution"
+else
+    echo "ℹ Only log files (.txt) detected"
+    echo "  → Limited pipeline: Stages 1, 2A only"
+    log_info "No correlator files detected - parameters-only pipeline"
+fi
+
 # Validate prerequisites
 echo ""
 echo "=== VALIDATING PREREQUISITES ==="
 if ! validate_prerequisites "$input_directory"; then
     echo "ERROR: Prerequisites validation failed" >&2
     exit 1
-fi
-
-# Detect if data set has correlator files
-has_correlators=false
-if detect_correlator_files "$input_directory"; then
-    has_correlators=true
-    echo "✓ Correlator files (.dat) detected - Full pipeline will execute (Stages 1, 2A, 2B, 2C)"
-    log_info "Correlator files detected - all processing stages will run"
-else
-    echo "ℹ Only log files (.txt) detected - Stages 2B & 2C will be skipped"
-    log_info "No correlator files detected - only Stages 1 and 2A will run"
 fi
 
 # Execute Stage 1: Parsing
@@ -549,15 +921,51 @@ if ! run_processing_stage; then
     exit 1
 fi
 
+# Execute Stage 3: Analysis (only if correlators present)
+if $has_correlators; then
+    if ! run_analysis_stage; then
+        echo ""
+        echo "PIPELINE FAILED: Error in analysis stage" >&2
+        log_error "Pipeline terminated: Analysis stage failed"
+        exit 1
+    fi
+else
+    echo ""
+    echo "○ Stage 3 (Analysis) skipped: No correlator data"
+    log_info "Stage 3 skipped (no correlator data)"
+fi
+
 # Organize auxiliary files into subdirectories
 organize_auxiliary_files
 
-# Pipeline completion
+# =============================================================================
+# PIPELINE COMPLETION
+# =============================================================================
+
 echo ""
 echo "==================================================================="
 echo "   PIPELINE COMPLETED SUCCESSFULLY"
 echo "==================================================================="
-echo "All applicable stages completed"
+
+# Display completion summary based on pipeline path
+if $has_correlators; then
+    echo "Complete analysis pipeline executed:"
+    echo "  Stage 1:   Parsing ✓"
+    echo "  Stage 2A:  Processing parameters ✓"
+    echo "  Stage 2B:  Jackknife analysis ✓"
+    if $enable_visualization; then
+        echo "  Stage 2C:  Jackknife visualization ✓"
+    fi
+    echo "  Stage 3.1: Correlator calculations ✓"
+    echo "  Stage 3.2: Plateau extraction ✓"
+    echo "  Stage 3.3: Critical mass extrapolation ✓"
+    echo "  Stage 3.4: Cost extrapolation ✓"
+else
+    echo "Parameters-only pipeline executed:"
+    echo "  Stage 1:  Parsing ✓"
+    echo "  Stage 2A: Processing parameters ✓"
+fi
+
 echo ""
 echo "Output structure:"
 echo "  Data files:    $(get_display_path "$output_directory")"
@@ -572,7 +980,11 @@ echo "Main log file: $(get_display_path "$SCRIPT_LOG_FILE_PATH")"
 echo "==================================================================="
 
 log_info "=== PIPELINE EXECUTION COMPLETED SUCCESSFULLY ==="
-log_info "All stages completed without errors"
+if $has_correlators; then
+    log_info "Full pipeline executed: All stages (1, 2A, 2B, 2C, 3.1-3.4) completed"
+else
+    log_info "Parameters-only pipeline executed: Stages 1, 2A completed"
+fi
 log_info "Auxiliary files organized successfully"
 
 exit 0
