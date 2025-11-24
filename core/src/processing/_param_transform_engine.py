@@ -440,6 +440,11 @@ class HDF5ParameterProcessor:
                 self.logger.info(f"No data found for dataset {dataset_name}")
                 return
 
+            # Skip if all arrays are empty
+            if all(len(arr) == 0 for arr in dataset_dict.values()):
+                self.logger.info(f"Skipping {dataset_name}: all arrays are empty")
+                return
+
             # Apply aggregation method
             aggregation_method = config["aggregation_method"]
             processed_dict = self._apply_aggregation(
@@ -540,27 +545,14 @@ class HDF5ParameterProcessor:
     def _extract_filename_from_group_path(self, group_path: str) -> Optional[str]:
         """
         Extract filename from HDF5 group path.
-
-        This method needs to implement the logic for mapping HDF5 group
-        paths back to the filenames used in the CSV. The exact
-        implementation depends on how the HDF5 file was structured
-        relative to the original log files.
+        
+        The HDF5 structure has filenames as the deepest level group names:
+        sign_squared_violation/Zolotarev_several_config_varying_n/filename.txt
         """
-        # This is a placeholder implementation - would need to be
-        # customized based on actual HDF5 structure and filename
-        # conventions
-
-        # Example: if group path is "/some/path/analysis_run_001", the
-        # filename might be "run_001.log" or similar
         parts = group_path.strip("/").split("/")
         if parts:
-            # Try to find a part that looks like a filename
-            for part in reversed(parts):
-                if any(char.isdigit() for char in part):
-                    # This is a very simple heuristic - would need
-                    # refinement
-                    return f"{part}.log"
-
+            # The filename is the last part of the path
+            return parts[-1]
         return None
 
     def _apply_aggregation(self, dataset_dict: Dict, method: str, config: Dict) -> Dict:
@@ -622,9 +614,9 @@ class HDF5ParameterProcessor:
             elif method == "unique_values_as_list":
                 data_type = config.get("data_type", "float")
                 if data_type == "float":
-                    unique_vals = [float(val) for val in np.unique(dataset_values)]
+                    unique_vals = tuple(float(val) for val in np.unique(dataset_values))  # Now a tuple
                 else:
-                    unique_vals = list(np.unique(dataset_values))
+                    unique_vals = tuple(np.unique(dataset_values))  # Now a tuple
                 result_dict[filename] = unique_vals
 
         return result_dict

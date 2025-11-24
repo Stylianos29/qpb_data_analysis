@@ -200,7 +200,8 @@ class PlotTitleBuilder:
                 terms = metadata.get("Number_of_Chebyshev_terms")
                 if terms is not None and "Number_of_Chebyshev_terms" not in excluded:
                     temp.append("N=" + str(terms))
-            elif overlap_method == "KL":
+            elif overlap_method in ["KL", "Neuberger", "Zolotarev"]:
+                # All three methods use the same iteration parameter with label "n"
                 order = metadata.get("KL_diagonal_order")
                 if order is not None and "KL_diagonal_order" not in excluded:
                     temp.append("n=" + str(order))

@@ -389,6 +389,8 @@ function run_stage_3_1() {
     cmd+=" -o \"$output_directory\""
     
     # Add plots directory if specified (visualization auto-enabled in substage)
+    # TODO: The substage auto-enables viz if plots dir provided or
+    # remove --enable-viz flag entirely
     if [[ -n "$plots_directory" ]]; then
         cmd+=" -p \"$plots_directory\" --enable-viz"
     fi
@@ -448,6 +450,8 @@ function run_stage_3_2() {
     cmd+=" -o \"$output_directory\""
     
     # Add plots directory if specified (visualization auto-enabled in substage)
+    # TODO: The substage auto-enables viz if plots dir provided or
+    # remove --enable-viz flag entirely
     if [[ -n "$plots_directory" ]]; then
         cmd+=" -p \"$plots_directory\" --enable-viz"
     fi
@@ -508,6 +512,8 @@ function run_stage_3_3() {
     cmd+=" -o \"$output_directory\""
     
     # Add plots directory if specified (visualization auto-enabled in substage)
+    # TODO: The substage auto-enables viz if plots dir provided or
+    # remove --enable-viz flag entirely
     if [[ -n "$plots_directory" ]]; then
         cmd+=" -p \"$plots_directory\" --enable-viz"
     fi
@@ -584,6 +590,8 @@ function run_stage_3_4() {
     cmd+=" -o \"$output_directory\""
     
     # Add plots directory if specified (visualization auto-enabled in substage)
+    # TODO: The substage auto-enables viz if plots dir provided or
+    # remove --enable-viz flag entirely
     if [[ -n "$plots_directory" ]]; then
         cmd+=" -p \"$plots_directory\" --enable-viz"
     fi

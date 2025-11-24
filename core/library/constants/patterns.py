@@ -6,7 +6,7 @@
 FILENAME_SCALAR_PATTERNS_DICTIONARY = {
     # General parameters
     "Overlap_operator_method": {
-        "pattern": r"(?P<Overlap_operator_method>Chebyshev|KL|Bare)",
+        "pattern": r"(?P<Overlap_operator_method>Chebyshev|KL|Bare|Neuberger|Zolotarev)",
         "type": str,
     },
     "Kernel_operator_type": {
@@ -56,6 +56,10 @@ FILENAME_SCALAR_PATTERNS_DICTIONARY = {
         "type": float,
     },
     "KL_diagonal_order": {"pattern": r"_n(?P<KL_diagonal_order>\d+)", "type": int},
+    "Zolotarev_order": {
+        "pattern": r"ZolOrder(?P<Zolotarev_order>\d+)",
+        "type": int,
+    },
     "KL_scaling_factor": {
         "pattern": r"mu(?P<KL_scaling_factor>\d+p?\d*)",
         "type": float,
@@ -216,6 +220,11 @@ FILE_CONTENTS_SCALAR_PATTERNS_DICTIONARY = {
     # KL-specific parameters
     "KL_diagonal_order": {
         "line_identifier": "KL iters = ",
+        "regex_pattern": r"(\d+)",
+        "type": int,
+    },
+    "Zolotarev_order": {
+        "line_identifier": "Zolotarev order = ",
         "regex_pattern": r"(\d+)",
         "type": int,
     },

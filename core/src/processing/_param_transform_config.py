@@ -67,7 +67,10 @@ EXTRACTION_RULES = {
 
 COLUMN_OPERATIONS = {
     # Column additions: result_column: [source_columns]
-    "additions": {"APE_iterations": ["APE_iterations", "Initial_APE_iterations"]},
+    "additions": {
+        "APE_iterations": ["APE_iterations", "Initial_APE_iterations"],
+        "KL_diagonal_order": ["KL_diagonal_order", "Zolotarev_order"],
+    },
     # Columns to remove after processing
     "columns_to_remove": [
         "Initial_APE_iterations",  # After adding to APE_iterations
