@@ -56,5 +56,6 @@ PARAMETERS_WITH_EXPONENTIAL_FORMAT = [
 
 PARAMETERS_OF_INTEGER_VALUE = [
     "KL_diagonal_order",
+    "Rational_order",
     "Number_of_Chebyshev_terms",
 ]
