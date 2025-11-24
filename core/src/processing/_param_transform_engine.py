@@ -494,12 +494,10 @@ class HDF5ParameterProcessor:
         return processed_dict
 
     def _extract_dataset_to_dict(self, dataset_name: str) -> Dict[str, np.ndarray]:
-        """Extract dataset values to a dictionary mapping filenames to
-        arrays."""
+        """Extract dataset values to a dictionary mapping filenames to arrays."""
         dataset_dict = {}
 
         try:
-            # Check if dataset exists in HDF5
             if (
                 dataset_name
                 not in self.hdf5_analyzer.list_of_output_quantity_names_from_hdf5
@@ -507,31 +505,31 @@ class HDF5ParameterProcessor:
                 self.logger.warning(f"Dataset {dataset_name} not found in HDF5 file")
                 return dataset_dict
 
-            # Get dataset values from all active groups
-            dataset_values_list = self.hdf5_analyzer.dataset_values(
-                dataset_name, return_gvar=False
-            )
-
-            # Map group paths to filenames from DataFrame
+            # Get all active groups
             active_groups = list(self.hdf5_analyzer.active_groups)
-
-            if len(active_groups) != len(dataset_values_list):
-                self.logger.error(
-                    f"Mismatch between active groups ({len(active_groups)}) "
-                    f"and dataset values ({len(dataset_values_list)})"
-                )
-                return dataset_dict
-
-            # Create filename mapping - this is a simplification In
-            # practice, you'd need a more sophisticated mapping strategy
-            # based on how filenames in CSV correspond to HDF5 group
-            # paths
-            for group_path, values in zip(active_groups, dataset_values_list):
-                # Extract filename from group path or use a mapping
-                # strategy
+            
+            # Fetch data for each group individually
+            for group_path in active_groups:
+                # Extract filename
                 filename = self._extract_filename_from_group_path(group_path)
-                if filename:
-                    dataset_dict[filename] = values
+                if not filename:
+                    continue
+                
+                # Fetch data directly for this specific group
+                try:
+                    # Access the already-open HDF5 file
+                    f = self.hdf5_analyzer._file
+                    if group_path in f and dataset_name in f[group_path]:
+                        dataset = f[group_path][dataset_name]
+                        dataset_dict[filename] = dataset[:]
+                    else:
+                        self.logger.warning(
+                            f"Dataset {dataset_name} not found in {group_path}"
+                        )
+                except Exception as e:
+                    self.logger.warning(
+                        f"Could not extract {dataset_name} from {group_path}: {e}"
+                    )
 
             self.logger.info(
                 f"Extracted {len(dataset_dict)} entries for dataset {dataset_name}"
