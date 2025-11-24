@@ -95,9 +95,7 @@ class QPBParameterProcessor:
         self.logger.info("Loading input data")
 
         # Load single-valued parameters CSV using library function
-        loaded_dataframe = load_csv(
-            self.single_valued_csv_path, encoding="utf-8", apply_categorical=True
-        )
+        loaded_dataframe = load_csv(self.single_valued_csv_path, encoding="utf-8")
 
         if loaded_dataframe is None:
             raise ValueError(f"Failed to load CSV file: {self.single_valued_csv_path}")
@@ -199,6 +197,27 @@ class QPBParameterProcessor:
     def _finalize_processing(self) -> None:
         """Perform final validation and cleanup operations."""
         self.logger.info("Finalizing processing")
+
+        # Apply categorical dtypes after all transformations
+        categorical_config = {
+            "Kernel_operator_type": {
+                "categories": ["Wilson", "Brillouin"],
+                "ordered": False,
+            },
+            "Overlap_operator_method": {
+                "categories": ["Chebyshev", "KL", "Bare", "Neuberger", "Zolotarev"],
+                "ordered": False,
+            },
+        }
+
+        # Ensure dataframe exists
+        assert self.dataframe is not None, "DataFrame is None in finalization"
+
+        from library.data.processing import apply_categorical_dtypes
+
+        self.dataframe = apply_categorical_dtypes(self.dataframe, categorical_config)
+
+        self.logger.info("Finalization completed")
 
         # Final data validation
         if self.dataframe is None:

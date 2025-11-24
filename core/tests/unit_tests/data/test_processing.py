@@ -125,7 +125,7 @@ KL,Brillouin,003"""
     
     def test_categorical_conversion_disabled(self, categorical_csv):
         """Test that categorical conversion can be disabled."""
-        df = load_csv(categorical_csv, apply_categorical=False)
+        df = load_csv(categorical_csv)
         
         # Check that Kernel_operator_type is NOT categorical
         assert not isinstance(df["Kernel_operator_type"].dtype, pd.CategoricalDtype)
@@ -266,22 +266,12 @@ KL,Brillouin,003"""
     
     def test_custom_categorical_config(self, temp_dir):
         """Test custom categorical columns configuration."""
-        csv_content = """Status,Value
-Active,1
-Inactive,2
-Active,3"""
+        csv_content = """Status,Value Active,1 Inactive,2 Active,3"""
         
         csv_file = temp_dir / "custom_cat.csv"
         csv_file.write_text(csv_content)
-        
-        custom_categorical = {
-            "Status": {
-                "categories": ["Active", "Inactive", "Pending"],
-                "ordered": False
-            }
-        }
-        
-        df = load_csv(csv_file, categorical_columns=custom_categorical, converters_mapping={})
+                
+        df = load_csv(csv_file, converters_mapping={})
         
         assert isinstance(df["Status"].dtype, pd.CategoricalDtype)
         assert "Pending" in df["Status"].cat.categories
@@ -305,7 +295,7 @@ Active,3"""
             "Delta_Max": lambda x: f"{float(x):.2f}" if x.strip() else "",
         }
         
-        df = load_csv(csv_file, converters_mapping=safe_converters, apply_categorical=False)
+        df = load_csv(csv_file, converters_mapping=safe_converters)
         
         # Should load successfully without converter errors
         assert not df.empty

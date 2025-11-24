@@ -112,7 +112,7 @@ def load_and_validate_results_data(
     """
     logger.info(f"Loading results from {results_csv_path}")
 
-    df = load_csv(results_csv_path, apply_categorical=True)
+    df = load_csv(results_csv_path)
 
     if df.empty:
         raise ValueError("Results CSV is empty")
@@ -153,7 +153,7 @@ def load_and_validate_mass_data(
     """
     logger.info(f"Loading mass data from {mass_csv_path}")
 
-    df = load_csv(mass_csv_path, apply_categorical=True)
+    df = load_csv(mass_csv_path)
 
     if df.empty:
         raise ValueError("Mass data CSV is empty")
@@ -190,7 +190,7 @@ def load_and_validate_cost_data(
     """
     logger.info(f"Loading cost data from {cost_csv_path}")
 
-    df = load_csv(cost_csv_path, apply_categorical=True)
+    df = load_csv(cost_csv_path)
 
     if df.empty:
         raise ValueError("Cost data CSV is empty")

@@ -564,8 +564,7 @@ def process_critical_mass_analysis(
     logger.info(f"Loading {analysis_type.upper()} plateau data")
     df = load_csv(
         input_csv_path,
-        validate_required_columns=set(required_columns),
-        apply_categorical=True,
+        validate_required_columns=set(required_columns)
     )
 
     analyzer = DataFrameAnalyzer(df)

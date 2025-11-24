@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
-from typing import Dict, Callable, Optional, Union, Set
+from typing import cast
+from typing import Dict, Callable, Optional, Union, Set, Any
 
 import pandas as pd
 
@@ -9,12 +10,10 @@ from ..constants import DTYPE_MAPPING, CONVERTERS_MAPPING
 
 def load_csv(
     input_csv_file_path: Union[str, Path],
-    dtype_mapping: Optional[Dict[str, type]] = None,
+    dtype_mapping: Optional[Dict[str, Any]] = None,
     converters_mapping: Optional[Dict[str, Callable]] = None,
-    categorical_columns: Optional[Dict[str, Dict[str, Union[list, bool]]]] = None,
     validate_required_columns: Optional[Set[str]] = None,
     encoding: str = "utf-8",
-    apply_categorical: bool = True,
 ) -> pd.DataFrame:
     """
     Loads a CSV file into a Pandas DataFrame with robust error handling
@@ -84,15 +83,6 @@ def load_csv(
     if converters_mapping is None:
         converters_mapping = CONVERTERS_MAPPING.copy()
 
-    # Set default categorical columns configuration
-    if categorical_columns is None:
-        categorical_columns = {
-            "Kernel_operator_type": {
-                "categories": ["Wilson", "Brillouin"],
-                "ordered": True,
-            }
-        }
-
     try:
         # Read header more robustly using pandas
         try:
@@ -135,7 +125,7 @@ def load_csv(
         try:
             dataframe = pd.read_csv(
                 file_path,
-                dtype=filtered_dtype_mapping,
+                dtype=cast(Any, filtered_dtype_mapping),
                 converters=filtered_converters_mapping,
                 encoding=encoding,
             )
@@ -152,38 +142,6 @@ def load_csv(
         # Check for missing values
         _check_missing_values(dataframe, file_path)
 
-        # Apply categorical data types
-        if apply_categorical:
-            for column_name, config in categorical_columns.items():
-                if column_name in dataframe.columns:
-                    try:
-                        expected_categories = set(config["categories"])
-                        actual_values = set(dataframe[column_name].dropna().unique())
-
-                        # Check if actual values are a subset of expected categories
-                        if actual_values.issubset(expected_categories):
-                            dataframe[column_name] = pd.Categorical(
-                                dataframe[column_name],
-                                categories=config["categories"],
-                                ordered=config.get("ordered", False),
-                            )
-                            logging.info(
-                                f"Applied categorical type to column '{column_name}'"
-                            )
-                        else:
-                            unexpected_values = actual_values - expected_categories
-                            logging.warning(
-                                f"Column '{column_name}' contains unexpected "
-                                f"values: {unexpected_values}. "
-                                f"Expected: {expected_categories}. Skipping "
-                                "categorical conversion."
-                            )
-                    except Exception as e:
-                        logging.error(
-                            f"Error applying categorical type to "
-                            f"column '{column_name}': {e}"
-                        )
-
         logging.info(
             f"Successfully loaded CSV with shape {dataframe.shape}: {file_path}"
         )
@@ -192,6 +150,58 @@ def load_csv(
     except Exception as e:
         logging.error(f"Failed to load CSV file {file_path}: {e}")
         raise
+
+
+def apply_categorical_dtypes(
+    dataframe: pd.DataFrame, categorical_config: Dict[str, Dict[str, Union[list, bool]]]
+) -> pd.DataFrame:
+    """
+    Apply categorical data types to DataFrame columns after all
+    transformations are complete.
+
+    This should be called AFTER data transformations (e.g., "Standard" → "Wilson")
+    to ensure values match expected categories.
+
+    Parameters:
+    -----------
+    dataframe : pd.DataFrame
+        DataFrame to apply categorical types to
+    categorical_config : dict
+        Configuration mapping column names to category definitions:
+        {column_name: {'categories': [list], 'ordered': bool}}
+        Example: {'Kernel_operator_type': {'categories': ['Wilson', 'Brillouin'],
+                                           'ordered': False}}
+
+    Returns:
+    --------
+    pd.DataFrame
+        DataFrame with categorical types applied where configured
+
+    Example:
+    --------
+    >>> config = {
+    ...     'Kernel_operator_type': {
+    ...         'categories': ['Wilson', 'Brillouin'],
+    ...         'ordered': False
+    ...     }
+    ... }
+    >>> df = apply_categorical_dtypes(df, config)
+    """
+    for column_name, config in categorical_config.items():
+        if column_name in dataframe.columns:
+            try:
+                dataframe[column_name] = pd.Categorical(
+                    dataframe[column_name],
+                    categories=config["categories"],
+                    ordered=cast(bool, config.get("ordered", False)),
+                )
+                logging.info(f"Applied categorical type to column '{column_name}'")
+            except Exception as e:
+                logging.warning(
+                    f"Could not apply categorical type to '{column_name}': {e}"
+                )
+
+    return dataframe
 
 
 def _check_missing_values(dataframe: pd.DataFrame, file_path: Path) -> None:

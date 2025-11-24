@@ -20,7 +20,6 @@ dataframe = load_csv(
     categorical_columns=None,
     validate_required_columns=None,
     encoding='utf-8',
-    apply_categorical=True
 )
 ```
 
@@ -44,8 +43,6 @@ filtering of dtypes and converters based on the CSV file's header.
 - **`validate_required_columns`** (set, optional): Set of column names that must
   be present in the CSV
 - **`encoding`** (str, optional): File encoding. Defaults to 'utf-8'
-- **`apply_categorical`** (bool, optional): Whether to apply categorical data
-  types. Defaults to True
 
 **Returns:**
 - **`pd.DataFrame`**: The loaded DataFrame with specified dtypes, converters,
@@ -185,7 +182,6 @@ df = load_csv(
     },
     validate_required_columns={'sample_id', 'measurement'},
     encoding='utf-8',
-    apply_categorical=True
 )
 ```
 
@@ -193,7 +189,7 @@ df = load_csv(
 
 ```python
 # Load without categorical conversion for raw data analysis
-df = load_csv('raw_data.csv', apply_categorical=False)
+df = load_csv('raw_data.csv')
 # All string columns remain as 'object' dtype
 ```
 
@@ -338,13 +334,12 @@ if issues:
 
 ```python
 # For exploratory analysis - disable strict validation
-df_explore = load_csv('messy_data.csv', apply_categorical=False)
+df_explore = load_csv('messy_data.csv')
 
 # For production analysis - enable all validations
 df_production = load_csv(
     'clean_data.csv',
-    validate_required_columns={'key_column'},
-    apply_categorical=True
+    validate_required_columns={'key_column'}    
 )
 ```
 

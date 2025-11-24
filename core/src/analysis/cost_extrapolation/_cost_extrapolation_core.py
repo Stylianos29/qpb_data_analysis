@@ -216,7 +216,7 @@ def convert_mass_to_bare_mass(
     logger.info(f"Loading mass data from {mass_csv_path}")
 
     # Load data
-    mass_df = load_csv(mass_csv_path, apply_categorical=True)
+    mass_df = load_csv(mass_csv_path)
 
     if mass_df.empty:
         logger.error("Mass data is empty")
@@ -686,7 +686,7 @@ def load_and_average_cost_data(cost_csv_path: str, logger) -> pd.DataFrame:
     Returns DataFrame with averaged costs per parameter group.
     """
     # Load cost data
-    cost_df = load_csv(cost_csv_path, apply_categorical=True)
+    cost_df = load_csv(cost_csv_path)
 
     # Check required columns
     required_cost_cols = get_cost_data_columns()
