@@ -545,7 +545,7 @@ class HDF5ParameterProcessor:
     def _extract_filename_from_group_path(self, group_path: str) -> Optional[str]:
         """
         Extract filename from HDF5 group path.
-        
+
         The HDF5 structure has filenames as the deepest level group names:
         sign_squared_violation/Zolotarev_several_config_varying_n/filename.txt
         """
@@ -611,12 +611,12 @@ class HDF5ParameterProcessor:
             elif method == "mean":
                 result_dict[filename] = float(np.mean(dataset_values))
 
-            elif method == "unique_values_as_list":
+            elif method == "unique_values_as_list":  # More precisle, a tuple
                 data_type = config.get("data_type", "float")
                 if data_type == "float":
-                    unique_vals = tuple(float(val) for val in np.unique(dataset_values))  # Now a tuple
+                    unique_vals = tuple(float(val) for val in np.unique(dataset_values))
                 else:
-                    unique_vals = tuple(np.unique(dataset_values))  # Now a tuple
+                    unique_vals = tuple(np.unique(dataset_values))
                 result_dict[filename] = unique_vals
 
         return result_dict

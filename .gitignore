@@ -28,3 +28,4 @@ output/*
 !output/plots/README.md
 !output/tables/README.md
 
+notebooks/*

@@ -11,7 +11,7 @@ TUNABLE_PARAMETER_NAMES_LIST = [
     "Delta_Min",
     "Kappa_value",
     "Kernel_operator_type",
-    "KL_diagonal_order",
+    "Rational_order",
     "KL_scaling_factor",
     "Lanczos_epsilon",
     "Main_program_type",

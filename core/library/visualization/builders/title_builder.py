@@ -202,8 +202,8 @@ class PlotTitleBuilder:
                     temp.append("N=" + str(terms))
             elif overlap_method in ["KL", "Neuberger", "Zolotarev"]:
                 # All three methods use the same iteration parameter with label "n"
-                order = metadata.get("KL_diagonal_order")
-                if order is not None and "KL_diagonal_order" not in excluded:
+                order = metadata.get("Rational_order")
+                if order is not None and "Rational_order" not in excluded:
                     temp.append("n=" + str(order))
 
             parts.append(" ".join(temp) + ",")
