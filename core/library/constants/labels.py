@@ -39,7 +39,6 @@ AXES_LABELS_DICTIONARY = {
     "Average_core_hours_per_vector": "Average cost of calculation per vector (core-hours)",
     "Average_core_hours_per_spinor": "Average cost of calculation per spinor (core-hours)",
     "Average_core_hours_per_spinor_per_configuration": "Average cost (per spinor per config) (core-hours)",
-    "Adjusted_average_core_hours_per_spinor_per_configuration": "Average cost (per spinor per config) (core-hours)",
     "Core_hours_for_constant_PCAC_mass": "Average cost (per spinor per config) (core-hours)",
     "Total_overhead_time": "Overhead (s)",
     "Total_calculation_time": "Total wall-clock time (s)",
@@ -122,7 +121,6 @@ PARAMETER_LABELS = {
 
 AXES_LABELS_BY_COLUMN_NAME = {
     "Absolute_critical_bare_mass": "|a$m^{\\text{critical}}_{\\text{bare}}$|",
-    "Adjusted_average_core_hours_per_spinor_per_configuration": "Computational cost (core-hours/spinor)",
     "Average_calculation_time_per_spinor_per_configuration": "Average wall-clock time (per spinor per config) (s)",
     "Average_core_hours_per_spinor": "Computational cost (core-hours/spinor)",
     "Average_core_hours_per_spinor_per_configuration": "Computational cost (core-hours/spinor/config)",

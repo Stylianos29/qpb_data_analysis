@@ -763,12 +763,6 @@ class AnalysisCaseProcessor:
             if case_suffix in config:
                 self._calculate_core_hours(config[case_suffix])
 
-        # Apply adjusted core hours calculations
-        if "adjusted_core_hours" in TIME_COST_CALCULATIONS:
-            config = TIME_COST_CALCULATIONS["adjusted_core_hours"]
-            if case_suffix in config:
-                self._calculate_adjusted_core_hours(config[case_suffix])
-
     def _calculate_wall_clock_time(self, config: Dict, analysis_case: str) -> None:
         """Calculate wall clock time per unit."""
         output_column = config["output_column"]
@@ -821,46 +815,3 @@ class AnalysisCaseProcessor:
                 self.dataframe["Number_of_cores"] * self.dataframe[input_column] / 3600
             )
             self.logger.info(f"Calculated {output_column}")
-
-    def _calculate_adjusted_core_hours(self, config: Dict) -> None:
-        """Calculate adjusted core hours with specific adjustment
-        rules."""
-        base_column = config["base_column"]
-        output_column = config["output_column"]
-        adjustment_rules = config["adjustment_rules"]
-
-        if base_column not in self.dataframe.columns:
-            return
-
-        # Start with base values
-        self.dataframe[output_column] = self.dataframe[base_column]
-
-        # Apply adjustment rules
-        for condition, multiplier in adjustment_rules.items():
-            # Parse condition and apply - this is a simplified
-            # implementation
-            if "Number_of_cores ==" in condition:
-                if "and" in condition:
-                    # Handle compound conditions
-                    parts = condition.split(" and ")
-                    cores_condition = parts[0].strip()
-                    kernel_condition = parts[1].strip()
-
-                    cores_value = int(cores_condition.split("==")[1].strip())
-                    kernel_value = (
-                        kernel_condition.split("==")[1].strip().replace("'", "")
-                    )
-
-                    mask = (self.dataframe["Number_of_cores"] == cores_value) & (
-                        self.dataframe["Kernel_operator_type"] == kernel_value
-                    )
-                else:
-                    # Simple cores condition
-                    cores_value = int(condition.split("==")[1].strip())
-                    mask = self.dataframe["Number_of_cores"] == cores_value
-
-                self.dataframe.loc[mask, output_column] = (
-                    self.dataframe.loc[mask, base_column] * multiplier
-                )
-
-        self.logger.info(f"Calculated {output_column} with adjustments")

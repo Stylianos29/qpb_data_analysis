@@ -186,27 +186,27 @@ TIME_COST_CALCULATIONS = {
             "output_column": "Average_core_hours_per_spinor",
         },
     },
-    "adjusted_core_hours": {
-        "forward_case": {
-            "base_column": "Average_core_hours_per_vector",
-            "output_column": "Adjusted_average_core_hours_per_vector",
-            "adjustment_rules": {
-                "Number_of_cores == 256": 0.87,
-                "Number_of_cores == 512": 1.13,
-                "Number_of_cores == 768": 0.98,
-            },
-        },
-        "inversion_case": {
-            "base_column": "Average_core_hours_per_spinor",
-            "output_column": "Adjusted_average_core_hours_per_spinor",
-            "adjustment_rules": {
-                "Number_of_cores == 3456 and Kernel_operator_type == 'Brillouin'": 0.95,
-                "Number_of_cores == 128 and Kernel_operator_type == 'Brillouin'": 1.2,
-                "Number_of_cores == 3456 and Kernel_operator_type == 'Wilson'": 0.51,
-                "Number_of_cores == 128 and Kernel_operator_type == 'Wilson'": 1.3,
-            },
-        },
-    },
+    # "adjusted_core_hours": {
+    #     "forward_case": {
+    #         "base_column": "Average_core_hours_per_vector",
+    #         "output_column": "Adjusted_average_core_hours_per_vector",
+    #         "adjustment_rules": {
+    #             "Number_of_cores == 256": 0.87,
+    #             "Number_of_cores == 512": 1.13,
+    #             "Number_of_cores == 768": 0.98,
+    #         },
+    #     },
+    #     "inversion_case": {
+    #         "base_column": "Average_core_hours_per_spinor",
+    #         "output_column": "Adjusted_average_core_hours_per_spinor",
+    #         "adjustment_rules": {
+    #             "Number_of_cores == 3456 and Kernel_operator_type == 'Brillouin'": 0.95,
+    #             "Number_of_cores == 128 and Kernel_operator_type == 'Brillouin'": 1.2,
+    #             "Number_of_cores == 3456 and Kernel_operator_type == 'Wilson'": 0.51,
+    #             "Number_of_cores == 128 and Kernel_operator_type == 'Wilson'": 1.3,
+    #         },
+    #     },
+    # },
 }
 
 
