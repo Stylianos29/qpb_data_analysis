@@ -190,23 +190,31 @@ class PlotTitleBuilder:
         overlap_method = metadata.get("Overlap_operator_method")
         kernel_type = metadata.get("Kernel_operator_type")
 
+        # Build the title part independently for each parameter
+        components = []
+        
+        # Add overlap method if present and not excluded
         if overlap_method and "Overlap_operator_method" not in excluded:
-            temp = [str(overlap_method)]
+            components.append(str(overlap_method))
 
-            if kernel_type and "Kernel_operator_type" not in excluded:
-                temp.append(str(kernel_type))
+        # Add kernel type if present and not excluded (INDEPENDENT CHECK)
+        if kernel_type and "Kernel_operator_type" not in excluded:
+            components.append(str(kernel_type))
 
+        # Add method-specific parameters only if overlap_method exists and is not excluded
+        if overlap_method and "Overlap_operator_method" not in excluded:
             if overlap_method == "Chebyshev":
                 terms = metadata.get("Number_of_Chebyshev_terms")
                 if terms is not None and "Number_of_Chebyshev_terms" not in excluded:
-                    temp.append("N=" + str(terms))
+                    components.append("N=" + str(terms))
             elif overlap_method in ["KL", "Neuberger", "Zolotarev"]:
-                # All three methods use the same iteration parameter with label "n"
                 order = metadata.get("Rational_order")
                 if order is not None and "Rational_order" not in excluded:
-                    temp.append("n=" + str(order))
+                    components.append("n=" + str(order))
 
-            parts.append(" ".join(temp) + ",")
+        # Only add to parts if we have something to show
+        if components:
+            parts.append(" ".join(components) + ",")
 
         return parts
 
@@ -241,6 +249,7 @@ class PlotTitleBuilder:
             "Kernel_operator_type",
             "Number_of_Chebyshev_terms",
             "KL_diagonal_order",
+            "Rational_order",
         }
 
         for param_name in tunable_params:
