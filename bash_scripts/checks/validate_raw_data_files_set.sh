@@ -1,12 +1,12 @@
 #!/bin/bash
 
 ################################################################################
-# validate_raw_data_files_set.sh - Validates the integrity and completeness of 
-# QPB simulation data files within a given data files set directory.
+# validate_raw_data_files_set.sh - Validates the integrity and
+# completeness of QPB simulation data files within a given data files
+# set directory.
 #
-# DESCRIPTION:
-# This script performs validation checks on QPB (Quantum Parallel Bridge) 
-# simulation data files in a specified directory. It verifies:
+# DESCRIPTION: This script performs validation checks on QPB simulation
+# data files in a specified directory. It verifies:
 # 1. The presence and structure of error, log, and correlator files
 # 2. The successful completion of simulations by checking for specific flags
 # 3. The absence of numerical errors (NaN/Inf values) in output files

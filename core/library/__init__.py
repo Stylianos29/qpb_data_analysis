@@ -3,7 +3,7 @@ QPB Data Analysis Library
 ========================
 
 A comprehensive toolkit for processing, analyzing, and visualizing
-quantum physics data from the QPB (Quantum Physics Benchmark) project.
+Lattice QCD data from the QPB project.
 
 This library provides modular components for:
 

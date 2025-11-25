@@ -15,8 +15,8 @@ how they relate to the HDF5 file hierarchy.
 
 ## Overview
 
-The `qpb_data_analysis` library is designed to analyze data from quantum
-physics simulations, particularly lattice QCD calculations using overlap
+The `qpb_data_analysis` library is designed to analyze data from Lattice
+QCD simulations, particularly lattice QCD calculations using overlap
 fermions. The data analysis revolves around three key concepts:
 
 - **Tunable Parameters**: Input variables that control the simulation or
@@ -324,5 +324,5 @@ quantities, and the HDF5 hierarchy is crucial for effective use of the
 - **Reproducible research** through comprehensive metadata storage
 
 The library's design abstracts away much of the complexity while
-providing powerful tools for exploring and analyzing quantum physics
+providing powerful tools for exploring and analyzing Lattice QCD
 simulation data.
