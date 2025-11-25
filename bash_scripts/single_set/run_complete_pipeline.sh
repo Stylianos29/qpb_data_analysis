@@ -566,7 +566,8 @@ function run_stage_3_4() {
     #
     # Returns:
     #   0 - Success
-    #   1 - Failure
+    #   1 - Hard failure (script error)
+    #   2 - Graceful skip (insufficient data for extrapolation)
     
     echo ""
     echo "==================================================================="
@@ -589,17 +590,12 @@ function run_stage_3_4() {
     cmd+=" -i_cost \"$processed_csv\""
     cmd+=" -o \"$output_directory\""
     
-    # Add plots directory if specified (visualization auto-enabled in substage)
-    # TODO: The substage auto-enables viz if plots dir provided or
-    # remove --enable-viz flag entirely
+    # Add plots directory if specified
     if [[ -n "$plots_directory" ]]; then
         cmd+=" -p \"$plots_directory\" --enable-viz"
     fi
     
     cmd+=" -log_dir \"$log_directory\""
-    
-    # Note: Visualization is auto-enabled in substage if plots_directory provided
-    # Not passing --enable-viz flag to avoid compatibility issues
     
     # Add skip flags
     if $skip_checks; then
@@ -612,22 +608,44 @@ function run_stage_3_4() {
     
     log_info "Command: $cmd"
     
-    # Execute
-    if eval "$cmd"; then
+    # Execute and capture output and exit code properly
+    local temp_log=$(mktemp)
+    eval "$cmd" 2>&1 | tee "$temp_log"
+    local exit_code=${PIPESTATUS[0]}  # Get exit code from first command in pipe
+    
+    if [[ $exit_code -eq 0 ]]; then
+        # Success
+        rm -f "$temp_log"
         echo "✓ Stage 3.4 completed successfully"
         log_info "Stage 3.4 completed successfully"
         return 0
     else
-        echo "ERROR: Stage 3.4 failed" >&2
-        log_error "Stage 3.4 failed"
-        return 1
+        # Failure - check if it's due to insufficient data
+        if grep -q "Cost extrapolation produced no results" "$temp_log"; then
+            # Graceful skip - insufficient data
+            rm -f "$temp_log"
+            echo ""
+            echo "⚠ WARNING: Insufficient data for cost extrapolation"
+            echo "  → Not enough bare mass variation for power law fit"
+            echo "  → Stage 3.4 skipped gracefully"
+            log_warning "Stage 3.4: Insufficient data for cost extrapolation"
+            log_info "Stage 3.4 skipped gracefully (data limitation, not error)"
+            return 2  # Graceful skip
+        else
+            # Hard failure - some other error
+            rm -f "$temp_log"
+            echo "ERROR: Stage 3.4 failed" >&2
+            log_error "Stage 3.4 failed (hard error)"
+            return 1  # Hard failure
+        fi
     fi
 }
 
 function run_analysis_stage() {
     # Execute Stage 3: Complete Analysis Pipeline
     # Runs all four substages sequentially: 3.1 → 3.2 → 3.3 → 3.4
-    # Stops gracefully if Stage 3.3 produces no results (insufficient data)
+    # Gracefully skips 3.3 if insufficient bare mass variation
+    # Gracefully skips 3.4 if 3.3 produced no results OR insufficient cost data
     #
     # Returns:
     #   0 - Success
@@ -678,11 +696,22 @@ function run_analysis_stage() {
     fi
     
     # Stage 3.4: Cost Extrapolation (only if 3.3 produced results)
-    if ! run_stage_3_4; then
+    run_stage_3_4
+    local stage_3_4_result=$?
+    
+    if [[ $stage_3_4_result -eq 1 ]]; then
+        # Hard failure
         echo ""
         echo "PIPELINE FAILED: Error in Stage 3.4" >&2
         log_error "Pipeline terminated: Stage 3.4 failed"
         return 1
+    elif [[ $stage_3_4_result -eq 2 ]]; then
+        # Graceful skip - insufficient data for cost extrapolation
+        echo ""
+        echo "○ Stage 3.4 completed with graceful skip"
+        log_info "Stage 3.4 skipped gracefully: insufficient data for cost extrapolation"
+        log_info "Stage 3 completed successfully (Stages 3.1, 3.2, and 3.3)"
+        return 0
     fi
     
     echo ""
