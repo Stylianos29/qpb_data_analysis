@@ -6,27 +6,11 @@ This module contains configuration parameters common to both PCAC mass
 and pion effective mass critical mass calculations.
 """
 
-from typing import List, Dict, Any
-
-
 # =============================================================================
 # CONSTANTS
 # =============================================================================
 
 GROUPING_EXCLUDED_PARAMETERS = ["Bare_mass", "MPI_geometry"]
-
-# Parameters used for grouping data points (lattice configurations)
-GROUPING_PARAMETERS = [
-    "KL_diagonal_order",
-    "Kernel_operator_type",
-    "Number_of_gauge_configurations",
-    "CG_epsilon",
-    "Clover_coefficient",
-    "KL_scaling_factor",
-    "MSCG_epsilon",
-    "Overlap_operator_method",
-    "Rho_value",
-]
 
 # Data filtering parameters
 FILTERING_PARAMETERS = {
@@ -98,11 +82,6 @@ ERROR_HANDLING = {
 # =============================================================================
 
 
-def get_grouping_parameters():
-    """Get list of parameters for data grouping."""
-    return GROUPING_PARAMETERS.copy()
-
-
 def get_filtering_config():
     """Get data filtering configuration."""
     return FILTERING_PARAMETERS.copy()
@@ -135,13 +114,6 @@ def get_error_handling_config():
 
 def validate_shared_config():
     """Validate shared configuration parameters."""
-    # Validate grouping parameters
-    if not isinstance(GROUPING_PARAMETERS, list):
-        raise ValueError("GROUPING_PARAMETERS must be a list")
-
-    if not GROUPING_PARAMETERS:
-        raise ValueError("GROUPING_PARAMETERS cannot be empty")
-
     # Validate filtering parameters
     if FILTERING_PARAMETERS["max_bare_mass"] <= 0:
         raise ValueError("max_bare_mass must be positive")
