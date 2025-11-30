@@ -223,6 +223,11 @@ FILE_CONTENTS_SCALAR_PATTERNS_DICTIONARY = {
         "regex_pattern": r"(\d+)",
         "type": int,
     },
+    "Neuberger_order": {
+        "line_identifier": "KL upper iters = ",
+        "regex_pattern": r"(\d+)",
+        "type": int,
+    },
     "Zolotarev_order": {
         "line_identifier": "Zolotarev order = ",
         "regex_pattern": r"(\d+)",
