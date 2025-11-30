@@ -43,16 +43,16 @@ Depending on the options provided, the script outputs:
 Usage:
 ------
 To list all top-level groups:
-    python inspect_HDF5_file.py --hdf5 /path/to/file.h5 --list_groups
+    python inspect_HDF5_file.py -hdf5 /path/to/file.h5 --list_groups
 
 To list unique first-level subgroups:
-    python inspect_HDF5_file.py --hdf5 /path/to/file.h5 --list_subgroups
+    python inspect_HDF5_file.py -hdf5 /path/to/file.h5 --list_subgroups
 
 To view attributes of a specific dataset:
-    python inspect_HDF5_file.py --hdf5 /path/to/file.h5 --list_attributes --show_dataset /group/dataset
+    python inspect_HDF5_file.py -hdf5 /path/to/file.h5 --list_attributes --show_dataset /group/dataset
 
 To display content or a sample of a dataset:
-    python inspect_HDF5_file.py --hdf5 /path/to/file.h5 --show_dataset /group/dataset --show_sample
+    python inspect_HDF5_file.py -hdf5 /path/to/file.h5 --show_dataset /group/dataset --show_sample
 
 Notes:
 ------
