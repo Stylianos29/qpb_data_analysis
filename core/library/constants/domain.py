@@ -13,6 +13,7 @@ TUNABLE_PARAMETER_NAMES_LIST = [
     "Kernel_operator_type",
     "Rational_order",
     "KL_diagonal_order",
+    "Zolotarev_order",
     "KL_scaling_factor",
     "Lanczos_epsilon",
     "Main_program_type",
