@@ -15,21 +15,23 @@ The script uses HDF5Analyzer for modern data handling and maintains the
 same hierarchical structure as the input file.
 
 Usage:
-    python apply_jackknife_analysis.py -i input.h5 -o output.h5
+    python apply_jackknife_analysis.py -i input.h5 -csv processed.csv -o output.h5
     [options]
 """
 
 import os
 import sys
 from pathlib import Path
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, cast
 
 import click
 import numpy as np
+import pandas as pd
 import re
 
 # Import library components
 from library.data.hdf5_analyzer import HDF5Analyzer
+from library.data import load_csv
 from library.constants import PARAMETERS_WITH_EXPONENTIAL_FORMAT, PARAMETER_LABELS
 from library.validation.click_validators import (
     hdf5_file,
@@ -62,6 +64,13 @@ from src.processing._hdf5_output import _create_custom_hdf5_output
     required=True,
     callback=hdf5_file.input,
     help="Path to input HDF5 file containing correlator data and parameters.",
+)
+@click.option(
+    "-csv",
+    "--processed_parameters_csv",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, readable=True),
+    help="Path to processed_parameter_values.csv (from Stage 2A) for consistent parameter values.",
 )
 @click.option(
     "-o",
@@ -116,6 +125,7 @@ from src.processing._hdf5_output import _create_custom_hdf5_output
 )
 def main(
     input_hdf5_file: str,
+    processed_parameters_csv: str,
     output_hdf5_file: str,
     output_directory: Optional[str],
     enable_logging: bool,
@@ -129,11 +139,12 @@ def main(
 
     This script processes correlator data by:
         1. Loading data using HDF5Analyzer
-        2. Grouping by tunable parameters (excluding
+        2. Loading processed parameters from CSV (Stage 2A output)
+        3. Grouping by tunable parameters (excluding
            Configuration_label)
-        3. Applying jackknife resampling to each group
-        4. Computing finite difference derivatives
-        5. Exporting results in clean, consistent format
+        4. Applying jackknife resampling to each group
+        5. Computing finite difference derivatives
+        6. Exporting results with processed parameter values
     """
     # === SETUP AND VALIDATION ===
 
@@ -141,128 +152,130 @@ def main(
     if output_directory is None:
         output_directory = os.path.dirname(input_hdf5_file)
 
-    # Ensure output file is in the specified directory. This way, we
-    # avoid potential issues with relative paths and make the output
-    # location clear.
-    output_path = Path(output_directory) / Path(output_hdf5_file).name
+    # Ensure output file is in the specified directory
+    if not os.path.isabs(output_hdf5_file):
+        output_path = Path(output_directory) / output_hdf5_file
+    else:
+        output_path = Path(output_hdf5_file)
 
-    # Get configuration values from config file
-    deriv_method = DEFAULT_DERIVATIVE_METHOD
-    compression = DEFAULT_COMPRESSION
-    compression_level = DEFAULT_COMPRESSION_LEVEL
+    # Setup logging directory
+    if enable_logging and log_directory is None:
+        log_directory = output_directory
 
-    # Setup logging
+    # Initialize logger
     logger = create_script_logger(
-        log_directory=log_directory or output_directory,
+        log_directory=log_directory,
         log_filename=log_filename,
         enable_file_logging=enable_logging,
-        enable_console_logging=verbose,  # Console logging follows verbose flag
-        verbose=False,  # Don't use DEBUG level console output
+        enable_console_logging=verbose,
     )
 
-    # Script lifecycle logging
-    logger.log_script_start("Jackknife analysis processing")
-
-    # Log configuration details (always to file, optionally to console
-    # if verbose)
-    logger.info(f"Input file: {input_hdf5_file}")
-    logger.info(f"Output file: {output_path}")
-    logger.info(f"Derivative method: {deriv_method.value}")
-    logger.info(f"Minimum configurations: {min_configurations}")
-
-    # === LOAD AND ANALYZE INPUT DATA ===
-
     try:
-        # Load HDF5 data using analyzer
-        analyzer = HDF5Analyzer(input_hdf5_file)
-        logger.info(f"Loaded HDF5 file with {len(analyzer.active_groups)} groups")
-        logger.debug(
-            f"Available datasets: {analyzer.list_of_output_quantity_names_from_hdf5}"
-        )
+        logger.log_script_start("Jackknife analysis with processed parameters")
 
-        # Validate required datasets are present
-        missing_datasets = []
-        for dataset in REQUIRED_INPUT_DATASETS:
-            if dataset not in analyzer.list_of_output_quantity_names_from_hdf5:
-                missing_datasets.append(dataset)
+        # === LOAD PROCESSED PARAMETERS FROM CSV ===
+
+        logger.info(f"Loading processed parameters from: {processed_parameters_csv}")
+        try:
+            processed_df = load_csv(processed_parameters_csv)
+            logger.info(f"Loaded processed parameters: {len(processed_df)} rows")
+
+            # Validate that CSV contains Filename column
+            if "Filename" not in processed_df.columns:
+                raise ValueError(
+                    "Processed parameters CSV must contain 'Filename' column"
+                )
+
+        except Exception as e:
+            logger.error(f"Failed to load processed parameters CSV: {e}")
+            raise
+
+        # === LOAD HDF5 INPUT ===
+
+        logger.info(f"Loading correlator data from: {input_hdf5_file}")
+        analyzer = HDF5Analyzer(input_hdf5_file)
+        logger.info(f"HDF5 file loaded successfully")
+
+        # === VALIDATE REQUIRED DATASETS ===
+
+        available_datasets = analyzer.list_of_output_quantity_names_from_hdf5
+        missing_datasets = [
+            ds for ds in REQUIRED_INPUT_DATASETS if ds not in available_datasets
+        ]
 
         if missing_datasets:
-            error_msg = f"Missing required datasets: {missing_datasets}"
-            logger.critical(error_msg)
-            # Use click.echo for immediate console feedback on critical
-            # errors
-            click.echo(f"ERROR: {error_msg}")
-            sys.exit(1)
+            error_msg = (
+                f"Required correlator datasets not found in HDF5 file: "
+                f"{missing_datasets}"
+            )
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        logger.info("All required datasets found in input HDF5")
 
         # === GROUP DATA BY PARAMETERS ===
 
-        # Group by tunable parameters, excluding configuration labels
-        logger.info("Grouping data by tunable parameters")
+        logger.info("Grouping correlator data by tunable parameters...")
         grouped_data = analyzer.group_by_multivalued_tunable_parameters(
             filter_out_parameters_list=EXCLUDED_FROM_GROUPING, verbose=verbose
         )
 
         if not grouped_data:
-            error_msg = "No valid parameter groupings found"
-            logger.critical(error_msg)
-            click.echo(f"ERROR: {error_msg}")
-            sys.exit(1)
+            error_msg = "No valid parameter groups found in input data"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
-        logger.info(f"Found {len(grouped_data)} parameter groups for processing")
+        logger.info(f"Found {len(grouped_data)} parameter groups to process")
+
+        # === INITIALIZE PROCESSOR ===
+
+        processor = JackknifeProcessor(
+            derivative_method=DEFAULT_DERIVATIVE_METHOD, logger=logger
+        )
 
         # === PROCESS EACH GROUP ===
 
-        # Initialize jackknife processor
-        processor = JackknifeProcessor(derivative_method=deriv_method, logger=logger)
-
-        # Store all processing results for custom HDF5 creation
         all_processing_results = {}
         processed_groups = 0
+        compression = DEFAULT_COMPRESSION
+        compression_level = DEFAULT_COMPRESSION_LEVEL
 
-        for group_index, (param_values, group_paths) in enumerate(grouped_data.items()):
+        for group_index, (param_values, group_paths) in enumerate(
+            grouped_data.items(), 1
+        ):
+            # group_paths is List[str] of HDF5 paths
+
+            # Create descriptive group name
+            multivalued_params = (
+                analyzer.reduced_multivalued_tunable_parameter_names_list
+            )
             group_name = _create_descriptive_group_name(
-                param_values, analyzer.reduced_multivalued_tunable_parameter_names_list
+                param_values, multivalued_params
             )
 
             logger.info(
-                f"Processing group {group_index + 1}/{len(grouped_data)}: {group_name}"
+                f"Processing group {group_index}/{len(grouped_data)}: {group_name}"
             )
-            logger.debug(f"Group parameters: {param_values}")
 
-            # === LOAD CORRELATOR DATA FOR THIS GROUP ===
+            try:
+                # === USE ORIGINAL APPROACH WITH CONTEXT MANAGER ===
 
-            # Restrict analyzer to this specific group
-            with analyzer:  # Use context manager to restore state after
-                # Filter to just the groups in this parameter
-                # combination
-                analyzer.active_groups = set(group_paths)
+                with analyzer:  # Context manager to restore state after
+                    # Filter to just the groups in this parameter combination
+                    analyzer.active_groups = set(group_paths)
 
-                # Get group metadata
-                if group_paths:
-                    first_group_path = list(group_paths)[0]
-                    group_metadata = analyzer.parameters_for_group(first_group_path)
-                    group_metadata["group_name"] = group_name
-                    group_metadata["param_values"] = param_values
-                else:
-                    logger.warning(f"No group paths found for {group_name}")
-                    continue
+                    # Sort paths for deterministic ordering
+                    sorted_group_paths = sorted(group_paths)
 
-                # === ENSURE DETERMINISTIC ORDERING ===
+                    logger.info(
+                        f"Processing {len(sorted_group_paths)} configurations in sorted order"
+                    )
 
-                # Sort group paths by configuration label for consistent
-                # ordering
-                sorted_group_paths = sorted(group_paths)
+                    # Load correlator data by looping through each path
+                    g5g5_data_list = []
+                    g4g5g5_data_list = []
 
-                logger.info(
-                    f"Processing {len(sorted_group_paths)} configurations in sorted order"
-                )
-
-                # Load correlator datasets in deterministic order
-                g5g5_data_list = []
-                g4g5g5_data_list = []
-
-                for group_path in sorted_group_paths:
-                    try:
+                    for group_path in sorted_group_paths:
                         # Temporarily restrict to single group
                         analyzer.active_groups = {group_path}
 
@@ -281,96 +294,62 @@ def main(
                             g5g5_data_list.append(g5g5_single)
                             g4g5g5_data_list.append(g4g5g5_single)
 
-                    except ValueError as e:
-                        logger.warning(f"Group {group_path}: Missing datasets - {e}")
+                    # Reset to full group set
+                    analyzer.active_groups = set(sorted_group_paths)
+
+                    if not g5g5_data_list or not g4g5g5_data_list:
+                        logger.warning(f"No valid correlator data for {group_name}")
                         continue
 
-                # Reset to full group set for metadata extraction
-                analyzer.active_groups = set(sorted_group_paths)
+                    # Stack into 2D arrays (configs × time)
+                    g5g5_group = np.vstack(g5g5_data_list)
+                    g4g5g5_group = np.vstack(g4g5g5_data_list)
 
-                if not g5g5_data_list or not g4g5g5_data_list:
-                    logger.warning(
-                        f"Group {group_name}: No valid correlator data found"
+                    # Extract configuration metadata
+                    # Use to_dataframe() within the filtered context
+                    temp_df = analyzer.to_dataframe(
+                        datasets=[INPUT_CORRELATOR_DATASETS["g5g5"]],
+                        add_time_column=False,
+                        flatten_arrays=False,
                     )
-                    continue
+                    config_metadata = extract_configuration_metadata(temp_df)
 
-                # Stack data into 2D arrays (configs × time) - now in
-                # sorted order
-                g5g5_data = np.vstack(g5g5_data_list)
-                g4g5g5_data = np.vstack(g4g5g5_data_list)
+                # Prepare group metadata
+                group_metadata = {
+                    "param_values": param_values,
+                    "n_configurations": len(group_paths),
+                    "group_name": group_name,
+                }
 
-                logger.debug(
-                    f"Loaded data shapes: g5g5={g5g5_data.shape}, "
-                    f"g4g5g5={g4g5g5_data.shape}"
-                )
-
-                # === EXTRACT CONFIGURATION METADATA ===
-
-                # Get configuration labels and filenames IN SORTED ORDER
-                config_metadata = {}
-
-                # Try to get configuration labels from the analyzer
-                try:
-                    # Create metadata arrays in the same sorted order as
-                    # data loading
-                    config_metadata = _extract_ordered_configuration_metadata(
-                        analyzer, sorted_group_paths, INPUT_CORRELATOR_DATASETS["g5g5"]
-                    )
-
-                    logger.info(
-                        "Extracted metadata for "
-                        f"{len(config_metadata.get('configuration_labels', []))} "
-                        "configurations"
-                    )
-
-                except Exception as e:
-                    logger.warning(f"Could not extract configuration metadata: {e}")
-                    # Create default metadata in the same order
-                    n_configs = g5g5_data.shape[0]
-                    config_metadata = {
-                        "configuration_labels": [
-                            f"config_{i}" for i in range(n_configs)
-                        ],
-                        "qpb_filenames": [f"unknown_{i}.txt" for i in range(n_configs)],
-                        "mpi_geometries": ["unknown" for _ in range(n_configs)],
-                    }
-
-                    logger.info(
-                        f"Using default config metadata for {n_configs} configurations"
-                    )
-
-                # === APPLY JACKKNIFE PROCESSING ===
-
-                # Process this group through complete jackknife analysis
-                processing_results = processor.process_correlator_group(
-                    g5g5_data=g5g5_data,
-                    g4g5g5_data=g4g5g5_data,
+                # Process with jackknife
+                jackknife_results = processor.process_correlator_group(
+                    g5g5_data=g5g5_group,
+                    g4g5g5_data=g4g5g5_group,
                     group_metadata=group_metadata,
                     min_configurations=min_configurations,
                 )
 
-                if not processing_results:
-                    logger.warning(f"Skipping group {group_name} - processing failed")
-                    continue
-
-                # Store results for later HDF5 creation
+                # Store results
                 all_processing_results[group_name] = {
-                    "jackknife_results": processing_results,
+                    "jackknife_results": jackknife_results,
                     "config_metadata": config_metadata,
                     "group_metadata": group_metadata,
+                    "group_paths": sorted_group_paths,
                 }
 
                 processed_groups += 1
                 logger.info(f"Successfully processed group {group_name}")
+
+            except Exception as e:
+                logger.warning(f"Failed to process group {group_name}: {e}")
+                continue
 
         # === VALIDATE RESULTS ===
 
         if processed_groups == 0:
             error_msg = "No groups were successfully processed"
             logger.critical(error_msg)
-            click.echo(
-                f"ERROR: {error_msg}"
-            )  # Keep immediate console feedback for critical errors
+            click.echo(f"ERROR: {error_msg}")
             sys.exit(1)
 
         logger.info(
@@ -379,12 +358,12 @@ def main(
 
         # === CREATE CUSTOM HDF5 OUTPUT ===
 
-        # Create custom HDF5 file with proper structure
         logger.info(f"Creating output HDF5 file: {output_path}")
         _create_custom_hdf5_output(
             output_path=output_path,
             all_processing_results=all_processing_results,
             analyzer=analyzer,
+            processed_params_df=processed_df,  # PASS PROCESSED PARAMETERS
             compression=compression,
             compression_level=compression_level,
             logger=logger,
@@ -395,16 +374,19 @@ def main(
             f"Processed {processed_groups} groups, saved to {output_path.name}"
         )
 
-        # Success summary (console output for immediate feedback)
+        # Success summary
         if verbose or not enable_logging:
             click.echo(f"✓ Jackknife analysis completed successfully")
             click.echo(
                 f"✓ Processed {processed_groups}/{len(grouped_data)} parameter groups"
             )
+            click.echo(
+                f"✓ Used processed parameters from: {Path(processed_parameters_csv).name}"
+            )
             click.echo(f"✓ Results saved to: {output_path}")
 
     except Exception as e:
-        logger.log_script_error(e)  # Use the enhanced error logging
+        logger.log_script_error(e)
         click.echo(f"ERROR: Critical failure during processing: {e}")
         sys.exit(1)
 
@@ -412,7 +394,7 @@ def main(
         # Clean up resources
         if "analyzer" in locals():
             analyzer.close()
-        logger.close()  # Proper logging cleanup
+        logger.close()
 
 
 def _create_descriptive_group_name(param_values, multivalued_params, max_length=100):
@@ -420,181 +402,54 @@ def _create_descriptive_group_name(param_values, multivalued_params, max_length=
     Create a descriptive group name using parameter names and values.
 
     Args:
-        - param_values: Values of the multivalued parameters (tuple/list
-        or single value)
+        - param_values: Tuple of parameter values
         - multivalued_params: List of parameter names
-        - max_length: Maximum length for the group name (default: 100)
+        - max_length: Maximum length for group name
 
     Returns:
-        str: Descriptive group name like
-        "jackknife_analysis_m0p06_n6_Brillouin"
+        Descriptive string name for the group
     """
-    if not multivalued_params:
-        return "jackknife_analysis_default_group"
+    # Filter out Configuration_label if present
+    actual_params = [p for p in multivalued_params if p != "Configuration_label"]
 
-    # Handle single parameter case - convert to list
+    # Handle single vs multiple parameters
     if not isinstance(param_values, (tuple, list)):
         param_values = [param_values]
 
-    # Always remove Configuration_label if it exists (it's not used in
-    # group names)
-    actual_params = [p for p in multivalued_params if p != "Configuration_label"]
+    # Create name parts
+    parts = []
+    for param_name, value in zip(actual_params, param_values):
+        # Get short label if available
+        label = PARAMETER_LABELS.get(param_name, param_name)
 
-    # Check if lengths match after filtering
-    if len(param_values) != len(actual_params):
-        # Fallback for mismatches
-        param_str = str(param_values) + str(multivalued_params)
-        hash_suffix = abs(hash(param_str)) % 10000
-        return f"jackknife_analysis_mismatch_{hash_suffix:04d}"
-
-    name_parts = []
-    for param_name, param_value in zip(actual_params, param_values):
-        # Check if this parameter has a label or should use value
-        # directly
-        if param_name in PARAMETER_LABELS:
-            # Use label + formatted value (no underscore between them)
-            label = PARAMETER_LABELS[param_name]
-            formatted_value = _format_parameter_value(param_name, param_value)
-            name_parts.append(f"{label}{formatted_value}")
+        # Format value
+        if param_name in PARAMETERS_WITH_EXPONENTIAL_FORMAT:
+            value_str = f"{value:.1e}".replace("e-0", "e-").replace("e+0", "e")
+        elif isinstance(value, float):
+            value_str = f"{value:.4g}".replace(".", "p").replace("-", "m")
         else:
-            # Parameters without labels (Overlap_operator_method,
-            # Kernel_operator_type) Use the value directly
-            formatted_value = _format_parameter_value(param_name, param_value)
-            name_parts.append(formatted_value)
+            value_str = str(value).replace(".", "p").replace("-", "m")
 
-    # Join with underscores between pairs only
-    group_name_suffix = "_".join(name_parts)
-    group_name = f"jackknife_analysis_{group_name_suffix}"
+        parts.append(f"{label}{value_str}")
 
-    # Ensure HDF5 compatibility (remove problematic characters except
-    # minus)
-    group_name = re.sub(r"[^a-zA-Z0-9_.-]", "", group_name)
+    # Combine parts
+    name = "jackknife_analysis_" + "_".join(parts)
 
-    # Truncate if too long but maintain uniqueness
-    if len(group_name) > max_length:
-        # Keep the first part and add a hash for uniqueness
-        truncated = group_name[: max_length - 10]
-        hash_suffix = abs(hash(str(param_values))) % 10000
-        group_name = f"{truncated}_{hash_suffix:04d}"
+    # Truncate if needed
+    if len(name) > max_length:
+        name = name[: max_length - 3] + "..."
 
-    return group_name
-
-
-def _format_parameter_value(param_name, value):
-    """
-    Format parameter value according to established rules.
-
-    Args:
-        param_name: Name of the parameter value: Value to format
-
-    Returns:
-        str: Formatted value suitable for group naming
-    """
-    if param_name in PARAMETERS_WITH_EXPONENTIAL_FORMAT:
-        # Use exponential format for specified parameters
-        if isinstance(value, (float, np.floating)):
-            return f"{value:.0e}".replace("+", "")
-        else:
-            return str(value)
-    elif isinstance(value, (float, np.floating)):
-        # Format floats with consistent precision, replace decimal with
-        # 'p'
-        formatted = f"{value:.6g}".replace(".", "p")
-        return formatted
-    elif isinstance(value, (int, np.integer)):
-        return str(int(value))
-    else:
-        # Handle strings and other types
-        clean_value = str(value).replace(" ", "").replace("_", "")
-        # Apply specific transformations for kernel types
-        if param_name == "Kernel_operator_type":
-            # Convert Standard -> Wilson as per the patterns
-            if clean_value.lower() == "standard":
-                return "Wilson"
-            else:
-                return clean_value  # Keep original case (Brillouin)
-        return clean_value  # Keep original case
-
-
-def _extract_ordered_configuration_metadata(
-    analyzer: HDF5Analyzer, sorted_group_paths: List[str], dataset_name: str
-) -> Dict[str, List]:
-    """
-    Extract configuration metadata in the exact same order as sorted
-    group paths.
-
-    Args:
-        - analyzer: HDF5Analyzer instance
-        - sorted_group_paths: List of group paths in sorted order
-        - dataset_name: Dataset name to use for DataFrame creation
-
-    Returns:
-        Dictionary with ordered configuration metadata
-    """
-    metadata = {
-        "configuration_labels": [],
-        "qpb_filenames": [],
-        "mpi_geometries": [],
-    }
-
-    for group_path in sorted_group_paths:
-        # Temporarily restrict to single group
-        analyzer.active_groups = {group_path}
-
-        try:
-            # Create DataFrame for this single group
-            temp_df = analyzer.to_dataframe(
-                datasets=[dataset_name],
-                add_time_column=False,
-                flatten_arrays=False,
-            )
-
-            # Extract metadata for this group
-            group_metadata = extract_configuration_metadata(temp_df)
-
-            # Append to ordered lists (should be single values since
-            # it's one group)
-            for key in metadata.keys():
-                source_key = key  # Direct mapping
-                if source_key in group_metadata:
-                    values = group_metadata[source_key]
-                    if isinstance(values, list) and len(values) == 1:
-                        metadata[key].append(values[0])
-                    elif not isinstance(values, list):
-                        metadata[key].append(values)
-                    else:
-                        # Handle multiple values per group (shouldn't
-                        # happen but be safe)
-                        metadata[key].extend(values)
-                else:
-                    # Add default value
-                    if key == "configuration_labels":
-                        # Extract from group path (filename)
-                        filename = group_path.split("/")[-1]
-                        metadata[key].append(filename)
-                    elif key == "qpb_filenames":
-                        metadata[key].append("unknown.txt")
-                    elif key == "mpi_geometries":
-                        metadata[key].append("unknown")
-
-        except Exception as e:
-            # Add default values for this group
-            if "configuration_labels" not in metadata or len(
-                metadata["configuration_labels"]
-            ) < len(sorted_group_paths):
-                filename = group_path.split("/")[-1]
-                metadata["configuration_labels"].append(filename)
-            if "qpb_filenames" not in metadata or len(metadata["qpb_filenames"]) < len(
-                sorted_group_paths
-            ):
-                metadata["qpb_filenames"].append("unknown.txt")
-            if "mpi_geometries" not in metadata or len(
-                metadata["mpi_geometries"]
-            ) < len(sorted_group_paths):
-                metadata["mpi_geometries"].append("unknown")
-
-    return metadata
+    return name
 
 
 if __name__ == "__main__":
     main()
+
+# TODO: Place main function definition at the bottom of the file and the
+# rest of the function definitions above it.
+# TODO: Set min_configurations parameter from the config file if
+# available.
+# TODO: Use the processed parameters Dataframe to update MPI_geometry
+# parameter.
+# TODO: For the jackknife analysis names, use the processed parameter
+# values instead of the raw ones.

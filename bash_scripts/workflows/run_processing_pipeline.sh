@@ -247,6 +247,7 @@ function run_stage_2b() {
     
     execute_python_script "$JACKKNIFE_SCRIPT" "apply_jackknife_analysis" \
         --input_hdf5_file "$input_hdf5_corr" \
+        --processed_parameters_csv "${output_directory}/${PROCESSED_CSV_FILENAME}" \
         --output_directory "$output_directory" \
         --output_hdf5_file "$JACKKNIFE_HDF5_FILENAME" \
         --enable_logging \
