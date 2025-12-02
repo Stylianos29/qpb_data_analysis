@@ -507,14 +507,14 @@ class HDF5ParameterProcessor:
 
             # Get all active groups
             active_groups = list(self.hdf5_analyzer.active_groups)
-            
+
             # Fetch data for each group individually
             for group_path in active_groups:
                 # Extract filename
                 filename = self._extract_filename_from_group_path(group_path)
                 if not filename:
                     continue
-                
+
                 # Fetch data directly for this specific group
                 try:
                     # Access the already-open HDF5 file
