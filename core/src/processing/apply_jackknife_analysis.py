@@ -9,10 +9,13 @@ HDF5 format, focusing on processing tasks:
     - Calculation of g4g5-g5 derivative correlators using finite
       differences
     - Export of jackknife samples, means, and errors in clean HDF5
-      format
+      format with processed parameter values
 
-The script uses HDF5Analyzer for modern data handling and maintains the
-same hierarchical structure as the input file.
+Key improvements in this version:
+    - Uses processed parameters from Stage 2A CSV as single source of truth
+    - Integrates PlotFilenameBuilder for consistent group naming
+    - Implements graceful error handling for filename mismatches
+    - Provides detailed user feedback on processing statistics
 
 Usage:
     python apply_jackknife_analysis.py -i input.h5 -csv processed.csv -o output.h5
@@ -22,12 +25,11 @@ Usage:
 import os
 import sys
 from pathlib import Path
-from typing import Dict, Optional, List, cast
+from typing import Dict, Optional, List
 
 import click
 import numpy as np
 import pandas as pd
-import re
 
 # Import library components
 from library.data.hdf5_analyzer import HDF5Analyzer
@@ -50,10 +52,7 @@ from src.processing._jackknife_config import (
     REQUIRED_INPUT_DATASETS,
     MIN_GAUGE_CONFIGURATIONS,
 )
-from src.processing._jackknife_processor import (
-    JackknifeProcessor,
-    extract_configuration_metadata,
-)
+from src.processing._jackknife_processor import JackknifeProcessor
 from src.processing._hdf5_output import _create_custom_hdf5_output
 
 
@@ -140,11 +139,10 @@ def main(
     This script processes correlator data by:
         1. Loading data using HDF5Analyzer
         2. Loading processed parameters from CSV (Stage 2A output)
-        3. Grouping by tunable parameters (excluding
-           Configuration_label)
+        3. Grouping by tunable parameters (excluding Configuration_label)
         4. Applying jackknife resampling to each group
         5. Computing finite difference derivatives
-        6. Exporting results with processed parameter values
+        6. Exporting results with processed parameter values from CSV
     """
     # === SETUP AND VALIDATION ===
 
@@ -193,12 +191,12 @@ def main(
         # === LOAD HDF5 INPUT ===
 
         logger.info(f"Loading correlator data from: {input_hdf5_file}")
-        analyzer = HDF5Analyzer(input_hdf5_file)
+        input_hdf5_analyzer = HDF5Analyzer(input_hdf5_file)
         logger.info(f"HDF5 file loaded successfully")
 
         # === VALIDATE REQUIRED DATASETS ===
 
-        available_datasets = analyzer.list_of_output_quantity_names_from_hdf5
+        available_datasets = input_hdf5_analyzer.list_of_output_quantity_names_from_hdf5
         missing_datasets = [
             ds for ds in REQUIRED_INPUT_DATASETS if ds not in available_datasets
         ]
@@ -216,7 +214,7 @@ def main(
         # === GROUP DATA BY PARAMETERS ===
 
         logger.info("Grouping correlator data by tunable parameters...")
-        grouped_data = analyzer.group_by_multivalued_tunable_parameters(
+        grouped_data = input_hdf5_analyzer.group_by_multivalued_tunable_parameters(
             filter_out_parameters_list=EXCLUDED_FROM_GROUPING, verbose=verbose
         )
 
@@ -245,104 +243,105 @@ def main(
         ):
             # group_paths is List[str] of HDF5 paths
 
-            # Create descriptive group name
-            multivalued_params = (
-                analyzer.reduced_multivalued_tunable_parameter_names_list
-            )
-            group_name = _create_descriptive_group_name(
-                param_values, multivalued_params
-            )
+            # Note: Group naming is now handled by _hdf5_output.py using PlotFilenameBuilder
+            # We use a temporary identifier here for tracking
+            temp_group_id = f"group_{group_index}"
 
             logger.info(
-                f"Processing group {group_index}/{len(grouped_data)}: {group_name}"
+                f"Processing group {group_index}/{len(grouped_data)}: "
+                f"{len(group_paths)} configurations"
             )
 
+            # === LOAD CORRELATOR DATA ===
+
+            logger.debug(f"Loading g5-g5 correlator data for group {group_index}")
+            g5g5_data = []
+            g4g5g5_data = []
+            config_labels = []
+            qpb_filenames = []
+
+            for path in group_paths:
+                try:
+                    # Load g5-g5 correlator
+                    g5g5_values = input_hdf5_analyzer.dataset_values(
+                        INPUT_CORRELATOR_DATASETS["g5g5"], group_path=path
+                    )
+                    g5g5_data.append(g5g5_values)
+
+                    # Load g4g5-g5 correlator
+                    g4g5g5_values = input_hdf5_analyzer.dataset_values(
+                        INPUT_CORRELATOR_DATASETS["g4g5g5"], group_path=path
+                    )
+                    g4g5g5_data.append(g4g5g5_values)
+
+                    # Extract metadata
+                    filename = path.split("/")[-1]
+                    qpb_filenames.append(filename)
+
+                    # Extract configuration label from filename
+                    config_label = filename.split("_n")[-1].split(".")[0]
+                    config_labels.append(config_label)
+
+                except Exception as e:
+                    logger.warning(f"Failed to load data from {path}: {e}")
+                    continue
+
+            if len(g5g5_data) < min_configurations:
+                logger.warning(
+                    f"Group {group_index} has insufficient configurations "
+                    f"({len(g5g5_data)} < {min_configurations}). Skipping."
+                )
+                continue
+
+            # Stack into arrays
+            g5g5_array = np.array(g5g5_data)
+            g4g5g5_array = np.array(g4g5g5_data)
+
+            logger.info(
+                f"Loaded data shapes: g5g5={g5g5_array.shape}, "
+                f"g4g5g5={g4g5g5_array.shape}"
+            )
+
+            # === BUILD METADATA BEFORE PROCESSING ===
+
+            # This is needed by the processor
+            group_metadata = {
+                "configuration_labels": config_labels,
+                "qpb_filenames": qpb_filenames,
+            }
+
+            # === APPLY JACKKNIFE PROCESSING ===
+
+            logger.debug(f"Applying jackknife processing to group {group_index}")
             try:
-                # === USE ORIGINAL APPROACH WITH CONTEXT MANAGER ===
-
-                with analyzer:  # Context manager to restore state after
-                    # Filter to just the groups in this parameter combination
-                    analyzer.active_groups = set(group_paths)
-
-                    # Sort paths for deterministic ordering
-                    sorted_group_paths = sorted(group_paths)
-
-                    logger.info(
-                        f"Processing {len(sorted_group_paths)} configurations in sorted order"
-                    )
-
-                    # Load correlator data by looping through each path
-                    g5g5_data_list = []
-                    g4g5g5_data_list = []
-
-                    for group_path in sorted_group_paths:
-                        # Temporarily restrict to single group
-                        analyzer.active_groups = {group_path}
-
-                        g5g5_single = analyzer.dataset_values(
-                            INPUT_CORRELATOR_DATASETS["g5g5"], return_gvar=False
-                        )
-                        g4g5g5_single = analyzer.dataset_values(
-                            INPUT_CORRELATOR_DATASETS["g4g5g5"], return_gvar=False
-                        )
-
-                        # Handle single vs list returns
-                        if isinstance(g5g5_single, list):
-                            g5g5_data_list.extend(g5g5_single)
-                            g4g5g5_data_list.extend(g4g5g5_single)
-                        else:
-                            g5g5_data_list.append(g5g5_single)
-                            g4g5g5_data_list.append(g4g5g5_single)
-
-                    # Reset to full group set
-                    analyzer.active_groups = set(sorted_group_paths)
-
-                    if not g5g5_data_list or not g4g5g5_data_list:
-                        logger.warning(f"No valid correlator data for {group_name}")
-                        continue
-
-                    # Stack into 2D arrays (configs × time)
-                    g5g5_group = np.vstack(g5g5_data_list)
-                    g4g5g5_group = np.vstack(g4g5g5_data_list)
-
-                    # Extract configuration metadata
-                    # Use to_dataframe() within the filtered context
-                    temp_df = analyzer.to_dataframe(
-                        datasets=[INPUT_CORRELATOR_DATASETS["g5g5"]],
-                        add_time_column=False,
-                        flatten_arrays=False,
-                    )
-                    config_metadata = extract_configuration_metadata(temp_df)
-
-                # Prepare group metadata
-                group_metadata = {
-                    "param_values": param_values,
-                    "n_configurations": len(group_paths),
-                    "group_name": group_name,
-                }
-
-                # Process with jackknife
                 jackknife_results = processor.process_correlator_group(
-                    g5g5_data=g5g5_group,
-                    g4g5g5_data=g4g5g5_group,
+                    g5g5_data=g5g5_array,
+                    g4g5g5_data=g4g5g5_array,
                     group_metadata=group_metadata,
                     min_configurations=min_configurations,
                 )
 
-                # Store results
-                all_processing_results[group_name] = {
-                    "jackknife_results": jackknife_results,
-                    "config_metadata": config_metadata,
-                    "group_metadata": group_metadata,
-                    "group_paths": sorted_group_paths,
-                }
-
-                processed_groups += 1
-                logger.info(f"Successfully processed group {group_name}")
+                logger.info(
+                    f"Jackknife processing complete for group {group_index}: "
+                    f"{jackknife_results['n_gauge_configurations']} configurations"
+                )
 
             except Exception as e:
-                logger.warning(f"Failed to process group {group_name}: {e}")
+                logger.error(
+                    f"Jackknife processing failed for group {group_index}: {e}"
+                )
                 continue
+
+            # === STORE RESULTS ===
+
+            # Store complete results for this group
+            all_processing_results[temp_group_id] = {
+                "jackknife_results": jackknife_results,
+                "config_metadata": group_metadata,
+                "group_paths": group_paths,
+            }
+            processed_groups += 1
+            logger.info(f"✓ Group {group_index} processing complete")
 
         # === VALIDATE RESULTS ===
 
@@ -359,31 +358,66 @@ def main(
         # === CREATE CUSTOM HDF5 OUTPUT ===
 
         logger.info(f"Creating output HDF5 file: {output_path}")
-        _create_custom_hdf5_output(
-            output_path=output_path,
-            all_processing_results=all_processing_results,
-            analyzer=analyzer,
-            processed_params_df=processed_df,  # PASS PROCESSED PARAMETERS
-            compression=compression,
-            compression_level=compression_level,
-            logger=logger,
+
+        successful_groups, skipped_groups, skipped_filenames = (
+            _create_custom_hdf5_output(
+                output_path=output_path,
+                all_processing_results=all_processing_results,
+                input_hdf5_analyzer=input_hdf5_analyzer,
+                processed_params_df=processed_df,
+                compression=compression,
+                compression_level=compression_level,
+                logger=logger,
+            )
         )
 
-        # Script completion with summary
+        # === SCRIPT COMPLETION WITH DETAILED SUMMARY ===
+
         logger.log_script_end(
-            f"Processed {processed_groups} groups, saved to {output_path.name}"
+            f"Processed {successful_groups}/{processed_groups} groups, "
+            f"saved to {output_path.name}"
         )
 
-        # Success summary
+        # === SUCCESS SUMMARY FOR CONSOLE ===
+
         if verbose or not enable_logging:
-            click.echo(f"✓ Jackknife analysis completed successfully")
+            click.echo("")
+            click.echo("=" * 70)
+            click.echo("  JACKKNIFE ANALYSIS COMPLETED")
+            click.echo("=" * 70)
             click.echo(
-                f"✓ Processed {processed_groups}/{len(grouped_data)} parameter groups"
+                f"✓ Successfully processed: {successful_groups}/{processed_groups} parameter groups"
             )
             click.echo(
-                f"✓ Used processed parameters from: {Path(processed_parameters_csv).name}"
+                f"✓ Processed parameters from: {Path(processed_parameters_csv).name}"
             )
             click.echo(f"✓ Results saved to: {output_path}")
+
+            # Warning about skipped groups
+            if skipped_groups > 0:
+                click.echo("")
+                click.echo(
+                    f"⚠ Warning: {skipped_groups} groups skipped due to filename mismatches"
+                )
+                click.echo("  Skipped filenames:")
+
+                # Show first 5 skipped filenames
+                for filename in skipped_filenames[:5]:
+                    click.echo(f"    - {filename}")
+
+                # Indicate if there are more
+                if len(skipped_filenames) > 5:
+                    remaining = len(skipped_filenames) - 5
+                    click.echo(f"    ... and {remaining} more")
+
+                click.echo("")
+                click.echo("  This usually indicates:")
+                click.echo("    • Stage 1B and Stage 2A processed different file sets")
+                click.echo("    • Incomplete or corrupted Stage 2A output")
+                click.echo("")
+                click.echo(f"  See log file for details: {log_directory}")
+
+            click.echo("=" * 70)
 
     except Exception as e:
         logger.log_script_error(e)
@@ -392,64 +426,10 @@ def main(
 
     finally:
         # Clean up resources
-        if "analyzer" in locals():
-            analyzer.close()
+        if "input_hdf5_analyzer" in locals():
+            input_hdf5_analyzer.close()
         logger.close()
-
-
-def _create_descriptive_group_name(param_values, multivalued_params, max_length=100):
-    """
-    Create a descriptive group name using parameter names and values.
-
-    Args:
-        - param_values: Tuple of parameter values
-        - multivalued_params: List of parameter names
-        - max_length: Maximum length for group name
-
-    Returns:
-        Descriptive string name for the group
-    """
-    # Filter out Configuration_label if present
-    actual_params = [p for p in multivalued_params if p != "Configuration_label"]
-
-    # Handle single vs multiple parameters
-    if not isinstance(param_values, (tuple, list)):
-        param_values = [param_values]
-
-    # Create name parts
-    parts = []
-    for param_name, value in zip(actual_params, param_values):
-        # Get short label if available
-        label = PARAMETER_LABELS.get(param_name, param_name)
-
-        # Format value
-        if param_name in PARAMETERS_WITH_EXPONENTIAL_FORMAT:
-            value_str = f"{value:.1e}".replace("e-0", "e-").replace("e+0", "e")
-        elif isinstance(value, float):
-            value_str = f"{value:.4g}".replace(".", "p").replace("-", "m")
-        else:
-            value_str = str(value).replace(".", "p").replace("-", "m")
-
-        parts.append(f"{label}{value_str}")
-
-    # Combine parts
-    name = "jackknife_analysis_" + "_".join(parts)
-
-    # Truncate if needed
-    if len(name) > max_length:
-        name = name[: max_length - 3] + "..."
-
-    return name
 
 
 if __name__ == "__main__":
     main()
-
-# TODO: Place main function definition at the bottom of the file and the
-# rest of the function definitions above it.
-# TODO: Set min_configurations parameter from the config file if
-# available.
-# TODO: Use the processed parameters Dataframe to update MPI_geometry
-# parameter.
-# TODO: For the jackknife analysis names, use the processed parameter
-# values instead of the raw ones.
