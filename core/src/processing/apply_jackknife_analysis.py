@@ -12,14 +12,15 @@ HDF5 format, focusing on processing tasks:
       format with processed parameter values
 
 Key improvements in this version:
-    - Uses processed parameters from Stage 2A CSV as single source of truth
+    - Uses processed parameters from Stage 2A CSV as single source of
+      truth
     - Integrates PlotFilenameBuilder for consistent group naming
     - Implements graceful error handling for filename mismatches
     - Provides detailed user feedback on processing statistics
 
 Usage:
-    python apply_jackknife_analysis.py -i input.h5 -csv processed.csv -o output.h5
-    [options]
+    python apply_jackknife_analysis.py -i input.h5 -csv processed.csv -o
+    output.h5 [options]
 """
 
 import os
@@ -139,7 +140,8 @@ def main(
     This script processes correlator data by:
         1. Loading data using HDF5Analyzer
         2. Loading processed parameters from CSV (Stage 2A output)
-        3. Grouping by tunable parameters (excluding Configuration_label)
+        3. Grouping by tunable parameters (excluding
+           Configuration_label)
         4. Applying jackknife resampling to each group
         5. Computing finite difference derivatives
         6. Exporting results with processed parameter values from CSV
@@ -243,8 +245,9 @@ def main(
         ):
             # group_paths is List[str] of HDF5 paths
 
-            # Note: Group naming is now handled by _hdf5_output.py using PlotFilenameBuilder
-            # We use a temporary identifier here for tracking
+            # Note: Group naming is now handled by _hdf5_output.py using
+            # PlotFilenameBuilder We use a temporary identifier here for
+            # tracking
             temp_group_id = f"group_{group_index}"
 
             logger.info(

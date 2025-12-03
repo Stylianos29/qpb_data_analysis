@@ -48,11 +48,13 @@ class ParameterClassification:
     Container for classified parameter information.
 
     Attributes:
-        constant_tunable: Dict of single-valued tunable parameters
-        multivalued_tunable_names: List of multivalued tunable parameter names
-        mpi_geometry_storage: Where to store MPI_geometry ("constant_attribute",
-                              "group_attribute", or "dataset_list")
-        grouping_params: Set of parameters used for grouping (if determinable)
+        - constant_tunable: Dict of single-valued tunable parameters
+        - multivalued_tunable_names: List of multivalued tunable
+          parameter names
+        - mpi_geometry_storage: Where to store MPI_geometry
+          ("constant_attribute", "group_attribute", or "dataset_list")
+        - grouping_params: Set of parameters used for grouping (if
+          determinable)
     """
 
     def __init__(
@@ -73,9 +75,9 @@ class GroupProcessingResult:
     Result of processing a single jackknife analysis group.
 
     Attributes:
-        success: Whether processing succeeded
-        group_name: Generated HDF5 group name
-        skipped_reason: Reason for skipping (if applicable)
+        - success: Whether processing succeeded
+        - group_name: Generated HDF5 group name
+        - skipped_reason: Reason for skipping (if applicable)
     """
 
     def __init__(
@@ -98,23 +100,25 @@ def _create_filename_to_params_lookup(
     processed_csv_df: Optional[pd.DataFrame], logger
 ) -> Dict[str, Dict]:
     """
-    Create dictionary mapping base filename (no extension) to processed parameters.
+    Create dictionary mapping base filename (no extension) to processed
+    parameters.
 
     This function strips file extensions to enable matching between:
-    - CSV filenames (typically .txt)
-    - HDF5 group names (typically .dat)
+        - CSV filenames (typically .txt)
+        - HDF5 group names (typically .dat)
 
     Args:
-        processed_csv_df: DataFrame from processed_parameter_values.csv
-        logger: Logger instance
+        - processed_csv_df: DataFrame from
+          processed_parameter_values.csv
+        - logger: Logger instance
 
     Returns:
         dict: {base_filename: {param_name: param_value, ...}}
 
     Example:
-        CSV has: "KL_Brillouin_..._n1.txt"
-        HDF5 has: "KL_Brillouin_..._n1.dat"
-        Lookup key: "KL_Brillouin_..._n1"
+        - CSV has: "KL_Brillouin_..._n1.txt"
+        - HDF5 has: "KL_Brillouin_..._n1.dat"
+        - Lookup key: "KL_Brillouin_..._n1"
     """
     if processed_csv_df is None:
         logger.warning("No processed parameters DataFrame provided")
@@ -122,7 +126,8 @@ def _create_filename_to_params_lookup(
 
     lookup = {}
     for _, row in processed_csv_df.iterrows():
-        # Strip extension from CSV filename to match any extension in HDF5
+        # Strip extension from CSV filename to match any extension in
+        # HDF5
         filename_with_ext = row["Filename"]
         base_filename = os.path.splitext(filename_with_ext)[0]
 
@@ -140,23 +145,28 @@ def _extract_group_parameters(
     logger,
 ) -> Optional[Dict[str, Any]]:
     """
-    Extract processed parameter values for an HDF5 group from CSV lookup.
+    Extract processed parameter values for an HDF5 group from CSV
+    lookup.
 
-    This function enforces the principle that ALL parameter values must come
-    from the processed CSV (Stage 2A output), not from raw HDF5 attributes.
+    This function enforces the principle that ALL parameter values must
+    come from the processed CSV (Stage 2A output), not from raw HDF5
+    attributes.
 
     Args:
-        config_metadata: Metadata dict containing qpb_filenames list
-        filename_lookup: Dictionary mapping base filenames to parameters
-        multivalued_tunable_names: List of multivalued tunable parameter names
-        logger: Logger instance
+        - config_metadata: Metadata dict containing qpb_filenames list
+        - filename_lookup: Dictionary mapping base filenames to
+          parameters
+        - multivalued_tunable_names: List of multivalued tunable
+          parameter names
+        - logger: Logger instance
 
     Returns:
         dict: {param_name: param_value} for multivalued tunable params,
               or None if filename not found in CSV
 
     Raises:
-        ValueError: If no filenames in config_metadata (indicates data corruption)
+        ValueError: If no filenames in config_metadata (indicates data
+        corruption)
     """
     # Extract filename from metadata
     filenames = config_metadata.get("qpb_filenames", [])
@@ -166,7 +176,8 @@ def _extract_group_parameters(
             "This indicates corrupted jackknife processing results."
         )
 
-    # Use first filename as reference (all configs in group have same parameters)
+    # Use first filename as reference (all configs in group have same
+    # parameters)
     reference_filename = filenames[0]
     base_filename = os.path.splitext(reference_filename)[0]
 
@@ -214,24 +225,27 @@ def _classify_parameters(
     processed_csv_analyzer: DataFrameAnalyzer, input_hdf5_analyzer: HDF5Analyzer, logger
 ) -> ParameterClassification:
     """
-    Classify parameters and determine storage strategy, including MPI_geometry.
+    Classify parameters and determine storage strategy, including
+    MPI_geometry.
 
     Classification rules:
-    1. Single-valued tunable → constant_attribute (second-to-deepest group)
-    2. Multivalued tunable:
-       - If used for grouping → group_attribute (deepest group)
-       - If NOT used for grouping → dataset_list (varies within group)
+        1. Single-valued tunable → constant_attribute (second-to-deepest
+           group)
+        2. Multivalued tunable:
+        - If used for grouping → group_attribute (deepest group)
+        - If NOT used for grouping → dataset_list (varies within group)
 
     Special handling for MPI_geometry:
-    - If single-valued → constant_attribute
-    - If multivalued:
-      * If used for grouping → group_attribute
-      * If not used for grouping → dataset_list ("mpi_geometry_values")
+        - If single-valued → constant_attribute
+        - If multivalued:
+        * If used for grouping → group_attribute
+        * If not used for grouping → dataset_list
+          ("mpi_geometry_values")
 
     Args:
-        processed_csv_analyzer: Analyzer for processed CSV DataFrame
-        input_hdf5_analyzer: Analyzer for input HDF5 file
-        logger: Logger instance
+        - processed_csv_analyzer: Analyzer for processed CSV DataFrame
+        - input_hdf5_analyzer: Analyzer for input HDF5 file
+        - logger: Logger instance
 
     Returns:
         ParameterClassification instance with all classification info
@@ -256,8 +270,8 @@ def _classify_parameters(
         processed_csv_analyzer.list_of_multivalued_tunable_parameter_names
     )
 
-    # Determine which parameters were used for grouping
-    # We infer this from the input HDF5 analyzer's grouping
+    # Determine which parameters were used for grouping We infer this
+    # from the input HDF5 analyzer's grouping
     grouping_params = set(
         input_hdf5_analyzer.reduced_multivalued_tunable_parameter_names_list
     )
@@ -287,22 +301,27 @@ def _classify_mpi_geometry_storage(
     mpi_in_constant: bool, mpi_in_multivalued: bool, mpi_in_grouping: bool, logger
 ) -> str:
     """
-    Determine where to store MPI_geometry based on its variability pattern.
+    Determine where to store MPI_geometry based on its variability
+    pattern.
 
     Logic:
-    - If single-valued (constant) → "constant_attribute" (second-to-deepest)
-    - If multivalued:
-      * If used for grouping → "group_attribute" (deepest group attribute)
-      * If NOT used for grouping → "dataset_list" (mpi_geometry_values array)
+        - If single-valued (constant) → "constant_attribute"
+          (second-to-deepest)
+        - If multivalued:
+            * If used for grouping → "group_attribute" (deepest group
+              attribute)
+            * If NOT used for grouping → "dataset_list"
+              (mpi_geometry_values array)
 
     Args:
-        mpi_in_constant: Is MPI_geometry single-valued?
-        mpi_in_multivalued: Is MPI_geometry multivalued?
-        mpi_in_grouping: Was MPI_geometry used for grouping?
-        logger: Logger instance
+        - mpi_in_constant: Is MPI_geometry single-valued?
+        - mpi_in_multivalued: Is MPI_geometry multivalued?
+        - mpi_in_grouping: Was MPI_geometry used for grouping?
+        - logger: Logger instance
 
     Returns:
-        str: One of "constant_attribute", "group_attribute", "dataset_list"
+        str: One of "constant_attribute", "group_attribute",
+        "dataset_list"
     """
     if mpi_in_constant:
         logger.info(
@@ -352,10 +371,11 @@ def _generate_group_name(
         "jackknife_analysis_Chebyshev_Wilson_m0p06_n6_MPI444"
 
     Args:
-        processed_params: Dict of processed parameter values from CSV
-        multivalued_tunable_names: List of multivalued tunable parameter names
-        filename_builder: PlotFilenameBuilder instance
-        logger: Logger instance
+        - processed_params: Dict of processed parameter values from CSV
+        - multivalued_tunable_names: List of multivalued tunable
+          parameter names
+        - filename_builder: PlotFilenameBuilder instance
+        - logger: Logger instance
 
     Returns:
         str: Descriptive group name
@@ -368,15 +388,17 @@ def _generate_group_name(
             if p != "Configuration_label" and p in processed_params
         ]
 
-        # Create a working copy of metadata for the builder
-        # IMPORTANT: Include ALL parameters, not just multivalued ones
-        # PlotFilenameBuilder needs to see Overlap_operator_method and Kernel_operator_type
+        # Create a working copy of metadata for the builder IMPORTANT:
+        # Include ALL parameters, not just multivalued ones
+        # PlotFilenameBuilder needs to see Overlap_operator_method and
+        # Kernel_operator_type
         metadata_for_builder = processed_params.copy()
 
         # Special handling for MPI_geometry: convert "(4, 4, 4)" → "444"
         if "MPI_geometry" in metadata_for_builder:
             mpi_value = metadata_for_builder["MPI_geometry"]
-            # Handle string representations of tuples: "(4, 4, 4)" or "(4,4,4)"
+            # Handle string representations of tuples: "(4, 4, 4)" or
+            # "(4,4,4)"
             if isinstance(mpi_value, str):
                 # Remove parentheses, commas, and spaces to get "444"
                 mpi_cleaned = (
@@ -391,8 +413,8 @@ def _generate_group_name(
                 mpi_cleaned = "".join(str(x) for x in mpi_value)
                 metadata_for_builder["MPI_geometry"] = mpi_cleaned
 
-        # Use PlotFilenameBuilder for consistent naming
-        # Note: We use custom_prefix to put "jackknife_analysis" at the front
+        # Use PlotFilenameBuilder for consistent naming Note: We use
+        # custom_prefix to put "jackknife_analysis" at the front
         group_name = filename_builder.build(
             metadata_dict=metadata_for_builder,  # Use the working copy with all params
             base_name="",  # Empty base name since prefix contains "jackknife_analysis"
@@ -413,7 +435,8 @@ def _generate_group_name(
         # Fallback to simple naming if builder fails
         logger.warning(f"PlotFilenameBuilder failed, using fallback naming: {e}")
 
-        # Simple fallback: jackknife_analysis_param1_value1_param2_value2
+        # Simple fallback:
+        # jackknife_analysis_param1_value1_param2_value2
         parts = ["jackknife_analysis"]
 
         # Add Overlap_operator_method if present
@@ -449,7 +472,8 @@ def _get_input_directory_structure(input_hdf5_analyzer: HDF5Analyzer) -> List[st
         sample_group = list(input_hdf5_analyzer.active_groups)[0]
         # Split path and remove empty strings
         parts = [part for part in sample_group.split("/") if part]
-        # Return all but the last part (which is the individual file group)
+        # Return all but the last part (which is the individual file
+        # group)
         return parts[:-1] if len(parts) > 1 else parts
     return []
 
@@ -458,12 +482,13 @@ def _store_constant_parameters(
     parent_group: h5py.Group, constant_params: Dict[str, Any], logger
 ) -> None:
     """
-    Store constant (single-valued) tunable parameters as HDF5 attributes.
+    Store constant (single-valued) tunable parameters as HDF5
+    attributes.
 
     Args:
-        parent_group: HDF5 group (second-to-deepest level)
-        constant_params: Dictionary of constant parameter values
-        logger: Logger instance
+        - parent_group: HDF5 group (second-to-deepest level)
+        - constant_params: Dictionary of constant parameter values
+        - logger: Logger instance
     """
     logger.info(
         f"Storing {len(constant_params)} constant parameters at second-to-deepest level"
@@ -488,11 +513,12 @@ def _store_group_parameters(
     it should be stored as a group attribute.
 
     Args:
-        jackknife_group: HDF5 group (deepest level)
-        processed_params: Dictionary of processed parameter values
-        multivalued_tunable_names: List of multivalued tunable parameter names
-        mpi_geometry_storage: Where to store MPI_geometry
-        logger: Logger instance
+        - jackknife_group: HDF5 group (deepest level)
+        - processed_params: Dictionary of processed parameter values
+        - multivalued_tunable_names: List of multivalued tunable
+          parameter names
+        - mpi_geometry_storage: Where to store MPI_geometry
+        - logger: Logger instance
     """
     # Filter out Configuration_label (handled separately as dataset)
     actual_params = [p for p in multivalued_tunable_names if p != "Configuration_label"]
@@ -534,28 +560,29 @@ def _store_jackknife_datasets(
     Store jackknife analysis results as HDF5 datasets.
 
     Creates datasets for:
-    - Jackknife samples (all resampled values)
-    - Mean values (central estimates)
-    - Error values (standard errors from jackknife)
+        - Jackknife samples (all resampled values)
+        - Mean values (central estimates)
+        - Error values (standard errors from jackknife)
 
     Args:
-        group: HDF5 group to store datasets in
-        jackknife_results: Dictionary containing jackknife analysis results
-        compression: HDF5 compression method
-        compression_opts: Compression level
-        logger: Logger instance
+        - group: HDF5 group to store datasets in
+        - jackknife_results: Dictionary containing jackknife analysis
+          results
+        - compression: HDF5 compression method
+        - compression_opts: Compression level
+        - logger: Logger instance
     """
     # Define expected dataset keys and their descriptions
     dataset_keys = {
         "g5g5_jackknife_samples": "g5-g5 correlator jackknife samples",
         "g5g5_mean_values": "g5-g5 correlator mean values",
         "g5g5_error_values": "g5-g5 correlator standard errors",
-        "g4g5g5_jackknife_samples": "g4γ5-g5 correlator jackknife samples",
-        "g4g5g5_mean_values": "g4γ5-g5 correlator mean values",
-        "g4g5g5_error_values": "g4γ5-g5 correlator standard errors",
-        "g4g5g5_derivative_jackknife_samples": "g4γ5-g5 derivative jackknife samples",
-        "g4g5g5_derivative_mean_values": "g4γ5-g5 derivative mean values",
-        "g4g5g5_derivative_error_values": "g4γ5-g5 derivative standard errors",
+        "g4g5g5_jackknife_samples": "g4g5-g5 correlator jackknife samples",
+        "g4g5g5_mean_values": "g4g5-g5 correlator mean values",
+        "g4g5g5_error_values": "g4g5-g5 correlator standard errors",
+        "g4g5g5_derivative_jackknife_samples": "g4g5-g5 derivative jackknife samples",
+        "g4g5g5_derivative_mean_values": "g4g5-g5 derivative mean values",
+        "g4g5g5_derivative_error_values": "g4g5-g5 derivative standard errors",
     }
 
     stored_count = 0
@@ -594,19 +621,20 @@ def _store_metadata_arrays(
     Store configuration metadata as HDF5 datasets.
 
     Always stores:
-    - gauge_configuration_labels: List of configuration labels
-    - qpb_log_filenames: List of log filenames
+        - gauge_configuration_labels: List of configuration labels
+        - qpb_log_filenames: List of log filenames
 
     Conditionally stores:
-    - mpi_geometry_values: Only if mpi_geometry_storage == "dataset_list"
+        - mpi_geometry_values: Only if mpi_geometry_storage ==
+          "dataset_list"
 
     Args:
-        group: HDF5 group to store datasets in
-        config_metadata: Dictionary containing configuration metadata
-        mpi_geometry_storage: Where MPI_geometry should be stored
-        compression: HDF5 compression method
-        compression_opts: Compression level
-        logger: Logger instance
+        - group: HDF5 group to store datasets in
+        - config_metadata: Dictionary containing configuration metadata
+        - mpi_geometry_storage: Where MPI_geometry should be stored
+        - compression: HDF5 compression method
+        - compression_opts: Compression level
+        - logger: Logger instance
     """
     # Always store these metadata arrays
     required_metadata = {
@@ -656,9 +684,10 @@ def _store_metadata_arrays(
                 logger.info("  Created MPI_geometry dataset (varies within group)")
                 stored_count += 1
             else:
-                # Classification suggested dataset storage, but MPI_geometry is actually
-                # constant within each group, so it's correctly stored as an attribute.
-                # No mpi_geometry_values dataset will be created.
+                # Classification suggested dataset storage, but
+                # MPI_geometry is actually constant within each group,
+                # so it's correctly stored as an attribute. No
+                # mpi_geometry_values dataset will be created.
                 logger.info(
                     "MPI_geometry stored as group attribute (constant within each group). "
                     "No 'mpi_geometry_values' dataset created."
@@ -682,23 +711,27 @@ def _create_custom_hdf5_output(
     logger,
 ) -> Tuple[int, int, List[str]]:
     """
-    Create custom HDF5 output file with processed parameters and robust error handling.
+    Create custom HDF5 output file with processed parameters and robust
+    error handling.
 
-    This function orchestrates the complete HDF5 output creation process:
-    1. Classify parameters using DataFrameAnalyzer
-    2. Create filename lookup for parameter matching
-    3. Build HDF5 structure with constant parameters
-    4. Process each jackknife group with error handling
-    5. Return detailed statistics for user feedback
+    This function orchestrates the complete HDF5 output creation
+    process:
+        1. Classify parameters using DataFrameAnalyzer
+        2. Create filename lookup for parameter matching
+        3. Build HDF5 structure with constant parameters
+        4. Process each jackknife group with error handling
+        5. Return detailed statistics for user feedback
 
     Args:
-        output_path: Path for output HDF5 file
-        all_processing_results: Dictionary with all jackknife processing results
-        input_hdf5_analyzer: Analyzer for input HDF5 file
-        processed_params_df: DataFrame from processed_parameter_values.csv
-        compression: Compression method ('gzip', 'lzf', or 'none')
-        compression_level: Compression level (1-9 for gzip)
-        logger: Logger instance
+        - output_path: Path for output HDF5 file
+        - all_processing_results: Dictionary with all jackknife
+          processing results
+        - input_hdf5_analyzer: Analyzer for input HDF5 file
+        - processed_params_df: DataFrame from
+          processed_parameter_values.csv
+        - compression: Compression method ('gzip', 'lzf', or 'none')
+        - compression_level: Compression level (1-9 for gzip)
+        - logger: Logger instance
 
     Returns:
         Tuple of (successful_groups, skipped_groups, skipped_filenames)
@@ -786,7 +819,8 @@ def _create_custom_hdf5_output(
                     logger=logger,
                 )
 
-                # Check if parameter extraction failed (filename not in CSV)
+                # Check if parameter extraction failed (filename not in
+                # CSV)
                 if processed_params is None:
                     skipped_groups += 1
                     skipped_filenames.append(
@@ -797,18 +831,10 @@ def _create_custom_hdf5_output(
                     )
                     continue
 
-                # # Generate descriptive group name
-                # group_name = _generate_group_name(
-                #     processed_params=processed_params,
-                #     multivalued_tunable_names=param_classification.multivalued_tunable_names,
-                #     filename_builder=filename_builder,
-                #     logger=logger,
-                # )
-
-                # Generate descriptive group name
-                # Combine constant and multivalued parameters for complete metadata
+                # Generate descriptive group name Combine constant and
+                # multivalued parameters for complete metadata
                 complete_metadata = {
-                    **param_classification.constant_tunable,  # Add constant params (like Overlap_operator_method)
+                    **param_classification.constant_tunable,  # Add constant params
                     **processed_params  # Add multivalued params
                 }
 
