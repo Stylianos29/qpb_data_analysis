@@ -1,8 +1,10 @@
 """
-HDF5 output module for jackknife analysis with comprehensive parameter handling.
+HDF5 output module for jackknife analysis with comprehensive parameter
+handling.
 
-This refactored module creates custom HDF5 output files using processed parameter
-values from Stage 2A as the single source of truth. Key improvements:
+This refactored module creates custom HDF5 output files using processed
+parameter values from Stage 2A as the single source of truth. Key
+improvements:
 
 1. Uses PlotFilenameBuilder for consistent group naming across pipeline
 2. Context-aware MPI_geometry handling (attribute vs dataset storage)
@@ -11,10 +13,11 @@ values from Stage 2A as the single source of truth. Key improvements:
 5. Comprehensive logging and user feedback
 
 Design Principles:
-- CSV processed parameters are the authoritative source (never use raw HDF5 attributes)
-- Only TUNABLE parameters stored as HDF5 attributes
-- Graceful degradation: skip mismatched groups, continue processing
-- Consistent naming conventions with visualization layer
+    - CSV processed parameters are the authoritative source (never use
+      raw HDF5 attributes)
+    - Only TUNABLE parameters stored as HDF5 attributes
+    - Graceful degradation: skip mismatched groups, continue processing
+    - Consistent naming conventions with visualization layer
 """
 
 from pathlib import Path
@@ -604,29 +607,34 @@ def _store_metadata_arrays(
         else:
             logger.warning(f"Expected metadata key '{metadata_key}' not found")
 
-    # Conditionally store MPI_geometry values
-    if mpi_geometry_storage == "dataset_list":
-        if "mpi_geometries" in config_metadata:
-            mpi_data = config_metadata["mpi_geometries"]
+        # Conditionally store MPI_geometry values
+        if mpi_geometry_storage == "dataset_list":
+            if "mpi_geometries" in config_metadata:
+                mpi_data = config_metadata["mpi_geometries"]
 
-            # Convert to appropriate format
-            if isinstance(mpi_data, list):
-                mpi_data = np.array(mpi_data, dtype=h5py.string_dtype(encoding="utf-8"))
+                # Convert to appropriate format
+                if isinstance(mpi_data, list):
+                    mpi_data = np.array(
+                        mpi_data, dtype=h5py.string_dtype(encoding="utf-8")
+                    )
 
-            group.create_dataset(
-                "mpi_geometry_values",
-                data=mpi_data,
-                compression=compression,
-                compression_opts=compression_opts,
-            )
+                group.create_dataset(
+                    "mpi_geometry_values",
+                    data=mpi_data,
+                    compression=compression,
+                    compression_opts=compression_opts,
+                )
 
-            logger.info("  Created MPI_geometry dataset (varies within group)")
-            stored_count += 1
-        else:
-            logger.warning(
-                "MPI_geometry should be stored as dataset but 'mpi_geometries' "
-                "not found in config_metadata"
-            )
+                logger.info("  Created MPI_geometry dataset (varies within group)")
+                stored_count += 1
+            else:
+                # Classification suggested dataset storage, but MPI_geometry is actually
+                # constant within each group, so it's correctly stored as an attribute.
+                # No mpi_geometry_values dataset will be created.
+                logger.info(
+                    "MPI_geometry stored as group attribute (constant within each group). "
+                    "No 'mpi_geometry_values' dataset created."
+                )
 
     logger.info(f"Stored {stored_count} metadata arrays")
 
