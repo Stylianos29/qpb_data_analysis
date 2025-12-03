@@ -32,7 +32,7 @@ import pandas as pd
 from library.data.hdf5_analyzer import HDF5Analyzer
 from library.data.analyzer import DataFrameAnalyzer
 from library.visualization.builders.filename_builder import PlotFilenameBuilder
-from library.constants import PARAMETER_LABELS
+from library.constants import FILENAME_LABELS_BY_COLUMN_NAME
 
 # Import from auxiliary modules
 from src.processing._jackknife_config import get_dataset_description
@@ -348,9 +348,8 @@ def _generate_group_name(
         jackknife_analysis_[Overlap]_[Kernel]_[param1][value1]_[param2][value2]...
 
     Examples:
-        "jackknife_analysis_Chebyshev_Wilson_m0p06_n6"
-        "jackknife_analysis_KL_Brillouin_m0p1_L32_B6p0"
-        "jackknife_analysis_m0p15_T48"  (no overlap/kernel)
+        "jackknife_analysis_KL_Brillouin_m0p01_n2_MPI444_EpsMSCG1e-06"
+        "jackknife_analysis_Chebyshev_Wilson_m0p06_n6_MPI444"
 
     Args:
         processed_params: Dict of processed parameter values from CSV
@@ -369,13 +368,36 @@ def _generate_group_name(
             if p != "Configuration_label" and p in processed_params
         ]
 
+        # Create a working copy of metadata for the builder
+        # IMPORTANT: Include ALL parameters, not just multivalued ones
+        # PlotFilenameBuilder needs to see Overlap_operator_method and Kernel_operator_type
+        metadata_for_builder = processed_params.copy()
+
+        # Special handling for MPI_geometry: convert "(4, 4, 4)" → "444"
+        if "MPI_geometry" in metadata_for_builder:
+            mpi_value = metadata_for_builder["MPI_geometry"]
+            # Handle string representations of tuples: "(4, 4, 4)" or "(4,4,4)"
+            if isinstance(mpi_value, str):
+                # Remove parentheses, commas, and spaces to get "444"
+                mpi_cleaned = (
+                    mpi_value.replace("(", "")
+                    .replace(")", "")
+                    .replace(",", "")
+                    .replace(" ", "")
+                )
+                metadata_for_builder["MPI_geometry"] = mpi_cleaned
+            elif isinstance(mpi_value, tuple):
+                # Handle actual tuple: (4, 4, 4) → "444"
+                mpi_cleaned = "".join(str(x) for x in mpi_value)
+                metadata_for_builder["MPI_geometry"] = mpi_cleaned
+
         # Use PlotFilenameBuilder for consistent naming
         # Note: We use custom_prefix to put "jackknife_analysis" at the front
         group_name = filename_builder.build(
-            metadata_dict=processed_params,
+            metadata_dict=metadata_for_builder,  # Use the working copy with all params
             base_name="",  # Empty base name since prefix contains "jackknife_analysis"
-            multivalued_params=actual_params,
-            custom_prefix="jackknife_analysis",
+            multivalued_params=actual_params,  # Only list multivalued ones
+            custom_prefix="jackknife_analysis_",
         )
 
         # Clean up any double underscores from empty base_name
@@ -393,9 +415,15 @@ def _generate_group_name(
 
         # Simple fallback: jackknife_analysis_param1_value1_param2_value2
         parts = ["jackknife_analysis"]
+
+        # Add Overlap_operator_method if present
+        if "Overlap_operator_method" in processed_params:
+            parts.append(str(processed_params["Overlap_operator_method"]))
+
+        # Add other parameters
         for param in actual_params:
             if param in processed_params:
-                label = PARAMETER_LABELS.get(param, param)
+                label = FILENAME_LABELS_BY_COLUMN_NAME.get(param, param)
                 value = str(processed_params[param]).replace(".", "p")
                 parts.append(f"{label}{value}")
 
@@ -698,7 +726,7 @@ def _create_custom_hdf5_output(
         f"Created DataFrameAnalyzer for processed CSV: {len(processed_params_df)} rows"
     )
 
-    filename_builder = PlotFilenameBuilder(PARAMETER_LABELS)
+    filename_builder = PlotFilenameBuilder(FILENAME_LABELS_BY_COLUMN_NAME)
     logger.info("Created PlotFilenameBuilder for group naming")
 
     filename_lookup = _create_filename_to_params_lookup(processed_params_df, logger)
@@ -769,12 +797,26 @@ def _create_custom_hdf5_output(
                     )
                     continue
 
+                # # Generate descriptive group name
+                # group_name = _generate_group_name(
+                #     processed_params=processed_params,
+                #     multivalued_tunable_names=param_classification.multivalued_tunable_names,
+                #     filename_builder=filename_builder,
+                #     logger=logger,
+                # )
+
                 # Generate descriptive group name
+                # Combine constant and multivalued parameters for complete metadata
+                complete_metadata = {
+                    **param_classification.constant_tunable,  # Add constant params (like Overlap_operator_method)
+                    **processed_params  # Add multivalued params
+                }
+
                 group_name = _generate_group_name(
-                    processed_params=processed_params,
+                    processed_params=complete_metadata,  # Pass combined metadata
                     multivalued_tunable_names=param_classification.multivalued_tunable_names,
                     filename_builder=filename_builder,
-                    logger=logger,
+                    logger=logger
                 )
 
                 # Create the jackknife analysis group

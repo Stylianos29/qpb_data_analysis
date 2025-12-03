@@ -73,7 +73,7 @@ PARAMETERS_PRINTED_LABELS_DICTIONARY = {
     "KL_diagonal_order": "n",  # Keep for any legacy references
     "Rational_order": "n",  # Add new unified name
     "KL_scaling_factor": "mu",
-    "MPI_geometry": "cores",
+    "MPI_geometry": "MPI",
 }
 
 
