@@ -12,15 +12,15 @@ HDF5 format, focusing on processing tasks:
       format with processed parameter values
 
 Key improvements in this version:
-    - Uses processed parameters from Stage 2A CSV as single source of
-      truth
+    - Uses processed parameters from Stage 2A CSV as single source of truth
+    - CSV-driven grouping using DataFrameAnalyzer ensures ALL parameters are used
     - Integrates PlotFilenameBuilder for consistent group naming
     - Implements graceful error handling for filename mismatches
     - Provides detailed user feedback on processing statistics
 
 Usage:
-    python apply_jackknife_analysis.py -i input.h5 -csv processed.csv -o
-    output.h5 [options]
+    python apply_jackknife_analysis.py -i input.h5 -csv processed.csv -o output.h5
+    [options]
 """
 
 import os
@@ -34,6 +34,7 @@ import pandas as pd
 
 # Import library components
 from library.data.hdf5_analyzer import HDF5Analyzer
+from library.data.analyzer import DataFrameAnalyzer
 from library.data import load_csv
 from library.constants import PARAMETERS_WITH_EXPONENTIAL_FORMAT, PARAMETER_LABELS
 from library.validation.click_validators import (
@@ -48,7 +49,7 @@ from src.processing._jackknife_config import (
     DEFAULT_DERIVATIVE_METHOD,
     DEFAULT_COMPRESSION,
     DEFAULT_COMPRESSION_LEVEL,
-    EXCLUDED_FROM_GROUPING,
+    GROUPING_PARAMETERS,
     INPUT_CORRELATOR_DATASETS,
     REQUIRED_INPUT_DATASETS,
     MIN_GAUGE_CONFIGURATIONS,
@@ -140,8 +141,7 @@ def main(
     This script processes correlator data by:
         1. Loading data using HDF5Analyzer
         2. Loading processed parameters from CSV (Stage 2A output)
-        3. Grouping by tunable parameters (excluding
-           Configuration_label)
+        3. Grouping by tunable parameters using DataFrameAnalyzer
         4. Applying jackknife resampling to each group
         5. Computing finite difference derivatives
         6. Exporting results with processed parameter values from CSV
@@ -171,7 +171,7 @@ def main(
     )
 
     try:
-        logger.log_script_start("Jackknife analysis with processed parameters")
+        logger.log_script_start("Jackknife analysis with CSV-driven grouping")
 
         # === LOAD PROCESSED PARAMETERS FROM CSV ===
 
@@ -195,6 +195,9 @@ def main(
         logger.info(f"Loading correlator data from: {input_hdf5_file}")
         input_hdf5_analyzer = HDF5Analyzer(input_hdf5_file)
         logger.info(f"HDF5 file loaded successfully")
+        logger.info(
+            f"Total HDF5 groups available: {len(input_hdf5_analyzer.active_groups)}"
+        )
 
         # === VALIDATE REQUIRED DATASETS ===
 
@@ -213,19 +216,99 @@ def main(
 
         logger.info("All required datasets found in input HDF5")
 
-        # === GROUP DATA BY PARAMETERS ===
+        # === GROUP DATA BY PARAMETERS (CSV-DRIVEN USING DataFrameAnalyzer) ===
 
-        logger.info("Grouping correlator data by tunable parameters...")
-        grouped_data = input_hdf5_analyzer.group_by_multivalued_tunable_parameters(
-            filter_out_parameters_list=EXCLUDED_FROM_GROUPING, verbose=verbose
+        logger.info("=" * 80)
+        logger.info("GROUPING DATA USING CSV PARAMETERS")
+        logger.info("=" * 80)
+
+        # Create analyzer for CSV
+        processed_csv_analyzer = DataFrameAnalyzer(processed_df)
+
+        # Get grouping parameters from analyzer
+        logger.info(f"Parameters filtered out from grouping: {GROUPING_PARAMETERS}")
+
+        # Group CSV using DataFrameAnalyzer method
+        csv_grouped = processed_csv_analyzer.group_by_multivalued_tunable_parameters(
+            filter_out_parameters_list=GROUPING_PARAMETERS, verbose=False
         )
 
+        logger.info(f"Found {len(csv_grouped)} parameter groups in CSV")
+
+        # Get the actual grouping parameter names used
+        grouping_params = (
+            processed_csv_analyzer.reduced_multivalued_tunable_parameter_names_list
+        )
+        logger.info(f"Grouping by parameters: {grouping_params}")
+
+        # For each CSV group, collect corresponding HDF5 paths
+        grouped_data = {}
+        csv_filenames_not_found = []
+        total_csv_files = 0
+
+        for group_index, (group_values, group_df) in enumerate(csv_grouped, 1):
+            # Create a tuple key for this group
+            if len(grouping_params) == 1:
+                group_key = (grouping_params[0], group_values)
+            else:
+                group_key = tuple(zip(grouping_params, group_values))
+
+            # Get filenames from this CSV group
+            csv_filenames = group_df["Filename"].tolist()
+            total_csv_files += len(csv_filenames)
+
+            # Convert to .dat extensions (correlator filenames)
+            dat_filenames = [os.path.splitext(f)[0] + ".dat" for f in csv_filenames]
+
+            # Create a set for fast lookup
+            dat_filenames_set = set(dat_filenames)
+
+            # Find corresponding HDF5 group paths
+            hdf5_paths = []
+            for path in input_hdf5_analyzer.active_groups:
+                # Extract filename from HDF5 path
+                hdf5_filename = path.split("/")[-1]
+
+                # Check if this HDF5 group matches any CSV filename
+                if hdf5_filename in dat_filenames_set:
+                    hdf5_paths.append(path)
+
+            if hdf5_paths:
+                grouped_data[group_key] = hdf5_paths
+                logger.info(
+                    f"Group {group_index}/{len(csv_grouped)}: "
+                    f"{dict(group_key) if isinstance(group_key, tuple) else group_key} → "
+                    f"{len(hdf5_paths)} files matched"
+                )
+            else:
+                logger.warning(
+                    f"Group {group_index}/{len(csv_grouped)}: "
+                    f"{dict(group_key) if isinstance(group_key, tuple) else group_key} → "
+                    f"No matching HDF5 paths found (CSV has {len(dat_filenames)} files)"
+                )
+                csv_filenames_not_found.extend(csv_filenames)
+
+        logger.info("=" * 80)
+        logger.info(f"CSV-driven grouping complete:")
+        logger.info(f"  Total CSV files: {total_csv_files}")
+        logger.info(f"  Groups with HDF5 data: {len(grouped_data)}")
+        logger.info(f"  CSV files without HDF5 match: {len(csv_filenames_not_found)}")
+        logger.info("=" * 80)
+
         if not grouped_data:
-            error_msg = "No valid parameter groups found in input data"
+            error_msg = "No valid parameter groups found with matching HDF5 data"
             logger.error(error_msg)
             raise ValueError(error_msg)
 
-        logger.info(f"Found {len(grouped_data)} parameter groups to process")
+        if csv_filenames_not_found:
+            logger.warning(
+                f"The following CSV files have no matching HDF5 groups "
+                f"(first 10 shown):"
+            )
+            for filename in csv_filenames_not_found[:10]:
+                logger.warning(f"  - {filename}")
+            if len(csv_filenames_not_found) > 10:
+                logger.warning(f"  ... and {len(csv_filenames_not_found) - 10} more")
 
         # === INITIALIZE PROCESSOR ===
 
@@ -237,6 +320,7 @@ def main(
 
         all_processing_results = {}
         processed_groups = 0
+        skipped_insufficient_configs = 0
         compression = DEFAULT_COMPRESSION
         compression_level = DEFAULT_COMPRESSION_LEVEL
 
@@ -245,15 +329,16 @@ def main(
         ):
             # group_paths is List[str] of HDF5 paths
 
-            # Note: Group naming is now handled by _hdf5_output.py using
-            # PlotFilenameBuilder We use a temporary identifier here for
-            # tracking
+            # Note: Group naming is now handled by _hdf5_output.py using PlotFilenameBuilder
+            # We use a temporary identifier here for tracking
             temp_group_id = f"group_{group_index}"
 
+            logger.info("")
             logger.info(
                 f"Processing group {group_index}/{len(grouped_data)}: "
                 f"{len(group_paths)} configurations"
             )
+            logger.debug(f"Group parameters: {param_values}")
 
             # === LOAD CORRELATOR DATA ===
 
@@ -278,10 +363,11 @@ def main(
                     g4g5g5_data.append(g4g5g5_values)
 
                     # Extract metadata
-                    filename = path.split("/")[-1]
+                    filename = path.split("/")[-1]  # Get filename from path
                     qpb_filenames.append(filename)
 
                     # Extract configuration label from filename
+                    # Assumes format like: "..._n123.dat" where 123 is config label
                     config_label = filename.split("_n")[-1].split(".")[0]
                     config_labels.append(config_label)
 
@@ -294,6 +380,7 @@ def main(
                     f"Group {group_index} has insufficient configurations "
                     f"({len(g5g5_data)} < {min_configurations}). Skipping."
                 )
+                skipped_insufficient_configs += 1
                 continue
 
             # Stack into arrays
@@ -306,7 +393,6 @@ def main(
             )
 
             # === BUILD METADATA BEFORE PROCESSING ===
-
             # This is needed by the processor
             group_metadata = {
                 "configuration_labels": config_labels,
@@ -341,8 +427,9 @@ def main(
             all_processing_results[temp_group_id] = {
                 "jackknife_results": jackknife_results,
                 "config_metadata": group_metadata,
-                "group_paths": group_paths,
+                "group_paths": group_paths,  # Keep for reference
             }
+
             processed_groups += 1
             logger.info(f"✓ Group {group_index} processing complete")
 
@@ -354,8 +441,10 @@ def main(
             click.echo(f"ERROR: {error_msg}")
             sys.exit(1)
 
+        logger.info("")
         logger.info(
-            f"Successfully processed {processed_groups}/{len(grouped_data)} groups"
+            f"Successfully processed {processed_groups}/{len(grouped_data)} groups "
+            f"(skipped {skipped_insufficient_configs} with insufficient configurations)"
         )
 
         # === CREATE CUSTOM HDF5 OUTPUT ===
@@ -388,8 +477,16 @@ def main(
             click.echo("=" * 70)
             click.echo("  JACKKNIFE ANALYSIS COMPLETED")
             click.echo("=" * 70)
+            click.echo(f"✓ CSV-driven grouping: {len(csv_grouped)} parameter groups")
+            click.echo(f"✓ Groups with sufficient data: {processed_groups}")
+
+            if skipped_insufficient_configs > 0:
+                click.echo(
+                    f"✓ Groups skipped (< {min_configurations} configs): {skipped_insufficient_configs}"
+                )
+
             click.echo(
-                f"✓ Successfully processed: {successful_groups}/{processed_groups} parameter groups"
+                f"✓ Successfully processed: {successful_groups}/{processed_groups} groups"
             )
             click.echo(
                 f"✓ Processed parameters from: {Path(processed_parameters_csv).name}"
@@ -419,6 +516,17 @@ def main(
                 click.echo("    • Incomplete or corrupted Stage 2A output")
                 click.echo("")
                 click.echo(f"  See log file for details: {log_directory}")
+
+            # Warning about CSV files without HDF5 matches
+            if csv_filenames_not_found:
+                click.echo("")
+                click.echo(
+                    f"⚠ Note: {len(csv_filenames_not_found)} CSV files had no matching HDF5 data"
+                )
+                click.echo(
+                    "  This means Stage 2A processed files that Stage 1B did not."
+                )
+                click.echo("  These files were skipped (see log for details).")
 
             click.echo("=" * 70)
 

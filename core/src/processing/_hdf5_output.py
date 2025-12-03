@@ -285,7 +285,6 @@ def _classify_parameters(
     mpi_storage = _classify_mpi_geometry_storage(
         mpi_in_constant=("MPI_geometry" in single_valued_tunable),
         mpi_in_multivalued=("MPI_geometry" in multivalued_tunable),
-        mpi_in_grouping=("MPI_geometry" in grouping_params),
         logger=logger,
     )
 
@@ -298,53 +297,42 @@ def _classify_parameters(
 
 
 def _classify_mpi_geometry_storage(
-    mpi_in_constant: bool, mpi_in_multivalued: bool, mpi_in_grouping: bool, logger
+    mpi_in_constant: bool,
+    mpi_in_multivalued: bool,
+    logger,
 ) -> str:
     """
-    Determine where to store MPI_geometry based on its variability
-    pattern.
+    Determine where to store MPI_geometry based on its variability in
+    the CSV.
 
-    Logic:
-        - If single-valued (constant) → "constant_attribute"
-          (second-to-deepest)
-        - If multivalued:
-            * If used for grouping → "group_attribute" (deepest group
-              attribute)
-            * If NOT used for grouping → "dataset_list"
-              (mpi_geometry_values array)
+    Simple logic:
+        - Single-valued (constant across CSV) → second-to-deepest group
+          attribute
+        - Multivalued (varies across CSV) → deepest group attribute
+        - Not present → not stored
 
     Args:
-        - mpi_in_constant: Is MPI_geometry single-valued?
-        - mpi_in_multivalued: Is MPI_geometry multivalued?
-        - mpi_in_grouping: Was MPI_geometry used for grouping?
+        - mpi_in_constant: Is MPI_geometry in
+          unique_value_columns_dictionary?
+        - mpi_in_multivalued: Is MPI_geometry in
+          list_of_multivalued_tunable_parameter_names?
         - logger: Logger instance
 
     Returns:
         str: One of "constant_attribute", "group_attribute",
-        "dataset_list"
+        "not_present"
     """
     if mpi_in_constant:
         logger.info(
-            "MPI_geometry is constant → storing as second-to-deepest group attribute"
+            "MPI_geometry is single-valued → storing as second-to-deepest group attribute"
         )
         return "constant_attribute"
 
     elif mpi_in_multivalued:
-        if mpi_in_grouping:
-            logger.info(
-                "MPI_geometry is multivalued and used for grouping → "
-                "storing as deepest group attribute"
-            )
-            return "group_attribute"
-        else:
-            logger.info(
-                "MPI_geometry is multivalued but NOT used for grouping → "
-                "storing as 'mpi_geometry_values' dataset"
-            )
-            return "dataset_list"
+        logger.info("MPI_geometry is multivalued → storing as deepest group attribute")
+        return "group_attribute"
 
     else:
-        # MPI_geometry not present in data
         logger.debug("MPI_geometry not found in processed parameters")
         return "not_present"
 
@@ -612,7 +600,7 @@ def _store_jackknife_datasets(
 def _store_metadata_arrays(
     group: h5py.Group,
     config_metadata: Dict,
-    mpi_geometry_storage: str,
+    mpi_geometry_storage: str,  # Keep parameter but ignore it
     compression: Optional[str],
     compression_opts: Optional[int],
     logger,
@@ -620,21 +608,11 @@ def _store_metadata_arrays(
     """
     Store configuration metadata as HDF5 datasets.
 
-    Always stores:
-        - gauge_configuration_labels: List of configuration labels
-        - qpb_log_filenames: List of log filenames
+    Always stores: - gauge_configuration_labels: List of configuration
+    labels - qpb_log_filenames: List of log filenames
 
-    Conditionally stores:
-        - mpi_geometry_values: Only if mpi_geometry_storage ==
-          "dataset_list"
-
-    Args:
-        - group: HDF5 group to store datasets in
-        - config_metadata: Dictionary containing configuration metadata
-        - mpi_geometry_storage: Where MPI_geometry should be stored
-        - compression: HDF5 compression method
-        - compression_opts: Compression level
-        - logger: Logger instance
+    Note: MPI_geometry is stored as an attribute (never as dataset)
+    based on whether it's single-valued or multivalued in the CSV.
     """
     # Always store these metadata arrays
     required_metadata = {
@@ -662,36 +640,6 @@ def _store_metadata_arrays(
             stored_count += 1
         else:
             logger.warning(f"Expected metadata key '{metadata_key}' not found")
-
-        # Conditionally store MPI_geometry values
-        if mpi_geometry_storage == "dataset_list":
-            if "mpi_geometries" in config_metadata:
-                mpi_data = config_metadata["mpi_geometries"]
-
-                # Convert to appropriate format
-                if isinstance(mpi_data, list):
-                    mpi_data = np.array(
-                        mpi_data, dtype=h5py.string_dtype(encoding="utf-8")
-                    )
-
-                group.create_dataset(
-                    "mpi_geometry_values",
-                    data=mpi_data,
-                    compression=compression,
-                    compression_opts=compression_opts,
-                )
-
-                logger.info("  Created MPI_geometry dataset (varies within group)")
-                stored_count += 1
-            else:
-                # Classification suggested dataset storage, but
-                # MPI_geometry is actually constant within each group,
-                # so it's correctly stored as an attribute. No
-                # mpi_geometry_values dataset will be created.
-                logger.info(
-                    "MPI_geometry stored as group attribute (constant within each group). "
-                    "No 'mpi_geometry_values' dataset created."
-                )
 
     logger.info(f"Stored {stored_count} metadata arrays")
 
@@ -835,14 +783,14 @@ def _create_custom_hdf5_output(
                 # multivalued parameters for complete metadata
                 complete_metadata = {
                     **param_classification.constant_tunable,  # Add constant params
-                    **processed_params  # Add multivalued params
+                    **processed_params,  # Add multivalued params
                 }
 
                 group_name = _generate_group_name(
                     processed_params=complete_metadata,  # Pass combined metadata
                     multivalued_tunable_names=param_classification.multivalued_tunable_names,
                     filename_builder=filename_builder,
-                    logger=logger
+                    logger=logger,
                 )
 
                 # Create the jackknife analysis group

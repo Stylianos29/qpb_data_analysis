@@ -25,10 +25,13 @@ DEFAULT_DERIVATIVE_METHOD = DerivativeMethod.FOURTH_ORDER
 
 # Parameters to exclude from grouping (these don't affect physics
 # results)
-EXCLUDED_FROM_GROUPING = [
-    "MPI_geometry",  # Only affects computation speed
-    "Configuration_label",  # Used as fundamental sampling unit
+GROUPING_PARAMETERS = [
+    "Configuration_label",  # Used as fundamental sampling unit - never group by individual configs
+    "MPI_geometry",  # Optional: affects computation speed but not physics
 ]
+
+# Note: Remove "MPI_geometry" from this list if you want to separate
+# (4,4,4) and (6,6,6) groups (as you did by commenting it out)
 
 # Minimum number of gauge configurations required for jackknife analysis
 MIN_GAUGE_CONFIGURATIONS = 2
@@ -104,13 +107,13 @@ DATASET_DESCRIPTIONS = {
         "configuration systematically excluded."
     ),
     "g4g5g5_jackknife_samples": (
-        "2D array containing jackknife replicas of g4γ5-g5 correlator values. "
+        "2D array containing jackknife replicas of g4g5-g5 correlator values. "
         "Shape: (N_jackknife_samples, N_time_points). Each row represents "
         "correlator values computed from N-1 gauge configurations with one "
         "configuration systematically excluded."
     ),
     "g4g5g5_derivative_jackknife_samples": (
-        "2D array containing jackknife replicas of g4γ5-g5 derivative correlator "
+        "2D array containing jackknife replicas of g4g5-g5 derivative correlator "
         "values computed using fourth-order centered finite difference. "
         "Shape: (N_jackknife_samples, N_time_points-4). Boundary points are "
         "excluded due to finite difference stencil requirements."
@@ -121,11 +124,11 @@ DATASET_DESCRIPTIONS = {
         "These represent the central estimates of the correlator at each time point."
     ),
     "g4g5g5_mean_values": (
-        "Mean values of g4γ5-g5 correlator jackknife samples. "
+        "Mean values of g4g5-g5 correlator jackknife samples. "
         "These represent the central estimates of the correlator at each time point."
     ),
     "g4g5g5_derivative_mean_values": (
-        "Mean values of g4γ5-g5 derivative correlator jackknife samples. "
+        "Mean values of g4g5-g5 derivative correlator jackknife samples. "
         "Computed using fourth-order centered finite difference approximation."
     ),
     # Error values
@@ -134,11 +137,11 @@ DATASET_DESCRIPTIONS = {
         "Computed using jackknife error estimation method."
     ),
     "g4g5g5_error_values": (
-        "Statistical uncertainties of g4γ5-g5 correlator jackknife samples. "
+        "Statistical uncertainties of g4g5-g5 correlator jackknife samples. "
         "Computed using jackknife error estimation method."
     ),
     "g4g5g5_derivative_error_values": (
-        "Statistical uncertainties of g4γ5-g5 derivative correlator jackknife samples. "
+        "Statistical uncertainties of g4g5-g5 derivative correlator jackknife samples. "
         "Errors propagated through finite difference calculation."
     ),
     # Metadata
