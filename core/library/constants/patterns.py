@@ -4,7 +4,9 @@
 # parameters next to their values. Listed below are the parameters and
 # their identifying labels
 FILENAME_SCALAR_PATTERNS_DICTIONARY = {
-    # General parameters
+    # =========================================================================
+    # GENERAL PARAMETERS
+    # =========================================================================
     "Overlap_operator_method": {
         "pattern": r"(?P<Overlap_operator_method>Chebyshev|KL|Bare|Neuberger|Zolotarev)",
         "type": str,
@@ -13,7 +15,10 @@ FILENAME_SCALAR_PATTERNS_DICTIONARY = {
         "pattern": r"(?P<Kernel_operator_type>Standard|Brillouin)",
         "type": str,
     },
-    "QCD_beta_value": {"pattern": r"beta(?P<QCD_beta_value>\d+p?\d*)", "type": float},
+    "QCD_beta_value": {
+        "pattern": r"beta(?P<QCD_beta_value>\d+p?\d*)",
+        "type": float,
+    },
     "Lattice_geometry": {
         "pattern": r"_T(?P<TemporalDimension>\d+)L(?P<SpatialDimension>\d+)_",
         "type": int,
@@ -26,43 +31,96 @@ FILENAME_SCALAR_PATTERNS_DICTIONARY = {
         "pattern": r"_cores(?P<MPI_geometry>\d{3})",
         "type": str,
     },
-    "Number_of_vectors": {"pattern": r"NVecs(?P<Number_of_vectors>\d+)", "type": int},
-    "APE_iterations": {"pattern": r"APEiters(?P<APE_iterations>\d+)", "type": int},
-    "Rho_value": {"pattern": r"rho(?P<Rho_value>\d+p?\d*)", "type": float},
-    "Bare_mass": {"pattern": r"m(?P<Bare_mass>-?\d+p?\d*)", "type": float},
-    "Kappa_value": {"pattern": r"kappa(?P<Kappa_value>-?\d+p?\d*)", "type": float},
+    "Number_of_vectors": {
+        "pattern": r"NVecs(?P<Number_of_vectors>\d+)",
+        "type": int,
+    },
+    "APE_iterations": {
+        "pattern": r"APEiters(?P<APE_iterations>\d+)",
+        "type": int,
+    },
+    "APE_alpha": {
+        "pattern": r"APEalpha(?P<APE_alpha>\d+p?\d*)",
+        "type": float,
+    },
+    "Rho_value": {
+        "pattern": r"rho(?P<Rho_value>\d+p?\d*)",
+        "type": float,
+    },
+    "Bare_mass": {
+        "pattern": r"m(?P<Bare_mass>-?\d+p?\d*)",
+        "type": float,
+    },
+    "Kappa_value": {
+        "pattern": r"kappa(?P<Kappa_value>-?\d+p?\d*)",
+        "type": float,
+    },
     "Clover_coefficient": {
         "pattern": r"cSW(?P<Clover_coefficient>\d+p?\d*)",
         "type": float,
     },
-    # Chebyshev-specific parameters
-    "Delta_Min": {"pattern": r"dMin(?P<Delta_Min>\d+p?\d*)", "type": float},
-    "Delta_Max": {"pattern": r"dMax(?P<Delta_Max>\d+p?\d*)", "type": float},
-    "Number_of_Chebyshev_terms": {
-        "pattern": r"N(?P<Number_of_Chebyshev_terms>\d+)",
-        "type": int,
-    },
+    # =========================================================================
+    # EIGENVALUE ESTIMATION PARAMETERS
+    # =========================================================================
     "Lanczos_epsilon": {
         "pattern": r"EpsLanczos(?P<Lanczos_epsilon>\d+\.\d+e[+-]\d+|\d+e[+-]\d+)",
         "type": float,
     },
-    # KL-specific parameters
-    "CG_epsilon": {
-        "pattern": r"_EpsCG(?P<CG_epsilon>\d*[\.p]?\d+e[+-]\d+|\d+e[+-]\d+)",
+    "Lanczos_max_iterations": {
+        "pattern": r"LanczosMaxIters(?P<Lanczos_max_iterations>\d+)",
+        "type": int,
+    },
+    "Delta_Min": {
+        "pattern": r"dMin(?P<Delta_Min>\d+p?\d*)",
         "type": float,
     },
-    "MSCG_epsilon": {
-        "pattern": r"_EpsMSCG(?P<MSCG_epsilon>\d*[\.p]?\d+e[+-]\d+|\d+e[+-]\d+)",
+    "Delta_Max": {
+        "pattern": r"dMax(?P<Delta_Max>\d+p?\d*)",
         "type": float,
     },
-    "KL_diagonal_order": {"pattern": r"_n(?P<KL_diagonal_order>\d+)", "type": int},
+    # =========================================================================
+    # APPROXIMATION ORDER PARAMETERS
+    # =========================================================================
+    "Number_of_Chebyshev_terms": {
+        "pattern": r"N(?P<Number_of_Chebyshev_terms>\d+)",
+        "type": int,
+    },
+    "Rational_order": {
+        "pattern": r"_n(?P<Rational_order>\d+)",
+        "type": int,
+    },
+    # TODO: It needs to be removed; kept for backward compatibility
     "Zolotarev_order": {
         "pattern": r"ZolOrder(?P<Zolotarev_order>\d+)",
         "type": int,
     },
+    # =========================================================================
+    # RATIONAL APPROXIMATION SCALING
+    # =========================================================================
     "KL_scaling_factor": {
         "pattern": r"mu(?P<KL_scaling_factor>\d+p?\d*)",
         "type": float,
+    },
+    # =========================================================================
+    # SOLVER PRECISION PARAMETERS
+    # =========================================================================
+    # OUTER SOLVER (for full overlap operator inversion)
+    "Outer_solver_epsilon": {
+        "pattern": r"_EpsCG(?P<Outer_solver_epsilon>\d*[\.p]?\d+e[+-]\d+|\d+e[+-]\d+)",
+        "type": float,
+    },
+    "Outer_solver_max_iterations": {
+        "pattern": r"CGMaxIters(?P<Outer_solver_max_iterations>\d+)",
+        "type": int,
+    },
+    # INNER SOLVER (for sign function inversion)
+    "Inner_solver_epsilon": {
+        "pattern": r"_EpsMSCG(?P<Inner_solver_epsilon>\d*[\.p]?\d+e[+-]\d+|\d+e[+-]\d+)",
+        "type": float,
+    },
+    "Inner_solver_max_iterations": {
+        "pattern": r"MSCGMaxIters(?P<Inner_solver_max_iterations>\d+)",
+        "type": int,
     },
 }
 
