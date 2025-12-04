@@ -1,8 +1,8 @@
 """Regex patterns for parsing log files and extracting parameters."""
 
 # Log files filenames might contain specific labels corresponding to
-# parameters next to their values. Listed below are the parameters and their
-# identifying labels
+# parameters next to their values. Listed below are the parameters and
+# their identifying labels
 FILENAME_SCALAR_PATTERNS_DICTIONARY = {
     # General parameters
     "Overlap_operator_method": {
@@ -67,12 +67,14 @@ FILENAME_SCALAR_PATTERNS_DICTIONARY = {
 }
 
 
-# Most of the information will be extracted from the contents of the
-# log files. Listed below are the line identifiers for locating the
-# line containing the parameter value, along with the regex type and the
+# Most of the information will be extracted from the contents of the log
+# files. Listed below are the line identifiers for locating the line
+# containing the parameter value, along with the regex type and the
 # value type
 FILE_CONTENTS_SCALAR_PATTERNS_DICTIONARY = {
-    # General parameters
+    # =========================================================================
+    # GENERAL PARAMETERS (common to all overlap operator methods)
+    # =========================================================================
     "Cluster_partition": {
         "line_identifier": "Partition:",
         "regex_pattern": r"Partition:\s*(.+)",
@@ -143,8 +145,6 @@ FILE_CONTENTS_SCALAR_PATTERNS_DICTIONARY = {
         "regex_pattern": r"(-?\d+(\.\d+)?)",
         "type": float,
     },
-    # NOTE: The Clover coefficient is an integer number, 0 or 1.  But it is
-    # given a float type for flexibility
     "Clover_coefficient": {
         "line_identifier": "Clover param = ",
         "regex_pattern": r"(\d+(\.\d+)?)",
@@ -155,12 +155,15 @@ FILE_CONTENTS_SCALAR_PATTERNS_DICTIONARY = {
         "regex_pattern": r"(\d+(\.\d+)?)",
         "type": float,
     },
-    # Chebyshev-specific parameters
-    "Number_of_Chebyshev_terms": {
-        "line_identifier": "Number of Chebyshev terms = ",
-        "regex_pattern": r"(\d+)",
+    # Only for invert programs
+    "Number_of_spinors": {
+        "line_identifier": "CG done,",
+        "regex_pattern": r"CG done, (\d+) vectors",
         "type": int,
     },
+    # =========================================================================
+    # EIGENVALUE ESTIMATION PARAMETERS
+    # =========================================================================
     "Lanczos_epsilon": {
         "line_identifier": "Lanczos epsilon =",
         "regex_pattern": r"(\d+\.\d+e[+-]\d+)",
@@ -201,23 +204,14 @@ FILE_CONTENTS_SCALAR_PATTERNS_DICTIONARY = {
         "regex_pattern": r"(\d+)",
         "type": int,
     },
-    "Number_of_spinors": {
-        "line_identifier": "CG done,",
-        "regex_pattern": r"CG done, (\d+) vectors",
+    # =========================================================================
+    # APPROXIMATION ORDER PARAMETERS
+    # =========================================================================
+    "Number_of_Chebyshev_terms": {
+        "line_identifier": "Number of Chebyshev terms = ",
+        "regex_pattern": r"(\d+)",
         "type": int,
     },
-    # TODO: Very problematic. Revisit!
-    # "Solver_epsilon": {
-    #     "line_identifier": "Solver epsilon =",
-    #     "regex_pattern": r"(\d+\.\d+e[+-]\d+)",
-    #     "type": float,
-    # },
-    # "Maximum_solver_iterations": {
-    #     "line_identifier": "Max solver iters = ",
-    #     "regex_pattern": r"(\d+)",
-    #     "type": int,
-    # },
-    # KL-specific parameters
     "KL_diagonal_order": {
         "line_identifier": "KL iters = ",
         "regex_pattern": r"(\d+)",
@@ -233,29 +227,72 @@ FILE_CONTENTS_SCALAR_PATTERNS_DICTIONARY = {
         "regex_pattern": r"(\d+)",
         "type": int,
     },
+    # =========================================================================
+    # RATIONAL APPROXIMATION SCALING
+    # =========================================================================
     "KL_scaling_factor": {
         "line_identifier": "Mu =",
         "regex_pattern": r"(\d+(\.\d+)?)",
         "type": float,
     },
-    # This one can attributed to both Chebyshev and KL cases with different
-    # meaning though
-    # TODO: I need to find a way to anticipate all the invert cases
+    # =========================================================================
+    # SOLVER PRECISION PARAMETERS
+    #
+    # These parameters control the precision of iterative CG/MSCG
+    # solvers. The interpretation depends on the overlap operator method
+    # and program type:
+    #
+    # INNER SOLVER:
+    #   - Inverts the matrix sign function (part of overlap operator)
+    #   - Used in: KL_invert, Neuberger_invert, Zolotarev_invert
+    #
+    # OUTER SOLVER:
+    #   - Inverts the complete overlap operator
+    #   - Used in: All invert programs (Bare, Chebyshev, KL, Neuberger,
+    #     Zolotarev)
+    #
+    # GENERIC SOLVER:
+    #   - Ambiguous - interpretation requires context from
+    #     Overlap_operator_method
+    #   - For non-invert KL/Neuberger/Zolotarev: refers to sign function
+    #     inversion
+    #   - For invert Bare/Chebyshev: refers to full overlap operator
+    #     inversion
+    #
+    # NOTE: These will be resolved to canonical names in Stage 2A
+    # processing:
+    #   - MSCG_epsilon / MSCG_max_iterations (inner)
+    #   - CG_epsilon / CG_max_iterations (outer)
+    # =========================================================================
+    "Inner_solver_epsilon": {
+        "line_identifier": "Inner solver epsilon =",
+        "regex_pattern": r"(\d+\.\d+e[+-]\d+)",
+        "type": float,
+    },
+    "Inner_solver_max_iterations": {
+        "line_identifier": "Inner solver max iters = ",
+        "regex_pattern": r"(\d+)",
+        "type": int,
+    },
     "Outer_solver_epsilon": {
-        # "line_identifier": "Solver epsilon =",
         "line_identifier": "Outer solver epsilon =",
         "regex_pattern": r"(\d+\.\d+e[+-]\d+)",
         "type": float,
     },
-    # "Maximum_solver_iterations": {
-    #     "line_identifier": "Max solver iters = ",
-    #     "regex_pattern": r"(\d+)",
-    #     "type": int,
-    # },
-    "Total_calculation_time": {
-        "line_identifier": "vectors in t",
-        "regex_pattern": r"(\d+\.\d+)",
+    "Outer_solver_max_iterations": {
+        "line_identifier": "Outer solver max iters = ",
+        "regex_pattern": r"(\d+)",
+        "type": int,
+    },
+    "Generic_solver_epsilon": {
+        "line_identifier": "Solver epsilon =",
+        "regex_pattern": r"(\d+\.\d+e[+-]\d+)",
         "type": float,
+    },
+    "Generic_solver_max_iterations": {
+        "line_identifier": "Solver max iters = ",
+        "regex_pattern": r"(\d+)",
+        "type": int,
     },
 }
 
