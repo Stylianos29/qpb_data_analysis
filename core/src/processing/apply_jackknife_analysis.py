@@ -23,6 +23,7 @@ Usage:
     [options]
 """
 
+from asyncio.log import logger
 import os
 import sys
 from pathlib import Path
@@ -225,12 +226,22 @@ def main(
         # Create analyzer for CSV
         processed_csv_analyzer = DataFrameAnalyzer(processed_df)
 
-        # Get grouping parameters from analyzer
-        logger.info(f"Parameters filtered out from grouping: {GROUPING_PARAMETERS}")
+        # Filter GROUPING_PARAMETERS to only include parameters that exist in this dataset
+        available_multivalued = (
+            processed_csv_analyzer.list_of_multivalued_tunable_parameter_names
+        )
+        actual_filter_params = [
+            p for p in GROUPING_PARAMETERS if p in available_multivalued
+        ]
+
+        logger.info(
+            f"Actual parameters to filter (present in dataset): {actual_filter_params}"
+        )
 
         # Group CSV using DataFrameAnalyzer method
         csv_grouped = processed_csv_analyzer.group_by_multivalued_tunable_parameters(
-            filter_out_parameters_list=GROUPING_PARAMETERS, verbose=False
+            filter_out_parameters_list=actual_filter_params,  # Use filtered list
+            verbose=False,
         )
 
         logger.info(f"Found {len(csv_grouped)} parameter groups in CSV")
