@@ -1,17 +1,21 @@
 """
-Parameter Transformation Engine for QPB log file processing.
+Enhanced Parameter Transformation Engine with Solver Resolution.
 
-This module provides the main transformation engine that applies all
-configured transformations systematically to parameter data.
+This module extends the transformation engine to include systematic
+resolution of ambiguous solver parameters into canonical names.
 """
 
 import logging
 from typing import Dict, Optional
+from typing import cast
 
 import numpy as np
 import pandas as pd
 
 from src.processing._param_transform_config import (
+    SOLVER_PARAMETER_RESOLUTION_RULES,
+    RAW_SOLVER_PARAMETER_NAMES,
+    CANONICAL_SOLVER_PARAMETER_NAMES,
     STRING_TRANSFORMATIONS,
     MATH_TRANSFORMATIONS,
     EXTRACTION_RULES,
@@ -27,11 +31,11 @@ from src.processing._param_transform_config import (
 
 class ParameterTransformationEngine:
     """
-    Main engine for applying systematic parameter transformations.
+    Enhanced transformation engine with solver parameter resolution.
 
-    This class orchestrates all parameter transformations using the
-    configuration-driven approach, replacing scattered hardcoded logic
-    with systematic, maintainable processing.
+    This class orchestrates all parameter transformations including the
+    new solver parameter resolution step that disambiguates Inner/Outer/
+    Generic solver parameters into canonical CG/MSCG names.
     """
 
     def __init__(self, dataframe: pd.DataFrame):
@@ -47,7 +51,17 @@ class ParameterTransformationEngine:
 
     def apply_all_transformations(self) -> pd.DataFrame:
         """
-        Apply all configured transformations in the correct order.
+        Apply all configured transformations in the correct dependency
+        order.
+
+        Order of operations:
+            1. String transformations (formatting, replacements)
+            2. Extraction rules (compound parameter splitting)
+            3. **Solver parameter resolution (NEW)**
+            4. Column operations (additions, default values, derived
+               calcs)
+            5. Mathematical transformations (sqrt, ratios, type
+               conversions)
 
         Returns:
             Transformed DataFrame
@@ -57,11 +71,101 @@ class ParameterTransformationEngine:
         # Apply transformations in dependency order
         self._apply_string_transformations()
         self._apply_extraction_rules()
+        self._resolve_solver_parameters()  # NEW: Resolution step
         self._apply_column_operations()
         self._apply_math_transformations()
 
         self.logger.info("Parameter transformation pipeline completed")
         return self.dataframe.copy()
+
+    def _resolve_solver_parameters(self) -> None:
+        """
+        Resolve ambiguous solver parameters to canonical names.
+
+        This method performs context-dependent renaming of solver
+        precision parameters based on Overlap_operator_method and
+        program type.
+
+        Resolution logic:
+            1. Determine program type from Main_program_type column
+            2. For each row, get the overlap method
+            3. Look up the resolution mapping
+            4. Rename parameters according to the mapping
+            5. Log any unresolved parameters
+
+        The mapping resolves:
+          - Inner_solver_* → MSCG_* (sign function inversion)
+          - Outer_solver_* → CG_* (full overlap inversion)
+          - Generic_solver_* → MSCG_* or CG_* (context-dependent)
+        """
+        self.logger.info("Resolving solver parameters to canonical names")
+
+        # Check if we have the required context columns
+        if "Overlap_operator_method" not in self.dataframe.columns:
+            self.logger.warning(
+                "Overlap_operator_method not found - skipping solver resolution"
+            )
+            return
+
+        # Process each row (typically all rows have same method/type,
+        # but handle general case)
+        for idx, row in self.dataframe.iterrows():
+            # Cast idx to the appropriate type for .at accessor
+            idx = cast(int | str, idx)  # Adjust types based on your index
+
+            overlap_method = row.get("Overlap_operator_method")
+            main_program_type = row.get("Main_program_type", "")
+
+            # Type validation: ensure overlap_method is a string
+            if not isinstance(overlap_method, str) or not overlap_method:
+                self.logger.warning(
+                    f"Row {idx}: Invalid Overlap_operator_method value: {overlap_method}"
+                )
+                continue
+
+            # Determine if this is an invert program
+            is_invert = bool(main_program_type == "invert")
+
+            # Get the resolution mapping for this combination
+            mapping_key = (overlap_method, is_invert)
+
+            if mapping_key not in SOLVER_PARAMETER_RESOLUTION_RULES:
+                self.logger.warning(
+                    f"Row {idx}: No resolution mapping for ({overlap_method}, invert={is_invert})"
+                )
+                continue
+
+            resolution_mapping = SOLVER_PARAMETER_RESOLUTION_RULES[mapping_key]
+
+            # Apply the mapping to this row
+            for raw_param, canonical_param in resolution_mapping.items():
+                if raw_param in self.dataframe.columns:
+                    # Copy the value to the canonical parameter name
+                    self.dataframe.at[idx, canonical_param] = self.dataframe.at[
+                        idx, raw_param
+                    ]
+
+                    self.logger.debug(
+                        f"Row {idx}: Resolved {raw_param} → {canonical_param}"
+                    )
+
+        # Log summary of resolution
+        resolved_params = [
+            col
+            for col in CANONICAL_SOLVER_PARAMETER_NAMES
+            if col in self.dataframe.columns
+        ]
+        if resolved_params:
+            self.logger.info(f"Created canonical solver parameters: {resolved_params}")
+
+        # Check for any raw parameters that weren't resolved
+        unresolved_params = [
+            col for col in RAW_SOLVER_PARAMETER_NAMES if col in self.dataframe.columns
+        ]
+        if unresolved_params:
+            self.logger.info(
+                f"Raw solver parameters present (will be removed): {unresolved_params}"
+            )
 
     def _apply_string_transformations(self) -> None:
         """Apply all string-based transformations."""
@@ -73,96 +177,74 @@ class ParameterTransformationEngine:
 
             # Apply value replacements
             if "replacements" in config:
-                for old_value, new_value in config["replacements"].items():
-                    self.dataframe[column_name] = self.dataframe[column_name].replace(
-                        old_value, new_value
-                    )
-                    self.logger.info(
-                        f"Replaced '{old_value}' with '{new_value}' in {column_name}"
-                    )
+                self.dataframe[column_name] = self.dataframe[column_name].replace(
+                    config["replacements"]
+                )
+                self.logger.info(f"Applied replacements to {column_name}")
 
-            # Apply formatters
+            # Apply formatting
             if "formatter" in config:
                 formatter_name = config["formatter"]
                 formatter_func = FORMATTER_FUNCTIONS.get(formatter_name)
 
                 if formatter_func is not None:
-                    # Get additional formatter parameters
-                    formatter_kwargs = {
-                        k: v
-                        for k, v in config.items()
-                        if k not in ["formatter", "replacements"]
+                    # Get formatter parameters
+                    formatter_params = {
+                        k: v for k, v in config.items() if k not in ["formatter"]
                     }
 
+                    # Assign to local variable for type narrowing in
+                    # lambda
+                    func = formatter_func
+
                     self.dataframe[column_name] = self.dataframe[column_name].apply(
-                        lambda x: formatter_func(x, **formatter_kwargs)  # type: ignore
-                    )
-                    self.logger.info(
-                        f"Applied {formatter_name} formatter to {column_name}"
-                    )
-                else:
-                    self.logger.warning(
-                        f"Formatter '{formatter_name}' not found for column '{column_name}'"
+                        lambda x: func(x, **formatter_params)
                     )
 
     def _apply_extraction_rules(self) -> None:
         """Apply compound parameter extraction rules."""
-        self.logger.info("Applying parameter extraction rules")
+        self.logger.info("Applying extraction rules")
 
         for source_column, config in EXTRACTION_RULES.items():
             if source_column not in self.dataframe.columns:
                 continue
 
-            parser_name = config.get("parser", "ast_literal_eval")
-            parser_func = PARSER_FUNCTIONS.get(parser_name)
-
-            if parser_func is None:
-                self.logger.warning(
-                    f"Parser '{parser_name}' not found for column '{source_column}' - skipping"
-                )
-                continue
-
-            # Handle extraction to multiple columns
-            if "extract_to" in config:
-                for target_column, extract_config in config["extract_to"].items():
-                    index = extract_config["index"]
-                    target_type = extract_config.get("type", "str")
-
-                    try:
-                        self.dataframe[target_column] = self.dataframe[
-                            source_column
-                        ].apply(
-                            lambda x: target_type(parser_func(x)[index])  # type: ignore
-                        )
-                        self.logger.info(
-                            f"Extracted {target_column} from {source_column}"
-                        )
-                    except (IndexError, TypeError, ValueError) as e:
-                        self.logger.error(
-                            f"Error extracting {target_column} from {source_column}: {e}"
-                        )
-
-            # Handle in-place transformations
-            elif "transform" in config:
-                transform_name = config["transform"]
-                transform_func = CALCULATION_FUNCTIONS.get(transform_name)
-
-                if transform_func is not None:
-                    try:
-                        self.dataframe[source_column] = self.dataframe[
-                            source_column
-                        ].apply(
-                            lambda x: transform_func(parser_func(x))  # type: ignore
-                        )
-                        self.logger.info(f"Applied {transform_name} to {source_column}")
-                    except Exception as e:
-                        self.logger.error(
-                            f"Error applying transform {transform_name} to {source_column}: {e}"
-                        )
-                else:
-                    self.logger.warning(
-                        f"Transform function '{transform_name}' not found for column '{source_column}'"
+            # Parse the source column if needed
+            parser_name = config.get("parser")
+            if parser_name:
+                parser_func = PARSER_FUNCTIONS.get(parser_name)
+                if parser_func:
+                    self.dataframe[source_column] = self.dataframe[source_column].apply(
+                        parser_func
                     )
+
+            # Handle extraction
+            if "extract_to" in config:
+                for target_column, extraction_config in config["extract_to"].items():
+                    index = extraction_config["index"]
+                    target_type = extraction_config["type"]
+
+                    self.dataframe[target_column] = self.dataframe[source_column].apply(
+                        lambda x: (
+                            target_type(x[index])
+                            if isinstance(x, (list, tuple))
+                            else None
+                        )
+                    )
+                    self.logger.info(f"Extracted {target_column} from {source_column}")
+
+            # Handle custom transformations
+            if "transform" in config:
+                transform_name = config["transform"]
+                if transform_name == "remove_first_element_and_stringify":
+                    self.dataframe[source_column] = self.dataframe[source_column].apply(
+                        lambda x: (
+                            str(tuple(x[1:]))
+                            if isinstance(x, (list, tuple)) and len(x) > 1
+                            else str(x)
+                        )
+                    )
+                    self.logger.info(f"Applied {transform_name} to {source_column}")
 
             # Remove source column if specified
             if config.get("remove_source", False):
@@ -170,9 +252,27 @@ class ParameterTransformationEngine:
                 self.logger.info(f"Removed source column {source_column}")
 
     def _apply_column_operations(self) -> None:
-        """Apply column addition, removal, and default value
-        operations."""
+        """Apply column addition, removal, and derived calculations."""
         self.logger.info("Applying column operations")
+
+        # Apply column additions
+        for result_column, source_columns in COLUMN_OPERATIONS.get(
+            "additions", {}
+        ).items():
+            existing_sources = [
+                col for col in source_columns if col in self.dataframe.columns
+            ]
+
+            if len(existing_sources) > 1:
+                # Sum the columns
+                self.dataframe[result_column] = self.dataframe[existing_sources].sum(
+                    axis=1
+                )
+                self.logger.info(f"Added columns {existing_sources} → {result_column}")
+            elif len(existing_sources) == 1:
+                # Just rename/keep the single column
+                if result_column != existing_sources[0]:
+                    self.dataframe[result_column] = self.dataframe[existing_sources[0]]
 
         # Apply default values for missing columns
         for column_name, default_value in COLUMN_OPERATIONS.get(
@@ -181,92 +281,45 @@ class ParameterTransformationEngine:
             if column_name not in self.dataframe.columns:
                 self.dataframe[column_name] = default_value
                 self.logger.info(
-                    f"Added default value {default_value} for {column_name}"
+                    f"Set default value for {column_name} = {default_value}"
                 )
-
-        # Apply column additions
-        for result_column, source_columns in COLUMN_OPERATIONS.get(
-            "additions", {}
-        ).items():
-            available_columns = [
-                col for col in source_columns if col in self.dataframe.columns
-            ]
-
-            if len(available_columns) == len(source_columns):
-                # All source columns available - add them
-                self.dataframe[result_column] = self.dataframe[available_columns].sum(
-                    axis=1
-                )
-                self.logger.info(
-                    f"Added columns {available_columns} to create {result_column}"
-                )
-
-                # Remove the additional columns (keep the first one as
-                # the result)
-                columns_to_remove = available_columns[1:]
-                if columns_to_remove:
-                    self.dataframe.drop(columns=columns_to_remove, inplace=True)
-
-            elif len(available_columns) == 1:
-                # Only one column available - rename it
-                old_name = available_columns[0]
-                if old_name != result_column:
-                    self.dataframe.rename(
-                        columns={old_name: result_column}, inplace=True
-                    )
-                    self.logger.info(f"Renamed {old_name} to {result_column}")
 
         # Apply derived calculations
         for result_column, config in COLUMN_OPERATIONS.get(
             "derived_calculations", {}
         ).items():
             formula_name = config["formula"]
-            formula_func = CALCULATION_FUNCTIONS.get(formula_name)
             input_columns = config["inputs"]
 
-            if formula_func is not None and all(
-                col in self.dataframe.columns for col in input_columns
-            ):
-                try:
-                    self.dataframe[result_column] = self.dataframe.apply(
-                        lambda row: formula_func(*[row[col] for col in input_columns]),  # type: ignore
-                        axis=1,
-                    )
-                    self.logger.info(f"Calculated {result_column} using {formula_name}")
-                except Exception as e:
-                    self.logger.error(
-                        f"Error calculating {result_column} using {formula_name}: {e}"
-                    )
-            elif formula_func is None:
-                self.logger.warning(
-                    f"Formula function '{formula_name}' not found for {result_column}"
-                )
-            else:
-                missing_cols = [
-                    col for col in input_columns if col not in self.dataframe.columns
-                ]
-                self.logger.warning(
-                    f"Missing input columns for {result_column}: {missing_cols}"
-                )
+            # Check if all input columns exist
+            if all(col in self.dataframe.columns for col in input_columns):
+                formula_func = CALCULATION_FUNCTIONS.get(formula_name)
 
-        # Apply conditional column removal
-        conditional_removals = {
-            "Solver_epsilon": ("MSCG_epsilon", "not_has_Outer_solver_epsilon")
-        }
+                if formula_func is not None:
+                    # Assign to local variable for type narrowing in
+                    # lambda
+                    func = formula_func
 
-        for column_to_remove, (
-            condition_column,
-            condition_type,
-        ) in conditional_removals.items():
-            if (
-                column_to_remove in self.dataframe.columns
-                and condition_column in self.dataframe.columns
-            ):
+                    try:
+                        self.dataframe[result_column] = self.dataframe.apply(
+                            lambda row: func(*[row[col] for col in input_columns]),
+                            axis=1,
+                        )
+                        self.logger.info(
+                            f"Calculated {result_column} using {formula_name}"
+                        )
+                    except Exception as e:
+                        self.logger.error(f"Error calculating {result_column}: {e}")
 
-                if condition_type == "not_has_Outer_solver_epsilon":
-                    if "Outer_solver_epsilon" not in self.dataframe.columns:
-                        self.dataframe.drop(columns=[column_to_remove], inplace=True)
-                        self.logger.info(f"Conditionally removed {column_to_remove}")
+        # Remove specified columns
+        columns_to_remove = COLUMN_OPERATIONS.get("columns_to_remove", [])
+        existing_columns_to_remove = [
+            col for col in columns_to_remove if col in self.dataframe.columns
+        ]
+
+        if existing_columns_to_remove:
+            self.dataframe.drop(columns=existing_columns_to_remove, inplace=True)
+            self.logger.info(f"Removed columns: {existing_columns_to_remove}")
 
     def _apply_math_transformations(self) -> None:
         """Apply mathematical transformations."""
@@ -300,7 +353,7 @@ class ParameterTransformationEngine:
             "type_conversions", {}
         ).items():
             if column_name in self.dataframe.columns:
-                if target_type == "int":
+                if target_type == int:
                     self.dataframe[column_name] = self.dataframe[column_name].astype(
                         int
                     )
@@ -354,7 +407,8 @@ class HDF5ParameterProcessor:
         This method implements the business logic for these special
         columns that's too complex for configuration-driven processing.
         """
-        # Safely get Main_program_type with proper column existence check
+        # Safely get Main_program_type with proper column existence
+        # check
         main_program_type = None
         if "Main_program_type" in self.dataframe.columns and len(self.dataframe) > 0:
             main_program_type = self.dataframe["Main_program_type"].iloc[0]
@@ -494,7 +548,8 @@ class HDF5ParameterProcessor:
         return processed_dict
 
     def _extract_dataset_to_dict(self, dataset_name: str) -> Dict[str, np.ndarray]:
-        """Extract dataset values to a dictionary mapping filenames to arrays."""
+        """Extract dataset values to a dictionary mapping filenames to
+        arrays."""
         dataset_dict = {}
 
         try:
@@ -544,7 +599,8 @@ class HDF5ParameterProcessor:
         """
         Extract filename from HDF5 group path.
 
-        The HDF5 structure has filenames as the deepest level group names:
+        The HDF5 structure has filenames as the deepest level group
+        names:
         sign_squared_violation/Zolotarev_several_config_varying_n/filename.txt
         """
         parts = group_path.strip("/").split("/")
@@ -705,7 +761,7 @@ class AnalysisCaseProcessor:
             method = self.dataframe["Overlap_operator_method"].iloc[0]
 
             if method in mv_rules:
-                formula = mv_rules[method]["formula"]
+                # formula = mv_rules[method]["formula"]
 
                 # Determine output column name based on analysis case
                 if analysis_case == "forward_operator_applications":

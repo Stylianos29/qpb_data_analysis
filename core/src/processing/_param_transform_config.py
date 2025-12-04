@@ -1,15 +1,133 @@
 """
-Parameter transformation configuration for QPB log file processing.
+Enhanced Parameter Transformation Configuration with Solver Resolution.
 
-This module defines declarative configurations for all parameter
-transformations, replacing hardcoded logic with systematic, maintainable
-transformation rules.
+This updated configuration adds systematic solver parameter resolution
+that disambiguates Inner/Outer/Generic solver parameters into canonical
+CG_epsilon/MSCG_epsilon names based on Overlap_operator_method and
+program type.
 """
 
 import ast
 from typing import List, Union, Any
 
 import numpy as np
+
+
+# =============================================================================
+# SOLVER PARAMETER RESOLUTION CONFIGURATION
+# =============================================================================
+"""
+This configuration handles the resolution of ambiguous solver parameters
+parsed from log files into canonical names based on context.
+
+The resolution logic depends on two factors:
+    1. Overlap_operator_method: Bare, Chebyshev, KL, Neuberger,
+       Zolotarev
+    2. Program type: invert vs non-invert (detected from
+       Main_program_type)
+
+Resolution Rules Summary:
+-------------------------
+Canonical Names (output):
+  - MSCG_epsilon / MSCG_max_iterations: Sign function (inner) solver
+  - CG_epsilon / CG_max_iterations: Full overlap (outer) solver
+
+Raw Names (input from parsing):
+  - Inner_solver_*: Always means MSCG (sign function)
+  - Outer_solver_*: Always means CG (full overlap)
+  - Generic_solver_*: Context-dependent (see mapping below)
+"""
+
+SOLVER_PARAMETER_RESOLUTION_RULES = {
+    # Define resolution mapping for each (method, program_type)
+    # combination Format: (overlap_method, is_invert): {raw_param:
+    # canonical_param}
+    # =========================================================================
+    # BARE METHOD
+    # =========================================================================
+    ("Bare", False): {
+        # Non-invert Bare: No solver parameters
+    },
+    ("Bare", True): {
+        # Invert Bare: Generic → CG (outer solver only)
+        "Generic_solver_epsilon": "CG_epsilon",
+        "Generic_solver_max_iterations": "CG_max_iterations",
+    },
+    # =========================================================================
+    # CHEBYSHEV METHOD
+    # =========================================================================
+    ("Chebyshev", False): {
+        # Non-invert Chebyshev: No solver parameters (only Lanczos)
+    },
+    ("Chebyshev", True): {
+        # Invert Chebyshev: Generic → CG (outer solver only)
+        "Generic_solver_epsilon": "CG_epsilon",
+        "Generic_solver_max_iterations": "CG_max_iterations",
+    },
+    # =========================================================================
+    # KL METHOD
+    # =========================================================================
+    ("KL", False): {
+        # Non-invert KL: Generic → MSCG (inner/sign function)
+        "Generic_solver_epsilon": "MSCG_epsilon",
+        "Generic_solver_max_iterations": "MSCG_max_iterations",
+    },
+    ("KL", True): {
+        # Invert KL: Inner → MSCG, Outer → CG
+        "Inner_solver_epsilon": "MSCG_epsilon",
+        "Inner_solver_max_iterations": "MSCG_max_iterations",
+        "Outer_solver_epsilon": "CG_epsilon",
+        "Outer_solver_max_iterations": "CG_max_iterations",
+    },
+    # =========================================================================
+    # NEUBERGER METHOD
+    # =========================================================================
+    ("Neuberger", False): {
+        # Non-invert Neuberger: Generic → MSCG (inner/sign function)
+        "Generic_solver_epsilon": "MSCG_epsilon",
+        "Generic_solver_max_iterations": "MSCG_max_iterations",
+    },
+    ("Neuberger", True): {
+        # Invert Neuberger: Inner → MSCG, Outer → CG
+        "Inner_solver_epsilon": "MSCG_epsilon",
+        "Inner_solver_max_iterations": "MSCG_max_iterations",
+        "Outer_solver_epsilon": "CG_epsilon",
+        "Outer_solver_max_iterations": "CG_max_iterations",
+    },
+    # =========================================================================
+    # ZOLOTAREV METHOD
+    # =========================================================================
+    ("Zolotarev", False): {
+        # Non-invert Zolotarev: Generic → MSCG (inner/sign function)
+        "Generic_solver_epsilon": "MSCG_epsilon",
+        "Generic_solver_max_iterations": "MSCG_max_iterations",
+    },
+    ("Zolotarev", True): {
+        # Invert Zolotarev: Inner → MSCG, Outer → CG
+        "Inner_solver_epsilon": "MSCG_epsilon",
+        "Inner_solver_max_iterations": "MSCG_max_iterations",
+        "Outer_solver_epsilon": "CG_epsilon",
+        "Outer_solver_max_iterations": "CG_max_iterations",
+    },
+}
+
+# List of all raw parameter names that will be resolved
+RAW_SOLVER_PARAMETER_NAMES = [
+    "Inner_solver_epsilon",
+    "Inner_solver_max_iterations",
+    "Outer_solver_epsilon",
+    "Outer_solver_max_iterations",
+    "Generic_solver_epsilon",
+    "Generic_solver_max_iterations",
+]
+
+# List of canonical parameter names (output)
+CANONICAL_SOLVER_PARAMETER_NAMES = [
+    "MSCG_epsilon",
+    "MSCG_max_iterations",
+    "CG_epsilon",
+    "CG_max_iterations",
+]
 
 
 # =============================================================================
@@ -31,7 +149,7 @@ STRING_TRANSFORMATIONS = {
 
 MATH_TRANSFORMATIONS = {
     # Parameters that need square root applied
-    "sqrt_parameters": ["Solver_epsilon", "CG_epsilon", "MSCG_epsilon"],
+    "sqrt_parameters": ["CG_epsilon", "MSCG_epsilon"],
     # Ratio calculations: result_column: (numerator, denominator)
     "ratio_calculations": {
         "Condition_number": ("Maximum_eigenvalue_squared", "Minimum_eigenvalue_squared")
@@ -69,13 +187,19 @@ COLUMN_OPERATIONS = {
     # Column additions: result_column: [source_columns]
     "additions": {
         "APE_iterations": ["APE_iterations", "Initial_APE_iterations"],
-        # "Rational_order": ["KL_diagonal_order", "Zolotarev_order", "Neuberger_order"],
     },
     # Columns to remove after processing
     "columns_to_remove": [
         "Initial_APE_iterations",  # After adding to APE_iterations
         "Lattice_geometry",  # After extracting components
-        "Solver_epsilon",  # Conditional removal based on MSCG_epsilon presence
+        # Raw solver parameters (removed after resolution to canonical
+        # names)
+        "Inner_solver_epsilon",
+        "Inner_solver_max_iterations",
+        "Outer_solver_epsilon",
+        "Outer_solver_max_iterations",
+        "Generic_solver_epsilon",
+        "Generic_solver_max_iterations",
     ],
     # Default value assignments for missing columns
     "default_values": {"Number_of_vectors": 1},
@@ -106,29 +230,22 @@ HDF5_PROCESSING_RULES = {
     },
     "Total_number_of_MSCG_iterations": {
         "output_pattern": "Average_number_of_MSCG_iterations_per_{unit}",
-        "aggregation_method": "sum_then_divide",
+        "aggregation_method": "mean_with_error",
+        "condition": "all_lengths_greater_than_one",
         "unit_mapping": {
-            "has_Number_of_spinors": {"unit": "spinor", "divisor": "Number_of_spinors"},
-            "default": {"unit": "vector", "divisor": "Number_of_vectors"},
+            "has_Number_of_spinors": {"unit": "spinor"},
+            "default": {"unit": "vector"},
         },
     },
-    "Number_of_kernel_applications_per_MSCG": {
-        "output_pattern": "Average_number_of_MV_multiplications_per_{unit}",
-        "aggregation_method": "sum_plus_length_then_divide",
-        "unit_mapping": {
-            "has_Number_of_spinors": {"unit": "spinor", "divisor": "Number_of_spinors"},
-            "default": {"unit": "vector", "divisor": "Number_of_vectors"},
-        },
-    },
-    "MS_expansion_shifts": {
-        "output_pattern": "MS_expansion_shifts",
-        "aggregation_method": "unique_values_as_list",
-        "data_type": "float",
+    "CG_total_calculation_time_per_spinor": {
+        "output_pattern": "Average_CG_calculation_time_per_spinor",
+        "aggregation_method": "mean_with_error",
+        "condition": "all_lengths_greater_than_one",
     },
     "Total_number_of_CG_iterations_per_spinor": {
         "output_pattern": "Average_number_of_CG_iterations_per_spinor",
-        "aggregation_method": "mean",
-        "data_type": "float",
+        "aggregation_method": "mean_with_error",
+        "condition": "all_lengths_greater_than_one",
     },
 }
 
@@ -138,23 +255,13 @@ HDF5_PROCESSING_RULES = {
 # =============================================================================
 
 ANALYSIS_CASES = {
-    "forward_operator_applications": {
-        "identifier": "not_has_Number_of_spinors",
-        "mv_multiplication_rules": {
-            "Chebyshev": {
-                "formula": "2 * Total_number_of_Lanczos_iterations + 1 + 2 * Number_of_Chebyshev_terms - 1"
-            }
-            # KL case would be added here when uncommented in original
-        },
-    },
     "inversions": {
-        "identifier": "has_Number_of_spinors",
-        "mv_multiplication_rules": {
-            "Chebyshev": {
-                "formula": "(2 * Total_number_of_Lanczos_iterations + 1) + (2 * Average_number_of_CG_iterations_per_spinor + 1) * (2 * Number_of_Chebyshev_terms - 1)"
-            }
-            # KL case would be added here when uncommented in original
-        },
+        "mv_multiplication_formula": "calculate_mv_from_cg_iterations",
+        "time_cost_input": "Average_wall_clock_time_per_spinor",
+    },
+    "forward_operator_applications": {
+        "mv_multiplication_formula": "calculate_mv_from_mscg_data",
+        "time_cost_input": "Average_wall_clock_time_per_vector",
     },
 }
 
@@ -164,70 +271,43 @@ ANALYSIS_CASES = {
 # =============================================================================
 
 TIME_COST_CALCULATIONS = {
-    "wall_clock_time": {
-        "forward_case": {
-            "base_formula": "Total_calculation_time / Number_of_vectors",
-            "with_overhead": "(Total_calculation_time - Total_overhead_time) / Number_of_vectors + Total_overhead_time",
-            "output_column": "Average_wall_clock_time_per_vector",
-        },
-        "inversion_case": {
-            "base_formula": "Total_calculation_time / Number_of_spinors",
-            "with_overhead": "(Total_calculation_time - Total_overhead_time) / Number_of_spinors + Total_overhead_time",
-            "output_column": "Average_wall_clock_time_per_spinor",
-        },
+    "Average_wall_clock_time_per_spinor": {
+        "formula": "mean_from_hdf5_dataset",
+        "hdf5_dataset": "CG_total_calculation_time_per_spinor",
     },
-    "core_hours": {
-        "forward_case": {
-            "formula": "Number_of_cores * Average_wall_clock_time_per_vector / 3600",
-            "output_column": "Average_core_hours_per_vector",
-        },
-        "inversion_case": {
-            "formula": "Number_of_cores * Average_wall_clock_time_per_spinor / 3600",
-            "output_column": "Average_core_hours_per_spinor",
-        },
+    "Average_wall_clock_time_per_vector": {
+        "formula": "total_time_divided_by_vectors",
+        "inputs": ["Total_calculation_time", "Number_of_vectors"],
+    },
+    "Average_core_hours_per_spinor": {
+        "formula": "cores_times_time_divided_by_3600",
+        "output_column": "Average_core_hours_per_spinor",
+    },
+    "Average_core_hours_per_vector": {
+        "formula": "cores_times_time_divided_by_3600",
+        "output_column": "Average_core_hours_per_vector",
     },
 }
 
 
 # =============================================================================
-# HELPER FUNCTION MAPPINGS
+# HELPER FUNCTION REGISTRIES
 # =============================================================================
 
-
-def zero_pad_formatter(value: str, length: int) -> str:
-    """Zero-pad a string to specified length."""
-    return str(value).zfill(length)
-
-
-def decimal_places_formatter(value: Union[str, float], places: int) -> str:
-    """Format number to specified decimal places."""
-    return f"{float(value):.{places}f}"
-
-
-def ast_literal_eval_parser(value: str) -> Any:
-    """Safely evaluate string as Python literal."""
-    return ast.literal_eval(value)
-
-
-def remove_first_element_and_stringify(parsed_list: List) -> str:
-    """Remove first element from list and convert back to string."""
-    return str(parsed_list[1:])
-
-
-def mpi_geometry_product_times_threads(mpi_geometry: str, threads: int) -> int:
-    """Calculate total cores from MPI geometry and threads."""
-    return np.prod(ast.literal_eval(mpi_geometry)) * threads
-
-
-# Function registry for dynamic lookup
 FORMATTER_FUNCTIONS = {
-    "zero_pad": zero_pad_formatter,
-    "decimal_places": decimal_places_formatter,
+    "zero_pad": lambda value, length: str(value).zfill(length),
+    "decimal_places": lambda value, places: f"{float(value):.{places}f}",
 }
 
-PARSER_FUNCTIONS = {"ast_literal_eval": ast_literal_eval_parser}
+PARSER_FUNCTIONS = {
+    "ast_literal_eval": ast.literal_eval,
+}
 
 CALCULATION_FUNCTIONS = {
-    "mpi_geometry_product_times_threads": mpi_geometry_product_times_threads,
-    "remove_first_element_and_stringify": remove_first_element_and_stringify,
+    "mpi_geometry_product_times_threads": lambda mpi_geo, threads: (
+        int(np.prod(ast.literal_eval(mpi_geo))) * int(threads)
+    ),
+    "total_time_divided_by_vectors": lambda total_time, n_vectors: (
+        float(total_time) / int(n_vectors)
+    ),
 }
