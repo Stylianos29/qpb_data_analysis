@@ -1018,12 +1018,18 @@ if $has_correlators; then
     echo "  Stage 3.1: Correlator calculations ✓"
     echo "  Stage 3.2: Plateau extraction ✓"
     
-    # Check if Stage 3.3/3.4 ran
+    # Check if Stage 3.3 ran
     if [[ -f "${output_directory}/${CRITICAL_PCAC_CSV_FILENAME}" || -f "${output_directory}/${CRITICAL_PION_CSV_FILENAME}" ]]; then
         echo "  Stage 3.3: Critical mass extrapolation ✓"
-        echo "  Stage 3.4: Cost extrapolation ✓"
+        
+        # Check if Stage 3.4 ran (separate check)
+        if [[ -f "${output_directory}/${COST_PCAC_CSV_FILENAME}" || -f "${output_directory}/${COST_PION_CSV_FILENAME}" ]]; then
+            echo "  Stage 3.4: Cost extrapolation ✓"
+        else
+            echo "  Stage 3.4: Cost extrapolation ○ (skipped)"
+        fi
     else
-        echo "  Stage 3.3: Critical mass extrapolation ○ (skipped - insufficient data)"
+        echo "  Stage 3.3: Critical mass extrapolation ○ (skipped)"
         echo "  Stage 3.4: Cost extrapolation ○ (skipped - no Stage 3.3 results)"
     fi
 else
