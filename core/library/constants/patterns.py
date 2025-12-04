@@ -276,7 +276,7 @@ FILE_CONTENTS_SCALAR_PATTERNS_DICTIONARY = {
         "type": int,
     },
     "Neuberger_order": {
-        "line_identifier": "KL upper iters = ",
+        "line_identifier": "Upper diagonal iters = ",
         "regex_pattern": r"(\d+)",
         "type": int,
     },

@@ -8,10 +8,23 @@ program type.
 """
 
 import ast
-from typing import List, Union, Any
 
 import numpy as np
 
+
+# =============================================================================
+# RATIONAL ORDER RESOLUTION CONFIGURATION
+# =============================================================================
+"""
+Resolve generic Rational_order (from filename) to method-specific names
+based on Overlap_operator_method.
+"""
+
+RATIONAL_ORDER_RESOLUTION_MAPPING = {
+    "KL": "KL_diagonal_order",
+    "Neuberger": "Neuberger_order",
+    "Zolotarev": "Zolotarev_order",
+}
 
 # =============================================================================
 # SOLVER PARAMETER RESOLUTION CONFIGURATION
@@ -192,6 +205,7 @@ COLUMN_OPERATIONS = {
     "columns_to_remove": [
         "Initial_APE_iterations",  # After adding to APE_iterations
         "Lattice_geometry",  # After extracting components
+        "Rational_order",  # After resolving to specific order names
         # Raw solver parameters (removed after resolution to canonical
         # names)
         "Inner_solver_epsilon",

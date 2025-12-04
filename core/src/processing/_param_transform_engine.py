@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 from src.processing._param_transform_config import (
+    RATIONAL_ORDER_RESOLUTION_MAPPING,
     SOLVER_PARAMETER_RESOLUTION_RULES,
     RAW_SOLVER_PARAMETER_NAMES,
     CANONICAL_SOLVER_PARAMETER_NAMES,
@@ -71,12 +72,73 @@ class ParameterTransformationEngine:
         # Apply transformations in dependency order
         self._apply_string_transformations()
         self._apply_extraction_rules()
-        self._resolve_solver_parameters()  # NEW: Resolution step
+        self._resolve_rational_order()
+        self._resolve_solver_parameters()
         self._apply_column_operations()
         self._apply_math_transformations()
 
         self.logger.info("Parameter transformation pipeline completed")
         return self.dataframe.copy()
+
+    def _resolve_rational_order(self) -> None:
+        """
+        Resolve generic Rational_order to method-specific order
+        parameter.
+
+        Maps Rational_order (from filename _n pattern) to:
+            - KL_diagonal_order (for KL method)
+            - Neuberger_order (for Neuberger method)
+            - Zolotarev_order (for Zolotarev method)
+
+        If the specific order already exists (from file contents),
+        performs cross-validation and logs any mismatches.
+        """
+        self.logger.info("Resolving Rational_order to method-specific names")
+
+        if "Rational_order" not in self.dataframe.columns:
+            self.logger.debug("No Rational_order column found - skipping resolution")
+            return
+
+        if "Overlap_operator_method" not in self.dataframe.columns:
+            self.logger.warning(
+                "Overlap_operator_method not found - cannot resolve Rational_order"
+            )
+            return
+
+        for idx, row in self.dataframe.iterrows():
+            idx = cast(int | str, idx)
+
+            overlap_method = row.get("Overlap_operator_method")
+            rational_order = row.get("Rational_order")
+
+            if (
+                not isinstance(overlap_method, str)
+                or overlap_method not in RATIONAL_ORDER_RESOLUTION_MAPPING
+            ):
+                continue
+
+            if pd.isna(rational_order):
+                continue
+
+            # Get the target column name
+            target_column = RATIONAL_ORDER_RESOLUTION_MAPPING[overlap_method]
+
+            # Check if target already exists (from file contents)
+            if target_column in self.dataframe.columns:
+                existing_value = self.dataframe.loc[idx, target_column]
+
+                if not pd.isna(existing_value) and existing_value != rational_order:
+                    self.logger.warning(
+                        f"Row {idx}: Mismatch between Rational_order ({rational_order}) "
+                        f"and {target_column} ({existing_value}) - using file contents value"
+                    )
+                    continue  # Keep file contents value
+
+            # Copy Rational_order to specific column
+            self.dataframe.loc[idx, target_column] = rational_order
+            self.logger.debug(f"Row {idx}: Resolved Rational_order → {target_column}")
+
+        self.logger.info("Rational order resolution completed")
 
     def _resolve_solver_parameters(self) -> None:
         """
