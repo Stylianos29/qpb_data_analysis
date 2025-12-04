@@ -328,7 +328,7 @@ FILE_CONTENTS_SCALAR_PATTERNS_DICTIONARY = {
         "type": float,
     },
     "Inner_solver_max_iterations": {
-        "line_identifier": "Inner solver max iters = ",
+        "line_identifier": "Inner max solver iters = ",
         "regex_pattern": r"(\d+)",
         "type": int,
     },
@@ -338,7 +338,7 @@ FILE_CONTENTS_SCALAR_PATTERNS_DICTIONARY = {
         "type": float,
     },
     "Outer_solver_max_iterations": {
-        "line_identifier": "Outer solver max iters = ",
+        "line_identifier": "Outer max solver iters = ",
         "regex_pattern": r"(\d+)",
         "type": int,
     },
@@ -348,7 +348,7 @@ FILE_CONTENTS_SCALAR_PATTERNS_DICTIONARY = {
         "type": float,
     },
     "Generic_solver_max_iterations": {
-        "line_identifier": "Solver max iters = ",
+        "line_identifier": "Max solver iters = ",
         "regex_pattern": r"(\d+)",
         "type": int,
     },
