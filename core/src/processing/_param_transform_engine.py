@@ -776,15 +776,17 @@ class HDF5ParameterProcessor:
 
     def _validate_vector_spinor_counts(self) -> None:
         """
-        Validate Number_of_vectors and Number_of_spinors against HDF5 dataset lengths.
+        Validate Number_of_vectors and Number_of_spinors against HDF5
+        dataset lengths.
 
         Validation logic:
-        - Invert case: len(CG_total_calculation_time_per_spinor) should equal
-                    Number_of_vectors × Number_of_spinors
-        - Non-invert case: len(Calculation_result_per_vector) should equal
-                        Number_of_vectors
+            - Invert case: len(Total_number_of_CG_iterations_per_spinor)
+              should equal Number_of_vectors × Number_of_spinors
+            - Non-invert case: len(Calculation_result_per_vector) should
+              equal Number_of_vectors
 
-        This validates that the parsed parameter values match the actual data structure.
+        This validates that the parsed parameter values match the actual
+        data structure.
         """
         # Determine program type
         main_program_type = None
@@ -800,11 +802,11 @@ class HDF5ParameterProcessor:
         """Validate vector/spinor counts for inversion case."""
         # Check if the relevant dataset exists
         if (
-            "CG_total_calculation_time_per_spinor"
+            "Total_number_of_CG_iterations_per_spinor"
             not in self.hdf5_analyzer.list_of_output_quantity_names_from_hdf5
         ):
             self.logger.warning(
-                "Cannot validate: CG_total_calculation_time_per_spinor dataset not found in HDF5"
+                "Cannot validate: Total_number_of_CG_iterations_per_spinor dataset not found in HDF5"
             )
             return
 
@@ -830,7 +832,7 @@ class HDF5ParameterProcessor:
             try:
                 # Access HDF5 file directly to get dataset for this specific file
                 actual_length = self._get_dataset_length_for_file(
-                    filename, "CG_total_calculation_time_per_spinor"
+                    filename, "Total_number_of_CG_iterations_per_spinor"
                 )
 
                 if actual_length is None:
@@ -843,7 +845,7 @@ class HDF5ParameterProcessor:
                 if actual_length != expected_total:
                     error_msg = (
                         f"Mismatch in {filename}: "
-                        f"CG_total_calculation_time_per_spinor has {actual_length} elements, "
+                        f"Total_number_of_CG_iterations_per_spinor has {actual_length} elements, "
                         f"but Number_of_spinors={expected_spinors} × Number_of_vectors={expected_vectors} "
                         f"= {expected_total} expected"
                     )
