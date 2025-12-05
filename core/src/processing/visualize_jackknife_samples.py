@@ -841,6 +841,9 @@ def load_gauge_configuration_labels(
     """
     Load gauge configuration labels for sample identification.
 
+    Attempts to extract Configuration_label values from group metadata.
+    Falls back to parsing filenames if direct labels unavailable.
+
     Args:
         - analyzer: HDF5Analyzer instance
         - group_path: Path to the HDF5 group
@@ -851,22 +854,37 @@ def load_gauge_configuration_labels(
         List of configuration labels
     """
     try:
+        # First try: Load from gauge_configuration_labels dataset
         labels = analyzer.dataset_values(
             "gauge_configuration_labels", return_gvar=False, group_path=group_path
         )
 
         # Convert to list of strings
         if isinstance(labels, np.ndarray):
-            # Flattens the labels array and returns a list of strings,
-            # decoding each label from bytes to UTF-8 if necessary.
-            return [
+            labels_list = [
                 label.decode("utf-8") if isinstance(label, bytes) else str(label)
                 for label in labels.flatten()
             ]
         elif isinstance(labels, list):
-            return [str(label) for label in labels]
+            labels_list = [str(label) for label in labels]
         else:
             raise ValueError("Unexpected format for gauge configuration labels")
+
+        # Extract just the configuration part if labels are filenames
+        # Look for pattern like "config0013800" and extract just the number
+        clean_labels = []
+        for label in labels_list:
+            # Try to extract configuration number from filename pattern
+            import re
+
+            match = re.search(r"config(\d+)", label)
+            if match:
+                clean_labels.append(match.group(1))  # Just the number
+            else:
+                # If no match, use the original label
+                clean_labels.append(label)
+
+        return clean_labels
 
     except Exception as e:
         logger.warning(f"Could not load gauge configuration labels: {e}")
