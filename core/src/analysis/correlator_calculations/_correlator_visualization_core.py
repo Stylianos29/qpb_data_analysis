@@ -62,6 +62,7 @@ from library import constants
 from src.analysis.correlator_calculations._correlator_visualization_config import (
     DEFAULT_FONT_SIZE,
     PLOT_STYLING,
+    TITLE_EXCLUDED_PARAMETERS,
 )
 
 
@@ -247,6 +248,7 @@ def _create_single_correlator_plot(
     title = title_builder.build(
         metadata_dict=title_metadata,
         tunable_params=list(group_metadata.keys()),
+        excluded=set(TITLE_EXCLUDED_PARAMETERS),
         leading_substring=PLOT_STYLING["title"]["leading_substring"],
         wrapping_length=PLOT_STYLING["title"]["wrapping_length"],
     )

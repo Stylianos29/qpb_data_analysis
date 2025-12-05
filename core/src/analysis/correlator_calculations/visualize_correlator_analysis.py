@@ -88,7 +88,13 @@ def _validate_correlator_data(
 
 
 def _load_configuration_labels(group: h5py.Group, n_samples: int) -> List[str]:
-    """Load configuration labels and validate count matches samples."""
+    """
+    Load configuration labels and validate count matches samples.
+
+    Extracts clean configuration numbers from filename strings.
+    """
+    import re
+
     config_obj = group["gauge_configuration_labels"]
 
     if not isinstance(config_obj, h5py.Dataset):
@@ -104,7 +110,18 @@ def _load_configuration_labels(group: h5py.Group, n_samples: int) -> List[str]:
             f"Label count mismatch: {len(labels)} labels vs {n_samples} samples"
         )
 
-    return labels
+    # Extract just the configuration numbers from filenames
+    clean_labels = []
+    for label in labels:
+        # Look for pattern like "config0013800" and extract just the number
+        match = re.search(r"config(\d+)", label)
+        if match:
+            clean_labels.append(match.group(1))  # Just the number
+        else:
+            # If no match, use the original label
+            clean_labels.append(label)
+
+    return clean_labels
 
 
 def _load_single_dataset(
