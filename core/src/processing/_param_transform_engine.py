@@ -454,6 +454,7 @@ class HDF5ParameterProcessor:
 
         # Handle special vector/spinor columns first
         self._handle_vector_spinor_columns()
+        self._validate_vector_spinor_counts()
 
         for dataset_name, config in HDF5_PROCESSING_RULES.items():
             self._process_hdf5_dataset(dataset_name, config)
@@ -773,6 +774,212 @@ class HDF5ParameterProcessor:
 
         return resolved_pattern
 
+    def _validate_vector_spinor_counts(self) -> None:
+        """
+        Validate Number_of_vectors and Number_of_spinors against HDF5 dataset lengths.
+
+        Validation logic:
+        - Invert case: len(CG_total_calculation_time_per_spinor) should equal
+                    Number_of_vectors × Number_of_spinors
+        - Non-invert case: len(Calculation_result_per_vector) should equal
+                        Number_of_vectors
+
+        This validates that the parsed parameter values match the actual data structure.
+        """
+        # Determine program type
+        main_program_type = None
+        if "Main_program_type" in self.dataframe.columns and len(self.dataframe) > 0:
+            main_program_type = self.dataframe["Main_program_type"].iloc[0]
+
+        if main_program_type == "invert":
+            self._validate_invert_case()
+        else:
+            self._validate_forward_case()
+
+    def _validate_invert_case(self) -> None:
+        """Validate vector/spinor counts for inversion case."""
+        # Check if the relevant dataset exists
+        if (
+            "CG_total_calculation_time_per_spinor"
+            not in self.hdf5_analyzer.list_of_output_quantity_names_from_hdf5
+        ):
+            self.logger.warning(
+                "Cannot validate: CG_total_calculation_time_per_spinor dataset not found in HDF5"
+            )
+            return
+
+        # Get expected counts from DataFrame
+        if "Number_of_spinors" not in self.dataframe.columns:
+            self.logger.error("Number_of_spinors missing for invert case")
+            raise ValueError("Number_of_spinors required for validation in invert case")
+
+        if "Number_of_vectors" not in self.dataframe.columns:
+            self.logger.error("Number_of_vectors missing for invert case")
+            raise ValueError("Number_of_vectors required for validation in invert case")
+
+        # Validate for each file/row
+        validation_errors = []
+
+        for idx, row in self.dataframe.iterrows():
+            filename = row["Filename"]
+            expected_spinors = int(row["Number_of_spinors"])
+            expected_vectors = int(row["Number_of_vectors"])
+            expected_total = expected_spinors * expected_vectors
+
+            # Get actual dataset length for this file
+            try:
+                # Access HDF5 file directly to get dataset for this specific file
+                actual_length = self._get_dataset_length_for_file(
+                    filename, "CG_total_calculation_time_per_spinor"
+                )
+
+                if actual_length is None:
+                    self.logger.warning(
+                        f"Could not retrieve dataset length for {filename}"
+                    )
+                    continue
+
+                # Validate
+                if actual_length != expected_total:
+                    error_msg = (
+                        f"Mismatch in {filename}: "
+                        f"CG_total_calculation_time_per_spinor has {actual_length} elements, "
+                        f"but Number_of_spinors={expected_spinors} × Number_of_vectors={expected_vectors} "
+                        f"= {expected_total} expected"
+                    )
+                    validation_errors.append(error_msg)
+                    self.logger.error(error_msg)
+                else:
+                    self.logger.debug(
+                        f"✓ {filename}: {actual_length} elements matches "
+                        f"{expected_spinors} × {expected_vectors}"
+                    )
+
+            except Exception as e:
+                self.logger.warning(f"Error validating {filename}: {e}")
+
+        # Report validation results
+        if validation_errors:
+            error_summary = "\n".join(validation_errors)
+            raise ValueError(
+                f"Vector/spinor count validation failed for {len(validation_errors)} files:\n"
+                f"{error_summary}"
+            )
+        else:
+            self.logger.info(
+                f"✓ Validation passed: Number_of_spinors × Number_of_vectors matches "
+                f"CG_total_calculation_time_per_spinor dataset lengths for all files"
+            )
+
+    def _validate_forward_case(self) -> None:
+        """Validate vector counts for forward case."""
+        # Check if the relevant dataset exists
+        if (
+            "Calculation_result_per_vector"
+            not in self.hdf5_analyzer.list_of_output_quantity_names_from_hdf5
+        ):
+            self.logger.warning(
+                "Cannot validate: Calculation_result_per_vector dataset not found in HDF5"
+            )
+            return
+
+        # Get expected count from DataFrame
+        if "Number_of_vectors" not in self.dataframe.columns:
+            self.logger.error("Number_of_vectors missing for forward case")
+            raise ValueError(
+                "Number_of_vectors required for validation in forward case"
+            )
+
+        # Validate for each file/row
+        validation_errors = []
+
+        for idx, row in self.dataframe.iterrows():
+            filename = row["Filename"]
+            expected_vectors = int(row["Number_of_vectors"])
+
+            # Get actual dataset length for this file
+            try:
+                actual_length = self._get_dataset_length_for_file(
+                    filename, "Calculation_result_per_vector"
+                )
+
+                if actual_length is None:
+                    self.logger.warning(
+                        f"Could not retrieve dataset length for {filename}"
+                    )
+                    continue
+
+                # Validate
+                if actual_length != expected_vectors:
+                    error_msg = (
+                        f"Mismatch in {filename}: "
+                        f"Calculation_result_per_vector has {actual_length} elements, "
+                        f"but Number_of_vectors={expected_vectors} expected"
+                    )
+                    validation_errors.append(error_msg)
+                    self.logger.error(error_msg)
+                else:
+                    self.logger.debug(
+                        f"✓ {filename}: {actual_length} elements matches "
+                        f"Number_of_vectors={expected_vectors}"
+                    )
+
+            except Exception as e:
+                self.logger.warning(f"Error validating {filename}: {e}")
+
+        # Report validation results
+        if validation_errors:
+            error_summary = "\n".join(validation_errors)
+            raise ValueError(
+                f"Vector count validation failed for {len(validation_errors)} files:\n"
+                f"{error_summary}"
+            )
+        else:
+            self.logger.info(
+                f"✓ Validation passed: Number_of_vectors matches "
+                f"Calculation_result_per_vector dataset lengths for all files"
+            )
+
+    def _get_dataset_length_for_file(
+        self, filename: str, dataset_name: str
+    ) -> Optional[int]:
+        """
+        Get the length of a specific dataset for a specific file.
+
+        Args:
+            filename: The filename to look up
+            dataset_name: Name of the dataset
+
+        Returns:
+            Length of the dataset array, or None if not found
+        """
+        try:
+            # Find the group path that contains this filename
+            group_path = None
+            for path in self.hdf5_analyzer.active_groups:
+                if path.endswith(filename):
+                    group_path = path
+                    break
+
+            if group_path is None:
+                self.logger.warning(f"No group found for filename: {filename}")
+                return None
+
+            # Access the HDF5 file directly
+            f = self.hdf5_analyzer._file
+            if group_path in f and dataset_name in f[group_path]:
+                dataset = f[group_path][dataset_name]
+                return len(dataset)
+            else:
+                self.logger.warning(
+                    f"Dataset {dataset_name} not found in group {group_path}"
+                )
+                return None
+
+        except Exception as e:
+            self.logger.error(f"Error accessing dataset for {filename}: {e}")
+            return None
+
 
 class AnalysisCaseProcessor:
     """
@@ -898,38 +1105,48 @@ class AnalysisCaseProcessor:
                 self.dataframe[output_column] = (
                     self.dataframe["Total_calculation_time"]
                     - self.dataframe["Total_overhead_time"]
-                ) / self.dataframe["Number_of_spinors"] + self.dataframe[
+                ) / (
+                    self.dataframe["Number_of_spinors"]
+                    * self.dataframe["Number_of_vectors"]
+                ) + self.dataframe[
                     "Total_overhead_time"
                 ]
         else:
-            # Use base formula
+            # Use base formula (no overhead)
             if analysis_case == "forward_operator_applications":
                 self.dataframe[output_column] = (
                     self.dataframe["Total_calculation_time"]
                     / self.dataframe["Number_of_vectors"]
                 )
             else:  # inversions
-                self.dataframe[output_column] = (
-                    self.dataframe["Total_calculation_time"]
-                    / self.dataframe["Number_of_spinors"]
+                self.dataframe[output_column] = self.dataframe[
+                    "Total_calculation_time"
+                ] / (
+                    self.dataframe["Number_of_spinors"]
+                    * self.dataframe["Number_of_vectors"]
                 )
 
         self.logger.info(f"Calculated {output_column}")
 
     def _calculate_core_hours(self, config: Dict) -> None:
-        """Calculate core hours."""
+        """Calculate core hours from wall clock time."""
         if "Number_of_cores" not in self.dataframe.columns:
             return
 
         output_column = config["output_column"]
-        # Extract input column from formula string - simplified approach
-        if "Average_wall_clock_time_per_vector" in config["formula"]:
-            input_column = "Average_wall_clock_time_per_vector"
-        else:
+
+        # Determine which wall clock time column to use
+        if output_column == "Average_core_hours_per_spinor":
             input_column = "Average_wall_clock_time_per_spinor"
+        else:  # Average_core_hours_per_vector
+            input_column = "Average_wall_clock_time_per_vector"
 
         if input_column in self.dataframe.columns:
             self.dataframe[output_column] = (
                 self.dataframe["Number_of_cores"] * self.dataframe[input_column] / 3600
             )
             self.logger.info(f"Calculated {output_column}")
+        else:
+            self.logger.warning(
+                f"Cannot calculate {output_column}: {input_column} not found"
+            )

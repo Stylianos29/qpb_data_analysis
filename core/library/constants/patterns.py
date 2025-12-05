@@ -219,6 +219,11 @@ FILE_CONTENTS_SCALAR_PATTERNS_DICTIONARY = {
         "regex_pattern": r"CG done, (\d+) vectors",
         "type": int,
     },
+    "Total_calculation_time": {
+        "line_identifier": "vectors in t =",
+        "regex_pattern": r"t = (\d+\.\d+) sec",
+        "type": float,
+    },
     # =========================================================================
     # EIGENVALUE ESTIMATION PARAMETERS
     # =========================================================================

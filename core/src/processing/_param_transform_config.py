@@ -285,21 +285,21 @@ ANALYSIS_CASES = {
 # =============================================================================
 
 TIME_COST_CALCULATIONS = {
-    "Average_wall_clock_time_per_spinor": {
-        "formula": "mean_from_hdf5_dataset",
-        "hdf5_dataset": "CG_total_calculation_time_per_spinor",
+    "wall_clock_time": {
+        "inversion_case": {
+            "output_column": "Average_wall_clock_time_per_spinor",
+        },
+        "forward_case": {
+            "output_column": "Average_wall_clock_time_per_vector",
+        },
     },
-    "Average_wall_clock_time_per_vector": {
-        "formula": "total_time_divided_by_vectors",
-        "inputs": ["Total_calculation_time", "Number_of_vectors"],
-    },
-    "Average_core_hours_per_spinor": {
-        "formula": "cores_times_time_divided_by_3600",
-        "output_column": "Average_core_hours_per_spinor",
-    },
-    "Average_core_hours_per_vector": {
-        "formula": "cores_times_time_divided_by_3600",
-        "output_column": "Average_core_hours_per_vector",
+    "core_hours": {
+        "inversion_case": {
+            "output_column": "Average_core_hours_per_spinor",
+        },
+        "forward_case": {
+            "output_column": "Average_core_hours_per_vector",
+        },
     },
 }
 
