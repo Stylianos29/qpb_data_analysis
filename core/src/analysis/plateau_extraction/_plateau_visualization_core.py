@@ -34,6 +34,7 @@ from src.analysis.plateau_extraction._plateau_visualization_config import (
     get_output_config,
     get_mass_type_for_template,
     get_subplot_grid_size,
+    TITLE_EXCLUDED_PARAMETERS,
 )
 
 
@@ -271,6 +272,8 @@ def create_multi_panel_figure(
         "plateau_end",
         "sigma_threshold_used",
     }
+    # Add standard excluded parameters
+    excluded_params.update(TITLE_EXCLUDED_PARAMETERS)
 
     main_title = title_builder.build(
         metadata_dict=group_metadata,
