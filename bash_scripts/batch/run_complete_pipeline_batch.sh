@@ -83,6 +83,7 @@ SINGLE_SET_SCRIPT="$(realpath "${SCRIPT_DIR}/../single_set/run_complete_pipeline
 # Default directories (relative to script location)
 DEFAULT_INPUT_BASE_DIR="$(realpath "${SCRIPT_DIR}/../../data_files/raw")"
 DEFAULT_OUTPUT_BASE_DIR="$(realpath "${SCRIPT_DIR}/../../data_files/processed")"
+DEFAULT_PLOTS_BASE_DIR="$(realpath "${SCRIPT_DIR}/../../output/plots")"
 
 # Timestamp script identifier
 TIMESTAMP_SCRIPT_NAME="run_complete_pipeline"
@@ -113,8 +114,11 @@ OPTIONAL ARGUMENTS:
                                Output structure mirrors input structure
 
   -plots_dir, --plots_base_directory
-                               Base directory for plots (enables visualization)
-                               (default: none - visualization disabled)
+                               Base directory for plots
+                               (default: ../../output/plots/ - AUTO-ENABLED)
+                               Visualization is automatically enabled in batch mode
+
+  --no-plots                   Disable visualization (faster processing)
 
   -log_dir, --log_base_directory
                                Base directory for log files
@@ -369,6 +373,10 @@ while [[ $# -gt 0 ]]; do
             plots_base_dir="$2"
             shift 2
             ;;
+        --no-plots)
+            plots_base_dir=""  # Explicitly disable
+            shift
+            ;;
         -log_dir|--log_base_directory)
             log_base_dir="$2"
             shift 2
@@ -434,18 +442,21 @@ if [[ ! -d "$output_base_dir" ]]; then
 fi
 output_base_dir="$(realpath "$output_base_dir")"
 
-# Handle plots directory if specified
-if [[ -n "$plots_base_dir" ]]; then
-    if [[ ! -d "$plots_base_dir" ]]; then
-        mkdir -p "$plots_base_dir" || {
-            echo "ERROR: Failed to create plots directory: $plots_base_dir" >&2
-            exit 1
-        }
-        echo "INFO: Created plots directory: $(get_display_path "$plots_base_dir")"
-    fi
-    plots_base_dir="$(realpath "$plots_base_dir")"
-    echo "INFO: Visualization enabled - plots will be saved to $(get_display_path "$plots_base_dir")"
+# Set default plots directory if not specified (auto-enable visualization)
+if [[ -z "$plots_base_dir" ]]; then
+    plots_base_dir="$DEFAULT_PLOTS_BASE_DIR"
+    echo "INFO: Auto-enabling visualization with plots directory: $(get_display_path "$plots_base_dir")"
 fi
+
+# Ensure plots base directory exists
+if [[ ! -d "$plots_base_dir" ]]; then
+    mkdir -p "$plots_base_dir" || {
+        echo "ERROR: Failed to create plots directory: $plots_base_dir" >&2
+        exit 1
+    }
+    echo "INFO: Created plots directory: $(get_display_path "$plots_base_dir")"
+fi
+plots_base_dir="$(realpath "$plots_base_dir")"
 
 # Validate single-set script exists
 if [[ ! -f "$SINGLE_SET_SCRIPT" ]]; then
@@ -464,14 +475,13 @@ echo "   QPB DATA ANALYSIS - BATCH PIPELINE EXECUTION"
 echo "==================================================================="
 echo "Input base:  $(get_display_path "$input_base_dir")"
 echo "Output base: $(get_display_path "$output_base_dir")"
-if [[ -n "$plots_base_dir" ]]; then
-    echo "Plots base:  $(get_display_path "$plots_base_dir")"
-fi
+echo "Plots base:  $(get_display_path "$plots_base_dir")"  # Always shown now
 if [[ "$force_all" == "true" ]]; then
     echo "Mode: FORCE ALL (ignoring timestamps)"
 else
     echo "Mode: INCREMENTAL (using timestamps)"
 fi
+echo "Visualization: ENABLED (automatic in batch mode)"  # NEW
 echo "==================================================================="
 echo ""
 
