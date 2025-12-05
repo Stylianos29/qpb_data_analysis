@@ -221,7 +221,7 @@ FILE_CONTENTS_SCALAR_PATTERNS_DICTIONARY = {
     },
     "Total_calculation_time": {
         "line_identifier": "vectors in t =",
-        "regex_pattern": r"t = (\d+\.\d+) sec",
+        "regex_pattern": r"t = (\d+(?:\.\d+)?) sec",
         "type": float,
     },
     # =========================================================================
@@ -393,7 +393,7 @@ FILE_CONTENTS_ARRAY_PATTERNS_DICTIONARY = {
     },
     "CG_total_calculation_time_per_spinor": {
         "line_identifier": ", CG converged,",
-        "regex_pattern": r", t = (\d+\.\d+) sec",
+        "regex_pattern": r", t = (\d+(?:\.\d+)?) sec",
         "type": float,
     },
     "Lanczos_iterations_running_count": {
