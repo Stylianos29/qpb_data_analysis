@@ -5,8 +5,8 @@ This module contains the list of 2D jackknife datasets that should be
 visualized by the jackknife visualization script.
 """
 
-# List of 2D jackknife datasets to visualize
-# These correspond to the exact dataset names in the HDF5 file
+# List of 2D jackknife datasets to visualize These correspond to the exact
+# dataset names in the HDF5 file
 JACKKNIFE_DATASETS_TO_PLOT = [
     "g4g5g5_derivative_jackknife_samples",
     "g4g5g5_jackknife_samples",
@@ -34,13 +34,25 @@ AVERAGE_PLOT_STYLE = {
     "label": "Jackknife average",
 }
 
-# Default plot appearance
-# DEFAULT_FIGURE_SIZE = (10, 6)
+# Default plot appearance DEFAULT_FIGURE_SIZE = (10, 6)
 DEFAULT_FIGURE_SIZE = (8, 6)
 DEFAULT_FONT_SIZE = 12
 
 # Multi-sample plotting configuration
-SAMPLES_PER_PLOT = 10  # Number of jackknife samples to include in each plot
+SAMPLES_PER_PLOT = 10  # Maximum number of jackknife samples to include in each plot
+
+# Parameters to exclude from plot titles
+TITLE_EXCLUDED_PARAMETERS = [
+    "APE_alpha",
+    "Main_program_type",
+    "Maximum_Lanczos_iterations",
+    "Number_of_spinors",
+    "Number_of_vectors",
+    "CG_max_iterations",
+    "MSCG_max_iterations",
+    "MPI_geometry",
+    "Threads_per_process",
+]
 
 # Dataset-specific plotting configurations
 DATASET_PLOT_CONFIGS = {

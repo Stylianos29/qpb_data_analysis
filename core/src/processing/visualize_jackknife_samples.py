@@ -55,6 +55,7 @@ from src.processing._jackknife_visualization_config import (
     DEFAULT_FIGURE_SIZE,
     DEFAULT_FONT_SIZE,
     SAMPLES_PER_PLOT,
+    TITLE_EXCLUDED_PARAMETERS,
     get_dataset_plot_config,
 )
 
@@ -417,7 +418,7 @@ def create_multi_sample_plots(
 
     Args:
         - jackknife_data: 2D array of jackknife samples (n_samples,
-        n_time)
+          n_time)
         - mean_values: Array of mean values
         - error_values: Array of error values
         - config_labels: List of gauge configuration labels
@@ -903,6 +904,7 @@ def generate_sample_plot_title(
             metadata_title = title_builder.build(
                 metadata_dict=group_metadata,
                 tunable_params=list(group_metadata.keys()),
+                excluded=set(TITLE_EXCLUDED_PARAMETERS),
                 # leading_substring=base_title,
                 wrapping_length=80,
             )
