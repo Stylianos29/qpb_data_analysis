@@ -192,7 +192,7 @@ class PlotTitleBuilder:
 
         # Build the title part independently for each parameter
         components = []
-        
+
         # Add overlap method if present and not excluded
         if overlap_method and "Overlap_operator_method" not in excluded:
             components.append(str(overlap_method))
@@ -275,6 +275,7 @@ class PlotTitleBuilder:
         Applies the configured number formatting to numeric values and
         converts other types to strings. Uses exponential formatting for
         parameters specified in PARAMETERS_WITH_EXPONENTIAL_FORMAT.
+        Parameters defined as integers are formatted without decimal places.
 
         Parameters:
         -----------
@@ -288,10 +289,19 @@ class PlotTitleBuilder:
         str
             Formatted string representation
         """
+        # Import here to avoid circular dependency
+        from library.constants.data_types import PARAMETERS_OF_INTEGER_VALUE
+        
         if isinstance(value, (int, float)):
+            # Check if parameter is defined as integer type
+            if param_name in PARAMETERS_OF_INTEGER_VALUE or isinstance(value, int):
+                return str(int(value))
+            
+            # Float formatting
             if param_name in PARAMETERS_WITH_EXPONENTIAL_FORMAT:
                 return format(value, self.title_exponential_format)
             return format(value, self.title_number_format)
+        
         return str(value)
 
     def _wrap_title(self, title: str, max_length: int) -> str:

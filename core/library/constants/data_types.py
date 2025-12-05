@@ -6,6 +6,15 @@ import pandas as pd
 DTYPE_MAPPING = {
     "Clover_coefficient": int,
     "Configuration_label": str,
+    "APE_iterations": int,
+    "Number_of_spinors": int,
+    "Number_of_vectors": int,
+    "MSCG_max_iterations": int,
+    "CG_max_iterations": int,
+    "Threads_per_process": int,
+    "Number_of_Chebyshev_terms": int,
+    "KL_diagonal_order": int,
+    "Rational_order": int,
 }
 
 
@@ -42,9 +51,8 @@ CONVERTERS_MAPPING = {
     # Format floats in exponential notation
     "Solver_epsilon": lambda x: f"{float(x):.0e}" if x.strip() else x,
     "Linear_fit_slope": lambda x: ast.literal_eval(x) if x.strip() else x,
-    # "Kernel_operator_type": lambda x: pd.Categorical(
-    #         x, categories=["Wilson", "Brillouin"], ordered=True
-    #     )
+    # "Kernel_operator_type": lambda x: pd.Categorical( x,
+    #         categories=["Wilson", "Brillouin"], ordered=True )
 }
 
 PARAMETERS_WITH_EXPONENTIAL_FORMAT = [
