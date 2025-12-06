@@ -82,6 +82,11 @@ ERROR_HANDLING = {
 # =============================================================================
 
 
+def get_grouping_parameters():
+    """Get list of parameters for data grouping."""
+    return GROUPING_EXCLUDED_PARAMETERS.copy()
+
+
 def get_filtering_config():
     """Get data filtering configuration."""
     return FILTERING_PARAMETERS.copy()

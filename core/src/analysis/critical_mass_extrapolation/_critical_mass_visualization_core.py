@@ -28,7 +28,6 @@ from library.data import load_csv
 
 from src.analysis.critical_mass_extrapolation._critical_mass_shared_config import (
     get_grouping_parameters,
-    GROUPING_EXCLUDED_PARAMETERS,
 )
 from src.analysis.critical_mass_extrapolation._critical_mass_visualization_config import (
     get_plot_styling,
@@ -341,13 +340,13 @@ def group_data_for_visualization(
     # analysis)
     analyzer = DataFrameAnalyzer(plateau_df)
 
+    grouping_params = get_grouping_parameters()
+
     # Filter exclusion list to only include parameters that exist in the
     # list of multivalued parameters
     available_multivalued_params = analyzer.list_of_multivalued_tunable_parameter_names
     filtered_exclusions = [
-        param
-        for param in GROUPING_EXCLUDED_PARAMETERS
-        if param in available_multivalued_params
+        param for param in grouping_params if param in available_multivalued_params
     ]
 
     # Group plateau data using analyzer's intelligence
