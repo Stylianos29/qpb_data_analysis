@@ -19,6 +19,11 @@
 # - Use --all flag to force reprocessing all data sets
 # - Use --force flag (synonym for --all) for compatibility
 #
+# SELECTIVE STAGE EXECUTION:
+# - Use --stages flag to run only specific pipeline stages (1, 2, or 3)
+# - Gracefully skips data sets that lack required inputs for requested stages
+# - In batch mode, missing inputs cause skip (not error) for robustness
+#
 # PIPELINE BEHAVIOR:
 # For each data set discovered:
 # - Detects data set type (correlators vs. parameters-only)
@@ -88,6 +93,12 @@ DEFAULT_PLOTS_BASE_DIR="$(realpath "${SCRIPT_DIR}/../../output/plots")"
 # Timestamp script identifier
 TIMESTAMP_SCRIPT_NAME="run_complete_pipeline"
 
+# Expected output filenames (for stage validation)
+PARSED_CSV_FILENAME="single_valued_parameters.csv"
+PARSED_HDF5_LOG_FILENAME="multivalued_parameters.h5"
+PROCESSED_CSV_FILENAME="processed_parameter_values.csv"
+JACKKNIFE_HDF5_FILENAME="correlators_jackknife_analysis.h5"
+
 # =============================================================================
 # SECTION 4: FUNCTION DEFINITIONS
 # =============================================================================
@@ -124,6 +135,12 @@ OPTIONAL ARGUMENTS:
                                Base directory for log files
                                (default: uses output directories)
 
+  --stages <1,2,3>            Comma-separated stages to execute (default: all)
+                               Examples: --stages 2,3 (rerun processing+analysis)
+                                        --stages 3 (rerun analysis only)
+                               Note: In batch mode, data sets lacking required
+                               inputs are skipped gracefully (not errors)
+
   --all                        Force reprocessing of ALL data sets,
                                bypassing timestamp checks
 
@@ -147,6 +164,17 @@ TIMESTAMP CACHING:
   - Failed runs don't update timestamps (will retry on next batch run)
   - Use --all or --force to ignore timestamps and reprocess everything
 
+SELECTIVE STAGE EXECUTION:
+  When using --stages flag:
+  - Stage 1: Requires raw .txt files in input directory
+  - Stage 2: Requires Stage 1 outputs (single_valued_parameters.csv, etc.)
+  - Stage 3: Requires Stage 2 outputs + correlators (jackknife HDF5)
+  
+  Batch mode behavior:
+  - Data sets lacking required inputs are SKIPPED (not errors)
+  - Allows mixed processing across heterogeneous data sets
+  - Example: --stages 3 skips parameter-only data sets automatically
+
 EXAMPLES:
   # Process all data sets under default raw directory
   $SCRIPT_NAME
@@ -157,31 +185,84 @@ EXAMPLES:
   # Process only data sets under the 'invert' program directory
   $SCRIPT_NAME -i ../data_files/raw/invert/
 
-  # Process single data set (batch mode with one set)
-  $SCRIPT_NAME -i ../data_files/raw/invert/my_experiment/
+  # Rerun only processing and analysis (skip parsing)
+  $SCRIPT_NAME --stages 2,3
+
+  # Rerun only analysis (requires existing Stage 2 outputs)
+  $SCRIPT_NAME --stages 3
 
   # Force reprocess all data sets
   $SCRIPT_NAME --all
 
-  # Process with visualization enabled
-  $SCRIPT_NAME -plots_dir ../output/plots/
+  # Disable visualization for faster batch processing
+  $SCRIPT_NAME --no-plots
 
-  # Process with custom output location
-  $SCRIPT_NAME -i ../raw_data/ -o ../processed_data/
-
-  # Fast processing (skip checks and summaries)
-  $SCRIPT_NAME --skip_checks --skip_summaries
+  # Fast batch processing (no checks, summaries, or plots)
+  $SCRIPT_NAME --no-plots --skip_checks --skip_summaries
 
 NOTES:
   - The script is non-blocking: failures in one data set don't stop others
   - Each data set runs independently via run_complete_pipeline.sh
   - Progress is reported for each data set processed
   - Summary statistics are displayed at the end
+  - Visualization is auto-enabled by default (use --no-plots to disable)
 
 EOF
     exit 0
 }
 
+function validate_stages_argument() {
+    # Validate and normalize the --stages argument
+    #
+    # Arguments:
+    #   $1 - stages : Comma-separated stage numbers
+    #
+    # Returns:
+    #   Prints normalized stages string (sorted, deduplicated)
+    #   Exit code 0 on success, 1 on validation failure
+    
+    local stages="$1"
+    
+    # Check for valid format (only 1,2,3 and commas, no spaces)
+    if [[ ! "$stages" =~ ^[1-3](,[1-3])*$ ]]; then
+        echo "ERROR: Invalid --stages format: '$stages'" >&2
+        echo "  Valid format: comma-separated numbers (1, 2, or 3)" >&2
+        echo "  Examples: --stages 1, --stages 2,3, --stages 1,2,3" >&2
+        return 1
+    fi
+    
+    # Remove duplicates and sort (e.g., "2,1,2" → "1,2")
+    local normalized
+    normalized=$(echo "$stages" | tr ',' '\n' | sort -u | tr '\n' ',' | sed 's/,$//')
+    
+    echo "$normalized"
+    return 0
+}
+
+function should_run_stage() {
+    # Check if a stage should be executed based on --stages argument
+    #
+    # Arguments:
+    #   $1 - stage : Stage number to check (1, 2, or 3)
+    #
+    # Returns:
+    #   0 - Stage should run
+    #   1 - Stage should be skipped
+    
+    local stage="$1"
+    
+    # If --stages not specified, run all stages (default behavior)
+    if [[ -z "$stages_to_run" ]]; then
+        return 0
+    fi
+    
+    # Check if stage is in the comma-separated list
+    if [[ ",$stages_to_run," == *",$stage,"* ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
 
 function discover_data_sets() {
     # Discover all data set directories under input base directory
@@ -205,12 +286,10 @@ function discover_data_sets() {
     
     # Check if input directory exists
     if [[ ! -d "$input_base_dir" ]]; then
-        echo "ERROR: Input directory does not exist: $input_base_dir" >&2
         return 1
     fi
     
-    # Find all directories that contain .txt or .dat files
-    # This identifies actual data set directories vs. organizational directories
+    # Find all directories containing .txt or .dat files
     while IFS= read -r -d '' dir; do
         # Check if directory contains .txt or .dat files
         if find "$dir" -maxdepth 1 -type f \( -name "*.txt" -o -name "*.dat" \) -print -quit | grep -q .; then
@@ -221,29 +300,26 @@ function discover_data_sets() {
     return 0
 }
 
-
 function should_process_data_set() {
-    # Determine if a data set should be processed based on timestamp
+    # Determine if a data set should be processed based on timestamps
     #
     # Arguments:
-    #   $1 - data_set_dir       : Path to data set directory
-    #   $2 - timestamp_file     : Path to timestamp file
-    #   $3 - force_flag         : Boolean flag (true/false) to bypass timestamp
+    #   $1 - data_set_dir   : Data set directory
+    #   $2 - timestamp_file : Path to timestamp file
     #
     # Returns:
-    #   0 - Should process (modified or force flag set)
-    #   1 - Should skip (unmodified and no force flag)
+    #   0 - Should process (modified or force mode)
+    #   1 - Should skip (not modified)
     
     local data_set_dir="$1"
     local timestamp_file="$2"
-    local force_flag="$3"
     
-    # If force flag set, always process
-    if [[ "$force_flag" == "true" ]]; then
+    # Force mode: always process
+    if $force_all; then
         return 0
     fi
     
-    # If timestamp file doesn't exist, must process
+    # No timestamp file: must process
     if [[ ! -f "$timestamp_file" ]]; then
         return 0
     fi
@@ -255,7 +331,6 @@ function should_process_data_set() {
         return 1  # Not modified - skip
     fi
 }
-
 
 function compute_output_directory() {
     # Compute output directory path by mirroring input structure
@@ -282,6 +357,53 @@ function compute_output_directory() {
     echo "$output_dir"
 }
 
+function can_process_stage() {
+    # Check if a data set can satisfy the requirements for a given stage
+    # Used in batch mode for graceful skipping of incompatible data sets
+    #
+    # Arguments:
+    #   $1 - stage      : Stage number (1, 2, or 3)
+    #   $2 - output_dir : Output directory for the data set
+    #
+    # Returns:
+    #   0 - Can process this stage
+    #   1 - Cannot process (missing inputs)
+    
+    local stage="$1"
+    local output_dir="$2"
+    
+    case "$stage" in
+        1)
+            # Stage 1 always valid (needs raw files, checked elsewhere)
+            return 0
+            ;;
+        2)
+            # Stage 2 needs Stage 1 outputs
+            local csv="${output_dir}/${PARSED_CSV_FILENAME}"
+            local hdf5="${output_dir}/${PARSED_HDF5_LOG_FILENAME}"
+            
+            if [[ -f "$csv" && -f "$hdf5" ]]; then
+                return 0
+            else
+                return 1
+            fi
+            ;;
+        3)
+            # Stage 3 needs Stage 2 outputs + correlators
+            local csv="${output_dir}/${PROCESSED_CSV_FILENAME}"
+            local hdf5="${output_dir}/${JACKKNIFE_HDF5_FILENAME}"
+            
+            if [[ -f "$csv" && -f "$hdf5" ]]; then
+                return 0
+            else
+                return 1
+            fi
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
 
 function process_single_data_set() {
     # Process a single data set by calling run_complete_pipeline.sh
@@ -291,8 +413,9 @@ function process_single_data_set() {
     #   $2 - output_dir       : Output directory for this data set
     #   $3 - plots_base_dir   : Base plots directory (optional)
     #   $4 - log_base_dir     : Base log directory (optional)
-    #   $5 - skip_checks      : Boolean flag (true/false)
-    #   $6 - skip_summaries   : Boolean flag (true/false)
+    #   $5 - stages_to_run    : Comma-separated stages (optional)
+    #   $6 - skip_checks      : Boolean flag (true/false)
+    #   $7 - skip_summaries   : Boolean flag (true/false)
     #
     # Returns:
     #   0 - Success
@@ -302,8 +425,9 @@ function process_single_data_set() {
     local output_dir="$2"
     local plots_base_dir="$3"
     local log_base_dir="$4"
-    local skip_checks="$5"
-    local skip_summaries="$6"
+    local stages_to_run="$5"
+    local skip_checks="$6"
+    local skip_summaries="$7"
     
     # Build command
     local cmd="$SINGLE_SET_SCRIPT"
@@ -323,9 +447,12 @@ function process_single_data_set() {
     
     # Add log directory if specified
     if [[ -n "$log_base_dir" ]]; then
-        # For logs, we can just use the output directory
-        # or create a mirrored structure
         cmd+=" -log_dir \"$output_dir\""
+    fi
+    
+    # Add stages flag if specified
+    if [[ -n "$stages_to_run" ]]; then
+        cmd+=" --stages \"$stages_to_run\""
     fi
     
     # Add skip flags
@@ -354,9 +481,11 @@ input_base_dir=""
 output_base_dir=""
 plots_base_dir=""
 log_base_dir=""
+stages_to_run=""
 force_all=false
 skip_checks=false
 skip_summaries=false
+disable_plots=false
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -374,11 +503,15 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         --no-plots)
-            plots_base_dir=""  # Explicitly disable
+            disable_plots=true
             shift
             ;;
         -log_dir|--log_base_directory)
             log_base_dir="$2"
+            shift 2
+            ;;
+        --stages)
+            stages_to_run=$(validate_stages_argument "$2") || exit 1
             shift 2
             ;;
         --all|--force)
@@ -442,21 +575,26 @@ if [[ ! -d "$output_base_dir" ]]; then
 fi
 output_base_dir="$(realpath "$output_base_dir")"
 
-# Set default plots directory if not specified (auto-enable visualization)
-if [[ -z "$plots_base_dir" ]]; then
-    plots_base_dir="$DEFAULT_PLOTS_BASE_DIR"
-    echo "INFO: Auto-enabling visualization with plots directory: $(get_display_path "$plots_base_dir")"
+# Handle plots directory (auto-enable unless --no-plots specified)
+if ! $disable_plots; then
+    if [[ -z "$plots_base_dir" ]]; then
+        plots_base_dir="$DEFAULT_PLOTS_BASE_DIR"
+        echo "INFO: Auto-enabling visualization with plots directory: $(get_display_path "$plots_base_dir")"
+    fi
+    
+    # Ensure plots base directory exists
+    if [[ ! -d "$plots_base_dir" ]]; then
+        mkdir -p "$plots_base_dir" || {
+            echo "ERROR: Failed to create plots directory: $plots_base_dir" >&2
+            exit 1
+        }
+        echo "INFO: Created plots directory: $(get_display_path "$plots_base_dir")"
+    fi
+    plots_base_dir="$(realpath "$plots_base_dir")"
+else
+    plots_base_dir=""  # Explicitly disable
+    echo "INFO: Visualization disabled (--no-plots)"
 fi
-
-# Ensure plots base directory exists
-if [[ ! -d "$plots_base_dir" ]]; then
-    mkdir -p "$plots_base_dir" || {
-        echo "ERROR: Failed to create plots directory: $plots_base_dir" >&2
-        exit 1
-    }
-    echo "INFO: Created plots directory: $(get_display_path "$plots_base_dir")"
-fi
-plots_base_dir="$(realpath "$plots_base_dir")"
 
 # Validate single-set script exists
 if [[ ! -f "$SINGLE_SET_SCRIPT" ]]; then
@@ -475,13 +613,25 @@ echo "   QPB DATA ANALYSIS - BATCH PIPELINE EXECUTION"
 echo "==================================================================="
 echo "Input base:  $(get_display_path "$input_base_dir")"
 echo "Output base: $(get_display_path "$output_base_dir")"
-echo "Plots base:  $(get_display_path "$plots_base_dir")"  # Always shown now
+
+if [[ -n "$plots_base_dir" ]]; then
+    echo "Plots base:  $(get_display_path "$plots_base_dir")"
+    echo "Visualization: ENABLED (automatic in batch mode)"
+else
+    echo "Visualization: DISABLED (--no-plots)"
+fi
+
+if [[ -n "$stages_to_run" ]]; then
+    echo "Stages: $stages_to_run (selective execution)"
+else
+    echo "Stages: 1,2,3 (full pipeline)"
+fi
+
 if [[ "$force_all" == "true" ]]; then
     echo "Mode: FORCE ALL (ignoring timestamps)"
 else
     echo "Mode: INCREMENTAL (using timestamps)"
 fi
-echo "Visualization: ENABLED (automatic in batch mode)"  # NEW
 echo "==================================================================="
 echo ""
 
@@ -510,7 +660,9 @@ success_count=0
 failure_count=0
 
 # Process each data set
+set_index=0
 for data_set_dir in "${data_sets[@]}"; do
+    ((set_index++))
     data_set_name=$(basename "$data_set_dir")
     
     # Compute output directory
@@ -532,16 +684,38 @@ for data_set_dir in "${data_sets[@]}"; do
     # Ensure timestamp file exists
     check_if_file_exists "$timestamp_file" -c -s
     
-    # Check if should process
-    if ! should_process_data_set "$data_set_dir" "$timestamp_file" "$force_all"; then
+    # Check if should process based on timestamps
+    if ! should_process_data_set "$data_set_dir" "$timestamp_file"; then
         echo "⊘ SKIPPING: $data_set_name (no changes detected)"
         ((skipped_count++))
         continue
     fi
     
-    # Process the data set
+    # If selective stages requested, check if this data set can satisfy them
+    if [[ -n "$stages_to_run" ]]; then
+        can_process=true
+        
+        # Check each requested stage
+        if should_run_stage 2; then
+            if ! can_process_stage 2 "$output_dir"; then
+                echo "⊘ SKIPPING: $data_set_name (Stage 2 requested but missing Stage 1 outputs)"
+                ((skipped_count++))
+                continue
+            fi
+        fi
+        
+        if should_run_stage 3; then
+            if ! can_process_stage 3 "$output_dir"; then
+                echo "⊘ SKIPPING: $data_set_name (Stage 3 requested but missing Stage 2 outputs or no correlators)"
+                ((skipped_count++))
+                continue
+            fi
+        fi
+    fi
+    
+    # Process this data set
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "▶ PROCESSING [$((processed_count + 1))/$total_sets]: $data_set_name"
+    echo "▶ PROCESSING [$set_index/$total_sets]: $data_set_name"
     echo "  Input:  $(get_display_path "$data_set_dir")"
     echo "  Output: $(get_display_path "$output_dir")"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -549,34 +723,33 @@ for data_set_dir in "${data_sets[@]}"; do
     
     ((processed_count++))
     
-    # Process the data set
+    # Execute single-set pipeline
     if process_single_data_set \
         "$data_set_dir" \
         "$output_dir" \
         "$plots_base_dir" \
         "$log_base_dir" \
+        "$stages_to_run" \
         "$skip_checks" \
         "$skip_summaries"; then
         
         # Success - update timestamp
-        update_timestamp "$data_set_dir" "$timestamp_file"
+        update_timestamp "$timestamp_file"
         ((success_count++))
         echo ""
         echo "✓ SUCCESS: $data_set_name completed successfully"
+        echo ""
     else
-        # Failure - don't update timestamp (will retry next time)
+        # Failure - don't update timestamp
         ((failure_count++))
         echo ""
-        echo "✗ FAILURE: $data_set_name failed (will retry on next batch run)"
+        echo "✗ FAILED: $data_set_name encountered errors"
+        echo ""
+        # Continue to next data set (non-blocking)
     fi
-    
-    echo ""
 done
 
-# =============================================================================
-# SECTION 8: SUMMARY REPORT
-# =============================================================================
-
+# Display final summary
 echo ""
 echo "==================================================================="
 echo "   BATCH PROCESSING COMPLETE"
@@ -588,14 +761,13 @@ echo "Successful:               $success_count"
 echo "Failed:                   $failure_count"
 echo "==================================================================="
 
-# Exit with appropriate code
-if [[ $failure_count -gt 0 ]]; then
+if [[ $success_count -eq $processed_count && $processed_count -gt 0 ]]; then
+    echo "INFO: All processed data sets completed successfully"
+    exit 0
+elif [[ $failure_count -gt 0 ]]; then
     echo "WARNING: Some data sets failed processing"
     exit 1
-elif [[ $processed_count -eq 0 ]]; then
-    echo "INFO: No data sets required processing"
-    exit 0
 else
-    echo "INFO: All processed data sets completed successfully"
+    echo "INFO: Batch processing complete"
     exit 0
 fi
