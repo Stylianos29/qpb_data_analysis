@@ -1088,12 +1088,21 @@ if should_run_stage 1; then
 fi
 
 if should_run_stage 2; then
-    validate_stage_inputs 2 || exit 1
+    # Only validate Stage 2 inputs if NOT running Stage 1
+    # (Stage 1 will create the inputs)
+    if ! should_run_stage 1; then
+        validate_stage_inputs 2 || exit 1
+    fi
 fi
 
 if should_run_stage 3; then
-    validate_stage_inputs 3 || exit 1
+    # Only validate Stage 3 inputs if NOT running Stage 2
+    # (Stage 2 will create the inputs)
+    if ! should_run_stage 2; then
+        validate_stage_inputs 3 || exit 1
+    fi
 fi
+
 echo "✓ All required inputs validated"
 
 # Validate prerequisites
