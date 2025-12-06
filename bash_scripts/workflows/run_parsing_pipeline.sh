@@ -181,22 +181,6 @@ function validate_prerequisites() {
     return 0
 }
 
-function detect_correlator_files() {
-    # Check if correlator files (.dat) are present
-    #
-    # Returns:
-    #   0 - Correlator files found
-    #   1 - No correlator files found
-    
-    local input_dir="$1"
-    
-    if find "$input_dir" -maxdepth 1 -type f -name "*.dat" -print -quit | grep -q .; then
-        return 0
-    else
-        return 1
-    fi
-}
-
 # =============================================================================
 # MAIN FUNCTION
 # =============================================================================

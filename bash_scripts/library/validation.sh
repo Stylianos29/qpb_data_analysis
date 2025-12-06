@@ -214,6 +214,37 @@ function update_timestamp() {
     echo "${CURRENT_TIMESTAMP}" > "$TIMESTAMP_FILE"
 }
 
+
+function detect_correlator_files() {
+    # Check if directory contains .dat correlator files
+    #
+    # Arguments:
+    #   $1 - directory : Directory to check for .dat files
+    #
+    # Returns:
+    #   0 - Correlator files found
+    #   1 - No correlator files found
+    #
+    # Example:
+    #   if detect_correlator_files "$input_dir"; then
+    #       echo "Has correlators"
+    #   fi
+    
+    local directory="$1"
+    
+    # Validate directory exists
+    if [[ ! -d "$directory" ]]; then
+        return 1
+    fi
+    
+    # Check for .dat files (correlator data files)
+    if find "$directory" -maxdepth 1 -type f -name "*.dat" -print -quit | grep -q .; then
+        return 0  # Found correlator files
+    else
+        return 1  # No correlator files
+    fi
+}
+
 # =============================================================================
 # FILE PATTERN MATCHING
 # =============================================================================
