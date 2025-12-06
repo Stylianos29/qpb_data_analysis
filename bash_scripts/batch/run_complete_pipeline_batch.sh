@@ -734,7 +734,7 @@ for data_set_dir in "${data_sets[@]}"; do
         "$skip_summaries"; then
         
         # Success - update timestamp
-        update_timestamp "$timestamp_file"
+        update_timestamp "$data_set_dir" "$timestamp_file"
         ((success_count++))
         echo ""
         echo "✓ SUCCESS: $data_set_name completed successfully"
