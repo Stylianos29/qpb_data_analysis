@@ -12,15 +12,17 @@ HDF5 format, focusing on processing tasks:
       format with processed parameter values
 
 Key improvements in this version:
-    - Uses processed parameters from Stage 2A CSV as single source of truth
-    - CSV-driven grouping using DataFrameAnalyzer ensures ALL parameters are used
+    - Uses processed parameters from Stage 2A CSV as single source of
+      truth
+    - CSV-driven grouping using DataFrameAnalyzer ensures ALL parameters
+      are used
     - Integrates PlotFilenameBuilder for consistent group naming
     - Implements graceful error handling for filename mismatches
     - Provides detailed user feedback on processing statistics
 
 Usage:
-    python apply_jackknife_analysis.py -i input.h5 -csv processed.csv -o output.h5
-    [options]
+    python apply_jackknife_analysis.py -i input.h5 -csv processed.csv -o
+    output.h5 [options]
 """
 
 from asyncio.log import logger
@@ -217,7 +219,7 @@ def main(
 
         logger.info("All required datasets found in input HDF5")
 
-        # === GROUP DATA BY PARAMETERS (CSV-DRIVEN USING DataFrameAnalyzer) ===
+        # === GROUP DATA BY PARAMETERS (CSV-DRIVEN) ===
 
         logger.info("=" * 80)
         logger.info("GROUPING DATA USING CSV PARAMETERS")
@@ -226,7 +228,8 @@ def main(
         # Create analyzer for CSV
         processed_csv_analyzer = DataFrameAnalyzer(processed_df)
 
-        # Filter GROUPING_PARAMETERS to only include parameters that exist in this dataset
+        # Filter GROUPING_PARAMETERS to only include parameters that
+        # exist in this dataset
         available_multivalued = (
             processed_csv_analyzer.list_of_multivalued_tunable_parameter_names
         )
@@ -285,7 +288,7 @@ def main(
                     hdf5_paths.append(path)
 
             if hdf5_paths:
-                grouped_data[group_key] = hdf5_paths
+                grouped_data[group_key] = {"paths": hdf5_paths, "dataframe": group_df}
                 logger.info(
                     f"Group {group_index}/{len(csv_grouped)}: "
                     f"{dict(group_key) if isinstance(group_key, tuple) else group_key} → "
@@ -335,13 +338,17 @@ def main(
         compression = DEFAULT_COMPRESSION
         compression_level = DEFAULT_COMPRESSION_LEVEL
 
-        for group_index, (param_values, group_paths) in enumerate(
+        for group_index, (param_values, group_data) in enumerate(
             grouped_data.items(), 1
         ):
+            # Unpack the dictionary
+            group_paths = group_data["paths"]
+            group_df = group_data["dataframe"]
             # group_paths is List[str] of HDF5 paths
 
-            # Note: Group naming is now handled by _hdf5_output.py using PlotFilenameBuilder
-            # We use a temporary identifier here for tracking
+            # Note: Group naming is handled by _hdf5_output.py using
+            # PlotFilenameBuilder. We use a temporary identifier here
+            # for tracking
             temp_group_id = f"group_{group_index}"
 
             logger.info("")
@@ -374,13 +381,26 @@ def main(
                     g4g5g5_data.append(g4g5g5_values)
 
                     # Extract metadata
-                    filename = path.split("/")[-1]  # Get filename from path
+                    filename = path.split("/")[
+                        -1
+                    ]  # Get filename from path (e.g., "something.dat")
                     qpb_filenames.append(filename)
 
-                    # Extract configuration label from filename
-                    # Assumes format like: "..._n123.dat" where 123 is config label
-                    config_label = filename.split("_n")[-1].split(".")[0]
-                    config_labels.append(config_label)
+                    # Extract configuration label from CSV
+                    csv_filename = filename.replace(
+                        ".dat", ".txt"
+                    )  # Convert to CSV format
+                    matching_row = group_df[group_df["Filename"] == csv_filename]
+
+                    if not matching_row.empty:
+                        config_label = str(matching_row["Configuration_label"].iloc[0])
+                        config_labels.append(config_label)
+                    else:
+                        logger.warning(
+                            f"Filename {csv_filename} not found in group DataFrame. "
+                            f"Using placeholder."
+                        )
+                        config_labels.append(f"unknown_{len(config_labels)}")
 
                 except Exception as e:
                     logger.warning(f"Failed to load data from {path}: {e}")
@@ -403,8 +423,8 @@ def main(
                 f"g4g5g5={g4g5g5_array.shape}"
             )
 
-            # === BUILD METADATA BEFORE PROCESSING ===
-            # This is needed by the processor
+            # === BUILD METADATA BEFORE PROCESSING === This is needed by
+            # the processor
             group_metadata = {
                 "configuration_labels": config_labels,
                 "qpb_filenames": qpb_filenames,
