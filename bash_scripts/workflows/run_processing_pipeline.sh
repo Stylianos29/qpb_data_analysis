@@ -39,6 +39,7 @@
 #   -log_dir, --log_directory      Log directory (default: output directory)
 #   -viz, --enable_visualization   Enable Stage 2C visualization
 #   --skip_checks                  Skip intermediate file validation
+#   --skip_summaries               Skip generation of summary files
 #   -h, --help                     Display this help message
 #
 # EXAMPLES:
@@ -63,6 +64,12 @@
 #       -plots_dir output/plots/ \
 #       -viz
 #
+#   # Skip summary file generation (faster)
+#   ./run_processing_pipeline.sh \
+#       -csv params.csv \
+#       -hdf5_param arrays.h5 \
+#       --skip_summaries
+#
 # DEPENDENCIES:
 # - Python scripts: process_raw_parameters.py, apply_jackknife_analysis.py,
 #                  visualize_jackknife_samples.py
@@ -74,6 +81,10 @@
 # - Jackknife_samples_visualization/    : Diagnostic plots (Stage 2C, if enabled)
 #                                         (in plots_directory if specified)
 # - run_processing_pipeline.log         : Execution log
+#
+# SUMMARY FILES (unless --skip_summaries):
+# - processed_parameter_values_uniqueness_report.txt : CSV column summary
+# - correlators_jackknife_analysis_tree.txt          : HDF5 structure tree
 #
 ################################################################################
 
@@ -144,23 +155,23 @@ REQUIRED ARGUMENTS:
 
 OPTIONAL ARGUMENTS:
   -hdf5_corr, --input_hdf5_corr  Correlators HDF5 file (enables stages 2B/2C)
-  -out_dir, --output_directory   Output directory for data files (default: CSV directory)
+  -out_dir, --output_directory   Output directory (default: CSV file directory)
   -plots_dir, --plots_directory  Plots directory (default: output_directory)
   -log_dir, --log_directory      Log directory (default: output directory)
-  -viz, --enable_visualization   Enable visualization (Stage 2C)
-  --skip_checks                  Skip validation checks
+  -viz, --enable_visualization   Enable Stage 2C visualization
+  --skip_checks                  Skip intermediate file validation
+  --skip_summaries               Skip summary file generation
   -h, --help                     Display this help message
 
 EXAMPLES:
-  # Parameters only
-  $SCRIPT_NAME -csv params.csv -hdf5_param arrays.h5
+  # Parameters only (Stage 2A only)
+  $SCRIPT_NAME -csv single_valued.csv -hdf5_param multivalued.h5
 
-  # With correlators and visualization
+  # Full processing with correlators
   $SCRIPT_NAME -csv params.csv -hdf5_param arrays.h5 -hdf5_corr corr.h5 -viz
 
-  # Separate data and plots directories
-  $SCRIPT_NAME -csv params.csv -hdf5_param arrays.h5 -hdf5_corr corr.h5 \\
-               -out_dir data/processed/ -plots_dir output/plots/ -viz
+  # Skip summary file generation (faster)
+  $SCRIPT_NAME -csv params.csv -hdf5_param arrays.h5 --skip_summaries
 
 EOF
     # Clear exit handlers before exiting
@@ -175,17 +186,11 @@ function validate_prerequisites() {
     #   0 - All prerequisites valid
     #   1 - Validation failed
     
-    # Always validate Stage 2A script
-    validate_python_script "$PROCESS_RAW_SCRIPT" -s || return 1
+    echo "Validating Python scripts..."
     
-    # Validate Stage 2B/2C scripts if correlators will be processed
-    if [[ "$has_correlators" == "true" ]]; then
-        validate_python_script "$JACKKNIFE_SCRIPT" -s || return 1
-        
-        if [[ "$enable_visualization" == "true" ]]; then
-            validate_python_script "$VISUALIZATION_SCRIPT" -s || return 1
-        fi
-    fi
+    validate_python_script "$PROCESS_RAW_SCRIPT" -s || return 1
+    validate_python_script "$JACKKNIFE_SCRIPT" -s || return 1
+    validate_python_script "$VISUALIZATION_SCRIPT" -s || return 1
     
     echo "All prerequisites validated successfully"
     log_info "Prerequisites validation completed successfully"
@@ -193,11 +198,11 @@ function validate_prerequisites() {
 }
 
 # =============================================================================
-# STAGE FUNCTIONS
+# STAGE EXECUTION FUNCTIONS
 # =============================================================================
 
 function run_stage_2a() {
-    # Execute Stage 2A: Process raw parameters (ALWAYS RUNS)
+    # Execute Stage 2A: Process raw parameters
     #
     # Returns:
     #   0 - Success
@@ -205,8 +210,10 @@ function run_stage_2a() {
     
     echo ""
     echo "=== STAGE 2A: PROCESSING RAW PARAMETERS ==="
-    echo "Processing and validating raw parameters..."
-    log_info "STAGE 2A: Starting raw parameter processing"
+    echo "Transforming parsed parameters into analysis-ready format..."
+    log_info "STAGE 2A: Starting parameter processing"
+    
+    local processed_csv_path="${output_directory}/${PROCESSED_CSV_FILENAME}"
     
     execute_python_script "$PROCESS_RAW_SCRIPT" "process_raw_parameters" \
         --input_single_valued_csv_file_path "$input_csv_file" \
@@ -216,25 +223,32 @@ function run_stage_2a() {
         --enable_logging \
         --log_directory "$log_directory" \
         || {
-            log_error "Stage 2A: Raw parameter processing failed"
+            log_error "Stage 2A: Parameter processing failed"
             return 1
         }
     
     # Validate output
-    local processed_csv_path="${output_directory}/${PROCESSED_CSV_FILENAME}"
     if ! $skip_checks; then
-        validate_output_file "$processed_csv_path" "Processed CSV" || return 1
+        validate_output_file "$processed_csv_path" "Processed CSV output" || return 1
     fi
     
-    echo "${PROGRESS_SUCCESS} Stage 2A completed: Raw parameters processed"
-    echo "  - Output: $(basename "$processed_csv_path")"
+    echo "${PROGRESS_SUCCESS} Stage 2A completed: Parameters processed"
+    echo "  - CSV output: $(basename "$processed_csv_path")"
     log_info "Stage 2A completed successfully"
+    log_info "  Output: $processed_csv_path"
+    
+    # Generate summary for processed CSV
+    if ! $skip_summaries; then
+        echo ""
+        echo "Generating CSV summary..."
+        generate_csv_summary "$processed_csv_path" "$output_directory"
+    fi
     
     return 0
 }
 
 function run_stage_2b() {
-    # Execute Stage 2B: Jackknife analysis (only if correlators exist)
+    # Execute Stage 2B: Apply jackknife analysis
     #
     # Returns:
     #   0 - Success
@@ -242,12 +256,15 @@ function run_stage_2b() {
     
     echo ""
     echo "=== STAGE 2B: JACKKNIFE ANALYSIS ==="
-    echo "Applying jackknife resampling to correlator data..."
+    echo "Applying jackknife resampling for error estimation..."
     log_info "STAGE 2B: Starting jackknife analysis"
+    
+    local jackknife_hdf5_path="${output_directory}/${JACKKNIFE_HDF5_FILENAME}"
+    local processed_csv_path="${output_directory}/${PROCESSED_CSV_FILENAME}"
     
     execute_python_script "$JACKKNIFE_SCRIPT" "apply_jackknife_analysis" \
         --input_hdf5_file "$input_hdf5_corr" \
-        --processed_parameters_csv "${output_directory}/${PROCESSED_CSV_FILENAME}" \
+        --processed_parameters_csv "$processed_csv_path" \
         --output_directory "$output_directory" \
         --output_hdf5_file "$JACKKNIFE_HDF5_FILENAME" \
         --enable_logging \
@@ -258,27 +275,34 @@ function run_stage_2b() {
         }
     
     # Validate output
-    local jackknife_hdf5_path="${output_directory}/${JACKKNIFE_HDF5_FILENAME}"
     if ! $skip_checks; then
-        validate_output_file "$jackknife_hdf5_path" "Jackknife HDF5" || return 1
+        validate_output_file "$jackknife_hdf5_path" "Jackknife HDF5 output" || return 1
     fi
     
     echo "${PROGRESS_SUCCESS} Stage 2B completed: Jackknife analysis applied"
-    echo "  - Output: $(basename "$jackknife_hdf5_path")"
+    echo "  - HDF5 output: $(basename "$jackknife_hdf5_path")"
     log_info "Stage 2B completed successfully"
+    log_info "  Output: $jackknife_hdf5_path"
+    
+    # Generate summary for jackknife HDF5
+    if ! $skip_summaries; then
+        echo ""
+        echo "Generating HDF5 tree..."
+        generate_hdf5_tree "$jackknife_hdf5_path" "$output_directory"
+    fi
     
     return 0
 }
 
 function run_stage_2c() {
-    # Execute Stage 2C: Visualization (optional, only if correlators exist)
+    # Execute Stage 2C: Visualize jackknife samples
     #
     # Returns:
     #   0 - Success
-    #   1 - Failure (but doesn't fail pipeline)
+    #   1 - Failure (non-fatal for pipeline)
     
     echo ""
-    echo "=== STAGE 2C: VISUALIZATION (OPTIONAL) ==="
+    echo "=== STAGE 2C: VISUALIZATION ==="
     echo "Generating jackknife diagnostic plots..."
     log_info "STAGE 2C: Starting visualization"
     
@@ -286,11 +310,11 @@ function run_stage_2c() {
     
     execute_python_script "$VISUALIZATION_SCRIPT" "visualize_jackknife_samples" \
         --input_hdf5_file "$jackknife_hdf5_path" \
-        --output_directory "$plots_directory" \
+        --plots_directory "$plots_directory" \
         --enable_logging \
         --log_directory "$log_directory" \
         || {
-            echo "WARNING: Stage 2C visualization failed (optional stage)" >&2
+            echo "WARNING: Visualization failed (non-fatal for pipeline stage)" >&2
             log_warning "Stage 2C visualization failed but continuing"
             return 0  # Don't fail pipeline for optional visualization
         }
@@ -317,6 +341,7 @@ function main() {
     local log_dir=""
     local enable_visualization=false
     local skip_checks=false
+    local skip_summaries=false
     
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -350,6 +375,10 @@ function main() {
                 ;;
             --skip_checks)
                 skip_checks=true
+                shift
+                ;;
+            --skip_summaries)
+                skip_summaries=true
                 shift
                 ;;
             -h|--help)
@@ -468,6 +497,7 @@ function main() {
     log_info "Log directory: $log_directory"
     log_info "Has correlators: $has_correlators"
     log_info "Visualization enabled: $enable_visualization"
+    log_info "Skip summaries: $skip_summaries"
     
     # Validate prerequisites
     echo ""
@@ -533,6 +563,16 @@ function main() {
             echo "  - Plots directory: $(get_display_path "$plots_directory")"
         fi
     fi
+    
+    if ! $skip_summaries; then
+        echo ""
+        echo "Summary files:"
+        echo "  - CSV summary: $(get_display_path "${output_directory}/${PROCESSED_CSV_FILENAME%.csv}_uniqueness_report.txt")"
+        if $has_correlators; then
+            echo "  - HDF5 tree: $(get_display_path "${output_directory}/${JACKKNIFE_HDF5_FILENAME%.h5}_tree.txt")"
+        fi
+    fi
+    
     echo ""
     echo "Log file: $(get_display_path "$log_file")"
     
@@ -548,6 +588,7 @@ function main() {
     log_info "PROCESSING PIPELINE COMPLETED SUCCESSFULLY"
     log_info "  Stages executed: $stages_executed"
     log_info "  Output directory: $output_directory"
+    log_info "  Summary files: $(( skip_summaries ? "SKIPPED" : "GENERATED" ))"
     
     echo -e "$SCRIPT_TERMINATION_MESSAGE" >> "$SCRIPT_LOG_FILE_PATH"
     echo ""
