@@ -207,9 +207,17 @@ class PlotTitleBuilder:
                 terms = metadata.get("Number_of_Chebyshev_terms")
                 if terms is not None and "Number_of_Chebyshev_terms" not in excluded:
                     components.append("N=" + str(terms))
-            elif overlap_method in ["KL", "Neuberger", "Zolotarev"]:
-                order = metadata.get("Rational_order")
-                if order is not None and "Rational_order" not in excluded:
+            elif overlap_method == "KL":
+                order = metadata.get("KL_diagonal_order")
+                if order is not None and "KL_diagonal_order" not in excluded:
+                    components.append("n=" + str(order))
+            elif overlap_method == "Neuberger":
+                order = metadata.get("Neuberger_order")
+                if order is not None and "Neuberger_order" not in excluded:
+                    components.append("n=" + str(order))
+            elif overlap_method == "Zolotarev":
+                order = metadata.get("Zolotarev_order")
+                if order is not None and "Zolotarev_order" not in excluded:
                     components.append("n=" + str(order))
 
         # Only add to parts if we have something to show
@@ -249,6 +257,8 @@ class PlotTitleBuilder:
             "Kernel_operator_type",
             "Number_of_Chebyshev_terms",
             "KL_diagonal_order",
+            "Zolotarev_order",
+            "Neuberger_order",
             "Rational_order",
         }
 
