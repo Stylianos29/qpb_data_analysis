@@ -69,8 +69,8 @@ from src.processing._jackknife_visualization_config import (
     help="Path to input HDF5 file containing jackknife analysis results.",
 )
 @click.option(
-    "-o",
-    "--output_directory",  # TODO: Change to --plots_direcotry
+    "-p",
+    "--plots_directory",
     required=True,
     callback=directory.must_exist,
     help="Directory for output plots.",
@@ -111,7 +111,7 @@ from src.processing._jackknife_visualization_config import (
 )
 def main(
     input_hdf5_file: str,
-    output_directory: str,
+    plots_directory: str,
     clear_existing: bool,
     enable_logging: bool,
     log_directory: Optional[str],
@@ -129,7 +129,7 @@ def main(
 
     # Setup logging
     logger = create_script_logger(
-        log_directory=log_directory or output_directory,
+        log_directory=log_directory or plots_directory,
         log_filename=log_filename,
         enable_file_logging=enable_logging,
         enable_console_logging=verbose,  # Console logging follows verbose flag
@@ -139,7 +139,7 @@ def main(
     logger.log_script_start("Jackknife samples visualization")
 
     logger.info(f"Input file: {input_hdf5_file}")
-    logger.info(f"Output directory: {output_directory}")
+    logger.info(f"Output directory: {plots_directory}")
     logger.info(f"Datasets to process: {JACKKNIFE_DATASETS_TO_PLOT}")
 
     try:
@@ -149,7 +149,7 @@ def main(
         logger.info(f"Found {len(analyzer.active_groups)} groups in HDF5 file")
 
         # === SETUP VISUALIZATION MANAGERS ===
-        file_manager = PlotFileManager(output_directory)
+        file_manager = PlotFileManager(plots_directory)
         layout_manager = PlotLayoutManager(constants)
         style_manager = PlotStyleManager(constants)
         filename_builder = PlotFilenameBuilder(constants.FILENAME_LABELS_BY_COLUMN_NAME)
