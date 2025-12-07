@@ -16,8 +16,9 @@ TITLE_LABELS_DICTIONARY = {
     "Solver_epsilon": "$\\epsilon_{CG}$",
     "CG_epsilon": "$\\epsilon_{CG}$",
     "MSCG_epsilon": "$\\epsilon_{MSCG}$",
-    "KL_diagonal_order": "n",  # Keep for any legacy references
-    "Rational_order": "n",  # Add new unified name
+    "KL_diagonal_order": "n",
+    "Zolotarev_order": "n",
+    "Rational_order": "n",
     "KL_scaling_factor": "$\\mu$",
     "Number_of_vectors": "# of random vecs",
     "Kappa_value": "$\\kappa$",
@@ -71,6 +72,8 @@ PARAMETERS_PRINTED_LABELS_DICTIONARY = {
     "CG_epsilon": "EpsCG",
     "MSCG_epsilon": "EpsMSCG",
     "KL_diagonal_order": "n",  # Keep for any legacy references
+    "Zolotarev_order": "n",
+    "Neuberger_order": "n",
     "Rational_order": "n",  # Add new unified name
     "KL_scaling_factor": "mu",
     "MPI_geometry": "MPI",
@@ -92,6 +95,8 @@ FILENAME_LABELS_BY_COLUMN_NAME = {
     "CG_epsilon": "EpsCG",
     "MSCG_epsilon": "EpsMSCG",
     "KL_diagonal_order": "n",  # Keep for any legacy references
+    "Zolotarev_order": "n",
+    "Neuberger_order": "n",
     "Rational_order": "n",  # Add new unified name
     "KL_scaling_factor": "mu",
     "MPI_geometry": "MPI",
@@ -104,7 +109,8 @@ PARAMETER_LABELS = {
     "Rho_value": "rho",
     "Delta_Min": "dMin",
     "Delta_Max": "dMax",
-    "KL_diagonal_order": "n",  # Keep for any legacy references
+    "KL_diagonal_order": "n",
+    "Zolotarev_order": "n",
     "Rational_order": "n",  # Add new unified name
     "KL_scaling_factor": "mu",
     "Number_of_Chebyshev_terms": "N",
@@ -148,6 +154,9 @@ AXES_LABELS_BY_COLUMN_NAME = {
     "Jackknife_average_of_g4g5_g5_derivative_correlator": "$\\partial_t C_{\\gamma_4\\gamma_5\\text{-}\\gamma_5}'(t)$",
     "Jackknife_average_of_g4g5_g5_derivative_correlator_mean_values": "$\\partial_t C_{\\gamma_4\\gamma_5\\text{-}\\gamma_5}'(t)$",
     "KL_diagonal_order": "n",  # Keep for any legacy references
+    "Zolotarev_order": "n",
+    "Neuberger_order": "n",
+    "KL_diagonal_order": "n",
     "Rational_order": "n",  # Add new unified name
     "Number_of_Chebyshev_terms": "N",
     "Number_of_cores": "Number of cores",
