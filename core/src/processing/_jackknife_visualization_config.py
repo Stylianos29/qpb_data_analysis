@@ -52,6 +52,8 @@ TITLE_EXCLUDED_PARAMETERS = [
     "MSCG_max_iterations",
     "MPI_geometry",
     "Threads_per_process",
+    "Delta_Min",
+    "Delta_Max",
 ]
 
 # Dataset-specific plotting configurations
