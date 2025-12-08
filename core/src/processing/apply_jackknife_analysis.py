@@ -25,21 +25,23 @@ Usage:
     output.h5 [options]
 """
 
-from asyncio.log import logger
+# from asyncio.log import logger
 import os
 import sys
 from pathlib import Path
-from typing import Dict, Optional, List
+from typing import Optional
 
 import click
 import numpy as np
-import pandas as pd
+
+# import pandas as pd
 
 # Import library components
 from library.data.hdf5_analyzer import HDF5Analyzer
 from library.data.analyzer import DataFrameAnalyzer
 from library.data import load_csv
-from library.constants import PARAMETERS_WITH_EXPONENTIAL_FORMAT, PARAMETER_LABELS
+
+# from library.constants import PARAMETERS_WITH_EXPONENTIAL_FORMAT, PARAMETER_LABELS
 from library.validation.click_validators import (
     hdf5_file,
     directory,
@@ -59,6 +61,7 @@ from src.processing._jackknife_config import (
 )
 from src.processing._jackknife_processor import JackknifeProcessor
 from src.processing._hdf5_output import _create_custom_hdf5_output
+from src.processing._jackknife_filter import load_filter_config, apply_filename_filter
 
 
 @click.command()
@@ -89,6 +92,13 @@ from src.processing._hdf5_output import _create_custom_hdf5_output
     default=None,
     callback=directory.must_exist,
     help="Directory for output files. If not specified, uses input file directory.",
+)
+@click.option(
+    "-filter",
+    "--filter_config",
+    type=click.Path(exists=True, dir_okay=False, readable=True),
+    default=None,
+    help="Optional JSON file specifying inclusion/exclusion filters for filenames.",
 )
 @click.option(
     "-log_on",
@@ -132,6 +142,7 @@ def main(
     processed_parameters_csv: str,
     output_hdf5_file: str,
     output_directory: Optional[str],
+    filter_config: Optional[str],
     enable_logging: bool,
     log_directory: Optional[str],
     log_filename: str,
@@ -255,10 +266,21 @@ def main(
         )
         logger.info(f"Grouping by parameters: {grouping_params}")
 
+        # === LOAD FILTER CONFIGURATION (IF PROVIDED) ===
+        filter_configuration = None
+        if filter_config:
+            try:
+                filter_configuration = load_filter_config(filter_config, logger)
+            except (FileNotFoundError, ValueError) as e:
+                logger.error(f"Failed to load filter configuration: {e}")
+                raise
+
         # For each CSV group, collect corresponding HDF5 paths
         grouped_data = {}
         csv_filenames_not_found = []
         total_csv_files = 0
+        total_files_filtered_out = 0
+        filter_stats_accumulated = {"kept": [], "removed": [], "not_found_in_data": []}
 
         for group_index, (group_values, group_df) in enumerate(csv_grouped, 1):
             # Create a tuple key for this group
@@ -270,6 +292,34 @@ def main(
             # Get filenames from this CSV group
             csv_filenames = group_df["Filename"].tolist()
             total_csv_files += len(csv_filenames)
+
+            # === APPLY FILTER TO CSV FILENAMES ===
+            if filter_configuration:
+                csv_filenames, filter_stats = apply_filename_filter(
+                    csv_filenames, filter_configuration, logger
+                )
+
+                # Accumulate statistics
+                filter_stats_accumulated["kept"].extend(filter_stats["kept"])
+                filter_stats_accumulated["removed"].extend(filter_stats["removed"])
+                filter_stats_accumulated["not_found_in_data"].extend(
+                    filter_stats["not_found_in_data"]
+                )
+
+                files_filtered_out = len(filter_stats["removed"])
+                total_files_filtered_out += files_filtered_out
+
+                if files_filtered_out > 0:
+                    logger.info(
+                        f"Group {group_index}: Filtered out {files_filtered_out} files"
+                    )
+
+                # If all files were filtered out, skip this group
+                if not csv_filenames:
+                    logger.info(
+                        f"Group {group_index}: All files filtered out, skipping group"
+                    )
+                    continue
 
             # Convert to .dat extensions (correlator filenames)
             dat_filenames = [os.path.splitext(f)[0] + ".dat" for f in csv_filenames]
@@ -509,6 +559,25 @@ def main(
             click.echo("  JACKKNIFE ANALYSIS COMPLETED")
             click.echo("=" * 70)
             click.echo(f"✓ CSV-driven grouping: {len(csv_grouped)} parameter groups")
+
+            # Add filter summary if filtering was applied
+            if filter_configuration:
+                logger.info("")
+                logger.info("FILTER SUMMARY:")
+                logger.info(f"  Total files before filtering: {total_csv_files}")
+                logger.info(
+                    f"  Files kept after filtering: {len(filter_stats_accumulated['kept'])}"
+                )
+                logger.info(
+                    f"  Files removed by filter: {len(filter_stats_accumulated['removed'])}"
+                )
+                if filter_stats_accumulated["not_found_in_data"]:
+                    logger.warning(
+                        f"  WARNING: {len(filter_stats_accumulated['not_found_in_data'])} "
+                        f"filter entries not found in data"
+                    )
+                logger.info("")
+
             click.echo(f"✓ Groups with sufficient data: {processed_groups}")
 
             if skipped_insufficient_configs > 0:
