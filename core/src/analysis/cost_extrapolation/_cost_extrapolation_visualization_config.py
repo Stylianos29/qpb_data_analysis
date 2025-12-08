@@ -213,6 +213,21 @@ ANALYSIS_CONFIG = {
     },
 }
 
+# Parameters to exclude from plot titles
+TITLE_EXCLUDED_PARAMETERS = [
+    "APE_alpha",
+    "Main_program_type",
+    "Maximum_Lanczos_iterations",
+    "Number_of_spinors",
+    "Number_of_vectors",
+    "CG_max_iterations",
+    "MSCG_max_iterations",
+    "MPI_geometry",
+    "Threads_per_process",
+    "Delta_Max",
+    "Delta_Min",
+]
+
 # =============================================================================
 # COLUMN MAPPINGS FOR RESULTS CSV
 # =============================================================================

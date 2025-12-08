@@ -33,6 +33,7 @@ from src.analysis.cost_extrapolation._cost_extrapolation_visualization_config im
     get_mass_data_column_mapping,
     get_cost_data_column_mapping,
     get_plot_type_subdirectories,
+    TITLE_EXCLUDED_PARAMETERS,
 )
 
 
@@ -609,7 +610,8 @@ def create_mass_fit_plot(
     title = title_builder.build(
         metadata_dict=group_info["group_metadata"],
         tunable_params=group_info["all_tunable_params"],
-        leading_substring="Bare Mass Extrapolation at Fixed Plateau Mass:",
+        excluded=set(TITLE_EXCLUDED_PARAMETERS),
+        leading_substring="Critical Bare Mass Extrapolation at Fixed Plateau Mass:",
         wrapping_length=80,
     )
     ax.set_title(title, fontsize=title_style["fontsize"], pad=title_style["pad"])
@@ -820,6 +822,7 @@ def create_cost_fit_plot(
     title = title_builder.build(
         metadata_dict=group_info["group_metadata"],
         tunable_params=group_info["all_tunable_params"],
+        excluded=set(TITLE_EXCLUDED_PARAMETERS),
         leading_substring="Cost Extrapolation at Fixed Bare Mass:",
         wrapping_length=80,
     )
