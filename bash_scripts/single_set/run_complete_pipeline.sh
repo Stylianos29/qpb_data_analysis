@@ -21,6 +21,7 @@
 #   Stage 2B (Jackknife Analysis) - Only if correlators present:
 #     - Applies jackknife resampling
 #     - Generates statistical samples
+#     - Optional filename filtering (via --filter_config)
 #   Stage 2C (Visualization) - Optional (only if correlators present):
 #     - Optional visualization of jackknife samples
 #   - Calls: run_processing_pipeline.sh
@@ -158,6 +159,8 @@ REQUIRED ARGUMENTS:
 
 OPTIONAL ARGUMENTS:
   -o, --output_directory       Output directory (default: mirrors raw in processed/)
+  -filter, --filter_config  Path to JSON filter configuration for jackknife analysis
+                            (optional, applies to Stage 2B only)
   -plots_dir, --plots_directory Plots directory (enables visualization for all stages)
   -log_dir, --log_directory    Log files directory (default: output_directory)
   --stages <1,2,3>            Comma-separated stages to execute (default: all)
@@ -221,6 +224,11 @@ EXAMPLES:
 
   # Fast processing (skip checks and summaries)
   $SCRIPT_NAME -i ../raw/experiment1/ --skip_checks --skip_summaries
+
+  # Process with filtering
+  $SCRIPT_NAME \\
+      -i raw_data_directory/ \\
+      --filter_config filters/experiment_subset.json
 
 NOTES:
   - Output directory structure mirrors input directory structure
@@ -475,7 +483,7 @@ function run_parsing_stage() {
 }
 
 function run_processing_stage() {
-    # Execute Stage 2: Processing pipeline
+    # Execute Stage 2: Processing
     #
     # Returns:
     #   0 - Success
@@ -485,9 +493,9 @@ function run_processing_stage() {
     echo "==================================================================="
     echo "   STAGE 2: PROCESSING"
     echo "==================================================================="
-    echo "Processing parameters and applying analysis..."
+    echo "Processing parsed parameters..."
     
-    log_info "=== STAGE 2: PROCESSING STAGE ==="
+    log_info "=== STAGE 2: PROCESSING ==="
     log_info "Executing processing pipeline script"
     
     # Build processing command
@@ -495,19 +503,20 @@ function run_processing_stage() {
     processing_cmd+=" -csv \"${output_directory}/${PARSED_CSV_FILENAME}\""
     processing_cmd+=" -hdf5_param \"${output_directory}/${PARSED_HDF5_LOG_FILENAME}\""
     
-    # Add correlators if present
-    if [[ -f "${output_directory}/${PARSED_HDF5_CORR_FILENAME}" ]]; then
+    if $has_correlators; then
         processing_cmd+=" -hdf5_corr \"${output_directory}/${PARSED_HDF5_CORR_FILENAME}\""
     fi
     
     processing_cmd+=" -out_dir \"$output_directory\""
     processing_cmd+=" -log_dir \"$log_directory\""
     
-    # Add plots directory if specified
+    # Add filter config if provided
+    if [[ -n "$filter_config" ]]; then
+        processing_cmd+=" --filter_config \"$filter_config\""
+    fi
+    
     if [[ -n "$plots_directory" ]]; then
-        processing_cmd+=" -plots_dir \"$plots_directory\""
-        # Enable visualization in Stage 2 if plots directory provided
-        processing_cmd+=" -viz"
+        processing_cmd+=" -plots_dir \"$plots_directory\" -viz"
     fi
     
     if $skip_checks; then
@@ -883,6 +892,7 @@ input_directory=""
 output_directory=""
 plots_directory=""
 log_directory=""
+filter_config=""
 stages_to_run=""
 skip_checks=false
 skip_summaries=false
@@ -892,6 +902,10 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         -i|--input_directory)
             input_directory="$2"
+            shift 2
+            ;;
+        -filter|--filter_config)
+            filter_config="$2"
             shift 2
             ;;
         -o|--output_directory)
@@ -954,6 +968,18 @@ fi
 # Convert to absolute path
 input_directory="$(realpath "$input_directory")"
 input_dir_name="$(basename "$input_directory")"
+
+# Validate filter config if provided
+if [[ -n "$filter_config" ]]; then
+    if [[ ! -f "$filter_config" ]]; then
+        echo "ERROR: Filter config file not found: $filter_config" >&2
+        log_error "Filter config file not found: $filter_config"
+        exit 1
+    fi
+    filter_config="$(realpath "$filter_config")"
+    echo "INFO: Filter configuration will be applied: $(get_display_path "$filter_config")"
+    log_info "Filter configuration: $filter_config"
+fi
 
 # Set default output directory if not specified
 # Mirror the raw data structure in processed/

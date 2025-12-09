@@ -16,6 +16,7 @@
 # Stage 2B (CONDITIONAL - only if correlator data exists):
 #   - apply_jackknife_analysis.py
 #   - Applies jackknife resampling for error estimation
+#   - Optional: JSON-based filename filtering to process subset of files
 #   - Input: HDF5 correlators
 #   - Output: correlators_jackknife_analysis.h5
 #
@@ -34,6 +35,7 @@
 #
 # OPTIONAL ARGUMENTS:
 #   -hdf5_corr, --input_hdf5_corr  Path to correlators HDF5 (enables stages 2B/2C)
+#   -filter, --filter_config       Path to JSON filter config (Stage 2B only)
 #   -out_dir, --output_directory   Output directory (default: CSV file directory)
 #   -plots_dir, --plots_directory  Plots directory (default: output_directory)
 #   -log_dir, --log_directory      Log directory (default: output directory)
@@ -54,6 +56,13 @@
 #       -hdf5_param multivalued_parameters.h5 \
 #       -hdf5_corr correlators_raw_data.h5 \
 #       -viz
+#
+#   # Apply filtering to jackknife analysis (Stage 2B)
+#   ./run_processing_pipeline.sh \
+#       -csv single_valued_parameters.csv \
+#       -hdf5_param multivalued_parameters.h5 \
+#       -hdf5_corr correlators_raw_data.h5 \
+#       --filter_config filters/my_subset.json
 #
 #   # Custom output location with separate plots directory
 #   ./run_processing_pipeline.sh \
@@ -155,6 +164,7 @@ REQUIRED ARGUMENTS:
 
 OPTIONAL ARGUMENTS:
   -hdf5_corr, --input_hdf5_corr  Correlators HDF5 file (enables stages 2B/2C)
+  -filter, --filter_config       Path to JSON filter configuration (optional)
   -out_dir, --output_directory   Output directory (default: CSV file directory)
   -plots_dir, --plots_directory  Plots directory (default: output_directory)
   -log_dir, --log_directory      Log directory (default: output directory)
@@ -172,6 +182,13 @@ EXAMPLES:
 
   # Skip summary file generation (faster)
   $SCRIPT_NAME -csv params.csv -hdf5_param arrays.h5 --skip_summaries
+
+  # Apply filtering to jackknife analysis
+  $SCRIPT_NAME \
+      -csv single_valued_parameters.csv \
+      -hdf5_param multivalued_parameters.h5 \
+      -hdf5_corr correlators_raw_data.h5 \
+      --filter_config filters/my_filter.json
 
 EOF
     # Clear exit handlers before exiting
@@ -262,17 +279,27 @@ function run_stage_2b() {
     local jackknife_hdf5_path="${output_directory}/${JACKKNIFE_HDF5_FILENAME}"
     local processed_csv_path="${output_directory}/${PROCESSED_CSV_FILENAME}"
     
-    execute_python_script "$JACKKNIFE_SCRIPT" "apply_jackknife_analysis" \
-        --input_hdf5_file "$input_hdf5_corr" \
-        --processed_parameters_csv "$processed_csv_path" \
-        --output_directory "$output_directory" \
-        --output_hdf5_file "$JACKKNIFE_HDF5_FILENAME" \
-        --enable_logging \
-        --log_directory "$log_directory" \
-        || {
-            log_error "Stage 2B: Jackknife analysis failed"
-            return 1
-        }
+    # Build the command with optional filter config
+    local cmd="execute_python_script \"$JACKKNIFE_SCRIPT\" \"apply_jackknife_analysis\""
+    cmd+=" --input_hdf5_file \"$input_hdf5_corr\""
+    cmd+=" --processed_parameters_csv \"$processed_csv_path\""
+    cmd+=" --output_directory \"$output_directory\""
+    cmd+=" --output_hdf5_file \"$JACKKNIFE_HDF5_FILENAME\""
+    cmd+=" --enable_logging"
+    cmd+=" --log_directory \"$log_directory\""
+    
+    # Add filter config if provided
+    if [[ -n "$filter_config_file" ]]; then
+        cmd+=" --filter_config \"$filter_config_file\""
+        echo "Using filter configuration: $(basename "$filter_config_file")"
+        log_info "Filter configuration applied: $filter_config_file"
+    fi
+    
+    # Execute the command
+    eval "$cmd" || {
+        log_error "Stage 2B: Jackknife analysis failed"
+        return 1
+    }
     
     # Validate output
     if ! $skip_checks; then
@@ -336,6 +363,7 @@ function main() {
     local input_csv_file=""
     local input_hdf5_param=""
     local input_hdf5_corr=""
+    local filter_config_file=""
     local output_dir=""
     local plots_dir=""
     local log_dir=""
@@ -355,6 +383,10 @@ function main() {
                 ;;
             -hdf5_corr|--input_hdf5_corr)
                 input_hdf5_corr="$2"
+                shift 2
+                ;;
+            -filter|--filter_config)
+                filter_config_file="$2"
                 shift 2
                 ;;
             -out_dir|--output_directory)
@@ -480,6 +512,17 @@ function main() {
         log_directory="$(realpath "$log_directory")"
     fi
     
+    # Validate filter config if provided
+    if [[ -n "$filter_config_file" ]]; then
+        if [[ ! -f "$filter_config_file" ]]; then
+            echo "ERROR: Filter config file not found: $filter_config_file" >&2
+            exit 1
+        fi
+        filter_config_file="$(realpath "$filter_config_file")"
+        echo "INFO: Filter configuration provided: $(get_display_path "$filter_config_file")"
+        log_info "Filter configuration: $filter_config_file"
+    fi
+
     # Initialize logging
     local log_file="${log_directory}/${SCRIPT_LOG_FILENAME}"
     export SCRIPT_LOG_FILE_PATH="$log_file"
