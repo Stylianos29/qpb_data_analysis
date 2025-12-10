@@ -37,7 +37,7 @@ CONVERTERS_MAPPING = {
         if x.strip()
         else x
     ),
-    # OUTPUT QUANTITIES    
+    # OUTPUT QUANTITIES
     # TODO: Add the rest of the 'Average_calculation_result' variations
     "PCAC_mass_estimate": lambda x: safe_literal_eval(x) if x.strip() else x,
     "Pion_effective_mass_estimate": lambda x: ast.literal_eval(x) if x.strip() else x,
