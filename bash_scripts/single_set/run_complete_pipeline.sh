@@ -169,6 +169,7 @@ OPTIONAL ARGUMENTS:
                                         --stages 1,2 (parse+process, no analysis)
   --skip_checks                Skip intermediate file validation
   --skip_summaries             Skip generation of summary files
+  --clean-plots                Remove existing plots before generating new ones  
   -h, --help                   Display this help message
 
 PIPELINE BEHAVIOR:
@@ -526,6 +527,10 @@ function run_processing_stage() {
     if $skip_summaries; then
         processing_cmd+=" --skip_summaries"
     fi
+
+    if [[ "$clean_plots" == "true" ]]; then
+        processing_cmd+=" --clean_plots"
+    fi
     
     log_info "Command: $processing_cmd"
     
@@ -573,6 +578,10 @@ function run_stage_3_1() {
     
     if $skip_summaries; then
         cmd+=" --skip_summaries"
+    fi
+
+    if [[ "$clean_plots" == "true" ]]; then
+        cmd+=" --clean_plots"
     fi
     
     log_info "Command: $cmd"
@@ -622,6 +631,10 @@ function run_stage_3_2() {
     if $skip_summaries; then
         cmd+=" --skip_summaries"
     fi
+
+    if [[ "$clean_plots" == "true" ]]; then
+        cmd+=" --clean_plots"
+    fi
     
     log_info "Command: $cmd"
     
@@ -670,6 +683,10 @@ function run_stage_3_3() {
     
     if $skip_summaries; then
         cmd+=" --skip_summaries"
+    fi
+
+    if [[ "$clean_plots" == "true" ]]; then
+        cmd+=" --clean_plots"
     fi
     
     log_info "Command: $cmd"
@@ -743,6 +760,10 @@ function run_stage_3_4() {
     
     if $skip_summaries; then
         cmd+=" --skip_summaries"
+    fi
+
+    if [[ "$clean_plots" == "true" ]]; then
+        cmd+=" --clean_plots"
     fi
     
     log_info "Command: $cmd"
@@ -896,6 +917,7 @@ filter_config=""
 stages_to_run=""
 skip_checks=false
 skip_summaries=false
+clean_plots=false
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -930,6 +952,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --skip_summaries)
             skip_summaries=true
+            shift
+            ;;
+        --clean-plots|--clean_plots)
+            clean_plots=true
             shift
             ;;
         -h|--help)

@@ -335,15 +335,28 @@ function run_stage_2c() {
     
     local jackknife_hdf5_path="${output_directory}/${JACKKNIFE_HDF5_FILENAME}"
     
+    # Build visualization arguments
+    local viz_args=(
+        --input_hdf5_file "$jackknife_hdf5_path"
+        --plots_directory "$plots_directory"
+        --enable_logging
+        --log_directory "$log_directory"
+    )
+
+    # Add clear_existing flag if requested
+    if [[ "$clean_plots" == "true" ]]; then
+        viz_args+=(--clear_existing)
+        echo "  → Clearing existing plots before regeneration..."
+        log_info "Clearing existing plots (--clean-plots enabled)"
+    fi
+
+    # Execute with built arguments
     execute_python_script "$VISUALIZATION_SCRIPT" "visualize_jackknife_samples" \
-        --input_hdf5_file "$jackknife_hdf5_path" \
-        --plots_directory "$plots_directory" \
-        --enable_logging \
-        --log_directory "$log_directory" \
+        "${viz_args[@]}" \
         || {
             echo "WARNING: Visualization failed (non-fatal for pipeline stage)" >&2
             log_warning "Stage 2C visualization failed but continuing"
-            return 0  # Don't fail pipeline for optional visualization
+            return 0
         }
     
     echo "${PROGRESS_SUCCESS} Stage 2C completed: Visualizations generated"
@@ -370,6 +383,7 @@ function main() {
     local enable_visualization=false
     local skip_checks=false
     local skip_summaries=false
+    local clean_plots=false
     
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -411,6 +425,10 @@ function main() {
                 ;;
             --skip_summaries)
                 skip_summaries=true
+                shift
+                ;;
+            --clean-plots|--clean_plots)
+                clean_plots=true
                 shift
                 ;;
             -h|--help)

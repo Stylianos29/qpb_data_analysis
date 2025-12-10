@@ -152,6 +152,9 @@ OPTIONAL ARGUMENTS:
   --skip_summaries             Skip generation of summary files
                                (passed to single-set pipeline)
 
+  --clean-plots                Remove existing plots before generating new ones
+                               (passed to single-set pipeline)
+
   -h, --help                   Display this help message
 
 TIMESTAMP CACHING:
@@ -464,6 +467,10 @@ function process_single_data_set() {
         cmd+=" --skip_summaries"
     fi
     
+    if [[ "$clean_plots" == "true" ]]; then
+        cmd+=" --clean-plots"
+    fi
+
     # Execute the command
     if eval "$cmd"; then
         return 0
@@ -486,6 +493,7 @@ force_all=false
 skip_checks=false
 skip_summaries=false
 disable_plots=false
+clean_plots=false
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -524,6 +532,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --skip_summaries)
             skip_summaries=true
+            shift
+            ;;
+        --clean-plots|--clean_plots)
+            clean_plots=true
             shift
             ;;
         -h|--help)

@@ -245,6 +245,7 @@ function main() {
     local enable_viz="false"
     local skip_checks="false"
     local skip_summaries="false"
+    local clean_plots=false
     
     # Parse command-line arguments
     while [[ $# -gt 0 ]]; do
@@ -279,6 +280,10 @@ function main() {
                 ;;
             --skip-summaries)
                 skip_summaries="true"
+                shift
+                ;;
+            --clean-plots|--clean_plots)
+                clean_plots=true
                 shift
                 ;;
             -h|--help)
@@ -474,29 +479,39 @@ function main() {
                 elif [[ ! -f "$VIZ_SCRIPT" ]]; then
                     echo "  ⚠ Warning: Visualization script not found: $VIZ_SCRIPT" >&2
                     log_warning "Visualization script not found"
+                elif [[ ! -d "$plots_directory" ]]; then
+                    echo "  ⚠ Warning: Plots directory does not exist: $plots_directory" >&2
+                    echo "  → Please create it to enable visualization" >&2
+                    log_warning "PCAC visualization skipped: plots directory does not exist"
                 else
-                    echo "  → Generating PCAC plateau visualizations..."
+                    echo "  → Generating PCAC visualizations..."
                     
-                    # Validate plots directory exists (user must create it)
-                    if [[ ! -d "$plots_directory" ]]; then
-                        echo "  ⚠ Warning: Plots directory does not exist: $plots_directory" >&2
-                        echo "  → Please create it to enable visualization" >&2
-                        log_warning "PCAC visualization skipped: plots directory does not exist"
+                    # Build visualization arguments
+                    local viz_args=(
+                        --analysis_type pcac_mass
+                        --input_hdf5_file "$pcac_hdf5_viz"
+                        --plots_directory "$plots_directory"
+                        --enable_logging
+                        --log_directory "$log_directory"
+                    )
+                    
+                    # Add clear_existing flag if requested
+                    if [[ "$clean_plots" == "true" ]]; then
+                        viz_args+=(--clear_existing)
+                        echo "  → Clearing existing plots before regeneration..."
+                        log_info "Clearing existing plots (--clean-plots enabled)"
+                    fi
+                    
+                    # Execute with built arguments
+                    execute_python_script "$VIZ_SCRIPT" "visualize_correlator_analysis" \
+                        "${viz_args[@]}"
+                    
+                    if [[ $? -eq 0 ]]; then
+                        echo "  ✓ PCAC visualizations generated"
+                        log_info "PCAC visualization completed"
                     else
-                        execute_python_script "$VIZ_SCRIPT" "visualize_plateau_extraction" \
-                            --analysis_type pcac_mass \
-                            --input_hdf5_file "$pcac_hdf5_viz" \
-                            --plots_directory "$plots_directory" \
-                            --enable_logging \
-                            --log_directory "$log_directory"
-                        
-                        if [[ $? -eq 0 ]]; then
-                            echo "  ✓ PCAC visualizations generated"
-                            log_info "PCAC visualization completed"
-                        else
-                            echo "  ⚠ Warning: PCAC visualization failed" >&2
-                            log_warning "PCAC visualization failed"
-                        fi
+                        echo "  ⚠ Warning: PCAC visualization failed" >&2
+                        log_warning "PCAC visualization failed"
                     fi
                 fi
             fi
@@ -609,33 +624,43 @@ function main() {
             if [[ "$enable_viz" == "true" ]]; then
                 if [[ -z "$plots_directory" ]]; then
                     echo "  ⚠ Warning: Visualization requested but no plots directory specified" >&2
-                    log_warning "Pion visualization skipped: no plots directory"
+                    log_warning "PCAC visualization skipped: no plots directory"
                 elif [[ ! -f "$VIZ_SCRIPT" ]]; then
                     echo "  ⚠ Warning: Visualization script not found: $VIZ_SCRIPT" >&2
                     log_warning "Visualization script not found"
+                elif [[ ! -d "$plots_directory" ]]; then
+                    echo "  ⚠ Warning: Plots directory does not exist: $plots_directory" >&2
+                    echo "  → Please create it to enable visualization" >&2
+                    log_warning "PCAC visualization skipped: plots directory does not exist"
                 else
-                    echo "  → Generating pion plateau visualizations..."
+                    echo "  → Generating PCAC visualizations..."
                     
-                    # Validate plots directory exists (user must create it)
-                    if [[ ! -d "$plots_directory" ]]; then
-                        echo "  ⚠ Warning: Plots directory does not exist: $plots_directory" >&2
-                        echo "  → Please create it to enable visualization" >&2
-                        log_warning "Pion visualization skipped: plots directory does not exist"
+                    # Build visualization arguments
+                    local viz_args=(
+                        --analysis_type pion_mass
+                        --input_hdf5_file "$pion_hdf5_viz"
+                        --plots_directory "$plots_directory"
+                        --enable_logging
+                        --log_directory "$log_directory"
+                    )
+                    
+                    # Add clear_existing flag if requested
+                    if [[ "$clean_plots" == "true" ]]; then
+                        viz_args+=(--clear_existing)
+                        echo "  → Clearing existing plots before regeneration..."
+                        log_info "Clearing existing plots (--clean-plots enabled)"
+                    fi
+                    
+                    # Execute with built arguments
+                    execute_python_script "$VIZ_SCRIPT" "visualize_correlator_analysis" \
+                        "${viz_args[@]}"
+                    
+                    if [[ $? -eq 0 ]]; then
+                        echo "  ✓ PCAC visualizations generated"
+                        log_info "PCAC visualization completed"
                     else
-                        execute_python_script "$VIZ_SCRIPT" "visualize_plateau_extraction" \
-                            --analysis_type pion_mass \
-                            --input_hdf5_file "$pion_hdf5_viz" \
-                            --plots_directory "$plots_directory" \
-                            --enable_logging \
-                            --log_directory "$log_directory"
-                        
-                        if [[ $? -eq 0 ]]; then
-                            echo "  ✓ Pion visualizations generated"
-                            log_info "Pion visualization completed"
-                        else
-                            echo "  ⚠ Warning: Pion visualization failed" >&2
-                            log_warning "Pion visualization failed"
-                        fi
+                        echo "  ⚠ Warning: PCAC visualization failed" >&2
+                        log_warning "PCAC visualization failed"
                     fi
                 fi
             fi

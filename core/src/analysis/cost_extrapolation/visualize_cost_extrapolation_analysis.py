@@ -115,7 +115,9 @@ def process_cost_extrapolation_visualization(
 
     file_manager = PlotFileManager(base_directory=str(plots_directory))
     plots_subdir_path = file_manager.prepare_subdirectory(
-        plot_base_name, clear_existing=clear_existing_plots, confirm_clear=False
+        plot_base_name,
+        clear_existing=clear_existing_plots,
+        confirm_clear=False,
     )
 
     if clear_existing_plots:

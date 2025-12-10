@@ -406,7 +406,9 @@ def main(
 
         # Prepare plots base subdirectory
         base_plots_dir = file_manager.prepare_subdirectory(
-            analysis_config["plot_base_directory"], clear_existing
+            analysis_config["plot_base_directory"],
+            clear_existing,
+            confirm_clear=False,
         )
 
         # Process correlator data

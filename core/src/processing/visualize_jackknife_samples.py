@@ -157,7 +157,9 @@ def main(
 
         # === PREPARE BASE DIRECTORY ===
         base_plots_dir = file_manager.prepare_subdirectory(
-            JACKKNIFE_PLOTS_BASE_DIRECTORY, clear_existing=clear_existing
+            JACKKNIFE_PLOTS_BASE_DIRECTORY,
+            clear_existing=clear_existing,
+            confirm_clear=False,
         )
 
         logger.info(f"Base plots directory: {base_plots_dir}")

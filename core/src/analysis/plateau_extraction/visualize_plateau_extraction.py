@@ -77,7 +77,7 @@ from src.analysis.plateau_extraction._plateau_visualization_core import (
 )
 @click.option(
     "-clear",
-    "--clear_existing_plots",
+    "--clear_existing",
     is_flag=True,
     default=False,
     help="Clear existing plots before creating new ones.",
@@ -113,7 +113,7 @@ def main(
     analysis_type: str,
     input_hdf5_file: str,
     plots_directory: str,
-    clear_existing_plots: bool,
+    clear_existing: bool,
     enable_logging: bool,
     log_directory: Optional[str],
     log_filename: Optional[str],
@@ -159,7 +159,7 @@ def main(
         logger.info(f"Analysis type: {analysis_type}")
         logger.info(f"Input HDF5 file: {input_hdf5_file}")
         logger.info(f"Plots directory: {plots_directory}")
-        logger.info(f"Clear existing plots: {clear_existing_plots}")
+        logger.info(f"Clear existing plots: {clear_existing}")
 
         # Get analysis-specific configuration
         analysis_config = get_analysis_config(analysis_type)
@@ -167,7 +167,7 @@ def main(
 
         # Prepare output directories and managers
         file_manager, title_builder = _prepare_visualization_tools(
-            plots_directory, analysis_config, clear_existing_plots, logger
+            plots_directory, analysis_config, clear_existing, logger
         )
 
         # Process HDF5 file
@@ -199,17 +199,17 @@ def main(
 def _prepare_visualization_tools(
     plots_directory: str,
     analysis_config: Dict,
-    clear_existing_plots: bool,
+    clear_existing: bool,
     logger,
 ) -> tuple[PlotFileManager, PlotTitleBuilder]:
     """
     Prepare visualization tools and output directories.
 
     Args:
-        plots_directory: Base plots directory
-        analysis_config: Analysis-specific configuration
-        clear_existing_plots: Whether to clear existing plots
-        logger: Logger instance
+        - plots_directory: Base plots directory
+        - analysis_config: Analysis-specific configuration
+        - clear_existing: Whether to clear existing plots
+        - logger: Logger instance
 
     Returns:
         Tuple of (PlotFileManager, PlotTitleBuilder)
@@ -223,11 +223,11 @@ def _prepare_visualization_tools(
     plot_subdir = analysis_config["plot_subdirectory"]
     subdir_path = file_manager.prepare_subdirectory(
         plot_subdir,
-        clear_existing=clear_existing_plots,
-        confirm_clear=False,  # Don't require confirmation in script
+        clear_existing=clear_existing,
+        confirm_clear=False,
     )
 
-    if clear_existing_plots:
+    if clear_existing:
         logger.info(f"Cleared existing plots in {plot_subdir}")
 
     logger.info(f"Plot output directory: {subdir_path}")
