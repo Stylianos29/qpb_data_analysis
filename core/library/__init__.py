@@ -103,6 +103,7 @@ from .validation import (
 from .validation.filesystem import (
     is_valid_directory,
     is_valid_file,
+    validate_path,
 )
 
 # Logging Utilities
@@ -136,6 +137,7 @@ __all__ = [
     "validate_output_file",
     "is_valid_directory",
     "is_valid_file",
+    "validate_path",
     # Logging system
     "LoggingWrapper",
     "QPBLogger",
