@@ -180,7 +180,7 @@ def main(
 
         # Ask user about deleting unsupported files
         response = get_yes_or_no_user_response(
-            "Delete unsupported file types to continue? "
+            "Delete unsupported file types to continue?\n"
             "Selecting 'n' will exit the program (y[Y]/n[N])"
         )
         if response:
@@ -244,7 +244,7 @@ def main(
 
         # Ask user about deleting null correlator files
         response = get_yes_or_no_user_response(
-            "Do you want to delete all correlator files with null values? "
+            "Do you want to delete all correlator files with null values?\n"
             "This will also remove their associated .txt files. (y[Y]/n[N])"
         )
         if response:
@@ -303,7 +303,7 @@ def main(
 
         # Ask used about deleting empty files
         response = get_yes_or_no_user_response(
-            "Do you want to delete all empty .txt and .dat files? "
+            "Do you want to delete all empty .txt and .dat files?\n"
             "Selecting 'n' will exit the program (y[Y]/n[N])"
         )
         if response:
@@ -539,9 +539,9 @@ def main(
 
         # Ask user about deleting corrupted files. Otherwise, exit the program
         response = get_yes_or_no_user_response(
-            "Do you want to delete all corrupted qpb log files? "
+            "Do you want to delete all corrupted qpb log files?\n"
             "Selecting 'n' will exit the program (y[Y]/n[N])"
-        )
+            )
         if response:
             # Delete corrupted files
             for file_path in list_of_corrupted_qpb_log_file_paths:
@@ -633,9 +633,9 @@ def main(
                 to_console=True,
             )
             response = get_yes_or_no_user_response(
-                "Do you want to delete all incompatible "
-                f"{incompatible_main_program_type} qpb log files?  Selecting 'n'"
-                " will exit the program. (y[Y]/n[N])?"
+                "Do you want to delete all incompatible\n"
+                f"{incompatible_main_program_type} qpb log files?\n"
+                "Selecting 'n' will exit the program. (y[Y]/n[N])?"
             )
             if response:
                 # Delete incompatible files
@@ -747,7 +747,7 @@ def main(
                 to_console=True,
             )
             response = get_yes_or_no_user_response(
-                "Delete correlators files containing only zero correlator values? "
+                "Delete correlators files containing only zero correlator values?\n"
                 "This will also remove their associated .txt files. (y[Y]/n[N])"
             )
             if response:
