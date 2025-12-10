@@ -234,7 +234,7 @@ FILE_CONTENTS_SCALAR_PATTERNS_DICTIONARY = {
     # =========================================================================
     "Lanczos_epsilon": {
         "line_identifier": "Lanczos epsilon =",
-        "regex_pattern": r"(\d+\.\d+e[+-]\d+)",
+        "regex_pattern": r"(\d+(?:\.\d+)?e[+-]\d+)",
         "type": float,
     },
     "Maximum_Lanczos_iterations": {
@@ -334,7 +334,7 @@ FILE_CONTENTS_SCALAR_PATTERNS_DICTIONARY = {
     # =========================================================================
     "Inner_solver_epsilon": {
         "line_identifier": "Inner solver epsilon =",
-        "regex_pattern": r"(\d+\.\d+e[+-]\d+)",
+        "regex_pattern": r"(\d+(?:\.\d+)?e[+-]\d+)",
         "type": float,
     },
     "Inner_solver_max_iterations": {
@@ -344,7 +344,7 @@ FILE_CONTENTS_SCALAR_PATTERNS_DICTIONARY = {
     },
     "Outer_solver_epsilon": {
         "line_identifier": "Outer solver epsilon =",
-        "regex_pattern": r"(\d+\.\d+e[+-]\d+)",
+        "regex_pattern": r"(\d+(?:\.\d+)?e[+-]\d+)",
         "type": float,
     },
     "Outer_solver_max_iterations": {
@@ -354,7 +354,7 @@ FILE_CONTENTS_SCALAR_PATTERNS_DICTIONARY = {
     },
     "Generic_solver_epsilon": {
         "line_identifier": "Solver epsilon =",
-        "regex_pattern": r"(\d+\.\d+e[+-]\d+)",
+        "regex_pattern": r"(\d+(?:\.\d+)?e[+-]\d+)",
         "type": float,
     },
     "Generic_solver_max_iterations": {
@@ -368,7 +368,7 @@ FILE_CONTENTS_SCALAR_PATTERNS_DICTIONARY = {
 FILE_CONTENTS_ARRAY_PATTERNS_DICTIONARY = {
     "Calculation_result_per_vector": {
         "line_identifier": "Done vector",
-        "regex_pattern": r"= (\d+\.\d+e[+-]\d+)",
+        "regex_pattern": r"= (\d+(?:\.\d+)?e[+-]\d+)",
         "type": float,
     },
     "MSCG_iterations_running_count": {
@@ -383,7 +383,7 @@ FILE_CONTENTS_ARRAY_PATTERNS_DICTIONARY = {
     },
     "MSCG_total_calculation_time": {
         "line_identifier": "msCG converged, t",
-        "regex_pattern": r", t = (\d+\.\d+)",
+        "regex_pattern": r", t = (\d+(?:\.\d+)?)",
         "type": float,
     },
     "Total_number_of_CG_iterations_per_spinor": {
@@ -413,22 +413,22 @@ FILE_CONTENTS_ARRAY_PATTERNS_DICTIONARY = {
     },
     "Running_squared_relative_residual": {
         "line_identifier": " iters =",
-        "regex_pattern": r", res = (\d+\.\d+e[+-]\d+)",
+        "regex_pattern": r", res = (\d+(?:\.\d+)?e[+-]\d+)",
         "type": float,
     },
     "MS_expansion_shifts": {
         "line_identifier": "Shift = ",
-        "regex_pattern": r"(\d+\.\d+),",
+        "regex_pattern": r"(\d+(?:\.\d+)?),",
         "type": float,
     },
     "Final_squared_residual": {
         "line_identifier": "Shift = ",
-        "regex_pattern": r", residual = (\d+\.\d+e[+-]\d+)",
+        "regex_pattern": r", residual = (\d+(?:\.\d+)?e[+-]\d+)",
         "type": float,
     },
     "Final_squared_relative_residual": {
         "line_identifier": "Shift = ",
-        "regex_pattern": r", relative = (\d+\.\d+e[+-]\d+)",
+        "regex_pattern": r", relative = (\d+(?:\.\d+)?e[+-]\d+)",
         "type": float,
     },
 }
