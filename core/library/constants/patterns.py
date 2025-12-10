@@ -59,6 +59,11 @@ FILENAME_SCALAR_PATTERNS_DICTIONARY = {
         "pattern": r"cSW(?P<Clover_coefficient>\d+p?\d*)",
         "type": float,
     },
+    # Only for invert programs
+    "Number_of_spinors": {
+        "pattern": r"_NSpinors(?P<Number_of_spinors>\d+)_",
+        "type": int,
+    },
     # =========================================================================
     # EIGENVALUE ESTIMATION PARAMETERS
     # =========================================================================
