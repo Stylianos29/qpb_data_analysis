@@ -41,6 +41,7 @@ from .click_validators import (
 from .filesystem import (
     is_valid_directory,
     is_valid_file,
+    validate_path,
 )
 
 __all__ = [
@@ -58,4 +59,5 @@ __all__ = [
     # Filesystem validators
     "is_valid_directory",
     "is_valid_file",
+    "validate_path",
 ]
