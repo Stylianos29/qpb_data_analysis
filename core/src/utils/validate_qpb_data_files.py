@@ -429,7 +429,7 @@ def main(
 
         # Ask user if they want to repeat the validation of already existing files
         response = get_yes_or_no_user_response(
-            "Would you like to repeat validation of already existing qpb data files? "
+            "Would you like to repeat validation of already existing qpb data files?\n"
             "Selecting 'n' will exit the program (y[Y]/n[N])"
         )
         if not response:
@@ -450,54 +450,51 @@ def main(
 
     # KEEP OR REMOVE QPB ERROR FILES
 
-    # Check for and handle .err files
-    if list_of_qpb_error_files_to_validate:
-        # Ask user to delete .err files
-        response = get_yes_or_no_user_response(
-            "Do you want to delete all .err files set for validation? (y[Y]/n[N])"
-        )
+    # Get ALL .err files in directory (both new and old)
+    all_error_files = glob.glob(
+        os.path.join(raw_data_files_set_directory_path, "*.err")
+    )
+
+    if all_error_files:
+        total_count = len(all_error_files)
+        new_count = len(list_of_qpb_error_files_to_validate)
+
+        # Build informative prompt
+        if new_count > 0:
+            prompt = (
+                f"Found {new_count} new .err error files ({total_count} "
+                "total in data file set).\n"
+                "Error files are diagnostic outputs and not required for validation.\n"
+                "Do you want to delete ALL .err files? (y[Y]/n[N])"
+            )
+        else:
+            prompt = (
+                f"Found {total_count} .err error files in data file set.\n"
+                "Error files are diagnostic outputs and not required for validation.\n"
+                "Do you want to delete ALL .err files? (y[Y]/n[N])"
+            )
+
+        # Single prompt for all error files
+        response = get_yes_or_no_user_response(prompt)
+
         if response:
-            number_of_qpb_error_files = len(list_of_qpb_error_files_to_validate)
-            for file_path in list_of_qpb_error_files_to_validate:
+            deleted_count = 0
+            for file_path in all_error_files:
                 try:
                     os.remove(file_path)
                     logger.info(f"Deleted .err file: {os.path.basename(file_path)}")
+                    deleted_count += 1
                 except Exception as e:
                     logger.error(
                         f"Error deleting file {file_path}: {str(e)}",
                         to_console=True,
                     )
             logger.info(
-                f"A total of {number_of_qpb_error_files} qpb error files were deleted.",
+                f"A total of {deleted_count} qpb error files were deleted.",
                 to_console=True,
             )
-            list_of_qpb_error_files_to_validate = []
         else:
-            logger.info(f"No qpb error files to validate were deleted.")
-
-    # Check for any remaining .err files in directory
-    remaining_error_files = [
-        file
-        for file in glob.glob(os.path.join(raw_data_files_set_directory_path, "*.err"))
-        if file not in list_of_qpb_error_files_to_validate
-    ]
-    if remaining_error_files:
-        # Ask user to delete .err files
-        response = get_yes_or_no_user_response(
-            f"There are still remaining a total of {len(remaining_error_files)} "
-            "qpb error file(s) inside the data files set directory. Do you want "
-            "to delete all remaining .err files? (y[Y]/n[N])"
-        )
-        if response:
-            for file_path in remaining_error_files:
-                try:
-                    os.remove(file_path)
-                    logger.info(f"Deleted .err file: {os.path.basename(file_path)}")
-                except Exception as e:
-                    logger.error(
-                        f"Error deleting file {file_path}: {str(e)}",
-                        to_console=True,
-                    )
+            logger.info(f"Keeping all {total_count} qpb error files.")
 
     # REMOVE CORRUPTED QPB DATA FILES
 
