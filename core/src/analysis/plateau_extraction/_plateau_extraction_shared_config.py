@@ -15,7 +15,7 @@ from typing import List
 
 # Plateau detection parameters
 PLATEAU_DETECTION_SIGMA_THRESHOLDS = [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
-MIN_PLATEAU_SIZE = 5
+MIN_PLATEAU_SIZE = 15
 PLATEAU_DETECTION_METHOD = (
     "weighted_range"  # Options: 'weighted_range', 'chi_squared', 'range_based'
 )

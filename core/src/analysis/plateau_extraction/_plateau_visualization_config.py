@@ -39,8 +39,8 @@ ANALYSIS_CONFIGS = {
         # PCAC-mass-specific trimming settings
         "trimming": {
             "apply_trimming": True,
-            "trim_start_points": 4,
-            "trim_end_points": 3,
+            "trim_start_points": 1,
+            "trim_end_points": 2,
         },
     },
     "pion_mass": {
@@ -59,8 +59,8 @@ ANALYSIS_CONFIGS = {
         # Pion-mass-specific trimming settings
         "trimming": {
             "apply_trimming": True,
-            "trim_start_points": 5,
-            "trim_end_points": 2,
+            "trim_start_points": 3,
+            "trim_end_points": 1,
         },
     },
 }
