@@ -21,30 +21,26 @@ compatibility, allowing both:
 """
 
 # Import all constants from submodules
+from .data_types import *
+from .domain import *
+from .labels import *
+from .operators import *
 from .paths import *
 from .patterns import *
-from .data_types import *
-from .labels import *
 from .visualization import *
-from .domain import *
 
 # Define explicit exports for clarity
 __all__ = [
-    # Paths
-    "ROOT",
-    "RAW_DATA_FILES_DIRECTORY",
-    "PROCESSED_DATA_FILES_DIRECTORY",
-    # Patterns
-    "FILENAME_SCALAR_PATTERNS_DICTIONARY",
-    "FILE_CONTENTS_SCALAR_PATTERNS_DICTIONARY",
-    "FILE_CONTENTS_ARRAY_PATTERNS_DICTIONARY",
-    "MAIN_PROGRAM_TYPE_MAPPING",
     # Data types
     "DTYPE_MAPPING",
     "CONVERTERS_MAPPING",
     "safe_literal_eval",
     "PARAMETERS_WITH_EXPONENTIAL_FORMAT",
     "PARAMETERS_OF_INTEGER_VALUE",
+    # Domain
+    "TUNABLE_PARAMETER_NAMES_LIST",
+    "OUTPUT_QUANTITY_NAMES_LIST",
+    "CORRELATOR_IDENTIFIERS_LIST",
     # Labels
     "TITLE_LABELS_DICTIONARY",
     "AXES_LABELS_DICTIONARY",
@@ -56,11 +52,19 @@ __all__ = [
     "MAIN_PROGRAM_TYPE_AXES_LABEL",
     "FIT_LABEL_POSITIONS",
     "PARAMETER_LABELS",
+    # Operators
+    "OVERLAP_OPERATOR_METHODS",
+    "KERNEL_OPERATOR_TYPES",
+    # Paths
+    "ROOT",
+    "RAW_DATA_FILES_DIRECTORY",
+    "PROCESSED_DATA_FILES_DIRECTORY",
+    # Patterns
+    "FILENAME_SCALAR_PATTERNS_DICTIONARY",
+    "FILE_CONTENTS_SCALAR_PATTERNS_DICTIONARY",
+    "FILE_CONTENTS_ARRAY_PATTERNS_DICTIONARY",
+    "MAIN_PROGRAM_TYPE_MAPPING",
     # Visualization
     "MARKER_STYLES",
     "DEFAULT_COLORS",
-    # Domain
-    "TUNABLE_PARAMETER_NAMES_LIST",
-    "OUTPUT_QUANTITY_NAMES_LIST",
-    "CORRELATOR_IDENTIFIERS_LIST",
 ]

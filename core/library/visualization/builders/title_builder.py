@@ -301,17 +301,17 @@ class PlotTitleBuilder:
         """
         # Import here to avoid circular dependency
         from library.constants.data_types import PARAMETERS_OF_INTEGER_VALUE
-        
+
         if isinstance(value, (int, float)):
             # Check if parameter is defined as integer type
             if param_name in PARAMETERS_OF_INTEGER_VALUE or isinstance(value, int):
                 return str(int(value))
-            
+
             # Float formatting
             if param_name in PARAMETERS_WITH_EXPONENTIAL_FORMAT:
                 return format(value, self.title_exponential_format)
             return format(value, self.title_number_format)
-        
+
         return str(value)
 
     def _wrap_title(self, title: str, max_length: int) -> str:

@@ -1,5 +1,7 @@
 from typing import Optional, Union, List
 
+from library.constants import OVERLAP_OPERATOR_METHODS, KERNEL_OPERATOR_TYPES
+
 
 class PlotFilenameBuilder:
     """
@@ -54,8 +56,8 @@ class PlotFilenameBuilder:
         self.filename_labels = filename_labels
 
         # Special parameters that get prioritized positioning
-        self._special_overlap_methods = {"KL", "Chebyshev", "Bare"}
-        self._special_kernel_types = {"Brillouin", "Wilson"}
+        self._special_overlap_methods = OVERLAP_OPERATOR_METHODS
+        self._special_kernel_types = KERNEL_OPERATOR_TYPES
 
         # Maximum filename length (most filesystems support 255 chars)
         self._max_filename_length = 250  # Leave some buffer
