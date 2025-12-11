@@ -67,8 +67,7 @@ import sys
 import click
 import h5py
 
-sys.path.append("../../")
-from library import filesystem_utilities
+from library.validation.filesystem import is_valid_file
 
 
 @click.command()
@@ -111,7 +110,7 @@ def main(
 ):
 
     # Check provided path to HDF5 file
-    if not filesystem_utilities.is_valid_file(hdf5_file_path):
+    if not is_valid_file(hdf5_file_path):
         print("ERROR: Provided path to .csv file is invalid.")
         print("Exiting...")
         sys.exit(1)

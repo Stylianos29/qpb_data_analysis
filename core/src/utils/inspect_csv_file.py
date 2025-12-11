@@ -72,7 +72,7 @@ import os
 import pandas as pd
 import click
 
-from library.filesystem_utilities import validate_file
+from library.validation.filesystem import is_valid_file
 
 from library import (
     validate_output_directory,
