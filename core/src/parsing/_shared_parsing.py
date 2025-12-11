@@ -9,7 +9,6 @@ should not be part of the public API.
 import os
 import pandas as pd
 import h5py
-from library import filesystem_utilities
 
 
 def _classify_parameters_by_uniqueness(scalar_params_list):
@@ -44,6 +43,56 @@ def _classify_parameters_by_uniqueness(scalar_params_list):
     return dataframe, constant_params_dict, multivalued_params_list
 
 
+def _create_hdf5_group_structure(
+    hdf5_file, base_directory, target_directory, logger=None
+):
+    """
+    Creates an HDF5 group structure that mirrors the directory structure of
+    target_directory beyond base_directory.
+
+    This function iteratively creates HDF5 groups corresponding to each
+    directory in target_directory after removing base_directory. If
+    base_directory and target_directory are the same, no groups are created, and
+    the root group is returned.
+
+    Parameters:
+        hdf5_file (h5py.File): Open HDF5 file handle. base_directory (str): The
+        base directory to remove from target_directory. target_directory (str):
+        The directory whose structure should be mirrored.
+        logger (logging.Logger, optional): Logger instance for warnings
+        (default: None).
+
+    Returns:
+        h5py.Group: The deepest group corresponding to target_directory.
+    """
+
+    # Convert both paths to their real full paths
+    base_directory = os.path.realpath(base_directory)
+    target_directory = os.path.realpath(target_directory)
+
+    # Get the relative path beyond the base directory
+    relative_path = os.path.relpath(target_directory, base_directory)
+
+    # Start from the root group
+    current_group = hdf5_file
+
+    if relative_path:
+        # Split the relative path into its hierarchical components
+        group_hierarchy = relative_path.split(os.sep)
+
+        # Iteratively create or retrieve groups
+        for group_name in group_hierarchy:
+            current_group = current_group.require_group(group_name)
+    else:
+        if logger:
+            logger.warning(
+                f"Target directory is the same as base directory: "
+                "{base_directory}. No groups created."
+            )
+
+    return current_group  # Return the deepest group created (or the root group)
+
+
 def _create_hdf5_structure_with_constant_params(
     hdf5_file, constant_params_dict, base_directory, target_directory, logger
 ):
@@ -63,7 +112,7 @@ def _create_hdf5_structure_with_constant_params(
         attributes
     """
     # Create HDF5 group structure mirroring directory hierarchy
-    data_files_set_group = filesystem_utilities.create_hdf5_group_structure(
+    data_files_set_group = _create_hdf5_group_structure(
         hdf5_file, base_directory, target_directory, logger
     )
 
