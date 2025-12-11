@@ -1,7 +1,5 @@
 .vscode/*
 
-archive/*
-
 bash_scripts/unit_tests/mock_data/*
 
 core/**/__pycache__/*
