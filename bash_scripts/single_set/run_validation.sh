@@ -26,7 +26,9 @@
 #
 # OUTPUT:
 # - Console output with validation results
-# - Detailed log file in auxiliary directory
+# - Detailed log files in auxiliary/logs/
+# - Metadata files in auxiliary/metadata/
+# - Timestamp files in auxiliary/timestamps/
 # - Exit code: 0 (success) or 1 (validation failed)
 #
 # USAGE:
@@ -79,8 +81,14 @@ VALIDATION_SCRIPT="${PYTHON_SCRIPTS_DIRECTORY}/utils/validate_qpb_data_files.py"
 # Script log filename
 SCRIPT_LOG_FILENAME="${SCRIPT_NAME%.sh}.log"
 
+# Timestamp filename
+SCRIPT_TIMESTAMP_FILENAME="${SCRIPT_NAME%.sh}.timestamp"
+
 # Auxiliary directory structure
 AUXILIARY_DIR_NAME="auxiliary"
+AUXILIARY_LOGS_SUBDIR="logs"
+AUXILIARY_METADATA_SUBDIR="metadata"
+AUXILIARY_TIMESTAMPS_SUBDIR="timestamps"
 
 # =============================================================================
 # SECTION 4: FUNCTION DEFINITIONS
@@ -99,7 +107,7 @@ REQUIRED ARGUMENTS:
 
 OPTIONAL ARGUMENTS:
   -aux_dir, --auxiliary_directory    
-                               Directory for log files (default: auto-detected)
+                               Directory for auxiliary files (default: auto-detected)
   -log_name, --log_filename    Custom log filename (default: ${SCRIPT_LOG_FILENAME})
   --disable-cache              Disable timestamp-based caching (force validation)
   -h, --help                   Display this help message
@@ -110,17 +118,22 @@ VALIDATION PROCESS:
   3. Validates file naming conventions
   4. Checks file contents for structural integrity
   5. Detects duplicate or conflicting files
-  6. Generates detailed validation log
+  6. Generates detailed validation outputs
 
 OUTPUT:
   - Console: Validation summary and results
-  - Log file: Detailed validation report in auxiliary directory
+  - auxiliary/logs/: Validation log files
+  - auxiliary/metadata/: Data file set metadata
+  - auxiliary/timestamps/: Validation timestamp
   - Exit code: 0 (valid), 1 (validation failed or error)
 
-AUXILIARY DIRECTORY:
-  If not specified, the auxiliary directory is auto-detected:
-  - If data set is under data_files/raw/, mirrors to data_files/processed/
-  - Otherwise, uses parent directory of data file set
+AUXILIARY DIRECTORY STRUCTURE:
+  auxiliary/
+  ├── logs/                    # Validation logs
+  ├── metadata/                # Data file set metadata
+  ├── timestamps/              # Validation timestamps
+  ├── summaries/               # (created by pipeline)
+  └── visualization/           # (created by pipeline)
 
 EXAMPLES:
   # Validate data set with auto-detected paths
@@ -206,12 +219,61 @@ function detect_auxiliary_directory() {
     echo "$auxiliary_dir"
 }
 
+function setup_auxiliary_directories() {
+    # Create auxiliary directory structure for validation
+    #
+    # Arguments:
+    #   $1 - auxiliary_directory : Base auxiliary directory
+    #
+    # Creates:
+    #   - auxiliary/logs/
+    #   - auxiliary/metadata/
+    #   - auxiliary/timestamps/
+    #
+    # Returns:
+    #   0 - Success
+    #   1 - Failure
+    
+    local auxiliary_dir="$1"
+    
+    # Create logs subdirectory
+    local logs_dir="${auxiliary_dir}/${AUXILIARY_LOGS_SUBDIR}"
+    if [[ ! -d "$logs_dir" ]]; then
+        mkdir -p "$logs_dir" || {
+            echo "ERROR: Failed to create logs directory: $logs_dir" >&2
+            return 1
+        }
+    fi
+    
+    # Create metadata subdirectory
+    local metadata_dir="${auxiliary_dir}/${AUXILIARY_METADATA_SUBDIR}"
+    if [[ ! -d "$metadata_dir" ]]; then
+        mkdir -p "$metadata_dir" || {
+            echo "ERROR: Failed to create metadata directory: $metadata_dir" >&2
+            return 1
+        }
+    fi
+    
+    # Create timestamps subdirectory
+    local timestamps_dir="${auxiliary_dir}/${AUXILIARY_TIMESTAMPS_SUBDIR}"
+    if [[ ! -d "$timestamps_dir" ]]; then
+        mkdir -p "$timestamps_dir" || {
+            echo "ERROR: Failed to create timestamps directory: $timestamps_dir" >&2
+            return 1
+        }
+    fi
+    
+    return 0
+}
+
 function run_validation() {
     # Execute Python validation script on the data file set
     #
     # Arguments:
     #   $1 - data_set_directory      : Path to data file set
     #   $2 - auxiliary_directory     : Path to auxiliary files directory
+    #   $3 - metadata_directory      : Path to metadata subdirectory
+    #   $4 - logs_directory          : Path to logs subdirectory
     #
     # Returns:
     #   0 - Validation successful
@@ -219,6 +281,8 @@ function run_validation() {
     
     local data_set_dir="$1"
     local auxiliary_dir="$2"
+    local metadata_dir="$3"
+    local logs_dir="$4"
     
     echo ""
     echo "Executing validation script..."
@@ -227,10 +291,13 @@ function run_validation() {
     log_info "Validation script: $VALIDATION_SCRIPT"
     
     # Build Python command
+    # Note: Python script needs to be updated to accept metadata_directory and logs_directory
     local python_cmd="python \"$VALIDATION_SCRIPT\""
     python_cmd+=" --raw_data_files_set_directory_path \"$data_set_dir\""
     python_cmd+=" --enable_logging"
     python_cmd+=" --auxiliary_files_directory \"$auxiliary_dir\""
+    python_cmd+=" --metadata_directory \"$metadata_dir\""
+    python_cmd+=" --logs_directory \"$logs_dir\""
     
     log_info "Executing command: $python_cmd"
     
@@ -244,6 +311,35 @@ function run_validation() {
         log_error "Data file set validation failed"
         return 1
     fi
+}
+
+function update_validation_timestamp() {
+    # Update validation timestamp file
+    #
+    # Arguments:
+    #   $1 - data_set_directory  : Path to data file set
+    #   $2 - timestamps_directory : Path to timestamps subdirectory
+    #
+    # Returns:
+    #   0 - Success
+    
+    local data_set_dir="$1"
+    local timestamps_dir="$2"
+    local timestamp_file="${timestamps_dir}/${SCRIPT_TIMESTAMP_FILENAME}"
+
+    # Ensure timestamp file exists (create if necessary)
+    check_if_file_exists "$timestamp_file" -c -s || {
+        echo "ERROR: Failed to create timestamp file: $timestamp_file" >&2
+        log_error "Failed to create timestamp file: $timestamp_file"
+        return 1
+    }
+
+    # Use library function to update timestamp
+    update_timestamp "$data_set_dir" "$timestamp_file"
+    
+    log_info "Updated validation timestamp: $timestamp_file"
+    
+    return 0
 }
 
 # =============================================================================
@@ -330,6 +426,17 @@ if [[ ! -d "$auxiliary_directory" ]]; then
 fi
 auxiliary_directory="$(realpath "$auxiliary_directory")"
 
+# Setup auxiliary subdirectories
+if ! setup_auxiliary_directories "$auxiliary_directory"; then
+    echo "ERROR: Failed to setup auxiliary directory structure" >&2
+    exit 1
+fi
+
+# Define subdirectory paths
+logs_directory="${auxiliary_directory}/${AUXILIARY_LOGS_SUBDIR}"
+metadata_directory="${auxiliary_directory}/${AUXILIARY_METADATA_SUBDIR}"
+timestamps_directory="${auxiliary_directory}/${AUXILIARY_TIMESTAMPS_SUBDIR}"
+
 # Set default log filename if not provided
 if [[ -z "$log_filename" ]]; then
     log_filename="$SCRIPT_LOG_FILENAME"
@@ -343,8 +450,8 @@ fi
 # Setup logging infrastructure
 export SCRIPT_TERMINATION_MESSAGE="\n\t\t$(echo "$SCRIPT_NAME" | tr '[:lower:]' '[:upper:]') EXECUTION TERMINATED"
 
-# Initialize logging
-SCRIPT_LOG_FILE_PATH="${auxiliary_directory}/${log_filename}"
+# Initialize logging (in logs subdirectory)
+SCRIPT_LOG_FILE_PATH="${logs_directory}/${log_filename}"
 export SCRIPT_LOG_FILE_PATH
 
 echo -e "\t\t$(echo "$SCRIPT_NAME" | tr '[:lower:]' '[:upper:]') EXECUTION INITIATED\n" > "$SCRIPT_LOG_FILE_PATH"
@@ -354,6 +461,9 @@ log_info "Script: $SCRIPT_NAME"
 log_info "Data file set: $input_dir_name"
 log_info "Input directory: $input_directory"
 log_info "Auxiliary directory: $auxiliary_directory"
+log_info "Logs directory: $logs_directory"
+log_info "Metadata directory: $metadata_directory"
+log_info "Timestamps directory: $timestamps_directory"
 log_info "Log file: $SCRIPT_LOG_FILE_PATH"
 log_info "Cache enabled: $enable_cache"
 
@@ -369,6 +479,9 @@ echo "==================================================================="
 echo "Data file set: $input_dir_name"
 echo "Input:      $(get_display_path "$input_directory")"
 echo "Auxiliary:  $(get_display_path "$auxiliary_directory")"
+echo "  Logs:     $(get_display_path "$logs_directory")"
+echo "  Metadata: $(get_display_path "$metadata_directory")"
+echo "  Timestamps: $(get_display_path "$timestamps_directory")"
 echo "Log file:   $(get_display_path "$SCRIPT_LOG_FILE_PATH")"
 echo "==================================================================="
 
@@ -402,7 +515,7 @@ else
 fi
 
 # Execute validation
-if ! run_validation "$input_directory" "$auxiliary_directory"; then
+if ! run_validation "$input_directory" "$auxiliary_directory" "$metadata_directory" "$logs_directory"; then
     echo ""
     echo "==================================================================="
     echo "   VALIDATION FAILED"
@@ -417,6 +530,9 @@ if ! run_validation "$input_directory" "$auxiliary_directory"; then
     exit 1
 fi
 
+# Update timestamp
+update_validation_timestamp "$input_directory" "$timestamps_directory"
+
 # Success
 echo ""
 echo "==================================================================="
@@ -426,7 +542,9 @@ echo "Data file set: $input_dir_name"
 echo "All data files validated successfully"
 echo ""
 echo "Output:"
-echo "  Log file: $(get_display_path "$SCRIPT_LOG_FILE_PATH")"
+echo "  Log file:   $(get_display_path "$SCRIPT_LOG_FILE_PATH")"
+echo "  Metadata:   $(get_display_path "$metadata_directory")"
+echo "  Timestamp:  $(get_display_path "${timestamps_directory}/${SCRIPT_TIMESTAMP_FILENAME}")"
 echo "==================================================================="
 
 log_info "=== VALIDATION COMPLETED SUCCESSFULLY ==="

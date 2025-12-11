@@ -2,17 +2,21 @@
 validate_qpb_data_files.py
 
 Summary:
-    A validation script for qpb data files that checks file integrity, ensures
-    consistency between file types, and maintains program type compatibility
-    (invert vs non-invert) within a data files set directory.
+    A validation script for qpb data files that checks file integrity,
+    ensures consistency between file types, and maintains program type
+    compatibility (invert vs non-invert) within a data files set
+    directory.
 
 Input:
     Required:
-        - raw_data_files_set_directory_path: Path to directory containing
-        qpb data files (.txt log files, .dat correlator files, .err error files)
+        - raw_data_files_set_directory_path: Path to directory
+          containing qpb data files (.txt log files, .dat correlator
+          files, .err error files)
     Optional:
-        - enable_logging: Flag to enable detailed logging of validation process
-        - auxiliary_files_directory: Directory for storing metadata and log files
+        - enable_logging: Flag to enable detailed logging of validation
+          process
+        - auxiliary_files_directory: Directory for storing metadata and
+          log files
         - log_filename: Custom name for the log file
 
 Output:
@@ -38,13 +42,13 @@ Functionality:
 Usage:
     python validate_qpb_data_files.py -raw_dir /path/to/data/files/set 
                                      [-log_on] [-ax_files_dir
-                                     /path/to/auxiliary/files] [-log_name
-                                     custom_log_name]
+                                     /path/to/auxiliary/files]
+                                     [-log_name custom_log_name]
 
 Note:
-    The script requires user interaction for critical decisions about file
-    deletion and handles error conditions by either exiting or allowing user
-    intervention.
+    The script requires user interaction for critical decisions about
+    file deletion and handles error conditions by either exiting or
+    allowing user intervention.
 """
 
 import os
@@ -107,15 +111,36 @@ def get_yes_or_no_user_response(prompt_text, logger=None):
     callback=partial(validate_output_file, extensions=[".log"]),
     help="Specific name for the script's log file.",
 )
+@click.option(
+    "-metadata_dir",
+    "--metadata_directory",
+    "metadata_directory",
+    required=False,
+    default=None,
+    callback=validate_output_directory,
+    help="Directory for metadata files (default: auxiliary_files_directory/metadata)",
+)
+@click.option(
+    "-logs_dir",
+    "--logs_directory",
+    "logs_directory",
+    required=False,
+    default=None,
+    callback=validate_output_directory,
+    help="Directory for log files (default: auxiliary_files_directory/logs)",
+)
 def main(
     raw_data_files_set_directory_path,
     enable_logging,
     auxiliary_files_directory,
     log_filename,
+    metadata_directory,
+    logs_directory,
 ):
     # HANDLE EMPTY INPUT ARGUMENTS
 
-    # Default to input file's parent directory if no auxiliary directory specified
+    # Default to input file's parent directory if no auxiliary directory
+    # specified
     if auxiliary_files_directory is None:
         auxiliary_files_directory = os.path.dirname(raw_data_files_set_directory_path)
 
@@ -124,12 +149,23 @@ def main(
         script_name = os.path.basename(sys.argv[0])
         log_filename = script_name.replace(".py", "_python_script.log")
 
+    # Setup subdirectory paths
+    if metadata_directory is None:
+        metadata_directory = os.path.join(auxiliary_files_directory, "metadata")
+
+    if logs_directory is None:
+        logs_directory = os.path.join(auxiliary_files_directory, "logs")
+
+    # Ensure subdirectories exist
+    os.makedirs(metadata_directory, exist_ok=True)
+    os.makedirs(logs_directory, exist_ok=True)
+
     # INITIATE SCRIPT AND LOGGING
 
     click.echo("   -- Validating raw qpb data files set initiated.")
 
     # Setup logging
-    logger = LoggingWrapper(auxiliary_files_directory, log_filename, enable_logging)
+    logger = LoggingWrapper(logs_directory, log_filename, enable_logging)
 
     # Log script start
     logger.initiate_script_logging()
@@ -157,7 +193,8 @@ def main(
 
     # REMOVE ANY UNSUPPORTED FILES FROM THE DIRECTORY
 
-    # Find files with extensions other than .txt, .err, or .dat (unsupported)
+    # Find files with extensions other than .txt, .err, or .dat
+    # (unsupported)
     all_files = glob.glob(os.path.join(raw_data_files_set_directory_path, "*"))
     logger.info(
         f"Total number of files in raw data files set directory: {len(all_files)}"
@@ -291,7 +328,8 @@ def main(
         and os.path.getsize(file) == 0
     ]
 
-    # Empty files better be deleted at the start of the validation process
+    # Empty files better be deleted at the start of the validation
+    # process
     if empty_files:
         # Log a list of empty files
         logger.warning(
@@ -352,7 +390,7 @@ def main(
 
     # Process each input list file
     for filename, file_list in file_mappings.items():
-        file_path = os.path.join(auxiliary_files_directory, filename)
+        file_path = os.path.join(metadata_directory, filename)
         try:
             if os.path.exists(file_path):
                 if os.path.getsize(file_path) == 0:
@@ -427,7 +465,8 @@ def main(
     ):
         logger.warning(f"No new files found to validate.", to_console=True)
 
-        # Ask user if they want to repeat the validation of already existing files
+        # Ask user if they want to repeat the validation of already
+        # existing files
         response = get_yes_or_no_user_response(
             "Would you like to repeat validation of already existing qpb data files?\n"
             "Selecting 'n' will exit the program (y[Y]/n[N])"
@@ -498,10 +537,12 @@ def main(
 
     # REMOVE CORRUPTED QPB DATA FILES
 
-    # Lists to store categorized files based on containing specific flag phrases
+    # Lists to store categorized files based on containing specific flag
+    # phrases
     list_of_invert_qpb_log_file_paths = []  # Containing "CG done"
     list_of_non_invert_qpb_log_file_paths = []  # Containing "per stochastic source"
-    # Files lacking "CG done" or "per stochastic source" are marked as corrupted
+    # Files lacking "CG done" or "per stochastic source" are marked as
+    # corrupted
     list_of_corrupted_qpb_log_file_paths = []
 
     # Check each log file for required phrases
@@ -527,8 +568,8 @@ def main(
             )
             list_of_corrupted_qpb_log_file_paths.append(log_file_path)
 
-    # Check if any corrupted files were found and delete them if requested.
-    # Associated .err and .dat files will be removed as well
+    # Check if any corrupted files were found and delete them if
+    # requested. Associated .err and .dat files will be removed as well
     if list_of_corrupted_qpb_log_file_paths:
         # Log the number of corrupted qpb files found
         logger.warning(
@@ -537,11 +578,12 @@ def main(
             to_console=True,
         )
 
-        # Ask user about deleting corrupted files. Otherwise, exit the program
+        # Ask user about deleting corrupted files. Otherwise, exit the
+        # program
         response = get_yes_or_no_user_response(
             "Do you want to delete all corrupted qpb log files?\n"
             "Selecting 'n' will exit the program (y[Y]/n[N])"
-            )
+        )
         if response:
             # Delete corrupted files
             for file_path in list_of_corrupted_qpb_log_file_paths:
@@ -551,7 +593,8 @@ def main(
                     logger.info(
                         f"Deleted corrupted file: {os.path.basename(file_path)}"
                     )
-                    # Remove corresponding .err and .dat files if they exist
+                    # Remove corresponding .err and .dat files if they
+                    # exist
                     basename = os.path.splitext(file_path)[0]
                     for ext in [".err", ".dat"]:
                         associated_file = basename + ext
@@ -574,7 +617,8 @@ def main(
                         to_console=True,
                     )
 
-            # After deleting corrupted files, check if directory is empty
+            # After deleting corrupted files, check if directory is
+            # empty
             if not os.listdir(raw_data_files_set_directory_path):
                 logger.error(
                     f"Data files set directory '{raw_data_files_set_directory_path}' "
@@ -598,7 +642,7 @@ def main(
     # IDENTIFY MAIN PROGRAM TYPE AND REMOVE INCOMPATIBLE FILES
 
     # Check if metadata file exists and get main program type if present
-    metadata_file = os.path.join(auxiliary_files_directory, "metadata.md")
+    metadata_file = os.path.join(metadata_directory, "metadata.md")
     main_program_type = None
     if os.path.exists(metadata_file) and os.path.getsize(metadata_file) > 0:
         with open(metadata_file, "r") as file:
@@ -646,7 +690,8 @@ def main(
                         logger.info(
                             f"Deleted incompatible file: {os.path.basename(file_path)}"
                         )
-                        # Remove corresponding .err and .dat files if they exist
+                        # Remove corresponding .err and .dat files if
+                        # they exist
                         basename = os.path.splitext(file_path)[0]
                         for ext in [".err", ".dat"]:
                             associated_file = basename + ext
@@ -714,14 +759,16 @@ def main(
     # CHECK IF CORRELATORS FILES CONTAIN ONLY ZERO VALUES
 
     if main_program_type == "invert":
-        # Initialize list to store files with all zero values in columns 5 and 6
+        # Initialize list to store files with all zero values in columns
+        # 5 and 6
         zero_value_correlator_files = []
 
         # Check each correlator file
         for correlator_file in list_of_qpb_correlators_files_to_validate:
             try:
                 with open(correlator_file, "r") as file:
-                    # Read all lines and check columns 5 and 6 (indices 4 and 5)
+                    # Read all lines and check columns 5 and 6 (indices
+                    # 4 and 5)
                     all_zeros = all(
                         line.strip().split()[4:6] == ["+0.000000e+00", "+0.000000e+00"]
                         for line in file
@@ -891,7 +938,7 @@ def main(
             list_of_qpb_correlators_file_paths
         )
     for filename, file_list in output_files_dictionary.items():
-        output_path = os.path.join(auxiliary_files_directory, filename)
+        output_path = os.path.join(metadata_directory, filename)
         try:
             file_exists = os.path.exists(output_path)
             with open(output_path, "w") as file:
