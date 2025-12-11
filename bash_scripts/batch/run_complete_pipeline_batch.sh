@@ -90,6 +90,9 @@ DEFAULT_INPUT_BASE_DIR="$(realpath "${SCRIPT_DIR}/../../data_files/raw")"
 DEFAULT_OUTPUT_BASE_DIR="$(realpath "${SCRIPT_DIR}/../../data_files/processed")"
 DEFAULT_PLOTS_BASE_DIR="$(realpath "${SCRIPT_DIR}/../../output/plots")"
 
+# Auxiliary directory structure
+AUXILIARY_TIMESTAMPS_SUBDIR="timestamps"
+
 # Timestamp script identifier
 TIMESTAMP_SCRIPT_NAME="run_complete_pipeline"
 
@@ -686,11 +689,15 @@ for data_set_dir in "${data_sets[@]}"; do
     # Setup auxiliary directory for timestamps
     auxiliary_dir="${output_dir}/auxiliary"
     check_if_directory_exists "$auxiliary_dir" -c -s
-    
+        
+    # Setup timestamps subdirectory
+    timestamps_dir="${auxiliary_dir}/${AUXILIARY_TIMESTAMPS_SUBDIR}"
+    check_if_directory_exists "$timestamps_dir" -c -s
+
     # Get timestamp file path
     timestamp_file=$(get_timestamp_file_path \
         "$data_set_dir" \
-        "$auxiliary_dir" \
+        "$timestamps_dir" \
         "$TIMESTAMP_SCRIPT_NAME")
     
     # Ensure timestamp file exists
