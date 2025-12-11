@@ -60,13 +60,13 @@ class TestDataFrameInspector:
     def test_initialization_with_invalid_input(self):
         """Test that inspector raises TypeError for non-DataFrame input."""
         with pytest.raises(TypeError, match="Input must be a pandas DataFrame"):
-            _DataFrameInspector([1, 2, 3]) # type: ignore
+            _DataFrameInspector([1, 2, 3])  # type: ignore
 
         with pytest.raises(TypeError, match="Input must be a pandas DataFrame"):
-            _DataFrameInspector("not a dataframe") # type: ignore
+            _DataFrameInspector("not a dataframe")  # type: ignore
 
         with pytest.raises(TypeError, match="Input must be a pandas DataFrame"):
-            _DataFrameInspector(None) # type: ignore
+            _DataFrameInspector(None)  # type: ignore
 
     def test_column_categorization(self, simple_dataframe):
         """Test that columns are correctly categorized."""
@@ -267,7 +267,7 @@ class TestDataFrameAnalyzer:
 
         # But should have same content
         pd.testing.assert_frame_equal(analyzer.original_dataframe, simple_dataframe)
-        pd.testing.assert_frame_equal(analyzer.dataframe, simple_dataframe) # type: ignore
+        pd.testing.assert_frame_equal(analyzer.dataframe, simple_dataframe)  # type: ignore
 
     def test_context_manager_basic(self, analyzer):
         """Test basic context manager functionality."""
@@ -458,7 +458,7 @@ class TestDataFrameAnalyzer:
         """Test basic groupby functionality."""
         # Group by all multivalued tunable parameters
         grouped = analyzer.group_by_multivalued_tunable_parameters()
-        
+
         # Create a reference groupby object for type checking
         reference_groupby = pd.DataFrame().groupby(lambda x: x)
         assert isinstance(grouped, type(reference_groupby))

@@ -263,6 +263,7 @@ def validate_output_directory(ctx, param, value):
     path_type = click.Path(exists=True, file_okay=True, dir_okay=True, readable=True)
     return path_type.convert(value, param, ctx)
 
+
 def validate_output_HDF5_filename(ctx, param, value):
     if not value.endswith(".h5"):
         raise click.BadParameter(
@@ -442,7 +443,8 @@ class LoggingWrapper:
             self.logger.info(message)
             if to_console:
                 print(f"INFO: {message}")
-# TODO: Create a list option
+
+    # TODO: Create a list option
     def warning(self, message, to_console=False):
         if self.logger:
             self.logger.warning(message)

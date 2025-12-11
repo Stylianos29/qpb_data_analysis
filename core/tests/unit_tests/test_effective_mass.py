@@ -3,14 +3,61 @@ import matplotlib.pyplot as plt
 import gvar as gv
 
 # Data
-x = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22])
-y_mean = np.array([3.2997, 2.1353, 1.850, 1.730, 1.657, 1.610, 1.576, 
-                   1.551, 1.541, 1.534, 1.527, 1.521, 1.513, 1.509, 
-                   1.508, 1.513, 1.525, 1.552, 1.616, 1.723, 1.861, 2.007])
-y_error = np.array([0.00459794, 0.00754023, 0.01124955, 0.01666036, 0.02104568, 0.02663433, 
-                    0.03122901, 0.03588413, 0.04005118, 0.04320726, 0.04495486, 0.04671572,
-                    0.04727865, 0.04901289, 0.05076231, 0.053096, 0.0553041, 0.05813505,
-                    0.06011091, 0.06248843, 0.06369647, 0.06465021])
+x = np.array(
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
+)
+y_mean = np.array(
+    [
+        3.2997,
+        2.1353,
+        1.850,
+        1.730,
+        1.657,
+        1.610,
+        1.576,
+        1.551,
+        1.541,
+        1.534,
+        1.527,
+        1.521,
+        1.513,
+        1.509,
+        1.508,
+        1.513,
+        1.525,
+        1.552,
+        1.616,
+        1.723,
+        1.861,
+        2.007,
+    ]
+)
+y_error = np.array(
+    [
+        0.00459794,
+        0.00754023,
+        0.01124955,
+        0.01666036,
+        0.02104568,
+        0.02663433,
+        0.03122901,
+        0.03588413,
+        0.04005118,
+        0.04320726,
+        0.04495486,
+        0.04671572,
+        0.04727865,
+        0.04901289,
+        0.05076231,
+        0.053096,
+        0.0553041,
+        0.05813505,
+        0.06011091,
+        0.06248843,
+        0.06369647,
+        0.06465021,
+    ]
+)
 
 # Convert to gvar objects
 y = gv.gvar(y_mean, y_error)
@@ -20,7 +67,9 @@ dy_dx_forward = np.diff(y) / np.diff(x)
 print(dy_dx_forward)
 
 # Check for plateau: |dy_dx_forward.mean| < dy_dx_forward.sdev (1 sigma condition)
-plateau_indices = [i for i, dy in enumerate(dy_dx_forward) if abs(dy.mean) <= 0.5*dy.sdev]
+plateau_indices = [
+    i for i, dy in enumerate(dy_dx_forward) if abs(dy.mean) <= 0.5 * dy.sdev
+]
 
 dy_dx_centered = (y[2:] - y[:-2]) / 2
 
@@ -28,7 +77,9 @@ print(plateau_indices)
 
 # dy_dx_backward = -np.diff(y[::-1])[::-1]
 print(dy_dx_centered)
-plateau_indices_centered = [i+1 for i, dy in enumerate(dy_dx_centered) if abs(dy.mean) <= 0.5*dy.sdev]
+plateau_indices_centered = [
+    i + 1 for i, dy in enumerate(dy_dx_centered) if abs(dy.mean) <= 0.5 * dy.sdev
+]
 
 print(plateau_indices_centered)
 
@@ -37,13 +88,13 @@ y_mean_plateau = gv.mean(y_plateau)
 y_error_plateau = gv.sdev(y_plateau)
 
 # Weights: inverse variance
-weights = 1 / (y_error_plateau ** 2)
+weights = 1 / (y_error_plateau**2)
 
 # Weighted mean (plateau value)
 plateau_value = np.sum(weights * y_mean_plateau) / np.sum(weights)
 
 # Error of the flat line
-plateau_error = np.sqrt(len(weights)/3) * np.sqrt(1 / np.sum(weights))
+plateau_error = np.sqrt(len(weights) / 3) * np.sqrt(1 / np.sum(weights))
 
 # Output results
 print(f"Optimal plateau value: {plateau_value:.5f}")
@@ -51,13 +102,30 @@ print(f"Plateau error: {plateau_error:.5f}")
 
 # Visualization
 plt.figure(figsize=(10, 6))
-plt.errorbar(x, gv.mean(y), yerr=gv.sdev(y), fmt='o', label='Data with Errors')
-plt.axhline(plateau_value, color='red', linestyle='--', label=f'Plateau: {plateau_value:.5f} ± {plateau_error:.5f}')
-plt.fill_between(x, plateau_value - plateau_error, plateau_value + plateau_error, color='r', alpha=0.2)
-plt.axvspan(x[plateau_indices_centered[0]], x[plateau_indices_centered[-1]], color='green', alpha=0.3, label='Plateau Range')
-plt.xlabel('x')
-plt.ylabel('y')
-plt.title('Optimal Plateau Line with Error')
+plt.errorbar(x, gv.mean(y), yerr=gv.sdev(y), fmt="o", label="Data with Errors")
+plt.axhline(
+    plateau_value,
+    color="red",
+    linestyle="--",
+    label=f"Plateau: {plateau_value:.5f} ± {plateau_error:.5f}",
+)
+plt.fill_between(
+    x,
+    plateau_value - plateau_error,
+    plateau_value + plateau_error,
+    color="r",
+    alpha=0.2,
+)
+plt.axvspan(
+    x[plateau_indices_centered[0]],
+    x[plateau_indices_centered[-1]],
+    color="green",
+    alpha=0.3,
+    label="Plateau Range",
+)
+plt.xlabel("x")
+plt.ylabel("y")
+plt.title("Optimal Plateau Line with Error")
 plt.legend()
 # plt.show()
 
@@ -95,17 +163,16 @@ plt.legend()
 # # plt.show()
 
 
-
 # import numpy as np
 # import matplotlib.pyplot as plt
 # import gvar as gv
 
 # # Data
 # x = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22])
-# y_mean = np.array([3.2997, 2.1353, 1.850, 1.730, 1.657, 1.610, 1.576, 
-#               1.551, 1.541, 1.534, 1.527, 1.521, 1.513, 1.509, 
+# y_mean = np.array([3.2997, 2.1353, 1.850, 1.730, 1.657, 1.610, 1.576,
+#               1.551, 1.541, 1.534, 1.527, 1.521, 1.513, 1.509,
 #               1.508, 1.513, 1.525, 1.552, 1.616, 1.723, 1.861, 2.007])
-# y_error = np.array([0.00459794, 0.00754023, 0.01124955, 0.01666036, 0.02104568, 0.02663433, 
+# y_error = np.array([0.00459794, 0.00754023, 0.01124955, 0.01666036, 0.02104568, 0.02663433,
 #                     0.03122901, 0.03588413, 0.04005118, 0.04320726, 0.04495486, 0.04671572,
 #                     0.04727865, 0.04901289, 0.05076231, 0.053096, 0.0553041, 0.05813505,
 #                     0.06011091, 0.06248843, 0.06369647, 0.06465021])
@@ -120,7 +187,7 @@ plt.legend()
 
 # # Sliding window standard deviation (include y_error)
 # window_size = 5
-# std_devs = np.array([np.std(y[i:i+window_size]) + np.mean(y_error[i:i+window_size]) 
+# std_devs = np.array([np.std(y[i:i+window_size]) + np.mean(y_error[i:i+window_size])
 #                      for i in range(len(y) - window_size + 1)])
 # x_windows = x[:len(std_devs)]
 
