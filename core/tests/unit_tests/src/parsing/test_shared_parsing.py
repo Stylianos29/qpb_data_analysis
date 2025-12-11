@@ -12,10 +12,11 @@ import pytest
 import pandas as pd
 import numpy as np
 import h5py
-from unittest.mock import Mock, patch, mock_open, ANY
+from unittest.mock import Mock, patch, ANY
 
 from src.parsing._shared_parsing import (
     _classify_parameters_by_uniqueness,
+    _create_hdf5_group_structure,
     _create_hdf5_structure_with_constant_params,
     _export_dataframe_to_csv,
     _export_arrays_to_hdf5_with_proper_structure,
@@ -131,12 +132,155 @@ class TestClassifyParametersByUniqueness:
         assert set(multivalued_params_list) == {"Filename", "beta"}
 
 
+# =============================================================================
+# NEW: Tests for _create_hdf5_group_structure (direct testing)
+# =============================================================================
+
+
+class TestCreateHdf5GroupStructure:
+    """Test HDF5 group structure creation that mirrors directory hierarchy."""
+
+    def test_single_level_directory_structure(self):
+        """Test creating structure for single-level subdirectory."""
+        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as tmp_file:
+            hdf5_path = tmp_file.name
+
+        try:
+            base_directory = "/data/raw"
+            target_directory = "/data/raw/study1"
+
+            with h5py.File(hdf5_path, "w") as hdf5_file:
+                result_group = _create_hdf5_group_structure(
+                    hdf5_file, base_directory, target_directory
+                )
+
+                # Check that the group was created
+                assert "study1" in hdf5_file
+                assert result_group.name == "/study1"
+
+        finally:
+            os.unlink(hdf5_path)
+
+    def test_multi_level_directory_structure(self):
+        """Test creating structure for multi-level subdirectory."""
+        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as tmp_file:
+            hdf5_path = tmp_file.name
+
+        try:
+            base_directory = "/data/raw"
+            target_directory = "/data/raw/project/experiment/run1"
+
+            with h5py.File(hdf5_path, "w") as hdf5_file:
+                result_group = _create_hdf5_group_structure(
+                    hdf5_file, base_directory, target_directory
+                )
+
+                # Check hierarchical structure
+                assert "project" in hdf5_file
+                assert "experiment" in hdf5_file["project"]
+                assert "run1" in hdf5_file["project/experiment"]
+                assert result_group.name == "/project/experiment/run1"
+
+        finally:
+            os.unlink(hdf5_path)
+
+    def test_same_base_and_target_directory(self):
+        """Test when base and target directories are the same."""
+        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as tmp_file:
+            hdf5_path = tmp_file.name
+
+        try:
+            base_directory = "/data/raw"
+            target_directory = "/data/raw"
+            logger = Mock()
+
+            with h5py.File(hdf5_path, "w") as hdf5_file:
+                result_group = _create_hdf5_group_structure(
+                    hdf5_file, base_directory, target_directory, logger
+                )
+
+                # Should return root group when directories are identical
+                assert result_group.name == "/"
+
+        finally:
+            os.unlink(hdf5_path)
+
+    def test_existing_groups_are_reused(self):
+        """Test that existing groups are reused (require_group behavior)."""
+        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as tmp_file:
+            hdf5_path = tmp_file.name
+
+        try:
+            base_directory = "/data"
+            target_directory = "/data/level1/level2"
+
+            with h5py.File(hdf5_path, "w") as hdf5_file:
+                # Pre-create a group with an attribute
+                existing_group = hdf5_file.create_group("level1")
+                existing_group.attrs["marker"] = "pre-existing"
+
+                # Now call the function
+                result_group = _create_hdf5_group_structure(
+                    hdf5_file, base_directory, target_directory
+                )
+
+                # The existing group should be reused (attribute preserved)
+                assert hdf5_file["level1"].attrs["marker"] == "pre-existing"
+                assert result_group.name == "/level1/level2"
+
+        finally:
+            os.unlink(hdf5_path)
+
+    def test_with_real_paths(self, tmp_path):
+        """Test with actual filesystem paths."""
+        # Create actual directory structure
+        base_dir = tmp_path / "raw_data"
+        target_dir = base_dir / "qcd_beta_6.0" / "mass_0.1"
+        target_dir.mkdir(parents=True)
+
+        hdf5_path = tmp_path / "test.h5"
+
+        with h5py.File(hdf5_path, "w") as hdf5_file:
+            result_group = _create_hdf5_group_structure(
+                hdf5_file, str(base_dir), str(target_dir)
+            )
+
+            # Check structure matches directory hierarchy
+            assert "qcd_beta_6.0" in hdf5_file
+            assert "mass_0.1" in hdf5_file["qcd_beta_6.0"]
+            assert result_group.name == "/qcd_beta_6.0/mass_0.1"
+
+    def test_returns_deepest_group(self):
+        """Test that the function returns the deepest group created."""
+        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as tmp_file:
+            hdf5_path = tmp_file.name
+
+        try:
+            with h5py.File(hdf5_path, "w") as hdf5_file:
+                result = _create_hdf5_group_structure(
+                    hdf5_file, "/base", "/base/a/b/c/d"
+                )
+
+                # Should return the deepest group
+                assert result.name == "/a/b/c/d"
+                # Verify it's an actual group object
+                assert isinstance(result, h5py.Group)
+
+        finally:
+            os.unlink(hdf5_path)
+
+
+# =============================================================================
+# UPDATED: Tests for _create_hdf5_structure_with_constant_params
+# (now testing directly without mocking)
+# =============================================================================
+
+
 class TestCreateHdf5StructureWithConstantParams:
     """Test HDF5 group structure creation with constant parameters."""
 
     def test_basic_structure_creation(self):
-        """Test basic HDF5 structure creation with constant
-        parameters."""
+        """Test basic HDF5 structure creation with constant parameters."""
         with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as tmp_file:
             hdf5_path = tmp_file.name
 
@@ -147,30 +291,27 @@ class TestCreateHdf5StructureWithConstantParams:
             logger = Mock()
 
             with h5py.File(hdf5_path, "w") as hdf5_file:
-                with patch(
-                    "library.filesystem_utilities.create_hdf5_group_structure"
-                ) as mock_create:
-                    mock_group = Mock()
-                    mock_group.attrs = {}
-                    mock_create.return_value = mock_group
+                result_group = _create_hdf5_structure_with_constant_params(
+                    hdf5_file,
+                    constant_params_dict,
+                    base_directory,
+                    target_directory,
+                    logger,
+                )
 
-                    result_group = _create_hdf5_structure_with_constant_params(
-                        hdf5_file,
-                        constant_params_dict,
-                        base_directory,
-                        target_directory,
-                        logger,
-                    )
+                # Check that the group was created
+                assert result_group.name == "/study1"
 
-                    # Check that filesystem utility was called correctly
-                    mock_create.assert_called_once_with(
-                        hdf5_file, base_directory, target_directory, logger
-                    )
+                # Check that attributes were set
+                assert result_group.attrs["beta"] == 6.0
+                assert result_group.attrs["method"] == "KL"
+                assert result_group.attrs["mass"] == 0.1
 
-                    # Check that attributes were set
-                    assert result_group.attrs["beta"] == 6.0
-                    assert result_group.attrs["method"] == "KL"
-                    assert result_group.attrs["mass"] == 0.1
+            # Verify persistence after closing
+            with h5py.File(hdf5_path, "r") as hdf5_file:
+                assert hdf5_file["study1"].attrs["beta"] == 6.0
+                assert hdf5_file["study1"].attrs["method"] == "KL"
+                assert hdf5_file["study1"].attrs["mass"] == 0.1
 
         finally:
             os.unlink(hdf5_path)
@@ -185,21 +326,79 @@ class TestCreateHdf5StructureWithConstantParams:
             logger = Mock()
 
             with h5py.File(hdf5_path, "w") as hdf5_file:
-                with patch(
-                    "library.filesystem_utilities.create_hdf5_group_structure"
-                ) as mock_create:
-                    mock_group = Mock()
-                    mock_group.attrs = {}
-                    mock_create.return_value = mock_group
+                result_group = _create_hdf5_structure_with_constant_params(
+                    hdf5_file, constant_params_dict, "/base", "/base/target", logger
+                )
 
-                    result_group = _create_hdf5_structure_with_constant_params(
-                        hdf5_file, constant_params_dict, "/base", "/target", logger
-                    )
+                # Group should be created but with no attributes
+                assert result_group.name == "/target"
+                assert len(result_group.attrs) == 0
 
-                    # Should still create structure but with no
-                    # attributes
-                    mock_create.assert_called_once()
-                    assert len(result_group.attrs) == 0
+        finally:
+            os.unlink(hdf5_path)
+
+    def test_nested_directory_structure(self):
+        """Test structure creation with deeply nested directories."""
+        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as tmp_file:
+            hdf5_path = tmp_file.name
+
+        try:
+            constant_params_dict = {"beta": 6.0}
+            base_directory = "/data"
+            target_directory = "/data/project/experiment/run1"
+            logger = Mock()
+
+            with h5py.File(hdf5_path, "w") as hdf5_file:
+                result_group = _create_hdf5_structure_with_constant_params(
+                    hdf5_file,
+                    constant_params_dict,
+                    base_directory,
+                    target_directory,
+                    logger,
+                )
+
+                # Check nested structure
+                assert result_group.name == "/project/experiment/run1"
+                assert result_group.attrs["beta"] == 6.0
+
+                # Verify intermediate groups exist
+                assert "project" in hdf5_file
+                assert "experiment" in hdf5_file["project"]
+
+        finally:
+            os.unlink(hdf5_path)
+
+    def test_various_attribute_types(self):
+        """Test that various Python types are stored correctly as
+        attributes."""
+        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as tmp_file:
+            hdf5_path = tmp_file.name
+
+        try:
+            constant_params_dict = {
+                "int_param": 42,
+                "float_param": 3.14159,
+                "string_param": "Wilson",
+                "tuple_param": (4, 4, 4, 8),
+            }
+            logger = Mock()
+
+            with h5py.File(hdf5_path, "w") as hdf5_file:
+                result_group = _create_hdf5_structure_with_constant_params(
+                    hdf5_file,
+                    constant_params_dict,
+                    "/base",
+                    "/base/study",
+                    logger,
+                )
+
+                assert result_group.attrs["int_param"] == 42
+                assert result_group.attrs["float_param"] == pytest.approx(3.14159)
+                assert result_group.attrs["string_param"] == "Wilson"
+                # Tuples are stored as arrays in HDF5
+                np.testing.assert_array_equal(
+                    result_group.attrs["tuple_param"], [4, 4, 4, 8]
+                )
 
         finally:
             os.unlink(hdf5_path)
@@ -265,6 +464,12 @@ class TestExportDataframeToCsv:
                 os.unlink(csv_path)
 
 
+# =============================================================================
+# UPDATED: Tests for _export_arrays_to_hdf5_with_proper_structure
+# (now testing directly without mocking)
+# =============================================================================
+
+
 class TestExportArraysToHdf5WithProperStructure:
     """Test HDF5 array export with proper hierarchical structure."""
 
@@ -305,72 +510,61 @@ class TestExportArraysToHdf5WithProperStructure:
             ]
             logger = Mock()
 
-            with patch(
-                "src.parsing._shared_parsing._create_hdf5_structure_with_constant_params"
-            ) as mock_create:
-                mock_data_group = Mock()
-                mock_create.return_value = mock_data_group
+            _export_arrays_to_hdf5_with_proper_structure(
+                constant_params_dict,
+                multivalued_params_list,
+                arrays_dict,
+                scalar_params_list,
+                hdf5_path,
+                "/base",
+                "/base/target",
+                logger,
+                "test arrays",
+            )
 
-                # Mock file groups
-                file_groups = {}
+            # Verify the structure
+            with h5py.File(hdf5_path, "r") as hdf5_file:
+                # Check top-level group with constant params
+                target_group = hdf5_file["target"]
+                assert target_group.attrs["beta"] == 6.0
+                assert target_group.attrs["method"] == "KL"
 
-                def create_group_side_effect(name):
-                    group = Mock()
-                    group.attrs = {}
-                    group.create_dataset = Mock()
-                    file_groups[name] = group
-                    return group
+                # Check file-level groups
+                assert "file1.dat" in target_group
+                assert "file2.dat" in target_group
 
-                mock_data_group.create_group.side_effect = create_group_side_effect
-
-                _export_arrays_to_hdf5_with_proper_structure(
-                    constant_params_dict,
-                    multivalued_params_list,
-                    arrays_dict,
-                    scalar_params_list,
-                    hdf5_path,
-                    "/base",
-                    "/target",
-                    logger,
-                    "test arrays",
-                )
-
-                # Check that structure creation was called
-                mock_create.assert_called_once_with(
-                    ANY, constant_params_dict, "/base", "/target", logger
-                )
-
-                # Check that file groups were created
-                assert mock_data_group.create_group.call_count == 2
-                mock_data_group.create_group.assert_any_call("file1.dat")
-                mock_data_group.create_group.assert_any_call("file2.dat")
-
-                # Check that multivalued parameters were set as
-                # attributes
-                file1_group = file_groups["file1.dat"]
+                # Check multivalued params as attributes on file groups
+                file1_group = target_group["file1.dat"]
                 assert file1_group.attrs["mass"] == 0.1
-                assert file1_group.attrs["geometry"] == (4, 4, 4, 8)
+                np.testing.assert_array_equal(
+                    file1_group.attrs["geometry"], [4, 4, 4, 8]
+                )
 
-                file2_group = file_groups["file2.dat"]
+                file2_group = target_group["file2.dat"]
                 assert file2_group.attrs["mass"] == 0.2
-                assert file2_group.attrs["geometry"] == (8, 8, 8, 16)
+                np.testing.assert_array_equal(
+                    file2_group.attrs["geometry"], [8, 8, 8, 16]
+                )
 
-                # Check that datasets were created
-                file1_group.create_dataset.assert_any_call("correlator_1-1", data=ANY)
-                file1_group.create_dataset.assert_any_call("correlator_g5-g5", data=ANY)
+                # Check datasets
+                np.testing.assert_array_almost_equal(
+                    file1_group["correlator_1-1"][:], [1.0, 0.8, 0.6]
+                )
+                np.testing.assert_array_almost_equal(
+                    file1_group["correlator_g5-g5"][:], [0.9, 0.7, 0.5]
+                )
 
-                # Check logging
-                logger.info.assert_called_once()
-                log_call = logger.info.call_args[0][0]
-                assert "test arrays" in log_call
+            # Check logging
+            logger.info.assert_called_once()
+            log_call = logger.info.call_args[0][0]
+            assert "test arrays" in log_call
 
         finally:
             if os.path.exists(hdf5_path):
                 os.unlink(hdf5_path)
 
     def test_missing_filename_in_scalar_params(self):
-        """Test handling when filename is missing from scalar params
-        lookup."""
+        """Test handling when filename is missing from scalar params lookup."""
         with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as tmp_file:
             hdf5_path = tmp_file.name
 
@@ -379,32 +573,55 @@ class TestExportArraysToHdf5WithProperStructure:
             scalar_params_list = [{"Filename": "different_file.dat", "param": "value"}]
             logger = Mock()
 
-            with patch(
-                "src.parsing._shared_parsing._create_hdf5_structure_with_constant_params"
-            ) as mock_create:
-                mock_data_group = Mock()
-                mock_create.return_value = mock_data_group
+            # Should not raise error, just handle gracefully
+            _export_arrays_to_hdf5_with_proper_structure(
+                {},  # constant_params_dict
+                [],  # multivalued_params_list
+                arrays_dict,
+                scalar_params_list,
+                hdf5_path,
+                "/base",
+                "/base/target",
+                logger,
+            )
 
-                file_group = Mock()
-                file_group.attrs = {}
-                file_group.create_dataset = Mock()
-                mock_data_group.create_group.return_value = file_group
-
-                # Should not raise error, just handle gracefully
-                _export_arrays_to_hdf5_with_proper_structure(
-                    {},  # constant_params_dict
-                    [],  # multivalued_params_list
-                    arrays_dict,
-                    scalar_params_list,
-                    hdf5_path,
-                    "/base",
-                    "/target",
-                    logger,
+            # Verify file was created and dataset exists
+            with h5py.File(hdf5_path, "r") as hdf5_file:
+                assert "target" in hdf5_file
+                assert "missing_file.dat" in hdf5_file["target"]
+                np.testing.assert_array_equal(
+                    hdf5_file["target/missing_file.dat/array1"][:], [1, 2, 3]
                 )
 
-                # File group should still be created and dataset added
-                mock_data_group.create_group.assert_called_once_with("missing_file.dat")
-                file_group.create_dataset.assert_called_once_with("array1", data=ANY)
+        finally:
+            if os.path.exists(hdf5_path):
+                os.unlink(hdf5_path)
+
+    def test_empty_arrays_dict(self):
+        """Test export with no arrays (edge case)."""
+        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as tmp_file:
+            hdf5_path = tmp_file.name
+
+        try:
+            logger = Mock()
+
+            _export_arrays_to_hdf5_with_proper_structure(
+                {"beta": 6.0},  # constant_params_dict
+                [],  # multivalued_params_list
+                {},  # empty arrays_dict
+                [],  # empty scalar_params_list
+                hdf5_path,
+                "/base",
+                "/base/target",
+                logger,
+            )
+
+            # Verify structure was created even with no data
+            with h5py.File(hdf5_path, "r") as hdf5_file:
+                assert "target" in hdf5_file
+                assert hdf5_file["target"].attrs["beta"] == 6.0
+                # No file groups should exist
+                assert len(list(hdf5_file["target"].keys())) == 0
 
         finally:
             if os.path.exists(hdf5_path):
