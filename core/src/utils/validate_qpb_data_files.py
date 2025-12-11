@@ -55,15 +55,15 @@ import os
 import sys
 import glob
 import datetime
-from functools import partial
 
 import click
 
-from library import (
-    LoggingWrapper,
-    validate_input_directory,
-    validate_output_directory,
-    validate_output_file,
+# TODO: Investigate whether to use library.utils.logging_utilities
+from library import LoggingWrapper
+
+from library.validation.click_validators import (
+    directory,
+    validate_log_filename,
 )
 
 
@@ -84,8 +84,25 @@ def get_yes_or_no_user_response(prompt_text, logger=None):
     "--raw_data_files_set_directory_path",
     "raw_data_files_set_directory_path",
     required=True,
-    callback=validate_input_directory,
+    callback=directory.must_exist,
     help="Path to the raw data files set directory",
+)
+@click.option(
+    "-ax_files_dir",
+    "--auxiliary_files_directory",
+    "auxiliary_files_directory",
+    default=None,
+    callback=directory.can_create,
+    help="Directory where the script's log file will be stored.",
+)
+@click.option(
+    "-metadata_dir",
+    "--metadata_directory",
+    "metadata_directory",
+    required=False,
+    default=None,
+    callback=directory.can_create,
+    help="Directory for metadata files",
 )
 @click.option(
     "-log_on",
@@ -96,46 +113,29 @@ def get_yes_or_no_user_response(prompt_text, logger=None):
     help="Enable logging.",
 )
 @click.option(
-    "-ax_files_dir",
-    "--auxiliary_files_directory",
-    "auxiliary_files_directory",
+    "-logs_dir",
+    "--logs_directory",
+    "logs_directory",
+    required=False,
     default=None,
-    callback=partial(validate_output_directory, check_parent_exists=True),
-    help="Directory where the script's log file will be stored.",
+    callback=directory.can_create,
+    help="Directory for log files",
 )
 @click.option(
     "-log_name",
     "--log_filename",
     "log_filename",
     default=None,
-    callback=partial(validate_output_file, extensions=[".log"]),
+    callback=validate_log_filename,
     help="Specific name for the script's log file.",
-)
-@click.option(
-    "-metadata_dir",
-    "--metadata_directory",
-    "metadata_directory",
-    required=False,
-    default=None,
-    callback=validate_output_directory,
-    help="Directory for metadata files (default: auxiliary_files_directory/metadata)",
-)
-@click.option(
-    "-logs_dir",
-    "--logs_directory",
-    "logs_directory",
-    required=False,
-    default=None,
-    callback=validate_output_directory,
-    help="Directory for log files (default: auxiliary_files_directory/logs)",
 )
 def main(
     raw_data_files_set_directory_path,
-    enable_logging,
     auxiliary_files_directory,
-    log_filename,
     metadata_directory,
+    enable_logging,
     logs_directory,
+    log_filename,
 ):
     # HANDLE EMPTY INPUT ARGUMENTS
 

@@ -66,16 +66,18 @@ Dependencies:
     - Custom library modules for analysis and validation
 """
 
-import sys
 import os
+import sys
 
-import pandas as pd
 import click
+import pandas as pd
 
-from library.validation.filesystem import is_valid_file
-
+# Import library components
+from library.validation.click_validators import (
+    csv_file,
+    directory,
+)
 from library import (
-    validate_output_directory,
     load_csv,
     DataFrameAnalyzer,
     TableGenerator,
@@ -88,7 +90,7 @@ from library import (
     "--csv_file_path",
     "csv_file_path",
     required=True,
-    callback=validate_file,
+    callback=csv_file.input,
     help="Path to the CSV file to be inspected.",
 )
 @click.option(
@@ -96,7 +98,7 @@ from library import (
     "--output_directory",
     "output_directory",
     default=None,
-    callback=validate_output_directory,
+    callback=directory.can_create,
     help="Directory where output files will be saved.",
 )
 @click.option(

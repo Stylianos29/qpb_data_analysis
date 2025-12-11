@@ -67,15 +67,16 @@ import sys
 import click
 import h5py
 
-from library.validation.filesystem import is_valid_file
+from library.validation.click_validators import hdf5_file
+from library import is_valid_file
 
 
 @click.command()
 @click.option(
-    "--hdf5_file_path",
-    "hdf5_file_path",
     "-hdf5",
-    default=None,
+    "--hdf5_file_path",
+    required=True,
+    callback=hdf5_file.input,
     help="Path to the HDF5 file to be inspected.",
 )
 @click.option(

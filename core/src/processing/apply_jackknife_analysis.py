@@ -34,16 +34,13 @@ from typing import Optional
 import click
 import numpy as np
 
-# import pandas as pd
-
 # Import library components
 from library.data.hdf5_analyzer import HDF5Analyzer
 from library.data.analyzer import DataFrameAnalyzer
 from library.data import load_csv
-
-# from library.constants import PARAMETERS_WITH_EXPONENTIAL_FORMAT, PARAMETER_LABELS
 from library.validation.click_validators import (
     hdf5_file,
+    csv_file,
     directory,
     validate_log_filename,
 )
@@ -76,8 +73,8 @@ from src.processing._jackknife_filter import load_filter_config, apply_filename_
     "-csv",
     "--processed_parameters_csv",
     required=True,
-    type=click.Path(exists=True, dir_okay=False, readable=True),
-    help="Path to processed_parameter_values.csv (from Stage 2A) for consistent parameter values.",
+    callback=csv_file.input,
+    help="Path to processed_parameter_values.csv for consistent parameter values.",
 )
 @click.option(
     "-o",
