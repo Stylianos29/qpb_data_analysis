@@ -146,8 +146,11 @@ DATASET_DESCRIPTIONS = {
     ),
     # Metadata
     "gauge_configuration_labels": (
-        "Array of gauge field configuration labels used in this jackknife analysis. "
-        "Each label corresponds to one gauge configuration in the ensemble."
+        "Array of gauge configuration labels corresponding to jackknife samples. "
+        "IMPORTANT: gauge_configuration_labels[i] identifies the configuration that was "
+        "EXCLUDED when computing the i-th jackknife sample (row i of *_jackknife_samples "
+        "datasets). This enables identification of problematic configurations by examining "
+        "which exclusion produces anomalous results."
     ),
     "qpb_log_filenames": (
         "Array of QPB log filenames corresponding to each gauge configuration. "
