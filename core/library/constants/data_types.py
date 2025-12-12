@@ -50,6 +50,15 @@ CONVERTERS_MAPPING = {
     "Average_ginsparg_wilson_relation_values": lambda x: (
         ast.literal_eval(x) if x.strip() else x
     ),
+    "Average_CG_calculation_time_per_spinor": lambda x: (
+        ast.literal_eval(x) if x.strip() else x
+    ),
+    "Average_number_of_CG_iterations_per_spinor": lambda x: (
+        ast.literal_eval(x) if x.strip() else x
+    ),
+    "Average_number_of_MSCG_iterations_per_spinor": lambda x: (
+        ast.literal_eval(x) if x.strip() else x
+    ),
     "Linear_fit_slope": lambda x: ast.literal_eval(x) if x.strip() else x,
     # TODO: Revisit whether Kernel_operator_type needs a converter
     # "Kernel_operator_type": lambda x: pd.Categorical( x,
