@@ -315,7 +315,7 @@ function run_stage_2b() {
     if ! $skip_summaries; then
         echo ""
         echo "Generating HDF5 tree..."
-        generate_hdf5_tree "$jackknife_hdf5_path" "$output_directory"
+        generate_hdf5_summary "$jackknife_hdf5_path" "$output_directory"
     fi
     
     return 0

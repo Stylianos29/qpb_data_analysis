@@ -309,7 +309,7 @@ function main() {
         echo ""
         echo "Generating summary files..."
         generate_csv_summary "$csv_output_path" "$output_directory"
-        generate_hdf5_tree "$hdf5_log_output_path" "$output_directory"
+        generate_hdf5_summary "$hdf5_log_output_path" "$output_directory"
     fi
     
     # =========================================================================
@@ -345,7 +345,7 @@ function main() {
         if ! $skip_summaries; then
             echo ""
             echo "Generating HDF5 tree..."
-            generate_hdf5_tree "$hdf5_corr_output_path" "$output_directory"
+            generate_hdf5_summary "$hdf5_corr_output_path" "$output_directory"
         fi
     else
         echo ""
