@@ -690,6 +690,11 @@ def main(
             for path in paths:
                 try:
                     ds = hdf5_file_handle[path]
+
+                    # Type guard: ensure it's a Dataset
+                    if not isinstance(ds, h5py.Dataset):
+                        continue
+
                     if dtype_str is None:
                         dtype_str = format_dtype(ds.dtype)
 
