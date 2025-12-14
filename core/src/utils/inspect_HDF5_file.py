@@ -499,7 +499,7 @@ def main(
             base_filename = output_filename
         else:
             base_filename = os.path.splitext(os.path.basename(hdf5_file_path))[0]
-            base_filename = f"{base_filename}_summary"
+            base_filename = f"{base_filename}_HDF5_summary"
 
         output_file_path = os.path.join(
             output_directory, f"{base_filename}.{output_format}"
