@@ -24,12 +24,18 @@
 # - Gracefully skips data sets that lack required inputs for requested stages
 # - In batch mode, missing inputs cause skip (not error) for robustness
 #
+# DATA FILE SET FILTERING:
+# - Use --filter flag to selectively include/exclude data file sets
+# - Filter configuration via JSON file (default: run_complete_pipeline_batch.json)
+# - Supports both allowlist (include) and blocklist (exclude) modes
+# - Filter paths are relative to input_base_dir
+#
 # PIPELINE BEHAVIOR:
-# For each data set discovered:
-# - Detects data set type (correlators vs. parameters-only)
+# For each data file set discovered:
+# - Detects data file set type (correlators vs. parameters-only)
 # - Executes appropriate pipeline stages via run_complete_pipeline.sh
 # - Updates timestamp on successful completion
-# - Continues to next data set on failure (non-blocking)
+# - Continues to next data file set on failure (non-blocking)
 #
 # DIRECTORY STRUCTURE:
 # The script expects data organized as:
@@ -90,6 +96,10 @@ DEFAULT_INPUT_BASE_DIR="$(realpath "${SCRIPT_DIR}/../../data_files/raw")"
 DEFAULT_OUTPUT_BASE_DIR="$(realpath "${SCRIPT_DIR}/../../data_files/processed")"
 DEFAULT_PLOTS_BASE_DIR="$(realpath "${SCRIPT_DIR}/../../output/plots")"
 
+# Default filter configuration file
+DEFAULT_FILTER_FILENAME="run_complete_pipeline_batch.json"
+DEFAULT_FILTER_FILE="$(realpath "${SCRIPT_DIR}/${DEFAULT_FILTER_FILENAME}")"
+
 # Auxiliary directory structure
 AUXILIARY_TIMESTAMPS_SUBDIR="timestamps"
 
@@ -144,6 +154,12 @@ OPTIONAL ARGUMENTS:
                                Note: In batch mode, data sets lacking required
                                inputs are skipped gracefully (not errors)
 
+  --filter [filter_file]       Enable data file set filtering (REQUIRES explicit flag)
+                               - No argument: use default file ($DEFAULT_FILTER_FILENAME)
+                               - With argument: use specified JSON file
+                               Filter file must exist and be readable
+                               Paths in filter are relative to input_base_directory
+
   --all                        Force reprocessing of ALL data sets,
                                bypassing timestamp checks
 
@@ -160,13 +176,34 @@ OPTIONAL ARGUMENTS:
 
   -h, --help                   Display this help message
 
+FILTER CONFIGURATION:
+  The filter JSON file controls which data file sets to process:
+  
+  Structure:
+    {
+      "filter_type": "data-file-set",
+      "include": [],
+      "exclude": ["path/to/data_file_set1", "path/to/data_file_set2"]
+    }
+  
+  Behavior:
+  - If "include" is non-empty: Process ONLY listed data file sets (allowlist)
+  - If "include" is empty and "exclude" is non-empty: Process all EXCEPT listed (blocklist)
+  - If both empty: No filtering (same as not using --filter)
+  - If both non-empty: "include" takes precedence (allowlist mode)
+  
+  Notes:
+  - Paths are relative to input_base_directory
+  - Exact string matching (no wildcards)
+  - Filter must be explicitly enabled with --filter flag
+
 TIMESTAMP CACHING:
-  The script tracks the processing status of each data set using timestamp
+  The script tracks the processing status of each data file set using timestamp
   files stored in the output directory structure:
-    output_dir/data_set_name/auxiliary/run_complete_pipeline.timestamp
+    output_dir/data_file_set_name/auxiliary/run_complete_pipeline.timestamp
 
   Behavior:
-  - Data sets are skipped if unmodified since last successful run
+  - Data file sets are skipped if unmodified since last successful run
   - Failed runs don't update timestamps (will retry on next batch run)
   - Use --all or --force to ignore timestamps and reprocess everything
 
@@ -177,19 +214,25 @@ SELECTIVE STAGE EXECUTION:
   - Stage 3: Requires Stage 2 outputs + correlators (jackknife HDF5)
   
   Batch mode behavior:
-  - Data sets lacking required inputs are SKIPPED (not errors)
-  - Allows mixed processing across heterogeneous data sets
-  - Example: --stages 3 skips parameter-only data sets automatically
+  - Data file sets lacking required inputs are SKIPPED (not errors)
+  - Allows mixed processing across heterogeneous data file sets
+  - Example: --stages 3 skips parameter-only data file sets automatically
 
 EXAMPLES:
-  # Process all data sets under default raw directory
+  # Process all data file sets under default raw directory
   $SCRIPT_NAME
 
-  # Process all data sets under a specific directory
+  # Process all data file sets under a specific directory
   $SCRIPT_NAME -i /path/to/raw/data/
 
-  # Process only data sets under the 'invert' program directory
+  # Process only data file sets under the 'invert' program directory
   $SCRIPT_NAME -i ../data_files/raw/invert/
+
+  # Use default filter to exclude certain data file sets
+  $SCRIPT_NAME --filter
+
+  # Use custom filter configuration
+  $SCRIPT_NAME --filter my_custom_filter.json
 
   # Rerun only processing and analysis (skip parsing)
   $SCRIPT_NAME --stages 2,3
@@ -197,7 +240,7 @@ EXAMPLES:
   # Rerun only analysis (requires existing Stage 2 outputs)
   $SCRIPT_NAME --stages 3
 
-  # Force reprocess all data sets
+  # Force reprocess all data file sets
   $SCRIPT_NAME --all
 
   # Disable visualization for faster batch processing
@@ -206,12 +249,16 @@ EXAMPLES:
   # Fast batch processing (no checks, summaries, or plots)
   $SCRIPT_NAME --no-plots --skip_checks --skip_summaries
 
+  # Filtered processing with custom settings
+  $SCRIPT_NAME --filter custom.json --stages 2,3 --all
+
 NOTES:
-  - The script is non-blocking: failures in one data set don't stop others
-  - Each data set runs independently via run_complete_pipeline.sh
-  - Progress is reported for each data set processed
+  - The script is non-blocking: failures in one data file set don't stop others
+  - Each data file set runs independently via run_complete_pipeline.sh
+  - Progress is reported for each data file set processed
   - Summary statistics are displayed at the end
   - Visualization is auto-enabled by default (use --no-plots to disable)
+  - Filtering is only active when --filter flag is explicitly used
 
 EOF
     exit 0
@@ -271,10 +318,9 @@ function should_run_stage() {
 }
 
 function discover_data_sets() {
-    # Discover all data set directories under input base directory
+    # Discover all data file set directories under input base directory
     #
-    # Traverses the directory tree to find valid data set directories.
-    # A valid data set directory is a leaf directory (no subdirectories)
+    # A valid data file set directory is a leaf directory (no subdirectories)
     # or a directory containing .txt or .dat files.
     #
     # Arguments:
@@ -282,7 +328,7 @@ function discover_data_sets() {
     #   $2 - discovered_sets_arr : Name of array to store results
     #
     # Returns:
-    #   Populates the named array with discovered data set paths
+    #   Populates the named array with discovered data file set paths
     
     local input_base_dir="$1"
     local -n discovered_sets_arr="$2"
@@ -307,25 +353,25 @@ function discover_data_sets() {
 }
 
 function should_process_data_set() {
-    # Determine if a data set should be processed based on timestamps
+    # Check if a data file set should be processed based on timestamp
     #
     # Arguments:
-    #   $1 - data_set_dir   : Data set directory
-    #   $2 - timestamp_file : Path to timestamp file
+    #   $1 - data_set_dir   : Data file set directory
+    #   $2 - timestamp_file : Timestamp file path
     #
     # Returns:
-    #   0 - Should process (modified or force mode)
-    #   1 - Should skip (not modified)
+    #   0 - Should process
+    #   1 - Should skip
     
     local data_set_dir="$1"
     local timestamp_file="$2"
     
-    # Force mode: always process
-    if $force_all; then
+    # If force_all is enabled, always process
+    if [[ "$force_all" == "true" ]]; then
         return 0
     fi
     
-    # No timestamp file: must process
+    # If timestamp file doesn't exist, must process
     if [[ ! -f "$timestamp_file" ]]; then
         return 0
     fi
@@ -364,12 +410,12 @@ function compute_output_directory() {
 }
 
 function can_process_stage() {
-    # Check if a data set can satisfy the requirements for a given stage
-    # Used in batch mode for graceful skipping of incompatible data sets
+    # Check if a data file set can satisfy the requirements for a given stage
+    # Used in batch mode for graceful skipping of incompatible data file sets
     #
     # Arguments:
     #   $1 - stage      : Stage number (1, 2, or 3)
-    #   $2 - output_dir : Output directory for the data set
+    #   $2 - output_dir : Output directory for the data file set
     #
     # Returns:
     #   0 - Can process this stage
@@ -411,12 +457,261 @@ function can_process_stage() {
     esac
 }
 
-function process_single_data_set() {
-    # Process a single data set by calling run_complete_pipeline.sh
+function load_filter_config() {
+    # Load and validate filter configuration from JSON file
     #
     # Arguments:
-    #   $1 - data_set_dir     : Input data set directory
-    #   $2 - output_dir       : Output directory for this data set
+    #   $1 - filter_file : Path to filter JSON file
+    #   $2 - include_var : Name of array variable to store include list
+    #   $3 - exclude_var : Name of array variable to store exclude list
+    #
+    # Returns:
+    #   0 - Success
+    #   1 - Failure (file error or invalid JSON)
+    
+    local filter_file="$1"
+    local include_var="$2"
+    local exclude_var="$3"
+    
+    # Check if jq is available
+    if ! command -v jq &> /dev/null; then
+        echo "ERROR: jq is required for filter configuration parsing but not found" >&2
+        echo "  Please install jq: sudo apt-get install jq" >&2
+        return 1
+    fi
+    
+    # Validate file exists and is readable
+    if [[ ! -f "$filter_file" ]]; then
+        echo "ERROR: Filter file not found: $filter_file" >&2
+        return 1
+    fi
+    
+    if [[ ! -r "$filter_file" ]]; then
+        echo "ERROR: Filter file not readable: $filter_file" >&2
+        return 1
+    fi
+    
+    # Validate JSON structure
+    if ! jq -e . "$filter_file" > /dev/null 2>&1; then
+        echo "ERROR: Invalid JSON in filter file: $filter_file" >&2
+        return 1
+    fi
+    
+    # Check for required fields
+    if ! jq -e '.filter_type' "$filter_file" > /dev/null 2>&1; then
+        echo "ERROR: Missing 'filter_type' field in filter file" >&2
+        return 1
+    fi
+    
+    if ! jq -e '.include' "$filter_file" > /dev/null 2>&1; then
+        echo "ERROR: Missing 'include' field in filter file" >&2
+        return 1
+    fi
+    
+    if ! jq -e '.exclude' "$filter_file" > /dev/null 2>&1; then
+        echo "ERROR: Missing 'exclude' field in filter file" >&2
+        return 1
+    fi
+    
+    # Validate filter_type
+    local filter_type
+    filter_type=$(jq -r '.filter_type' "$filter_file")
+    if [[ "$filter_type" != "data-file-set" ]]; then
+        echo "ERROR: Invalid filter_type '$filter_type' (expected 'data-file-set')" >&2
+        return 1
+    fi
+    
+    # Parse include list
+    local include_count
+    include_count=$(jq '.include | length' "$filter_file")
+    eval "$include_var=()"
+    
+    if [[ $include_count -gt 0 ]]; then
+        while IFS= read -r path; do
+            eval "$include_var+=(\"\$path\")"
+        done < <(jq -r '.include[]' "$filter_file")
+    fi
+    
+    # Parse exclude list
+    local exclude_count
+    exclude_count=$(jq '.exclude | length' "$filter_file")
+    eval "$exclude_var=()"
+    
+    if [[ $exclude_count -gt 0 ]]; then
+        while IFS= read -r path; do
+            eval "$exclude_var+=(\"\$path\")"
+        done < <(jq -r '.exclude[]' "$filter_file")
+    fi
+    
+    return 0
+}
+
+function get_relative_path() {
+    # Get relative path of data file set from input_base_dir
+    #
+    # Arguments:
+    #   $1 - data_file_set_path : Absolute path to data file set
+    #   $2 - input_base_dir     : Absolute path to input base directory
+    #
+    # Returns:
+    #   Prints the relative path
+    
+    local data_file_set_path="$1"
+    local input_base_dir="$2"
+    
+    # Remove base directory prefix and leading slash
+    local rel_path="${data_file_set_path#"$input_base_dir"}"
+    rel_path="${rel_path#/}"
+    
+    echo "$rel_path"
+}
+
+function should_process_data_file_set_filter() {
+    # Check if a data file set should be processed based on filter configuration
+    #
+    # Arguments:
+    #   $1 - data_file_set_path : Absolute path to data file set
+    #   $2 - input_base_dir     : Absolute path to input base directory
+    #   $3 - include_array      : Name of include array variable
+    #   $4 - exclude_array      : Name of exclude array variable
+    #   $5 - reason_var         : Name of variable to store skip reason (output)
+    #
+    # Returns:
+    #   0 - Should process
+    #   1 - Should skip (reason stored in reason_var)
+    
+    local data_file_set_path="$1"
+    local input_base_dir="$2"
+    local include_array="$3"
+    local exclude_array="$4"
+    local reason_var="$5"
+    
+    # Get relative path
+    local rel_path
+    rel_path=$(get_relative_path "$data_file_set_path" "$input_base_dir")
+    
+    # Get array sizes
+    local include_size=0
+    local exclude_size=0
+    
+    eval "include_size=\${#${include_array}[@]}"
+    eval "exclude_size=\${#${exclude_array}[@]}"
+    
+    # If both lists are empty, no filtering
+    if [[ $include_size -eq 0 && $exclude_size -eq 0 ]]; then
+        return 0
+    fi
+    
+    # If include list is non-empty, use allowlist mode
+    if [[ $include_size -gt 0 ]]; then
+        # Check if data file set is in include list
+        local found=false
+        local i
+        for ((i=0; i<include_size; i++)); do
+            local include_path
+            eval "include_path=\${${include_array}[$i]}"
+            if [[ "$rel_path" == "$include_path" ]]; then
+                found=true
+                break
+            fi
+        done
+        
+        if [[ "$found" == "true" ]]; then
+            return 0  # In allowlist, process
+        else
+            eval "$reason_var='not in include list (allowlist mode)'"
+            return 1  # Not in allowlist, skip
+        fi
+    fi
+    
+    # If only exclude list is non-empty, use blocklist mode
+    if [[ $exclude_size -gt 0 ]]; then
+        # Check if data file set is in exclude list
+        local i
+        for ((i=0; i<exclude_size; i++)); do
+            local exclude_path
+            eval "exclude_path=\${${exclude_array}[$i]}"
+            if [[ "$rel_path" == "$exclude_path" ]]; then
+                eval "$reason_var='in exclude list (blocklist mode)'"
+                return 1  # In blocklist, skip
+            fi
+        done
+        
+        return 0  # Not in blocklist, process
+    fi
+    
+    return 0
+}
+
+function validate_filter_paths() {
+    # Validate that filter paths match discovered data file sets
+    # Warns about paths that don't match any discovered data file sets
+    #
+    # Arguments:
+    #   $1 - discovered_array : Name of array with discovered data file set paths
+    #   $2 - input_base_dir   : Absolute path to input base directory
+    #   $3 - include_array    : Name of include array variable
+    #   $4 - exclude_array    : Name of exclude array variable
+    #
+    # Returns:
+    #   Prints warnings for unmatched paths (always returns 0)
+    
+    local discovered_array="$1"
+    local input_base_dir="$2"
+    local include_array="$3"
+    local exclude_array="$4"
+    
+    # Build set of discovered relative paths
+    local -A discovered_set
+    local discovered_size
+    eval "discovered_size=\${#${discovered_array}[@]}"
+    
+    local i
+    for ((i=0; i<discovered_size; i++)); do
+        local data_file_set_path
+        eval "data_file_set_path=\${${discovered_array}[$i]}"
+        local rel_path
+        rel_path=$(get_relative_path "$data_file_set_path" "$input_base_dir")
+        discovered_set["$rel_path"]=1
+    done
+    
+    # Check include list
+    local include_size
+    eval "include_size=\${#${include_array}[@]}"
+    
+    if [[ $include_size -gt 0 ]]; then
+        for ((i=0; i<include_size; i++)); do
+            local include_path
+            eval "include_path=\${${include_array}[$i]}"
+            if [[ ! -v discovered_set["$include_path"] ]]; then
+                echo "WARNING: Filter include path does not match any discovered data file set: $include_path" >&2
+            fi
+        done
+    fi
+    
+    # Check exclude list
+    local exclude_size
+    eval "exclude_size=\${#${exclude_array}[@]}"
+    
+    if [[ $exclude_size -gt 0 ]]; then
+        for ((i=0; i<exclude_size; i++)); do
+            local exclude_path
+            eval "exclude_path=\${${exclude_array}[$i]}"
+            if [[ ! -v discovered_set["$exclude_path"] ]]; then
+                echo "WARNING: Filter exclude path does not match any discovered data file set: $exclude_path" >&2
+            fi
+        done
+    fi
+    
+    return 0
+}
+
+function process_single_data_set() {
+    # Process a single data file set by calling run_complete_pipeline.sh
+    #
+    # Arguments:
+    #   $1 - data_set_dir     : Input data file set directory
+    #   $2 - output_dir       : Output directory for this data file set
     #   $3 - plots_base_dir   : Base plots directory (optional)
     #   $4 - log_base_dir     : Base log directory (optional)
     #   $5 - stages_to_run    : Comma-separated stages (optional)
@@ -497,6 +792,8 @@ skip_checks=false
 skip_summaries=false
 disable_plots=false
 clean_plots=false
+use_filter=false
+filter_file=""
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -513,17 +810,24 @@ while [[ $# -gt 0 ]]; do
             plots_base_dir="$2"
             shift 2
             ;;
-        --no-plots)
-            disable_plots=true
-            shift
-            ;;
         -log_dir|--log_base_directory)
             log_base_dir="$2"
             shift 2
             ;;
         --stages)
-            stages_to_run=$(validate_stages_argument "$2") || exit 1
+            stages_to_run="$2"
             shift 2
+            ;;
+        --filter)
+            use_filter=true
+            # Check if next argument is a file path or another flag
+            if [[ $# -gt 1 && "$2" != -* ]]; then
+                filter_file="$2"
+                shift 2
+            else
+                filter_file="$DEFAULT_FILTER_FILE"
+                shift 1
+            fi
             ;;
         --all|--force)
             force_all=true
@@ -537,7 +841,11 @@ while [[ $# -gt 0 ]]; do
             skip_summaries=true
             shift
             ;;
-        --clean-plots|--clean_plots)
+        --no-plots)
+            disable_plots=true
+            shift
+            ;;
+        --clean-plots)
             clean_plots=true
             shift
             ;;
@@ -545,42 +853,42 @@ while [[ $# -gt 0 ]]; do
             usage
             ;;
         *)
-            echo "ERROR: Unknown option: $1" >&2
-            usage
+            echo "ERROR: Unknown argument: $1" >&2
+            echo "Use -h or --help for usage information" >&2
+            exit 1
             ;;
     esac
 done
 
 # =============================================================================
-# SECTION 6: INPUT VALIDATION AND SETUP
+# SECTION 6: VALIDATION AND SETUP
 # =============================================================================
 
-# Set default input directory if not specified
-if [[ -z "$input_base_dir" ]]; then
-    input_base_dir="$DEFAULT_INPUT_BASE_DIR"
-    echo "INFO: Using default input directory: $(get_display_path "$input_base_dir")"
+# Validate and normalize --stages argument if provided
+if [[ -n "$stages_to_run" ]]; then
+    if ! stages_to_run=$(validate_stages_argument "$stages_to_run"); then
+        exit 1
+    fi
 fi
 
-# Validate and resolve input directory
+# Setup input base directory
+if [[ -z "$input_base_dir" ]]; then
+    input_base_dir="$DEFAULT_INPUT_BASE_DIR"
+fi
+
+# Ensure input directory exists
 if [[ ! -d "$input_base_dir" ]]; then
-    echo "ERROR: Input directory does not exist: $input_base_dir" >&2
+    echo "ERROR: Input base directory not found: $input_base_dir" >&2
     exit 1
 fi
 input_base_dir="$(realpath "$input_base_dir")"
 
-# Set default output directory if not specified
+# Setup output base directory
 if [[ -z "$output_base_dir" ]]; then
-    # Try to mirror input structure
-    if [[ "$input_base_dir" == *"/data_files/raw"* ]]; then
-        output_base_dir="${input_base_dir/\/raw/\/processed}"
-        echo "INFO: Auto-detected output directory: $(get_display_path "$output_base_dir")"
-    else
-        output_base_dir="$DEFAULT_OUTPUT_BASE_DIR"
-        echo "INFO: Using default output directory: $(get_display_path "$output_base_dir")"
-    fi
+    output_base_dir="$DEFAULT_OUTPUT_BASE_DIR"
 fi
 
-# Ensure output base directory exists
+# Ensure output directory exists
 if [[ ! -d "$output_base_dir" ]]; then
     mkdir -p "$output_base_dir" || {
         echo "ERROR: Failed to create output directory: $output_base_dir" >&2
@@ -590,7 +898,7 @@ if [[ ! -d "$output_base_dir" ]]; then
 fi
 output_base_dir="$(realpath "$output_base_dir")"
 
-# Handle plots directory (auto-enable unless --no-plots specified)
+# Handle plots directory
 if ! $disable_plots; then
     if [[ -z "$plots_base_dir" ]]; then
         plots_base_dir="$DEFAULT_PLOTS_BASE_DIR"
@@ -615,6 +923,35 @@ fi
 if [[ ! -f "$SINGLE_SET_SCRIPT" ]]; then
     echo "ERROR: Single-set pipeline script not found: $SINGLE_SET_SCRIPT" >&2
     exit 1
+fi
+
+# Load filter configuration if requested
+filter_include=()
+filter_exclude=()
+filter_mode=""
+
+if [[ "$use_filter" == "true" ]]; then
+    echo "INFO: Loading filter configuration from: $(get_display_path "$filter_file")"
+    
+    if ! load_filter_config "$filter_file" filter_include filter_exclude; then
+        echo "ERROR: Failed to load filter configuration" >&2
+        exit 1
+    fi
+    
+    # Determine filter mode
+    if [[ ${#filter_include[@]} -gt 0 ]]; then
+        filter_mode="ALLOWLIST"
+        echo "INFO: Filter mode: ALLOWLIST (include) with ${#filter_include[@]} data file set(s)"
+        if [[ ${#filter_exclude[@]} -gt 0 ]]; then
+            echo "WARNING: Both 'include' and 'exclude' lists are non-empty; using ALLOWLIST mode (include takes precedence)"
+        fi
+    elif [[ ${#filter_exclude[@]} -gt 0 ]]; then
+        filter_mode="BLOCKLIST"
+        echo "INFO: Filter mode: BLOCKLIST (exclude) with ${#filter_exclude[@]} data file set(s)"
+    else
+        filter_mode="NONE"
+        echo "WARNING: Filter file loaded but both 'include' and 'exclude' are empty (no filtering will occur)"
+    fi
 fi
 
 # =============================================================================
@@ -647,30 +984,45 @@ if [[ "$force_all" == "true" ]]; then
 else
     echo "Mode: INCREMENTAL (using timestamps)"
 fi
+
+if [[ "$use_filter" == "true" ]]; then
+    echo "Filtering: ENABLED ($filter_mode mode)"
+else
+    echo "Filtering: DISABLED"
+fi
+
 echo "==================================================================="
 echo ""
 
-# Discover all data sets
-echo "Discovering data sets..."
+# Discover all data file sets
+echo "Discovering data file sets..."
 data_sets=()
 if ! discover_data_sets "$input_base_dir" data_sets; then
-    echo "ERROR: Failed to discover data sets" >&2
+    echo "ERROR: Failed to discover data file sets" >&2
     exit 1
 fi
 
 total_sets=${#data_sets[@]}
 if [[ $total_sets -eq 0 ]]; then
-    echo "WARNING: No data sets found under $(get_display_path "$input_base_dir")"
-    echo "Data sets should contain .txt or .dat files"
+    echo "WARNING: No data file sets found under $(get_display_path "$input_base_dir")"
+    echo "Data file sets should contain .txt or .dat files"
     exit 0
 fi
 
-echo "Found $total_sets data set(s) to process"
+echo "Found $total_sets data file set(s)"
+
+# Validate filter paths if filtering is enabled
+if [[ "$use_filter" == "true" && "$filter_mode" != "NONE" ]]; then
+    validate_filter_paths data_sets "$input_base_dir" filter_include filter_exclude
+fi
+
 echo ""
 
 # Initialize counters
 processed_count=0
-skipped_count=0
+skipped_timestamp_count=0
+skipped_filter_count=0
+skipped_stage_count=0
 success_count=0
 failure_count=0
 
@@ -679,6 +1031,19 @@ set_index=0
 for data_set_dir in "${data_sets[@]}"; do
     ((set_index++))
     data_set_name=$(basename "$data_set_dir")
+    
+    # Get relative path for display
+    rel_path=$(get_relative_path "$data_set_dir" "$input_base_dir")
+    
+    # Check filter first (if enabled)
+    if [[ "$use_filter" == "true" && "$filter_mode" != "NONE" ]]; then
+        skip_reason=""
+        if ! should_process_data_file_set_filter "$data_set_dir" "$input_base_dir" filter_include filter_exclude skip_reason; then
+            echo "⊘ SKIPPING [$set_index/$total_sets]: $rel_path (filter: $skip_reason)"
+            ((skipped_filter_count++))
+            continue
+        fi
+    fi
     
     # Compute output directory
     output_dir=$(compute_output_directory "$data_set_dir" "$input_base_dir" "$output_base_dir")
@@ -705,8 +1070,8 @@ for data_set_dir in "${data_sets[@]}"; do
     
     # Check if should process based on timestamps
     if ! should_process_data_set "$data_set_dir" "$timestamp_file"; then
-        echo "⊘ SKIPPING: $data_set_name (no changes detected)"
-        ((skipped_count++))
+        echo "⊘ SKIPPING [$set_index/$total_sets]: $rel_path (timestamp: no changes detected)"
+        ((skipped_timestamp_count++))
         continue
     fi
     
@@ -717,16 +1082,16 @@ for data_set_dir in "${data_sets[@]}"; do
         # Check each requested stage
         if should_run_stage 2; then
             if ! can_process_stage 2 "$output_dir"; then
-                echo "⊘ SKIPPING: $data_set_name (Stage 2 requested but missing Stage 1 outputs)"
-                ((skipped_count++))
+                echo "⊘ SKIPPING [$set_index/$total_sets]: $rel_path (stage validation: Stage 2 requested but missing Stage 1 outputs)"
+                ((skipped_stage_count++))
                 continue
             fi
         fi
         
         if should_run_stage 3; then
             if ! can_process_stage 3 "$output_dir"; then
-                echo "⊘ SKIPPING: $data_set_name (Stage 3 requested but missing Stage 2 outputs or no correlators)"
-                ((skipped_count++))
+                echo "⊘ SKIPPING [$set_index/$total_sets]: $rel_path (stage validation: Stage 3 requested but missing Stage 2 outputs or no correlators)"
+                ((skipped_stage_count++))
                 continue
             fi
         fi
@@ -734,7 +1099,7 @@ for data_set_dir in "${data_sets[@]}"; do
     
     # Process this data set
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "▶ PROCESSING [$set_index/$total_sets]: $data_set_name"
+    echo "▶ PROCESSING [$set_index/$total_sets]: $rel_path"
     echo "  Input:  $(get_display_path "$data_set_dir")"
     echo "  Output: $(get_display_path "$output_dir")"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -756,35 +1121,47 @@ for data_set_dir in "${data_sets[@]}"; do
         update_timestamp "$data_set_dir" "$timestamp_file"
         ((success_count++))
         echo ""
-        echo "✓ SUCCESS: $data_set_name completed successfully"
+        echo "✓ SUCCESS [$set_index/$total_sets]: $rel_path completed successfully"
         echo ""
     else
         # Failure - don't update timestamp
         ((failure_count++))
         echo ""
-        echo "✗ FAILED: $data_set_name encountered errors"
+        echo "✗ FAILED [$set_index/$total_sets]: $rel_path encountered errors"
         echo ""
         # Continue to next data set (non-blocking)
     fi
 done
+
+# Calculate total skipped
+total_skipped=$((skipped_timestamp_count + skipped_filter_count + skipped_stage_count))
 
 # Display final summary
 echo ""
 echo "==================================================================="
 echo "   BATCH PROCESSING COMPLETE"
 echo "==================================================================="
-echo "Total data sets found:    $total_sets"
-echo "Processed:                $processed_count"
-echo "Skipped (no changes):     $skipped_count"
-echo "Successful:               $success_count"
-echo "Failed:                   $failure_count"
+echo "Total data file sets found:    $total_sets"
+echo "Processed:                     $processed_count"
+echo "Skipped (total):               $total_skipped"
+if [[ $skipped_timestamp_count -gt 0 ]]; then
+    echo "  - Timestamp (no changes):    $skipped_timestamp_count"
+fi
+if [[ $skipped_filter_count -gt 0 ]]; then
+    echo "  - Filter:                    $skipped_filter_count"
+fi
+if [[ $skipped_stage_count -gt 0 ]]; then
+    echo "  - Stage validation:          $skipped_stage_count"
+fi
+echo "Successful:                    $success_count"
+echo "Failed:                        $failure_count"
 echo "==================================================================="
 
 if [[ $success_count -eq $processed_count && $processed_count -gt 0 ]]; then
-    echo "INFO: All processed data sets completed successfully"
+    echo "INFO: All processed data file sets completed successfully"
     exit 0
 elif [[ $failure_count -gt 0 ]]; then
-    echo "WARNING: Some data sets failed processing"
+    echo "WARNING: Some data file sets failed processing"
     exit 1
 else
     echo "INFO: Batch processing complete"

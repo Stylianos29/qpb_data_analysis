@@ -1,0 +1,13 @@
+{
+    "filter_type": "data-file-set",
+    "include": [
+    ],
+    "exclude": [
+        "invert/Zolotarev_NSpinors1_several_m_varying_n",
+        "invert/KL_strong_scaling",
+        "invert/KL_single_Vs_partial_fraction_varying_n",
+        "invert/KL_several_n_pfrac_CGNR_Vs_CGNE",
+        "invert/Chebyshev_several_config_varying_N",
+        "invert/KL_several_n_sfrac_CGNR_Vs_CGNE"
+    ]
+}
