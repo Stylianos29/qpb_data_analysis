@@ -235,13 +235,20 @@ def get_dataset_statistics(
         # Sample the first path to check dtype
         try:
             sample_dataset = hdf5_file[paths[0]]
+            # Type guard: ensure it's a Dataset, not a Group
+            if not isinstance(sample_dataset, h5py.Dataset):
+                continue
+
             if not np.issubdtype(sample_dataset.dtype, np.number):
                 continue  # Skip non-numeric datasets
 
             all_values = []
             for path in paths:
-                data = hdf5_file[path][:]
-                all_values.append(data.flatten())
+                dataset = hdf5_file[path]
+                # Type guard for each path as well
+                if not isinstance(dataset, h5py.Dataset):
+                    continue
+                all_values.append(dataset[:].flatten())
 
             combined = np.concatenate(all_values)
             stats[dataset_name] = {
