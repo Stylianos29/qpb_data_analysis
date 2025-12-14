@@ -424,6 +424,85 @@ def generate_uniqueness_report(
         return "\n".join(lines)
 
 
+def format_unique_values_list(values: List[Any], max_values: int = 10) -> str:
+    """
+    Format a list of unique values for display.
+
+    Shows first few and last few values if the list exceeds max_values.
+    Handles sorting for numeric and string types.
+
+    Args:
+        - values: List of unique values
+        - max_values: Maximum number of values to display (default: 10)
+
+    Returns:
+        Formatted string representation of values
+    """
+    if not values:
+        return "{}"
+
+    # Try to sort the values
+    try:
+        # Try numeric sort first
+        sorted_values = sorted(
+            values, key=lambda x: float(x) if not isinstance(x, (tuple, list)) else x
+        )
+    except (TypeError, ValueError):
+        # Fall back to string sort for strings
+        try:
+            sorted_values = sorted(values, key=str)
+        except TypeError:
+            # If sorting fails completely, keep original order
+            sorted_values = list(values)
+
+    # If within limit, show all values
+    if len(sorted_values) <= max_values:
+        formatted_values = ", ".join(str(v) for v in sorted_values)
+        return f"{{{formatted_values}}}"
+
+    # Otherwise, show first few and last few
+    show_count = max_values // 2  # Split between start and end
+    first_values = sorted_values[:show_count]
+    last_values = sorted_values[-show_count:]
+
+    first_str = ", ".join(str(v) for v in first_values)
+    last_str = ", ".join(str(v) for v in last_values)
+
+    return f"{{{first_str}, ..., {last_str}}}"
+
+
+def generate_multivalued_tunable_params_summary(
+    analyzer: HDF5Analyzer, max_values: int = 10
+) -> str:
+    """
+    Generate a summary of unique values for multivalued tunable
+    parameters.
+
+    Args:
+        - analyzer: HDF5Analyzer instance
+        - max_values: Maximum number of unique values to display per
+          parameter
+
+    Returns:
+        Formatted summary string
+    """
+    multivalued_tunable_params = analyzer.list_of_multivalued_tunable_parameter_names
+
+    if not multivalued_tunable_params:
+        return "No multivalued tunable parameters found."
+
+    lines = []
+    for param_name in sorted(multivalued_tunable_params):
+        try:
+            unique_values = analyzer.column_unique_values(param_name)
+            formatted_values = format_unique_values_list(unique_values, max_values)
+            lines.append(f"{param_name} = {formatted_values}")
+        except Exception as e:
+            lines.append(f"{param_name} = (error retrieving values: {str(e)})")
+
+    return "\n".join(lines)
+
+
 @click.command()
 @click.option(
     "-hdf5",
@@ -715,6 +794,19 @@ def main(
             write_content(report, print_to_console=False)
         except Exception as e:
             write_content(f"Could not generate uniqueness report: {str(e)}")
+
+        # Multivalued Tunable Parameters Summary
+        write_section("Multivalued Tunable Parameters - Unique Values")
+
+        try:
+            params_summary = generate_multivalued_tunable_params_summary(
+                analyzer, max_values=10
+            )
+            write_content(params_summary, print_to_console=False)
+        except Exception as e:
+            write_content(
+                f"Could not generate multivalued parameters summary: {str(e)}"
+            )
 
     # Structural Consistency Check
     is_consistent, inconsistencies = check_structural_consistency(analyzer)

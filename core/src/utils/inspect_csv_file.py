@@ -2,21 +2,24 @@
 CSV File Inspector
 =================
 
-A command-line utility for comprehensive inspection and analysis of CSV files.
+A command-line utility for comprehensive inspection and analysis of CSV
+files.
 
 This script provides a variety of analysis tools for examining CSV data,
 including:
-- Basic information about the file structure and data integrity
-- Column uniqueness analysis to identify categorical vs continuous variables
-- Statistical summaries for numeric columns
-- Sampling capabilities to view representative data
-- Detection of unusual data patterns or mixed data types
-- Customizable output formats (text, markdown, LaTeX)
-- Generation of grouped summary tables for cross-tabulation analysis
+    - Basic information about the file structure and data integrity
+    - Column uniqueness analysis to identify categorical vs continuous
+      variables
+    - Statistical summaries for numeric columns
+    - Sampling capabilities to view representative data
+    - Detection of unusual data patterns or mixed data types
+    - Customizable output formats (text, markdown, LaTeX)
+    - Generation of grouped summary tables for cross-tabulation analysis
 
-The tool is designed to help data scientists and analysts quickly understand the
-structure and content of CSV datasets before deeper analysis, identifying
-potential data quality issues and providing useful summaries.
+The tool is designed to help data scientists and analysts quickly
+understand the structure and content of CSV datasets before deeper
+analysis, identifying potential data quality issues and providing useful
+summaries.
 
 Usage:
 ------
@@ -71,6 +74,84 @@ import sys
 
 import click
 import pandas as pd
+
+
+def format_unique_values_list(values: list, max_values: int = 10) -> str:
+    """
+    Format a list of unique values for display.
+
+    Shows first few and last few values if the list exceeds max_values.
+    Handles sorting for numeric and string types.
+
+    Args:
+        - values: List of unique values
+        - max_values: Maximum number of values to display (default: 10)
+
+    Returns:
+        Formatted string representation of values
+    """
+    if not values:
+        return "{}"
+
+    # Try to sort the values
+    try:
+        # Try numeric sort first
+        sorted_values = sorted(
+            values, key=lambda x: float(x) if not isinstance(x, (tuple, list)) else x
+        )
+    except (TypeError, ValueError):
+        # Fall back to string sort for strings
+        try:
+            sorted_values = sorted(values, key=str)
+        except TypeError:
+            # If sorting fails completely, keep original order
+            sorted_values = list(values)
+
+    # If within limit, show all values
+    if len(sorted_values) <= max_values:
+        formatted_values = ", ".join(str(v) for v in sorted_values)
+        return f"{{{formatted_values}}}"
+
+    # Otherwise, show first few and last few
+    show_count = max_values // 2  # Split between start and end
+    first_values = sorted_values[:show_count]
+    last_values = sorted_values[-show_count:]
+
+    first_str = ", ".join(str(v) for v in first_values)
+    last_str = ", ".join(str(v) for v in last_values)
+
+    return f"{{{first_str}, ..., {last_str}}}"
+
+
+def generate_multivalued_tunable_params_summary(analyzer, max_values: int = 10) -> str:
+    """
+    Generate a summary of unique values for multivalued tunable
+    parameters.
+
+    Args:
+        - analyzer: DataFrameAnalyzer instance
+        - max_values: Maximum number of unique values to display per
+          parameter
+
+    Returns:
+        Formatted summary string
+    """
+    multivalued_tunable_params = analyzer.list_of_multivalued_tunable_parameter_names
+
+    if not multivalued_tunable_params:
+        return "No multivalued tunable parameters found."
+
+    lines = []
+    for param_name in sorted(multivalued_tunable_params):
+        try:
+            unique_values = analyzer.unique_values(param_name)
+            formatted_values = format_unique_values_list(unique_values, max_values)
+            lines.append(f"{param_name} = {formatted_values}")
+        except Exception as e:
+            lines.append(f"{param_name} = (error retrieving values: {str(e)})")
+
+    return "\n".join(lines)
+
 
 # Import library components
 from library.validation.click_validators import (
@@ -218,7 +299,8 @@ def main(
         output_file = open(output_file_path, "w", encoding="utf-8")
 
     def write_section(title, content=""):
-        """Write a section with a title and content to output file or console."""
+        """Write a section with a title and content to output file or
+        console."""
         if output_file:
             if output_format == "md":
                 output_file.write(f"## {title}\n\n")
@@ -243,13 +325,14 @@ def main(
         Write content to output file and optionally to console.
 
         Args:
-            content (str): The content to write
-            print_to_console (bool): Whether to also print to console when writing to file
+            content (str): The content to write print_to_console (bool):
+            Whether to also print to console when writing to file
         """
         if output_file:
             output_file.write(f"{content}\n\n")
 
-            # Print to console only if verbose mode is on or print_to_console flag is True
+            # Print to console only if verbose mode is on or
+            # print_to_console flag is True
             if verbose and print_to_console:
                 click.echo(f"{content}")
         else:
@@ -264,7 +347,8 @@ def main(
         # Load the file
         dataframe = load_csv(csv_file_path)
 
-        # Always write the basic info to file and conditionally to console
+        # Always write the basic info to file and conditionally to
+        # console
         loading_message = (
             f"Successfully loaded CSV file: '{file_name}' "
             f"\nfrom directory: '{parent_dir}'."
@@ -331,7 +415,8 @@ def main(
 
             # Check for mixed numeric and non-numeric values
             if pd.api.types.is_numeric_dtype(col_data):
-                # For numeric columns, check if there are any strings mixed in
+                # For numeric columns, check if there are any strings
+                # mixed in
                 try:
                     pd.to_numeric(col_data)
                 except:
@@ -375,7 +460,8 @@ def main(
         no_unusual_message = "  No unusual data types detected in the CSV file."
         write_content(no_unusual_message)
 
-    # If additional analysis options are specified, show these in formatted sections
+    # If additional analysis options are specified, show these in
+    # formatted sections
     if (
         list_fields
         or num_rows > 0
@@ -389,7 +475,8 @@ def main(
             write_section("Columns")
             cols_info = []
 
-            # Group columns by type (tunable parameters vs output quantities)
+            # Group columns by type (tunable parameters vs output
+            # quantities)
             tunable_params = analyzer.list_of_tunable_parameter_names_from_dataframe
             output_quantities = analyzer.list_of_output_quantity_names_from_dataframe
 
@@ -434,6 +521,21 @@ def main(
                 )  # Don't duplicate in console
             except Exception as e:
                 write_content(f"Could not generate uniqueness report: {str(e)}")
+
+            # NEW SECTION: Multivalued Tunable Parameters Summary
+            write_section("Multivalued Tunable Parameters - Unique Values")
+
+            try:
+                params_summary = generate_multivalued_tunable_params_summary(
+                    analyzer, max_values=10
+                )
+                write_content(
+                    params_summary, print_to_console=False
+                )  # Don't duplicate in console
+            except Exception as e:
+                write_content(
+                    f"Could not generate multivalued parameters summary: {str(e)}"
+                )
 
         # Show unique values for a specific column if requested
         if show_unique_values_for:
