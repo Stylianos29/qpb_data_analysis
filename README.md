@@ -6,17 +6,63 @@ and visualizing data, with outputs in CSV, HDF5, and image formats. It
 includes modular libraries, usage examples, and unit tests to ensure
 reliability and ease of use.
 
+## System Requirements
+
+This project requires the following system tools to be installed:
+
+- **Python** 3.8 or higher
+- **jq** - Command-line JSON processor
+  - Ubuntu/Debian: `sudo apt-get install jq`
+  - macOS: `brew install jq`
+  - Windows: Download from https://jqlang.github.io/jq/download/
+
 ## Installation
 
-1. Clone the repository:  
+### 1. Clone the repository
+
 ```bash
-git clone https://github.com/Stylianos29/qpb_data_analysis.git cd
-qpb_data_analysis
+git clone https://github.com/Stylianos29/qpb_data_analysis.git
+cd qpb_data_analysis
 ```
 
-2. Install the project as a Python package with dependencies:  
+### 2. Set up your Python environment
+
+#### Option A: Using conda (recommended)
+
+```bash
+# Create a new conda environment
+conda create -n qpb_analysis python=3.11
+conda activate qpb_analysis
+```
+
+#### Option B: Using venv
+
+```bash
+# Create a virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+### 3. Install the package
+
+Choose the installation option that fits your needs:
+
+#### Basic installation (core functionality only)
+
 ```bash
 pip install -e .
+```
+
+#### With Jupyter notebook support (for interactive analysis)
+
+```bash
+pip install -e ".[notebooks]"
+```
+
+#### Development installation (includes testing tools)
+
+```bash
+pip install -e ".[dev]"
 ```
 
 ## Project Structure
@@ -76,6 +122,14 @@ cd bash_scripts
 jupyter notebook ../notebooks/
 ```
 
+## Running Tests
+
+If you installed with the `dev` option:
+
+```bash
+pytest core/tests/
+```
+
 ## Documentation
 
 - **[project_structure.md](docs/project_structure.md)** - Detailed
@@ -84,3 +138,12 @@ jupyter notebook ../notebooks/
 - **[usage.md](docs/usage.md)** - Comprehensive usage instructions
 - **[api.md](docs/api.md)** - API documentation for modules and
   functions
+
+## Contributing
+
+This project is maintained by Stylianos Gregoriou and team. For
+questions or contributions, please contact s.gregoriou@cyi.ac.cy.
+
+## License
+
+[Add your license information here]

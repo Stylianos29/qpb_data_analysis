@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qpb_data_analysis"
+version = "0.1"
+description = "A Python project for data analysis and processing of qpb data."
+authors = [
+    {name = "Stylianos Gregoriou", email = "s.gregoriou@cyi.ac.cy"}
+]
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "click",
+    "gvar",
+    "lsqfit",
+    "h5py",
+    "h5glance",
+]
+
+[project.optional-dependencies]
+# For interactive data analysis with Jupyter notebooks
+notebooks = [
+    "jupyter",
+    "notebook",
+    "ipykernel",
+    "matplotlib",
+    "pandas",
+]
+
+# For development (includes notebooks + testing/linting tools)
+dev = [
+    "jupyter",
+    "notebook",
+    "ipykernel",
+    "matplotlib",
+    "pandas",
+    "pytest",
+    "pytest-cov",
+]
+
+[project.urls]
+Homepage = "https://github.com/Stylianos29/qpb_data_analysis"
+Repository = "https://github.com/Stylianos29/qpb_data_analysis"
+
+[tool.setuptools.packages.find]
+where = ["core"]
