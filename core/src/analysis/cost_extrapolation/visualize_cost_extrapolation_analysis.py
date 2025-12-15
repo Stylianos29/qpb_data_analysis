@@ -59,7 +59,7 @@ from library.validation.click_validators import (
 from library.utils.logging_utilities import create_script_logger
 from library.visualization.builders.title_builder import PlotTitleBuilder
 from library.visualization.managers.file_manager import PlotFileManager
-from library.constants.labels import TITLE_LABELS_DICTIONARY
+from library.constants.labels import TITLE_LABELS_BY_COLUMN_NAME
 
 from src.analysis.cost_extrapolation._cost_extrapolation_visualization_config import (
     validate_visualization_config,
@@ -108,7 +108,7 @@ def process_cost_extrapolation_visualization(
     cost_df = load_and_validate_cost_data(cost_csv_path, logger)
 
     # Set up visualization infrastructure
-    title_builder = PlotTitleBuilder(TITLE_LABELS_DICTIONARY)
+    title_builder = PlotTitleBuilder(TITLE_LABELS_BY_COLUMN_NAME)
 
     # Create plots directory structure
     plot_base_name = get_plot_subdirectory(analysis_type)

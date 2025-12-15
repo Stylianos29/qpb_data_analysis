@@ -57,7 +57,7 @@ from library.validation.click_validators import (
 from library.utils.logging_utilities import create_script_logger
 from library.visualization.builders.title_builder import PlotTitleBuilder
 from library.visualization.managers.file_manager import PlotFileManager
-from library.constants.labels import TITLE_LABELS_DICTIONARY
+from library.constants.labels import TITLE_LABELS_BY_COLUMN_NAME
 
 from src.analysis.critical_mass_extrapolation._critical_mass_visualization_config import (
     validate_visualization_config,
@@ -143,7 +143,7 @@ def process_critical_mass_visualization(
     )
 
     # Set up visualization infrastructure
-    title_builder = PlotTitleBuilder(TITLE_LABELS_DICTIONARY)
+    title_builder = PlotTitleBuilder(TITLE_LABELS_BY_COLUMN_NAME)
 
     # Create plots directory structure
     plot_base_name = f"critical_mass_extrapolation_{analysis_type}"

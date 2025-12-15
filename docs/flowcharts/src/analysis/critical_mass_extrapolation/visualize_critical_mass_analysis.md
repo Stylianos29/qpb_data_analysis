@@ -47,7 +47,7 @@ flowchart TD
     CheckConsistency -- Yes --> LogDataCounts[Log Data Counts:<br/>Number of results and plateau points]
     
     %% VISUALIZATION INFRASTRUCTURE SETUP
-    LogDataCounts --> SetupInfrastructure[Setup Visualization Infrastructure:<br/>PlotTitleBuilder, PlotFileManager<br/>TITLE_LABELS_DICTIONARY]
+    LogDataCounts --> SetupInfrastructure[Setup Visualization Infrastructure:<br/>PlotTitleBuilder, PlotFileManager<br/>TITLE_LABELS_BY_COLUMN_NAME]
     SetupInfrastructure --> CreatePlotsDirectory[Create Plots Directory:<br/>critical_mass_extrapolation_analysis_type<br/>Clear existing subdirectory]
     CreatePlotsDirectory --> PrepareSubdirectory[Prepare Subdirectory:<br/>file_manager.prepare_subdirectory<br/>clear_existing = True]
     
@@ -157,7 +157,7 @@ flowchart TD
 - **PlotFileManager**: Handles file paths, directory creation, and
   naming conventions
 - **PlotTitleBuilder**: Generates descriptive plot titles using
-  TITLE_LABELS_DICTIONARY
+  TITLE_LABELS_BY_COLUMN_NAME
 - **Parameter-Based Naming**: Creates meaningful filenames based on
   lattice parameters
 - **High-Quality Output**: Professional matplotlib styling with
