@@ -219,6 +219,8 @@ LEGEND_LABELS_BY_COLUMN_NAME = {
     "Condition_number": "$\\kappa_{\\mathbb{X}^2}=$",
     "Configuration_label": "Config. labels:",
     "KL_diagonal_order": "n=",
+    "Zolotarev_order": "n=",
+    "Neuberger_order": "n=",
     "Kernel_operator_type": "Kernel:",
     "Bare_mass": "a$m_{\\text{bare}}=$",
     "Threads_per_process": "$n_{\\text{OMP}}=$",
