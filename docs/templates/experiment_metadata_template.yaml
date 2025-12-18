@@ -1,0 +1,36 @@
+# experiment_metadata_template.yaml
+# Machine-readable template for experiment logging
+# Placeholders marked with {{ }} can be programmatically filled
+
+experiment:
+  date: "{{ YYYY-MM-DD }}"
+  status: "{{ planning | running | completed | failed | archived }}"
+
+# Why did I do this?
+purpose: |
+  {{ Describe the scientific question or supervisor request.
+     What are you trying to learn or estimate? }}
+
+# What did I do?
+method: |
+  {{ Describe your approach and key decisions:
+     - Why these parameter values?
+     - Any resource constraints or compromises?
+     - What data is/isn't meaningful?
+     - Any unusual choices that need explanation? }}
+
+parameters:
+  varied:
+    {{ param_name }}: [{{ value1, value2, value3 }}]
+  
+  fixed:
+    {{ param_name }}: {{ value }}
+
+# What did I find?
+result: |
+  {{ Summary of findings. Use [TODO] if analysis not complete yet. }}
+
+# What's next?
+next: |
+  {{ List immediate analysis tasks and future experiments.
+     Include any decision points (e.g., "if cost acceptable, proceed to X"). }}
