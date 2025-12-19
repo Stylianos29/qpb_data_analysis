@@ -126,8 +126,9 @@ class PlotFilenameBuilder:
             filename_parts.append(overlap_method)
             working_metadata.pop("Overlap_operator_method", None)
 
-        # 2. Add base name
-        filename_parts.append(base_name)
+        # 2. Add base name (only if not empty)
+        if base_name:
+            filename_parts.append(base_name)
 
         # 3. Handle operator kernel type (gets special positioning)
         kernel_type = working_metadata.get("Kernel_operator_type")
