@@ -140,15 +140,17 @@ TITLE_EXCLUDED_PARAMETERS = [
 
 # Filename configuration
 FILENAME_CONFIG = {
-    "base_name_pcac": "",  # Empty = clean filenames
+    "base_name_pcac": "",
     "base_name_pion": "",
+    "custom_prefix_pcac": "Critical_mass_extrapolation",
+    "custom_prefix_pion": "Critical_mass_extrapolation",
 }
 
 PLOT_DIRECTORY_CONFIG = {
     "parent_directory_name": "Critical_mass_extrapolation",
     "use_parent_directory": True,
-    "subdirectory_name_pcac": "pcac",
-    "subdirectory_name_pion": "pion",
+    "subdirectory_name_pcac": "from_PCAC_mass",
+    "subdirectory_name_pion": "from_Pion_mass",
 }
 
 # =============================================================================
@@ -269,6 +271,12 @@ def get_title_excluded_parameters():
 
 def get_filename_base_name(analysis_type: str) -> str:
     return FILENAME_CONFIG.get(f"base_name_{analysis_type}", "")
+
+
+def get_filename_custom_prefix(analysis_type: str) -> str:
+    """Get the custom prefix for filenames."""
+    key = f"custom_prefix_{analysis_type}"
+    return FILENAME_CONFIG.get(key, "")
 
 
 def get_plot_subdirectory_name(analysis_type: str) -> tuple:

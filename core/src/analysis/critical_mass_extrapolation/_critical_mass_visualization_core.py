@@ -33,8 +33,9 @@ from src.analysis.critical_mass_extrapolation._critical_mass_visualization_confi
     get_plot_styling,
     get_plateau_mass_power,
     get_plateau_column_mapping,
-    get_filename_base_name,
     get_title_excluded_parameters,
+    get_filename_base_name,
+    get_filename_custom_prefix,
     ANALYSIS_CONFIGS,
 )
 
@@ -878,16 +879,20 @@ def create_critical_mass_extrapolation_plots(
             title_text, fontsize=styling["title_font_size"], pad=styling["title_pad"]
         )
 
-        # # Generate filename
+        # Generate filename
+        filename_builder = PlotFilenameBuilder(FILENAME_LABELS_BY_COLUMN_NAME)
+
         # Get the actual grouping parameters used
         grouping_params = group_info.get("grouping_params", [])
-        filename_builder = PlotFilenameBuilder(FILENAME_LABELS_BY_COLUMN_NAME)
-        # Get configurable base name (empty string for no base name)
+        # Get configurable base name and custom prefix
         base_name = get_filename_base_name(analysis_type)
+        custom_prefix = get_filename_custom_prefix(analysis_type)
+
         filename = filename_builder.build(
             metadata_dict=group_info["group_metadata"],
             base_name=base_name,
             multivalued_params=grouping_params,
+            custom_prefix=custom_prefix,
         )
 
         # Save plot
