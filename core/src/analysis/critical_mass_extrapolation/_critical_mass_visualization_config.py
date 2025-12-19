@@ -100,37 +100,24 @@ ANALYSIS_CONFIGS = {
 
 # Parameters to exclude from plot titles (too verbose or not relevant)
 TITLE_EXCLUDED_PARAMETERS = [
-    # System/infrastructure parameters
     "Main_program_type",
     "Maximum_Lanczos_iterations",
     "MPI_geometry",
+    "Threads_per_process",
     "Number_of_spinors",
     "Number_of_vectors",
-    "Threads_per_process",
-    # APE smearing parameters (usually constant)
     "APE_alpha",
-    # Delta parameters for Chebyshev (usually constant)
+    # "APE_iterations",
+    # "CG_epsilon",
+    # "Lanczos_epsilon",
+    # "Clover_coefficient",
     # "Delta_Max",
     # "Delta_Min",
-    # QCD parameters (usually constant)
     # "QCD_beta_value",
     # "Rho_value",
-    # Results/output parameters (not input parameters)
     # "Number_of_gauge_configurations",
-    "PCAC_n_failed_samples",
-    "PCAC_n_successful_samples",
-    "PCAC_n_total_samples",
-    "PCAC_plateau_n_points",
-    "PCAC_sigma_threshold_used",
-    "PCAC_estimation_method",
-    # Fit results (these are in the plot, not parameters)
-    "n_data_points",
-    "r_squared",
-    "chi2_reduced",
-    "fit_quality",
-    "fit_range_min",
-    "fit_range_max",
 ]
+# That's it! No output quantities needed.
 
 # Filename configuration
 FILENAME_CONFIG = {

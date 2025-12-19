@@ -435,6 +435,11 @@ def group_data_for_visualization(
         plateau_analyzer.reduced_multivalued_tunable_parameter_names_list
     )
 
+    # Get actual tunable parameters from analyzer
+    actual_tunable_params = (
+        plateau_analyzer.list_of_tunable_parameter_names_from_dataframe
+    )
+
     print(f"\nGrouping plateau data:")
     print(f"  Total plateau rows: {len(plateau_df)}")
     print(f"  Multivalued parameters: {available_multivalued}")
@@ -477,6 +482,7 @@ def group_data_for_visualization(
             "results_data": matching_results,
             "group_metadata": group_metadata,
             "grouping_params": actual_grouping_params,
+            "tunable_params": actual_tunable_params,
         }
         grouped_data.append(group_info)
 
@@ -870,7 +876,7 @@ def create_critical_mass_extrapolation_plots(
         title_excluded = get_title_excluded_parameters()
         title_text = title_builder.build(
             metadata_dict=group_info["group_metadata"],
-            tunable_params=list(group_info["group_metadata"].keys()),
+            tunable_params=group_info.get("tunable_params", []),
             excluded=set(title_excluded),
             leading_substring=f"Critical Mass Extrapolation:",
             wrapping_length=styling["title_width"],
