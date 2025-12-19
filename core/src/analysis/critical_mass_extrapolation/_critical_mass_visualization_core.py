@@ -33,6 +33,8 @@ from src.analysis.critical_mass_extrapolation._critical_mass_visualization_confi
     get_plot_styling,
     get_plateau_mass_power,
     get_plateau_column_mapping,
+    get_filename_base_name,
+    get_title_excluded_parameters,
     ANALYSIS_CONFIGS,
 )
 
@@ -473,6 +475,7 @@ def group_data_for_visualization(
             "plateau_data": plateau_group,
             "results_data": matching_results,
             "group_metadata": group_metadata,
+            "grouping_params": actual_grouping_params,
         }
         grouped_data.append(group_info)
 
@@ -833,7 +836,6 @@ def create_critical_mass_plot(
 def create_critical_mass_extrapolation_plots(
     group_info: Dict[str, Any],
     title_builder: Any,
-    file_manager: Any,
     plots_subdir_path: str,
     analysis_type: str,
 ) -> Optional[str]:
@@ -847,8 +849,6 @@ def create_critical_mass_extrapolation_plots(
     Args:
         - group_info: Dictionary containing group data and metadata
         - title_builder: PlotTitleBuilder instance for plot titles
-        - file_manager: PlotFileManager instance (unused but kept for
-          interface)
         - plots_subdir_path: Directory path for saving plots
         - analysis_type: Type of analysis ("pcac" or "pion")
 
@@ -858,7 +858,6 @@ def create_critical_mass_extrapolation_plots(
     try:
         # Get styling configuration
         styling = get_plot_styling()
-
         plateau_column_mapping = get_plateau_column_mapping(analysis_type)
 
         # Create the plot (pass column mapping, not styling)
@@ -867,9 +866,11 @@ def create_critical_mass_extrapolation_plots(
         )
 
         # Generate title
+        title_excluded = get_title_excluded_parameters()
         title_text = title_builder.build(
             metadata_dict=group_info["group_metadata"],
             tunable_params=list(group_info["group_metadata"].keys()),
+            excluded=set(title_excluded),
             leading_substring=f"Critical Mass Extrapolation:",
             wrapping_length=styling["title_width"],
         )
@@ -877,12 +878,16 @@ def create_critical_mass_extrapolation_plots(
             title_text, fontsize=styling["title_font_size"], pad=styling["title_pad"]
         )
 
-        # Generate filename
+        # # Generate filename
+        # Get the actual grouping parameters used
+        grouping_params = group_info.get("grouping_params", [])
         filename_builder = PlotFilenameBuilder(FILENAME_LABELS_BY_COLUMN_NAME)
+        # Get configurable base name (empty string for no base name)
+        base_name = get_filename_base_name(analysis_type)
         filename = filename_builder.build(
             metadata_dict=group_info["group_metadata"],
-            base_name=f"critical_mass_extrapolation_{analysis_type}",
-            multivalued_params=["KL_diagonal_order", "Kernel_operator_type"],
+            base_name=base_name,
+            multivalued_params=grouping_params,
         )
 
         # Save plot

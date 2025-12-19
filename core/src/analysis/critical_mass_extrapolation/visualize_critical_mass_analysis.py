@@ -202,7 +202,6 @@ def process_critical_mass_visualization(
             plot_path = create_critical_mass_extrapolation_plots(
                 group_info,
                 title_builder,
-                file_manager,
                 plots_subdir_path,
                 analysis_type,
             )

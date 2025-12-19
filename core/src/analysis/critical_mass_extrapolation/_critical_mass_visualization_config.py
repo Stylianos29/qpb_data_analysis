@@ -86,7 +86,6 @@ VISUALIZATION_CONFIG = {
     "enable_plot_validation": True,
 }
 
-
 # UPDATE ANALYSIS CONFIGS TO REFLECT ACTUAL Y-AXIS LABELS
 ANALYSIS_CONFIGS = {
     "pcac": {
@@ -97,6 +96,52 @@ ANALYSIS_CONFIGS = {
         "plot_subdirectory": "critical_mass_extrapolation_pion",
         "default_y_label": "$a^2 m^2_{\\pi}$",
     },
+}
+
+# Parameters to exclude from plot titles (too verbose or not relevant)
+TITLE_EXCLUDED_PARAMETERS = [
+    # System/infrastructure parameters
+    "Main_program_type",
+    "Maximum_Lanczos_iterations",
+    "MPI_geometry",
+    "Number_of_spinors",
+    "Number_of_vectors",
+    "Threads_per_process",
+    # APE smearing parameters (usually constant)
+    # "APE_alpha",
+    "APE_iterations",
+    # Solver parameters (usually constant)
+    # "CG_epsilon",
+    # "Lanczos_epsilon",
+    # Clover coefficient (usually constant)
+    # "Clover_coefficient",
+    # Delta parameters for Chebyshev (usually constant)
+    # "Delta_Max",
+    # "Delta_Min",
+    # QCD parameters (usually constant)
+    # "QCD_beta_value",
+    # "Rho_value",
+    # Results/output parameters (not input parameters)
+    # "Number_of_gauge_configurations",
+    "PCAC_n_failed_samples",
+    "PCAC_n_successful_samples",
+    "PCAC_n_total_samples",
+    "PCAC_plateau_n_points",
+    "PCAC_sigma_threshold_used",
+    "PCAC_estimation_method",
+    # Fit results (these are in the plot, not parameters)
+    "n_data_points",
+    "r_squared",
+    "chi2_reduced",
+    "fit_quality",
+    "fit_range_min",
+    "fit_range_max",
+]
+
+# Filename configuration
+FILENAME_CONFIG = {
+    "base_name_pcac": "",  # Empty = clean filenames
+    "base_name_pion": "",
 }
 
 
@@ -210,6 +255,14 @@ def get_analysis_prefix(analysis_type: str) -> str:
         return OUTPUT_COLUMN_PREFIX
     else:
         raise ValueError(f"Unsupported analysis_type: {analysis_type}")
+
+
+def get_title_excluded_parameters():
+    return TITLE_EXCLUDED_PARAMETERS.copy()
+
+
+def get_filename_base_name(analysis_type: str) -> str:
+    return FILENAME_CONFIG.get(f"base_name_{analysis_type}", "")
 
 
 # =============================================================================
