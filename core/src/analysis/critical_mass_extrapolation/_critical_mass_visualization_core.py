@@ -335,6 +335,7 @@ def load_and_validate_plateau_data(
 def group_data_for_visualization(
     results_df: pd.DataFrame,
     plateau_df: pd.DataFrame,
+    logger,
 ) -> List[Dict[str, Any]]:
     """
     Group plateau data and match with results for visualization.
@@ -440,12 +441,12 @@ def group_data_for_visualization(
         plateau_analyzer.list_of_tunable_parameter_names_from_dataframe
     )
 
-    print(f"\nGrouping plateau data:")
-    print(f"  Total plateau rows: {len(plateau_df)}")
-    print(f"  Multivalued parameters: {available_multivalued}")
-    print(f"  Excluding from grouping: {filtered_exclusions}")
-    print(f"  Actual grouping parameters: {actual_grouping_params}")
-    print(f"  Number of groups created: {grouped_plateau_data.ngroups}")
+    logger.info(f"\nGrouping plateau data:")
+    logger.info(f"  Total plateau rows: {len(plateau_df)}")
+    logger.info(f"  Multivalued parameters: {available_multivalued}")
+    logger.info(f"  Excluding from grouping: {filtered_exclusions}")
+    logger.info(f"  Actual grouping parameters: {actual_grouping_params}")
+    logger.info(f"  Number of groups created: {grouped_plateau_data.ngroups}")
 
     # === STEP 4: MATCH RESULTS ROWS TO PLATEAU GROUPS ===
     grouped_data = []
@@ -487,10 +488,10 @@ def group_data_for_visualization(
         grouped_data.append(group_info)
 
     # === STEP 5: VALIDATE MATCHING ===
-    print(f"\nMatching results:")
-    print(f"  Total results rows: {len(results_df)}")
-    print(f"  Successful matches: {len(grouped_data)}")
-    print(f"  Unmatched plateau groups: {unmatched_plateau_groups}")
+    logger.info(f"\nMatching results:")
+    logger.info(f"  Total results rows: {len(results_df)}")
+    logger.info(f"  Successful matches: {len(grouped_data)}")
+    logger.info(f"  Unmatched plateau groups: {unmatched_plateau_groups}")
 
     if len(grouped_data) == 0:
         raise ValueError(

@@ -202,7 +202,7 @@ def process_critical_mass_visualization(
     logger.info("=" * 80)
 
     try:
-        grouped_data = group_data_for_visualization(results_df, plateau_df)
+        grouped_data = group_data_for_visualization(results_df, plateau_df, logger)
     except ValueError as e:
         logger.error(f"Data grouping failed: {e}")
         raise
