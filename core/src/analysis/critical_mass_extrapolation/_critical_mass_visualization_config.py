@@ -108,13 +108,7 @@ TITLE_EXCLUDED_PARAMETERS = [
     "Number_of_vectors",
     "Threads_per_process",
     # APE smearing parameters (usually constant)
-    # "APE_alpha",
-    "APE_iterations",
-    # Solver parameters (usually constant)
-    # "CG_epsilon",
-    # "Lanczos_epsilon",
-    # Clover coefficient (usually constant)
-    # "Clover_coefficient",
+    "APE_alpha",
     # Delta parameters for Chebyshev (usually constant)
     # "Delta_Max",
     # "Delta_Min",
@@ -142,8 +136,8 @@ TITLE_EXCLUDED_PARAMETERS = [
 FILENAME_CONFIG = {
     "base_name_pcac": "",
     "base_name_pion": "",
-    "custom_prefix_pcac": "Critical_mass_extrapolation",
-    "custom_prefix_pion": "Critical_mass_extrapolation",
+    "custom_prefix_pcac": "",
+    "custom_prefix_pion": "",
 }
 
 PLOT_DIRECTORY_CONFIG = {

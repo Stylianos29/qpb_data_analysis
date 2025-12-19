@@ -65,8 +65,8 @@ class PlotFilenameBuilder:
     def build(
         self,
         metadata_dict: dict,
-        base_name: str,
-        multivalued_params: list,
+        base_name: str = "",
+        multivalued_params: list[str] | None = None,
         grouping_variable: Optional[Union[str, List[str]]] = None,
         include_combined_prefix: bool = False,
         custom_prefix: Optional[str] = None,
@@ -120,6 +120,10 @@ class PlotFilenameBuilder:
         # Build filename components in order
         filename_parts = []
 
+        # Handle None for multivalued_params
+        if multivalued_params is None:
+            multivalued_params = []
+
         # 1. Handle overlap operator method (gets special positioning)
         overlap_method = working_metadata.get("Overlap_operator_method")
         if overlap_method in self._special_overlap_methods:
@@ -143,14 +147,37 @@ class PlotFilenameBuilder:
                 sanitized_value = self._sanitize_value(working_metadata[param])
                 filename_parts.append(f"{label}{sanitized_value}")
 
-        # 5. Determine optional prefix
+        # 5. Determine prefix if specified
         prefix = self._determine_prefix(custom_prefix, include_combined_prefix)
+        if prefix:
+            prefix = prefix.rstrip("_")  # Remove trailing underscores
 
-        # 6. Add grouping suffix
+        # 6. Determine suffix if grouping_variable specified
         suffix = self._build_grouping_suffix(grouping_variable)
 
-        # 7. Combine all parts
-        filename = prefix + "_".join(filename_parts) + suffix
+        # 7. Combine all parts properly
+        parts = []
+
+        # Add prefix if it exists
+        if prefix:
+            parts.append(prefix)
+
+        # Add main filename parts
+        parts.extend(filename_parts)
+
+        # Add suffix if it exists
+        if suffix:
+            parts.append(suffix)
+
+        # Join all parts with underscores
+        filename = "_".join(parts)
+
+        # Clean up any double underscores
+        while "__" in filename:
+            filename = filename.replace("__", "_")
+
+        # Remove any leading/trailing underscores
+        filename = filename.strip("_")
 
         # 8. Validate the resulting filename
         self._validate_filename(filename)
