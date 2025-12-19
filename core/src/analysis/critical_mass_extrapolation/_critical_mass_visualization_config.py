@@ -144,6 +144,12 @@ FILENAME_CONFIG = {
     "base_name_pion": "",
 }
 
+PLOT_DIRECTORY_CONFIG = {
+    "parent_directory_name": "Critical_mass_extrapolation",
+    "use_parent_directory": True,
+    "subdirectory_name_pcac": "pcac",
+    "subdirectory_name_pion": "pion",
+}
 
 # =============================================================================
 # ACCESSOR FUNCTIONS
@@ -263,6 +269,27 @@ def get_title_excluded_parameters():
 
 def get_filename_base_name(analysis_type: str) -> str:
     return FILENAME_CONFIG.get(f"base_name_{analysis_type}", "")
+
+
+def get_plot_subdirectory_name(analysis_type: str) -> tuple:
+    """
+    Get subdirectory name(s) for plots.
+
+    Returns:
+        - Tuple of (parent_name, subdir_name)
+        If use_parent_directory is False, parent_name will be None
+    """
+    config = PLOT_DIRECTORY_CONFIG
+
+    if config["use_parent_directory"]:
+        parent = config["parent_directory_name"]
+        subdir = config[f"subdirectory_name_{analysis_type}"]
+        return (parent, subdir)
+    else:
+        # Backward compatibility: flat structure
+        parent = None
+        subdir = f"{config['parent_directory_name']}_{analysis_type}"
+        return (parent, subdir)
 
 
 # =============================================================================

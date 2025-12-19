@@ -45,6 +45,7 @@ Input Requirements:
 """
 
 from pathlib import Path
+import shutil
 
 import click
 
@@ -63,6 +64,7 @@ from src.analysis.critical_mass_extrapolation._critical_mass_visualization_confi
     validate_visualization_config,
     get_results_column_mapping,
     get_plateau_column_mapping,
+    get_plot_subdirectory_name,
 )
 from src.analysis.critical_mass_extrapolation._critical_mass_visualization_core import (
     create_critical_mass_extrapolation_plots,
@@ -159,17 +161,40 @@ def process_critical_mass_visualization(
 
     title_builder = PlotTitleBuilder(TITLE_LABELS_BY_COLUMN_NAME)
 
-    # Create plots directory structure
-    plot_base_name = f"critical_mass_extrapolation_{analysis_type}"
-
     file_manager = PlotFileManager(base_directory=str(plots_directory))
-    # Clear and prepare subdirectory
-    plots_subdir_path = file_manager.prepare_subdirectory(
-        plot_base_name, clear_existing=clear_existing_plots, confirm_clear=False
-    )
 
-    if clear_existing_plots:
-        logger.info(f"Cleared existing plots in {plot_base_name} subdirectory")
+    # Get hierarchical directory structure
+    parent_name, subdir_name = get_plot_subdirectory_name(analysis_type)
+
+    if parent_name:
+        # Hierarchical: parent/subdir/
+        logger.info(f"Using directory structure: {parent_name}/{subdir_name}/")
+
+        # Create parent directory
+        parent_path = file_manager.prepare_subdirectory(
+            parent_name, clear_existing=False, confirm_clear=False
+        )
+
+        # Create subdirectory within parent
+        plots_subdir_path = Path(parent_path) / subdir_name
+        plots_subdir_path.mkdir(parents=True, exist_ok=True)
+
+        # Clear only this subdirectory if requested
+        if clear_existing_plots:
+            if plots_subdir_path.exists():
+                shutil.rmtree(plots_subdir_path)
+                plots_subdir_path.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Cleared existing plots in {parent_name}/{subdir_name}/")
+
+        plots_subdir_path = str(plots_subdir_path)
+    else:
+        # Flat structure (backward compatibility)
+        logger.info(f"Using directory structure: {subdir_name}/")
+        plots_subdir_path = file_manager.prepare_subdirectory(
+            subdir_name, clear_existing=clear_existing_plots, confirm_clear=False
+        )
+        if clear_existing_plots:
+            logger.info(f"Cleared existing plots in {subdir_name}/")
 
     # Group data for visualization
     logger.info("\n" + "=" * 80)
