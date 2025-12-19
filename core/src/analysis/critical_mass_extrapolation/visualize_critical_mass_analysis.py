@@ -113,14 +113,15 @@ def process_critical_mass_visualization(
 
     Process Flow:
         1. Load and validate input CSV files with required columns
-        2. Group data by lattice parameters using intelligent analysis
-        3. Set up visualization infrastructure (file managers, title
+        2. Validate parameter consistency between results and plateau data
+        3. Group data by lattice parameters using intelligent analysis
+        4. Set up visualization infrastructure (file managers, title
            builders)
-        4. Create individual plots for each parameter group combination
-        5. Apply analysis-specific transformations (pion: square values)
-        6. Generate plots with data points, fit lines, and critical mass
+        5. Create individual plots for each parameter group combination
+        6. Apply analysis-specific transformations (pion: square values)
+        7. Generate plots with data points, fit lines, and critical mass
            annotations
-        7. Save plots with descriptive filenames and return success
+        8. Save plots with descriptive filenames and return success
            count
 
     Plot Features:
@@ -134,15 +135,28 @@ def process_critical_mass_visualization(
     results_column_mapping = get_results_column_mapping()
     plateau_column_mapping = get_plateau_column_mapping(analysis_type)
 
-    # Load and validate data using NEW configurable functions
+    logger.info("=" * 80)
+    logger.info("LOADING AND VALIDATING DATA")
+    logger.info("=" * 80)
+
+    # Load and validate data using configurable functions
+    logger.info(f"Loading results data from: {results_csv_path}")
     results_df = load_and_validate_results_data(
         results_csv_path, results_column_mapping, logger
     )
+    logger.info(f"  Loaded {len(results_df)} results rows")
+
+    logger.info(f"Loading plateau data from: {plateau_csv_path}")
     plateau_df = load_and_validate_plateau_data(
         plateau_csv_path, plateau_column_mapping
     )
+    logger.info(f"  Loaded {len(plateau_df)} plateau rows")
 
     # Set up visualization infrastructure
+    logger.info("\n" + "=" * 80)
+    logger.info("SETTING UP VISUALIZATION INFRASTRUCTURE")
+    logger.info("=" * 80)
+
     title_builder = PlotTitleBuilder(TITLE_LABELS_BY_COLUMN_NAME)
 
     # Create plots directory structure
@@ -158,12 +172,32 @@ def process_critical_mass_visualization(
         logger.info(f"Cleared existing plots in {plot_base_name} subdirectory")
 
     # Group data for visualization
-    grouped_data = group_data_for_visualization(results_df, plateau_df, analysis_type)
-    logger.info(f"Creating plots for {len(grouped_data)} parameter groups")
+    logger.info("\n" + "=" * 80)
+    logger.info("GROUPING DATA FOR VISUALIZATION")
+    logger.info("=" * 80)
+
+    try:
+        grouped_data = group_data_for_visualization(results_df, plateau_df)
+    except ValueError as e:
+        logger.error(f"Data grouping failed: {e}")
+        raise
+
+    logger.info(
+        f"\n✓ Successfully grouped data into {len(grouped_data)} parameter combinations"
+    )
 
     # Create plots
+    logger.info("\n" + "=" * 80)
+    logger.info("CREATING PLOTS")
+    logger.info("=" * 80)
+
     plots_created = 0
-    for group_info in grouped_data:
+    plots_failed = 0
+
+    for i, group_info in enumerate(grouped_data, 1):
+        group_id = group_info.get("group_id", "unknown")
+        logger.info(f"\nPlot {i}/{len(grouped_data)}: {group_id}")
+
         try:
             plot_path = create_critical_mass_extrapolation_plots(
                 group_info,
@@ -174,15 +208,25 @@ def process_critical_mass_visualization(
             )
             if plot_path:
                 plots_created += 1
+                logger.info(f"  ✓ Created: {plot_path}")
+            else:
+                plots_failed += 1
+                logger.warning(f"  ✗ Failed to create plot (no path returned)")
         except Exception as e:
-            logger.warning(
-                f"Failed to create plot for group {group_info.get('group_id', 'unknown')}: {e}"
-            )
+            plots_failed += 1
+            logger.warning(f"  ✗ Failed to create plot: {e}")
             continue
 
+    logger.info("\n" + "=" * 80)
+    logger.info("VISUALIZATION SUMMARY")
+    logger.info("=" * 80)
+    logger.info(f"Total groups: {len(grouped_data)}")
+    logger.info(f"Plots created: {plots_created}")
+    logger.info(f"Plots failed: {plots_failed}")
     logger.info(
-        f"Successfully created {plots_created} critical mass extrapolation plots"
+        f"Success rate: {plots_created}/{len(grouped_data)} ({100*plots_created/len(grouped_data):.1f}%)"
     )
+
     return plots_created
 
 

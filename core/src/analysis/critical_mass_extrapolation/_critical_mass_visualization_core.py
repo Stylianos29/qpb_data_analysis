@@ -125,6 +125,40 @@ def calculate_plot_ranges(
     return x_range, y_range
 
 
+def _values_are_equal(
+    val1: Any, val2: Any, rtol: float = 1e-9, atol: float = 1e-9
+) -> bool:
+    """
+    Compare two values with proper handling for floats, strings, and
+    other types.
+
+    Args:
+        - val1: First value
+        - val2: Second value
+        - rtol: Relative tolerance for float comparison
+        - atol: Absolute tolerance for float comparison
+
+    Returns:
+        True if values are equal (within tolerance for floats)
+    """
+    # Handle None/NaN cases
+    if pd.isna(val1) and pd.isna(val2):
+        return True
+    if pd.isna(val1) or pd.isna(val2):
+        return False
+
+    # Try numeric comparison first
+    try:
+        # Convert to float if possible
+        float_val1 = float(val1)
+        float_val2 = float(val2)
+        # Use numpy's isclose for proper floating point comparison
+        return bool(np.isclose(float_val1, float_val2, rtol=rtol, atol=atol))
+    except (ValueError, TypeError):
+        # Not numeric - fall back to direct comparison
+        return val1 == val2
+
+
 # ============================================================================
 # FIT RANGE FORMATTING HELPER FUNCTION
 # =============================================================================
@@ -136,8 +170,8 @@ def format_fit_range_for_legend(min_val: float, max_val: float) -> str:
     display.
 
     Args:
-        min_val: Minimum value of fit range max_val: Maximum value of
-        fit range
+        - min_val: Minimum value of fit range
+        - max_val: Maximum value of fit range
 
     Returns:
         Formatted string like "[0.010, 0.070]" with uniform precision
@@ -160,47 +194,21 @@ def format_fit_range_for_legend(min_val: float, max_val: float) -> str:
 # =============================================================================
 
 
-def _extract_metadata_from_group_id(
-    group_id: str, plateau_group: pd.DataFrame
-) -> Dict[str, Any]:
-    """
-    Extract lattice parameter metadata from plateau data group.
-
-    Args:
-        - group_id: String identifier for parameter group
-        - plateau_group: DataFrame containing plateau data for this
-          group
-
-    Returns:
-        Dictionary of single-valued lattice parameters for this group
-    """
-    # Get the first row to extract parameter values
-    first_row = plateau_group.iloc[0]
-
-    grouping_params = get_grouping_parameters()
-
-    # Extract metadata for parameters that exist and are single-valued
-    # in this group
-    group_metadata = {}
-    for param in grouping_params:
-        if param in plateau_group.columns:
-            unique_values = plateau_group[param].unique()
-            if len(unique_values) == 1:  # Single-valued in this group
-                group_metadata[param] = unique_values[0]
-
-    return group_metadata
-
-
 def _find_matching_results(
-    results_df: pd.DataFrame, group_metadata: Dict[str, Any]
+    results_df: pd.DataFrame,
+    group_metadata: Dict[str, Any],
+    grouping_params: List[str],
 ) -> Optional[pd.Series]:
     """
-    Find results row matching the plateau data group parameters.
+    Find results row matching the plateau group parameters.
+
+    Uses explicit grouping parameters for reliable matching.
 
     Args:
         - results_df: DataFrame containing critical mass calculation
           results
-        - group_metadata: Dictionary of group parameter values to match
+        - group_metadata: Dictionary of group parameter values
+        - grouping_params: List of parameters that define the groups
 
     Returns:
         Matching results row as Series, or None if no match found
@@ -208,12 +216,16 @@ def _find_matching_results(
     if len(results_df) == 0:
         return None
 
-    # Create mask to find matching results
+    # Create mask using only the grouping parameters
     results_mask = pd.Series([True] * len(results_df))
 
-    for param, value in group_metadata.items():
-        if param in results_df.columns:
-            results_mask &= results_df[param] == value
+    for param in grouping_params:
+        if param in group_metadata and param in results_df.columns:
+            results_mask &= results_df[param] == group_metadata[param]
+        elif param in group_metadata:
+            # Parameter is in group_metadata but not in results - this
+            # shouldn't happen after validation, but handle gracefully
+            return None
 
     matching_results = results_df[results_mask]
 
@@ -222,7 +234,9 @@ def _find_matching_results(
     elif len(matching_results) == 1:
         return matching_results.iloc[0]  # Return as Series
     else:
-        # Multiple matches - take the first one
+        # Multiple matches - this indicates an issue with grouping
+        print(f"WARNING: Multiple results rows match group metadata {group_metadata}")
+        print(f"         Using first match of {len(matching_results)} matches")
         return matching_results.iloc[0]
 
 
@@ -316,64 +330,144 @@ def load_and_validate_plateau_data(
 
 
 def group_data_for_visualization(
-    results_df: pd.DataFrame, plateau_df: pd.DataFrame, analysis_type: str
+    results_df: pd.DataFrame,
+    plateau_df: pd.DataFrame,
 ) -> List[Dict[str, Any]]:
     """
-    Group plateau and results data by lattice parameters for plotting.
+    Group plateau data and match with results for visualization.
 
-    Uses DataFrameAnalyzer to intelligently group plateau data, then
-    matches each group with corresponding critical mass calculation
-    results.
+    ROBUST IMPLEMENTATION:
+        1. Validates parameter consistency between results and plateau
+           CSVs
+        2. Checks single-valued tunable parameters match
+        3. Uses actual grouping parameters to match results rows to
+           plateau groups
+        4. Ensures each results row maps to exactly one plateau group
 
     Args:
         - results_df: DataFrame containing critical mass calculation
           results
         - plateau_df: DataFrame containing plateau mass estimates
-        - analysis_type: Type of analysis ("pcac" or "pion")
 
     Returns:
         List of dictionaries, each containing group metadata, plateau
         data, and matching results data for one parameter combination
+
+    Raises:
+        - ValueError: If parameter consistency checks fail or no matches
+          found
     """
 
-    # Use DataFrameAnalyzer on plateau data (more data points for better
-    # analysis)
-    analyzer = DataFrameAnalyzer(plateau_df)
+    # Create analyzers for both DataFrames
+    results_analyzer = DataFrameAnalyzer(results_df)
+    plateau_analyzer = DataFrameAnalyzer(plateau_df)
 
-    grouping_params = get_grouping_parameters()
+    # === STEP 1: VALIDATE PARAMETER CONSISTENCY ===
+    results_tunables = set(
+        results_analyzer.list_of_tunable_parameter_names_from_dataframe
+    )
+    plateau_tunables = set(
+        plateau_analyzer.list_of_tunable_parameter_names_from_dataframe
+    )
 
-    # Filter exclusion list to only include parameters that exist in the
-    # list of multivalued parameters
-    available_multivalued_params = analyzer.list_of_multivalued_tunable_parameter_names
+    # Results should NOT have Bare_mass, but plateau SHOULD have it
+    if "Bare_mass" in results_tunables:
+        raise ValueError(
+            "Results CSV should not contain 'Bare_mass' column - "
+            "this is the independent variable used for fitting"
+        )
+
+    if "Bare_mass" not in plateau_tunables:
+        raise ValueError("Plateau CSV must contain 'Bare_mass' column")
+
+    # Check that all other tunable parameters match (excluding
+    # Bare_mass)
+    plateau_tunables_without_bare_mass = plateau_tunables - {"Bare_mass"}
+    param_diff = results_tunables.symmetric_difference(
+        plateau_tunables_without_bare_mass
+    )
+
+    if param_diff:
+        raise ValueError(
+            f"Tunable parameter mismatch between results and plateau CSVs. "
+            f"Parameters only in results: {param_diff & results_tunables}. "
+            f"Parameters only in plateau: {param_diff & plateau_tunables_without_bare_mass}"
+        )
+
+    # === STEP 2: VALIDATE SINGLE-VALUED PARAMETERS ===
+    results_single_valued = results_analyzer.unique_value_columns_dictionary
+    plateau_single_valued = plateau_analyzer.unique_value_columns_dictionary
+
+    # Compare single-valued parameters with proper float handling
+    for param in results_single_valued:
+        if param in plateau_single_valued:
+            if not _values_are_equal(
+                results_single_valued[param], plateau_single_valued[param]
+            ):
+                raise ValueError(
+                    f"Single-valued parameter '{param}' has different values: "
+                    f"results={results_single_valued[param]} (type: {type(results_single_valued[param])}), "
+                    f"plateau={plateau_single_valued[param]} (type: {type(plateau_single_valued[param])})"
+                )
+
+    # === STEP 3: GROUP PLATEAU DATA ===
+    grouping_excluded_params = (
+        get_grouping_parameters()
+    )  # ["Bare_mass", "MPI_geometry"]
+
+    # Filter to only parameters that are actually multivalued in plateau
+    # data
+    available_multivalued = plateau_analyzer.list_of_multivalued_tunable_parameter_names
     filtered_exclusions = [
-        param for param in grouping_params if param in available_multivalued_params
+        param for param in grouping_excluded_params if param in available_multivalued
     ]
 
-    # Group plateau data using analyzer's intelligence
-    grouped_plateau_data = analyzer.group_by_multivalued_tunable_parameters(
+    # Group plateau data
+    grouped_plateau_data = plateau_analyzer.group_by_multivalued_tunable_parameters(
         filter_out_parameters_list=filtered_exclusions
     )
 
-    # Build grouped data for visualization
+    # Get the actual parameters used for grouping
+    actual_grouping_params = (
+        plateau_analyzer.reduced_multivalued_tunable_parameter_names_list
+    )
+
+    print(f"\nGrouping plateau data:")
+    print(f"  Total plateau rows: {len(plateau_df)}")
+    print(f"  Multivalued parameters: {available_multivalued}")
+    print(f"  Excluding from grouping: {filtered_exclusions}")
+    print(f"  Actual grouping parameters: {actual_grouping_params}")
+    print(f"  Number of groups created: {grouped_plateau_data.ngroups}")
+
+    # === STEP 4: MATCH RESULTS ROWS TO PLATEAU GROUPS ===
     grouped_data = []
+    unmatched_plateau_groups = 0
 
     for group_identifier, plateau_group in grouped_plateau_data:
-        # Convert group_identifier to string if it's not already
-        if isinstance(group_identifier, tuple):
-            group_id = "_".join(str(val) for val in group_identifier)
-        else:
-            group_id = str(group_identifier)
+        # Ensure group_identifier is a tuple
+        if not isinstance(group_identifier, tuple):
+            group_identifier = (group_identifier,)
 
-        # Extract group parameters from plateau_group directly
-        group_metadata = _extract_metadata_from_group_id(group_id, plateau_group)
+        # Build group_metadata from actual grouping parameters
+        group_metadata = dict(zip(actual_grouping_params, group_identifier))
 
-        # Find matching results row using the same grouping logic
-        matching_results = _find_matching_results(results_df, group_metadata)
+        # Add single-valued parameters
+        group_metadata.update(plateau_single_valued)
+
+        # Create group_id string for logging/filenames
+        group_id = "_".join(str(val) for val in group_identifier)
+
+        # Find matching results row
+        matching_results = _find_matching_results(
+            results_df, group_metadata, actual_grouping_params
+        )
 
         if matching_results is None:
-            continue  # Skip if no matching results found
+            # No matching results for this plateau group
+            unmatched_plateau_groups += 1
+            continue
 
-        # Create group info structure expected by plotting functions
+        # Create group info structure
         group_info = {
             "group_id": group_id,
             "plateau_data": plateau_group,
@@ -381,6 +475,26 @@ def group_data_for_visualization(
             "group_metadata": group_metadata,
         }
         grouped_data.append(group_info)
+
+    # === STEP 5: VALIDATE MATCHING ===
+    print(f"\nMatching results:")
+    print(f"  Total results rows: {len(results_df)}")
+    print(f"  Successful matches: {len(grouped_data)}")
+    print(f"  Unmatched plateau groups: {unmatched_plateau_groups}")
+
+    if len(grouped_data) == 0:
+        raise ValueError(
+            f"No matches found between results ({len(results_df)} rows) "
+            f"and plateau groups ({grouped_plateau_data.ngroups} groups). "
+            f"Grouping parameters used: {actual_grouping_params}"
+        )
+
+    # Check if we matched all results rows
+    if len(grouped_data) < len(results_df):
+        unmatched_results = len(results_df) - len(grouped_data)
+        print(
+            f"  WARNING: {unmatched_results} results rows did not match any plateau groups"
+        )
 
     return grouped_data
 
