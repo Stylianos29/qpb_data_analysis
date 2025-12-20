@@ -91,9 +91,9 @@ AXES_LABELS_BY_COLUMN_NAME = {
     # ---------------------------------------------------------------------------
     # Critical mass and bare mass
     # ---------------------------------------------------------------------------
-    "Absolute_critical_bare_mass": "|a$m^{\\text{critical}}_{\\text{bare}}$|",
-    "Critical_bare_mass": "a$m^{\\text{critical}}_{\\text{bare}}$",
-    "Bare_mass": "a$m$",
+    "Absolute_critical_bare_mass": "|$a m^{\\text{critical}}_{\\text{bare}}$|",
+    "Critical_bare_mass": "$a m^{\\text{critical}}_{\\text{bare}}$",
+    "Bare_mass": "$a m$",
     # ---------------------------------------------------------------------------
     # Computational cost metrics
     # ---------------------------------------------------------------------------
@@ -140,20 +140,20 @@ AXES_LABELS_BY_COLUMN_NAME = {
     # ---------------------------------------------------------------------------
     # PCAC mass observables
     # ---------------------------------------------------------------------------
-    "PCAC_mass": "a$m_{\\mathrm{PCAC}}(t)$",
-    "PCAC_mass_estimate": "a$m_{PCAC}$",
-    "Plateau_PCAC_mass": "a$m_{PCAC}$",
-    "Jackknife_average_of_PCAC_mass_correlator": "a$m_{\\text{PCAC}}$(t)",
-    "Jackknife_average_of_PCAC_mass_correlator_mean_values": "a$m_{\\text{PCAC}}$(t)",
-    "PCAC_mass_jackknife_samples": "a$m_{\\text{PCAC}}$(t)",
+    "PCAC_mass": "$a m_{\\mathrm{PCAC}}(t)$",
+    "PCAC_mass_estimate": "$a m_{\\mathrm{PCAC}}$",
+    "Plateau_PCAC_mass": "$a m_{\\mathrm{PCAC}}$",
+    "Jackknife_average_of_PCAC_mass_correlator": "$a m_{\\text{PCAC}}$(t)",
+    "Jackknife_average_of_PCAC_mass_correlator_mean_values": "$a m_{\\text{PCAC}}$(t)",
+    "PCAC_mass_jackknife_samples": "$a m_{\\text{PCAC}}$(t)",
     # ---------------------------------------------------------------------------
     # Pion effective mass observables
     # ---------------------------------------------------------------------------
-    "Pion_effective_mass_estimate": "a$m_{\\pi}$",
-    "Pion_effective_mass_estimate_squared": "$a^2 m^2_{\\pi}$",
-    "Jackknife_average_of_pion_effective_mass_correlator": "a$m_{\\text{eff.}}(t)$",
-    "pion_effective_mass_jackknife_samples": "a$m_{\\text{eff.}}(t)$",
-    "pion_effective_mass": "a$M_{\\pi}^{\\mathrm{eff}}(t)$",
+    "Pion_effective_mass_estimate": "$a M_{\\pi}$",
+    "Pion_effective_mass_estimate_squared": "$a^2 M^2_{\\pi}$",
+    "Jackknife_average_of_pion_effective_mass_correlator": "$a M_{\\pi}^{\\mathrm{eff}}(t)$",
+    "pion_effective_mass_jackknife_samples": "$a M_{\\pi}^{\\mathrm{eff}}(t)$",
+    "pion_effective_mass": "$a M_{\\pi}^{\\mathrm{eff}}(t)$",
     # ---------------------------------------------------------------------------
     # Correlator observables
     # ---------------------------------------------------------------------------
