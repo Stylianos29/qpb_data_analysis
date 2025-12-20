@@ -190,7 +190,8 @@ class PlotFilenameBuilder:
 
         Converts problematic characters to filename-safe alternatives:
         - Dots (.) become 'p'
-        - Removes commas, parentheses
+        - Removes commas, parentheses, spaces
+        - Slashes become underscores
         - Converts to string representation
 
         Parameters:
@@ -209,6 +210,8 @@ class PlotFilenameBuilder:
         '3p14'
         >>> builder._sanitize_value("test(1,2)")
         'test12'
+        >>> builder._sanitize_value("(4, 4, 4)")
+        '444'
         """
         return (
             str(value)
@@ -216,8 +219,8 @@ class PlotFilenameBuilder:
             .replace(",", "")
             .replace("(", "")
             .replace(")", "")
-            .replace(" ", "_")  # Added: spaces to underscores
-            .replace("/", "_")  # Added: slashes to underscores
+            .replace(" ", "")
+            .replace("/", "_")
         )
 
     def _determine_prefix(
