@@ -208,6 +208,8 @@ AXES_LABELS_BY_COLUMN_NAME = {
     "Rational_order": "n",
     "Number_of_Chebyshev_terms": "N",
     "Number_of_cores": "Number of cores",
+    "Minimum_eigenvalue_squared": "$\\lambda_{min}^2$",
+    "Maximum_eigenvalue_squared": "$\\lambda_{max}^2$",
 }
 
 
