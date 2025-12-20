@@ -128,7 +128,7 @@ FILENAME_CONFIG = {
 }
 
 PLOT_DIRECTORY_CONFIG = {
-    "parent_directory_name": "Critical_mass_extrapolation",
+    "parent_directory_name": "Critical_bare_mass_extrapolation",
     "use_parent_directory": True,
     "subdirectory_name_pcac": "from_PCAC_mass",
     "subdirectory_name_pion": "from_Pion_mass",
