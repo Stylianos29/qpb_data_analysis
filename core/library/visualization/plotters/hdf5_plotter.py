@@ -183,6 +183,7 @@ class HDF5Plotter(HDF5Analyzer):
         self,
         use_gvar: bool = False,
         use_dataframe_cache: bool = True,
+        time_offset: int = 0,
         **plot_kwargs,
     ) -> "HDF5Plotter":
         """
@@ -202,6 +203,10 @@ class HDF5Plotter(HDF5Analyzer):
             creates (mean, error) tuples for error bar plotting.
         use_dataframe_cache : bool, optional
             Whether to cache converted DataFrames for performance
+        time_offset : int, optional
+            Offset to add to time_index values. Useful for shifting
+            time series data (e.g., time_offset=1 changes indices from
+            0,1,2,... to 1,2,3,...). Default is 0.
         **plot_kwargs
             All the same plotting arguments as DataPlotter.plot(),
             including:
@@ -253,7 +258,7 @@ class HDF5Plotter(HDF5Analyzer):
 
         # Convert HDF5 data to DataFrame using the set variables
         df = self._convert_to_dataframe(
-            use_gvar=use_gvar, use_cache=use_dataframe_cache
+            use_gvar=use_gvar, use_cache=use_dataframe_cache, time_offset=time_offset
         )
 
         # Plot using the converted DataFrame (variables already set)
@@ -375,7 +380,7 @@ class HDF5Plotter(HDF5Analyzer):
         )
 
     def _convert_to_dataframe(
-        self, use_gvar: bool, use_cache: bool = True
+        self, use_gvar: bool, use_cache: bool = True, time_offset: int = 0
     ) -> pd.DataFrame:
         """
         Convert HDF5 dataset(s) to DataFrame format compatible with
@@ -395,7 +400,12 @@ class HDF5Plotter(HDF5Analyzer):
         DataPlotter already knows how to handle, rather than using gvar
         objects.
         """
-        cache_key = (self.xaxis_variable_name, self.yaxis_variable_name, use_gvar)
+        cache_key = (
+            self.xaxis_variable_name,
+            self.yaxis_variable_name,
+            use_gvar,
+            time_offset,
+        )
 
         if use_cache and cache_key in self._dataframe_cache:
             return self._dataframe_cache[cache_key]
@@ -458,6 +468,10 @@ class HDF5Plotter(HDF5Analyzer):
 
                 # Remove the original mean/error columns
                 df = df.drop(columns=[mean_col, error_col])
+
+        # Apply time offset if specified and time_index column exists
+        if time_offset != 0 and "time_index" in df.columns:
+            df["time_index"] = df["time_index"] + time_offset
 
         if use_cache:
             self._dataframe_cache[cache_key] = df
