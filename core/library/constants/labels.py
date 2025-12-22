@@ -43,7 +43,7 @@ TITLE_LABELS_BY_COLUMN_NAME = {
     "Number_of_vectors": "# of random vecs",
     "Kappa_value": "$\\kappa$",
     # Output quantities
-    "Condition_number": "$\\kappa$",
+    "Condition_number": "$\\kappa_{\\mathbb{X}^2}$",
     "Minimum_eigenvalue_squared": "$\\lambda_{min}^2$",
     "Maximum_eigenvalue_squared": "$\\lambda_{max}^2$",
     "Number_of_gauge_configurations": "# of configs",
@@ -210,6 +210,7 @@ AXES_LABELS_BY_COLUMN_NAME = {
     "Number_of_cores": "Number of cores",
     "Minimum_eigenvalue_squared": "$\\lambda_{min}^2$",
     "Maximum_eigenvalue_squared": "$\\lambda_{max}^2$",
+    "Condition_number": "$\\kappa_{\\mathbb{X}^2}$",
 }
 
 
