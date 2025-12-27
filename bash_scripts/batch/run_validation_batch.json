@@ -1,0 +1,14 @@
+{
+    "filter_type": "data-file-set",
+    "description": "Filter configuration for run_validation_batch.sh",
+    "usage_notes": [
+        "This file controls which data file sets are validated in batch mode.",
+        "Paths are relative to the input_base_directory.",
+        "If 'include' is non-empty: Only listed data file sets are validated (allowlist).",
+        "If 'include' is empty and 'exclude' is non-empty: All EXCEPT listed are validated (blocklist).",
+        "If both empty: No filtering occurs (all data file sets are validated).",
+        "If both non-empty: 'include' takes precedence (allowlist mode)."
+    ],
+    "include": [],
+    "exclude": []
+}
