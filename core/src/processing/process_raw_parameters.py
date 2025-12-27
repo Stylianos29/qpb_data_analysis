@@ -123,6 +123,7 @@ def main(
             multivalued_hdf5_path=input_multivalued_hdf5_file_path,
             output_directory=output_directory,
             output_filename=output_csv_filename,
+            logger=logger,
         )
 
         logger.info(f"Initialized processor for {input_single_valued_csv_file_path}")
@@ -131,7 +132,6 @@ def main(
         )
 
         # Execute processing pipeline
-        logger.info("Starting parameter processing pipeline")
         result_dataframe = processor.process_all_parameters()
         logger.info(
             f"Processing completed: {result_dataframe.shape[0]} rows, {result_dataframe.shape[1]} columns"

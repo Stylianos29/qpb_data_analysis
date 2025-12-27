@@ -134,14 +134,6 @@ RAW_SOLVER_PARAMETER_NAMES = [
     "Generic_solver_max_iterations",
 ]
 
-# List of canonical parameter names (output)
-CANONICAL_SOLVER_PARAMETER_NAMES = [
-    "MSCG_epsilon",
-    "MSCG_max_iterations",
-    "CG_epsilon",
-    "CG_max_iterations",
-]
-
 
 # =============================================================================
 # STRING TRANSFORMATION CONFIGURATIONS

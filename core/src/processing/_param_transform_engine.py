@@ -16,7 +16,6 @@ from src.processing._param_transform_config import (
     RATIONAL_ORDER_RESOLUTION_MAPPING,
     SOLVER_PARAMETER_RESOLUTION_RULES,
     RAW_SOLVER_PARAMETER_NAMES,
-    CANONICAL_SOLVER_PARAMETER_NAMES,
     STRING_TRANSFORMATIONS,
     MATH_TRANSFORMATIONS,
     EXTRACTION_RULES,
@@ -39,16 +38,17 @@ class ParameterTransformationEngine:
     Generic solver parameters into canonical CG/MSCG names.
     """
 
-    def __init__(self, dataframe: pd.DataFrame):
+    def __init__(self, dataframe: pd.DataFrame, logger=None):
         """
         Initialize the transformation engine.
 
         Args:
             dataframe: The DataFrame containing single-valued parameters
+            logger: Optional logger instance
         """
         self.dataframe = dataframe.copy()
         self.original_dataframe = dataframe.copy()
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger if logger is not None else logging.getLogger(__name__)
 
     def apply_all_transformations(self) -> pd.DataFrame:
         """
@@ -82,151 +82,179 @@ class ParameterTransformationEngine:
 
     def _resolve_rational_order(self) -> None:
         """
-        Resolve generic Rational_order to method-specific order
-        parameter.
+        Resolve generic Rational_order to method-specific parameter
+        names.
 
-        Maps Rational_order (from filename _n pattern) to:
-            - KL_diagonal_order (for KL method)
-            - Neuberger_order (for Neuberger method)
-            - Zolotarev_order (for Zolotarev method)
+        **Problem**: The Rational_order parameter parsed from filenames
+        is generic and needs to be mapped to the specific parameter name
+        used by each overlap operator method.
 
-        If the specific order already exists (from file contents),
-        performs cross-validation and logs any mismatches.
+        **Resolution Mapping**:
+            - KL method: Rational_order → KL_diagonal_order
+            - Neuberger method: Rational_order → Neuberger_order
+            - Zolotarev method: Rational_order → Zolotarev_order
+            - Bare/Chebyshev: No resolution needed (doesn't use rational
+              approximation)
+
+        **Process**:
+            1. Check if Rational_order column exists
+            2. For each row, get the Overlap_operator_method
+            3. Look up the appropriate target parameter name
+            4. Create new column with method-specific name
+            5. Original Rational_order is preserved for later removal
+
+        **Modifies**:
+            - self.dataframe: Adds method-specific order columns
+            (e.g., Zolotarev_order, KL_diagonal_order)
+
+        **Logs**:
+            - Summary of resolution (e.g., "Resolved Rational_order →
+              Zolotarev_order for 201 rows")
+
+        **Example**:
+            Input: Overlap_operator_method='Zolotarev',
+            Rational_order=10 Output: Creates Zolotarev_order=10 column
+
+        **Notes**:
+            - The generic Rational_order column is removed later by
+              _apply_column_operations()
+            - Only applies to methods that use rational approximations
+              (KL, Neuberger, Zolotarev)
         """
-        self.logger.info("Resolving Rational_order to method-specific names")
 
         if "Rational_order" not in self.dataframe.columns:
-            self.logger.debug("No Rational_order column found - skipping resolution")
             return
-
         if "Overlap_operator_method" not in self.dataframe.columns:
-            self.logger.warning(
-                "Overlap_operator_method not found - cannot resolve Rational_order"
-            )
             return
 
-        for idx, row in self.dataframe.iterrows():
-            idx = cast(int | str, idx)
+        self.logger.info("Resolving Rational_order to method-specific names")
 
-            overlap_method = row.get("Overlap_operator_method")
-            rational_order = row.get("Rational_order")
+        resolved_count = 0
 
-            if (
-                not isinstance(overlap_method, str)
-                or overlap_method not in RATIONAL_ORDER_RESOLUTION_MAPPING
-            ):
+        for idx in self.dataframe.index:
+            method = self.dataframe.loc[idx, "Overlap_operator_method"]
+
+            # Type check: ensure method is a string
+            if not isinstance(method, str):
                 continue
 
-            if pd.isna(rational_order):
-                continue
+            if method in RATIONAL_ORDER_RESOLUTION_MAPPING:
+                target_col = RATIONAL_ORDER_RESOLUTION_MAPPING[method]
+                self.dataframe.loc[idx, target_col] = self.dataframe.loc[
+                    idx, "Rational_order"
+                ]
+                resolved_count += 1
 
-            # Get the target column name
-            target_column = RATIONAL_ORDER_RESOLUTION_MAPPING[overlap_method]
+        if resolved_count > 0:
+            method = self.dataframe["Overlap_operator_method"].iloc[0]
 
-            # Check if target already exists (from file contents)
-            if target_column in self.dataframe.columns:
-                existing_value = self.dataframe.loc[idx, target_column]
-
-                if not pd.isna(existing_value) and existing_value != rational_order:
-                    self.logger.warning(
-                        f"Row {idx}: Mismatch between Rational_order ({rational_order}) "
-                        f"and {target_column} ({existing_value}) - using file contents value"
-                    )
-                    continue  # Keep file contents value
-
-            # Copy Rational_order to specific column
-            self.dataframe.loc[idx, target_column] = rational_order
-            self.logger.debug(f"Row {idx}: Resolved Rational_order → {target_column}")
-
-        self.logger.info("Rational order resolution completed")
+            # Type check here too
+            if isinstance(method, str):
+                target = RATIONAL_ORDER_RESOLUTION_MAPPING.get(method, "unknown")
+                self.logger.info(
+                    f"✓ Resolved Rational_order → {target} for {resolved_count} rows"
+                )
 
     def _resolve_solver_parameters(self) -> None:
         """
-        Resolve ambiguous solver parameters to canonical names.
+        Resolve ambiguous solver parameters to canonical names based on
+        context.
 
-        This method performs context-dependent renaming of solver
-        precision parameters based on Overlap_operator_method and
-        program type.
+        **Problem**: QPB log files use generic parameter names
+        (Inner_solver_*, Outer_solver_*) whose meaning depends on the
+        overlap operator method and program type. This method
+        disambiguates them into canonical names.
 
-        Resolution logic:
-            1. Determine program type from Main_program_type column
-            2. For each row, get the overlap method
-            3. Look up the resolution mapping
-            4. Rename parameters according to the mapping
-            5. Log any unresolved parameters
+        **Resolution Strategy**:
 
-        The mapping resolves:
-          - Inner_solver_* → MSCG_* (sign function inversion)
-          - Outer_solver_* → CG_* (full overlap inversion)
-          - Generic_solver_* → MSCG_* or CG_* (context-dependent)
+        For Zolotarev/KL/Neuberger overlap operators:
+            - Inner_solver_* → MSCG_* (multi-shift CG for sign function)
+            - Outer_solver_* → CG_* (conjugate gradient for full
+              inversion)
+
+        For Chebyshev overlap operator:
+            - Generic_solver_* → MSCG_* (forward applications)
+            - Generic_solver_* → CG_* (inversion programs)
+
+        For Bare operator:
+            - Generic_solver_* → CG_* (no multi-shift solver)
+
+        **Process**:
+            1. Check each row's Overlap_operator_method and
+               Main_program_type
+            2. Look up the appropriate parameter mapping
+            3. Create new columns with canonical names (MSCG_epsilon,
+               CG_epsilon, etc.)
+            4. Original raw parameters are preserved for later removal
+
+        **Modifies**:
+            - self.dataframe: Adds new columns with canonical parameter
+              names
+
+        **Logs**:
+            - List of canonical parameters created
+            - List of raw parameters that will be removed later
+
+        **Example**:
+            Input columns: Inner_solver_epsilon, Outer_solver_epsilon
+            Output columns (added): MSCG_epsilon, CG_epsilon
+
+        **Notes**:
+            - Raw parameters (Inner_solver_*, Outer_solver_*,
+              Generic_solver_*)
+            are removed later in the pipeline by
+            _apply_column_operations() - This resolution is necessary
+            for correct downstream analysis
         """
         self.logger.info("Resolving solver parameters to canonical names")
 
-        # Check if we have the required context columns
         if "Overlap_operator_method" not in self.dataframe.columns:
             self.logger.warning(
                 "Overlap_operator_method not found - skipping solver resolution"
             )
             return
 
-        # Process each row (typically all rows have same method/type,
-        # but handle general case)
-        for idx, row in self.dataframe.iterrows():
-            # Cast idx to the appropriate type for .at accessor
-            idx = cast(int | str, idx)  # Adjust types based on your index
+        resolved_params_set = set()
 
-            overlap_method = row.get("Overlap_operator_method")
-            main_program_type = row.get("Main_program_type", "")
+        # Iterate over index directly instead of using iterrows()
+        for idx in self.dataframe.index:
+            overlap_method = self.dataframe.loc[idx, "Overlap_operator_method"]
+            main_program_type = (
+                self.dataframe.loc[idx, "Main_program_type"]
+                if "Main_program_type" in self.dataframe.columns
+                else ""
+            )
 
-            # Type validation: ensure overlap_method is a string
             if not isinstance(overlap_method, str) or not overlap_method:
-                self.logger.warning(
-                    f"Row {idx}: Invalid Overlap_operator_method value: {overlap_method}"
-                )
                 continue
 
-            # Determine if this is an invert program
             is_invert = bool(main_program_type == "invert")
-
-            # Get the resolution mapping for this combination
             mapping_key = (overlap_method, is_invert)
 
             if mapping_key not in SOLVER_PARAMETER_RESOLUTION_RULES:
-                self.logger.warning(
-                    f"Row {idx}: No resolution mapping for ({overlap_method}, invert={is_invert})"
-                )
                 continue
 
             resolution_mapping = SOLVER_PARAMETER_RESOLUTION_RULES[mapping_key]
 
-            # Apply the mapping to this row
             for raw_param, canonical_param in resolution_mapping.items():
                 if raw_param in self.dataframe.columns:
-                    # Copy the value to the canonical parameter name
-                    self.dataframe.at[idx, canonical_param] = self.dataframe.at[
+                    # Now idx has the correct type from the index
+                    self.dataframe.loc[idx, canonical_param] = self.dataframe.loc[
                         idx, raw_param
                     ]
+                    resolved_params_set.add(canonical_param)
 
-                    self.logger.debug(
-                        f"Row {idx}: Resolved {raw_param} → {canonical_param}"
-                    )
+        if resolved_params_set:
+            self.logger.info(
+                f"✓ Created canonical solver parameters: {sorted(list(resolved_params_set))}"
+            )
 
-        # Log summary of resolution
-        resolved_params = [
-            col
-            for col in CANONICAL_SOLVER_PARAMETER_NAMES
-            if col in self.dataframe.columns
-        ]
-        if resolved_params:
-            self.logger.info(f"Created canonical solver parameters: {resolved_params}")
-
-        # Check for any raw parameters that weren't resolved
         unresolved_params = [
             col for col in RAW_SOLVER_PARAMETER_NAMES if col in self.dataframe.columns
         ]
         if unresolved_params:
             self.logger.info(
-                f"Raw solver parameters present (will be removed): {unresolved_params}"
+                f"  Raw solver parameters will be removed: {unresolved_params}"
             )
 
     def _apply_string_transformations(self) -> None:
@@ -431,35 +459,34 @@ class HDF5ParameterProcessor:
     configuration-driven approach.
     """
 
-    def __init__(self, hdf5_analyzer, dataframe: pd.DataFrame):
+    def __init__(self, hdf5_analyzer, dataframe: pd.DataFrame, logger=None):
         """
         Initialize the HDF5 processor.
 
         Args:
-            hdf5_analyzer: HDF5Analyzer instance for data access
-            dataframe: DataFrame to merge results into
+            - hdf5_analyzer: HDF5Analyzer instance for data access
+            - dataframe: DataFrame to merge results into
+            - logger: Optional logger instance
         """
         self.hdf5_analyzer = hdf5_analyzer
         self.dataframe = dataframe
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger if logger is not None else logging.getLogger(__name__)
 
     def process_all_hdf5_parameters(self) -> pd.DataFrame:
-        """
-        Process all configured HDF5 parameters.
+        self.logger.info("Processing HDF5 parameters...")
 
-        Returns:
-            DataFrame with HDF5-derived columns added
-        """
-        self.logger.info("Starting HDF5 parameter processing")
-
-        # Handle special vector/spinor columns first
         self._handle_vector_spinor_columns()
         self._validate_vector_spinor_counts()
+
+        cols_before = len(self.dataframe.columns)  # Track before
 
         for dataset_name, config in HDF5_PROCESSING_RULES.items():
             self._process_hdf5_dataset(dataset_name, config)
 
-        self.logger.info("HDF5 parameter processing completed")
+        cols_after = len(self.dataframe.columns)  # Track after
+        cols_added = cols_after - cols_before
+
+        self.logger.info(f"✓ Processed {cols_added} HDF5 datasets")  # Use actual count
         return self.dataframe
 
     def _handle_vector_spinor_columns(self) -> None:
@@ -546,45 +573,252 @@ class HDF5ParameterProcessor:
                 pass
         return None
 
-    def _process_hdf5_dataset(self, dataset_name: str, config: Dict) -> None:
-        """Process a single HDF5 dataset according to its
-        configuration."""
+    def _add_mean_with_error_column(
+        self, dataset_dict: Dict, output_column: str, config: Dict
+    ) -> None:
+        """Add column with mean values and errors where applicable."""
+        result_dict = {}
+
+        for filename, dataset_values in dataset_dict.items():
+            if not isinstance(dataset_values, np.ndarray):
+                dataset_values = np.array(dataset_values)
+
+            if len(dataset_values) > 1:
+                mean_val = float(np.mean(dataset_values))
+                error_val = float(
+                    np.std(dataset_values, ddof=1) / np.sqrt(len(dataset_values))
+                )
+                result_dict[filename] = (mean_val, error_val)
+            elif len(dataset_values) == 1 and "fallback" in config:
+                # Use fallback for single values
+                result_dict[filename] = float(dataset_values[0])
+
+        # Map results to DataFrame
+        self.dataframe[output_column] = self.dataframe["Filename"].map(result_dict)
+
+        # Count how many had errors vs single values
+        has_error = sum(1 for v in result_dict.values() if isinstance(v, tuple))
+        single_val = len(result_dict) - has_error
+
+        self.logger.info(
+            f"    Added: {len(result_dict)} values ({has_error} with errors, {single_val} single)"
+        )
+
+    def _add_single_value_column(self, dataset_dict: Dict, output_column: str) -> None:
+        """Add column extracting single values from datasets."""
+        result_dict = {}
+
+        for filename, dataset_values in dataset_dict.items():
+            if not isinstance(dataset_values, np.ndarray):
+                dataset_values = np.array(dataset_values)
+
+            if len(dataset_values) == 1:
+                result_dict[filename] = float(dataset_values[0])
+
+        self.dataframe[output_column] = self.dataframe["Filename"].map(result_dict)
+        self.logger.info(f"    Added: {len(result_dict)} single values")
+
+    def _add_mean_column(self, dataset_dict: Dict, output_column: str) -> None:
+        """Add column with mean values (no error)."""
+        result_dict = {}
+
+        for filename, dataset_values in dataset_dict.items():
+            if not isinstance(dataset_values, np.ndarray):
+                dataset_values = np.array(dataset_values)
+
+            result_dict[filename] = float(np.mean(dataset_values))
+
+        self.dataframe[output_column] = self.dataframe["Filename"].map(result_dict)
+        self.logger.info(f"    Added: {len(result_dict)} mean values")
+
+    def _add_sum_divided_column(
+        self, dataset_dict: Dict, output_column: str, config: Dict
+    ) -> None:
+        """Add column with summed values divided by unit."""
+        result_dict = {}
+
+        for filename, dataset_values in dataset_dict.items():
+            if not isinstance(dataset_values, np.ndarray):
+                dataset_values = np.array(dataset_values)
+
+            total = float(np.sum(dataset_values))
+            result_dict[filename] = total
+
+        # Apply unit division
+        result_dict = self._apply_unit_division(result_dict, config)
+
+        self.dataframe[output_column] = self.dataframe["Filename"].map(result_dict)
+
+        # Log divisor used
+        divisor_info = self._get_divisor_info(config)
+        self.logger.info(
+            f"    Added: {len(result_dict)} summed values (divided by {divisor_info})"
+        )
+
+    def _add_sum_plus_length_divided_column(
+        self, dataset_dict: Dict, output_column: str, config: Dict
+    ) -> None:
+        """Add column with summed values plus length, divided by
+        unit."""
+        result_dict = {}
+
+        for filename, dataset_values in dataset_dict.items():
+            if not isinstance(dataset_values, np.ndarray):
+                dataset_values = np.array(dataset_values)
+
+            # Sum + length (for kernel applications with initial
+            # application)
+            total = int(np.sum(dataset_values)) + len(dataset_values)
+            result_dict[filename] = total
+
+        # Apply unit division
+        result_dict = self._apply_unit_division(result_dict, config)
+
+        self.dataframe[output_column] = self.dataframe["Filename"].map(result_dict)
+
+        divisor_info = self._get_divisor_info(config)
+        self.logger.info(
+            f"    Added: {len(result_dict)} sum+length values (divided by {divisor_info})"
+        )
+
+    def _add_unique_values_column(
+        self, dataset_dict: Dict, output_column: str, config: Dict
+    ) -> None:
+        """Add column with unique values as tuples."""
+        result_dict = {}
+        data_type = config.get("data_type", "float")
+
+        for filename, dataset_values in dataset_dict.items():
+            if not isinstance(dataset_values, np.ndarray):
+                dataset_values = np.array(dataset_values)
+
+            if data_type == "float":
+                unique_vals = tuple(float(val) for val in np.unique(dataset_values))
+            else:
+                unique_vals = tuple(np.unique(dataset_values))
+            result_dict[filename] = unique_vals
+
+        self.dataframe[output_column] = self.dataframe["Filename"].map(result_dict)
+
+        # Log how many unique values per entry (average)
+        avg_unique = np.mean([len(v) for v in result_dict.values()])
+        self.logger.info(
+            f"    Added: {len(result_dict)} entries (avg {avg_unique:.1f} unique values each)"
+        )
+
+    def _get_divisor_info(self, config: Dict) -> str:
+        """Get human-readable divisor information for logging."""
+        unit_mapping = config.get("unit_mapping", {})
+
+        if (
+            "has_Number_of_spinors" in unit_mapping
+            and "Number_of_spinors" in self.dataframe.columns
+        ):
+            divisor_col = unit_mapping["has_Number_of_spinors"]["divisor"]
+            divisor_val = self.dataframe[divisor_col].iloc[0]
+            return f"{divisor_col}={divisor_val}"
+        elif "default" in unit_mapping:
+            divisor_col = unit_mapping["default"]["divisor"]
+            if divisor_col in self.dataframe.columns:
+                divisor_val = self.dataframe[divisor_col].iloc[0]
+                return f"{divisor_col}={divisor_val}"
+
+        return "unit"
+
+    def _log_column_statistics(self, column_name: str) -> None:
+        """Log statistics about a newly added column."""
+        if column_name not in self.dataframe.columns:
+            return
+
+        col_data = self.dataframe[column_name]
+
+        # Handle both numeric and tuple columns
+        if col_data.dtype == object:
+            # Could be tuples (mean with error) or other objects
+            sample_value = (
+                col_data.dropna().iloc[0] if not col_data.dropna().empty else None
+            )
+
+            if isinstance(sample_value, tuple) and len(sample_value) == 2:
+                # Mean with error format: extract means
+                means = col_data.apply(lambda x: x[0] if isinstance(x, tuple) else x)
+                self.logger.info(
+                    f"    Range (means): [{means.min():.6g}, {means.max():.6g}]"
+                )
+            else:
+                self.logger.info(
+                    f"    Non-numeric data (type: {type(sample_value).__name__})"
+                )
+        else:
+            # Numeric column
+            self.logger.info(f"    Range: [{col_data.min():.6g}, {col_data.max():.6g}]")
+            self.logger.info(
+                f"    Mean: {col_data.mean():.6g}, Std: {col_data.std():.6g}"
+            )
+
+    def _process_hdf5_dataset(self, dataset_name: str, config: dict) -> None:
+        """
+        Process a single HDF5 dataset according to its configuration.
+
+        Args:
+            dataset_name: Name of the dataset in HDF5 config: Processing
+            configuration dictionary
+        """
+        # Check if dataset exists in HDF5
+        if (
+            dataset_name
+            not in self.hdf5_analyzer.list_of_output_quantity_names_from_hdf5
+        ):
+            self.logger.debug(f"  Skipping {dataset_name} (not in HDF5)")
+            return
+
         try:
             # Extract dataset values using HDF5Analyzer
             dataset_dict = self._extract_dataset_to_dict(dataset_name)
 
             if not dataset_dict:
-                self.logger.info(f"No data found for dataset {dataset_name}")
+                self.logger.info(f"  No data found for {dataset_name}")
                 return
 
             # Skip if all arrays are empty
             if all(len(arr) == 0 for arr in dataset_dict.values()):
-                self.logger.info(f"Skipping {dataset_name}: all arrays are empty")
+                self.logger.info(f"  Skipping {dataset_name}: all arrays are empty")
                 return
-
-            # Apply aggregation method
-            aggregation_method = config["aggregation_method"]
-            processed_dict = self._apply_aggregation(
-                dataset_dict, aggregation_method, config
-            )
-
-            # Handle unit division for sum_then_divide methods
-            if aggregation_method in ["sum_then_divide", "sum_plus_length_then_divide"]:
-                processed_dict = self._apply_unit_division(processed_dict, config)
 
             # Determine output column name
             output_pattern = config["output_pattern"]
             output_column = self._resolve_output_pattern(output_pattern, config)
 
-            # Map results to DataFrame
-            self.dataframe[output_column] = self.dataframe["Filename"].map(
-                processed_dict
-            )
+            self.logger.info(f"  Processing: {dataset_name} → {output_column}")
 
-            self.logger.info(f"Processed {dataset_name} -> {output_column}")
+            # Apply aggregation method based on type
+            aggregation_method = config["aggregation_method"]
+
+            if aggregation_method == "mean_with_error":
+                self._add_mean_with_error_column(dataset_dict, output_column, config)
+            elif aggregation_method == "single_value":
+                self._add_single_value_column(dataset_dict, output_column)
+            elif aggregation_method == "mean":
+                self._add_mean_column(dataset_dict, output_column)
+            elif aggregation_method == "sum_then_divide":
+                self._add_sum_divided_column(dataset_dict, output_column, config)
+            elif aggregation_method == "sum_plus_length_then_divide":
+                self._add_sum_plus_length_divided_column(
+                    dataset_dict, output_column, config
+                )
+            elif aggregation_method == "unique_values_as_list":
+                self._add_unique_values_column(dataset_dict, output_column, config)
+            else:
+                self.logger.warning(
+                    f"  Unknown aggregation method '{aggregation_method}' for {dataset_name}"
+                )
+                return
+
+            # Log statistics about the added column
+            self._log_column_statistics(output_column)
 
         except Exception as e:
-            self.logger.error(f"Error processing {dataset_name}: {e}")
+            self.logger.error(f"  Error processing {dataset_name}: {e}")
 
     def _apply_unit_division(self, processed_dict: Dict, config: Dict) -> Dict:
         """Apply unit-based division to processed values."""
@@ -649,9 +883,8 @@ class HDF5ParameterProcessor:
                         f"Could not extract {dataset_name} from {group_path}: {e}"
                     )
 
-            self.logger.info(
-                f"Extracted {len(dataset_dict)} entries for dataset {dataset_name}"
-            )
+            # self.logger.info( f"Extracted {len(dataset_dict)} entries
+            #     for dataset {dataset_name}" )
 
         except Exception as e:
             self.logger.error(f"Failed to extract dataset {dataset_name}: {e}")
@@ -821,6 +1054,7 @@ class HDF5ParameterProcessor:
 
         # Validate for each file/row
         validation_errors = []
+        validated_count = 0  # Track successful validations
 
         for idx, row in self.dataframe.iterrows():
             filename = row["Filename"]
@@ -830,7 +1064,8 @@ class HDF5ParameterProcessor:
 
             # Get actual dataset length for this file
             try:
-                # Access HDF5 file directly to get dataset for this specific file
+                # Access HDF5 file directly to get dataset for this
+                # specific file
                 actual_length = self._get_dataset_length_for_file(
                     filename, "Total_number_of_CG_iterations_per_spinor"
                 )
@@ -852,10 +1087,7 @@ class HDF5ParameterProcessor:
                     validation_errors.append(error_msg)
                     self.logger.error(error_msg)
                 else:
-                    self.logger.debug(
-                        f"✓ {filename}: {actual_length} elements matches "
-                        f"{expected_spinors} × {expected_vectors}"
-                    )
+                    validated_count += 1
 
             except Exception as e:
                 self.logger.warning(f"Error validating {filename}: {e}")
@@ -949,8 +1181,8 @@ class HDF5ParameterProcessor:
         Get the length of a specific dataset for a specific file.
 
         Args:
-            filename: The filename to look up
-            dataset_name: Name of the dataset
+            filename: The filename to look up dataset_name: Name of the
+            dataset
 
         Returns:
             Length of the dataset array, or None if not found
@@ -991,18 +1223,17 @@ class AnalysisCaseProcessor:
     Implements strategy pattern for case-specific processing logic.
     """
 
-    def __init__(self, dataframe: pd.DataFrame):
+    def __init__(self, dataframe: pd.DataFrame, logger=None):
         """Initialize with the DataFrame to process."""
         self.dataframe = dataframe
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger if logger is not None else logging.getLogger(__name__)
 
     def process_analysis_cases(self) -> pd.DataFrame:
-        """Process all analysis-case-specific calculations."""
-        self.logger.info("Processing analysis case calculations")
+        """Apply all analysis-case-specific calculations."""
+        self.logger.info("Determining analysis case...")
 
-        # Determine analysis case
         analysis_case = self._determine_analysis_case()
-        self.logger.info(f"Detected analysis case: {analysis_case}")
+        self.logger.info(f"  Detected: {analysis_case}")
 
         # Apply case-specific calculations
         self._apply_mv_multiplication_calculations(analysis_case)
@@ -1011,11 +1242,24 @@ class AnalysisCaseProcessor:
         return self.dataframe
 
     def _determine_analysis_case(self) -> str:
-        """Determine whether this is forward operator applications or
-        inversions."""
+        """
+        Determine whether this is forward operator applications or
+        inversions.
+
+        Returns:
+            "inversions" or "forward_operator_applications"
+        """
+        # Simple logic: presence of Number_of_spinors indicates
+        # inversion case
         if "Number_of_spinors" in self.dataframe.columns:
+            self.logger.debug(
+                "  Analysis case determined from Number_of_spinors column"
+            )
             return "inversions"
         else:
+            self.logger.debug(
+                "  Analysis case determined from absence of Number_of_spinors"
+            )
             return "forward_operator_applications"
 
     def _apply_mv_multiplication_calculations(self, analysis_case: str) -> None:
