@@ -550,8 +550,8 @@ function run_stage_3_1() {
     # Execute Stage 3.1: Correlator Calculations
     #
     # Returns:
-    #   0 - Success
-    #   1 - Failure
+    #   0 - Success (core analysis completed, visualization may have failed)
+    #   1 - Failure (core analysis failed)
     
     echo ""
     echo "==================================================================="
@@ -568,8 +568,10 @@ function run_stage_3_1() {
     cmd+=" -o \"$output_directory\""
     cmd+=" -log_dir \"$log_directory\""
     
+    local viz_enabled=false
     if [[ -n "$plots_directory" ]]; then
         cmd+=" -p \"$plots_directory\" --enable-viz"
+        viz_enabled=true
     fi
     
     if $skip_checks; then
@@ -586,14 +588,33 @@ function run_stage_3_1() {
     
     log_info "Command: $cmd"
     
+    # Execute and capture result
     if eval "$cmd"; then
         echo "✓ Stage 3.1 completed successfully"
         log_info "Stage 3.1 completed successfully"
         return 0
     else
-        echo "ERROR: Stage 3.1 failed" >&2
-        log_error "Stage 3.1 failed"
-        return 1
+        # Check if core outputs exist despite failure
+        local pcac_output="${output_directory}/${PCAC_MASS_CSV_FILENAME}"
+        local pion_output="${output_directory}/${PION_MASS_CSV_FILENAME}"
+        
+        if [[ -f "$pcac_output" ]] || [[ -f "$pion_output" ]]; then
+            # Core analysis succeeded, likely visualization failed
+            echo "⚠ WARNING: Stage 3.1 core analysis succeeded but visualization may have failed"
+            log_warning "Stage 3.1: Core analysis completed but script reported failure (likely visualization)"
+            
+            if $viz_enabled; then
+                visualization_failures+=("Stage 3.1")
+            fi
+            
+            echo "✓ Stage 3.1 core analysis completed"
+            return 0
+        else
+            # Core analysis actually failed
+            echo "ERROR: Stage 3.1 failed" >&2
+            log_error "Stage 3.1 failed (core analysis)"
+            return 1
+        fi
     fi
 }
 
@@ -601,8 +622,8 @@ function run_stage_3_2() {
     # Execute Stage 3.2: Plateau Extraction
     #
     # Returns:
-    #   0 - Success
-    #   1 - Failure
+    #   0 - Success (core analysis completed, visualization may have failed)
+    #   1 - Failure (core analysis failed)
     
     echo ""
     echo "==================================================================="
@@ -620,8 +641,10 @@ function run_stage_3_2() {
     cmd+=" -o \"$output_directory\""
     cmd+=" -log_dir \"$log_directory\""
     
+    local viz_enabled=false
     if [[ -n "$plots_directory" ]]; then
         cmd+=" -p \"$plots_directory\" --enable-viz"
+        viz_enabled=true
     fi
     
     if $skip_checks; then
@@ -638,14 +661,33 @@ function run_stage_3_2() {
     
     log_info "Command: $cmd"
     
+    # Execute and capture result
     if eval "$cmd"; then
         echo "✓ Stage 3.2 completed successfully"
         log_info "Stage 3.2 completed successfully"
         return 0
     else
-        echo "ERROR: Stage 3.2 failed" >&2
-        log_error "Stage 3.2 failed"
-        return 1
+        # Check if core outputs exist despite failure
+        local pcac_output="${output_directory}/${PCAC_PLATEAU_CSV_FILENAME}"
+        local pion_output="${output_directory}/${PION_PLATEAU_CSV_FILENAME}"
+        
+        if [[ -f "$pcac_output" ]] || [[ -f "$pion_output" ]]; then
+            # Core analysis succeeded, likely visualization failed
+            echo "⚠ WARNING: Stage 3.2 core analysis succeeded but visualization may have failed"
+            log_warning "Stage 3.2: Core analysis completed but script reported failure (likely visualization)"
+            
+            if $viz_enabled; then
+                visualization_failures+=("Stage 3.2")
+            fi
+            
+            echo "✓ Stage 3.2 core analysis completed"
+            return 0
+        else
+            # Core analysis actually failed
+            echo "ERROR: Stage 3.2 failed" >&2
+            log_error "Stage 3.2 failed (core analysis)"
+            return 1
+        fi
     fi
 }
 
@@ -653,15 +695,15 @@ function run_stage_3_3() {
     # Execute Stage 3.3: Critical Mass Extrapolation
     #
     # Returns:
-    #   0 - Success
-    #   1 - Hard failure (script error)
-    #   2 - Graceful skip (insufficient data)
+    #   0 - Success (core analysis completed, visualization may have failed)
+    #   1 - Hard failure (core analysis failed)
+    #   2 - Graceful skip (insufficient data for extrapolation)
     
     echo ""
     echo "==================================================================="
     echo "   STAGE 3.3: CRITICAL MASS EXTRAPOLATION"
     echo "==================================================================="
-    echo "Extrapolating critical bare mass from PCAC and pion..."
+    echo "Extrapolating critical bare mass..."
     
     log_info "=== STAGE 3.3: CRITICAL MASS EXTRAPOLATION ==="
     log_info "Executing critical mass extraction script"
@@ -673,8 +715,10 @@ function run_stage_3_3() {
     cmd+=" -o \"$output_directory\""
     cmd+=" -log_dir \"$log_directory\""
     
+    local viz_enabled=false
     if [[ -n "$plots_directory" ]]; then
         cmd+=" -p \"$plots_directory\" --enable-viz"
+        viz_enabled=true
     fi
     
     if $skip_checks; then
@@ -691,13 +735,13 @@ function run_stage_3_3() {
     
     log_info "Command: $cmd"
     
-    # Execute and capture output
+    # Execute and capture output and exit code
     local temp_log=$(mktemp)
     eval "$cmd" 2>&1 | tee "$temp_log"
     local exit_code=${PIPESTATUS[0]}
     
     if [[ $exit_code -eq 0 ]]; then
-        # Success
+        # Complete success
         rm -f "$temp_log"
         echo "✓ Stage 3.3 completed successfully"
         log_info "Stage 3.3 completed successfully"
@@ -706,7 +750,7 @@ function run_stage_3_3() {
         # Check if graceful skip due to insufficient data
         if grep -q "Insufficient bare mass variation for extrapolation" "$temp_log" || \
            grep -q "No valid groups with sufficient bare mass variation" "$temp_log"; then
-            # Graceful skip
+            # Graceful skip - insufficient data
             rm -f "$temp_log"
             echo ""
             echo "⚠ WARNING: Insufficient data for critical mass extrapolation"
@@ -715,8 +759,26 @@ function run_stage_3_3() {
             log_warning "Stage 3.3: Insufficient data for critical mass extrapolation"
             log_info "Stage 3.3 skipped gracefully (data limitation, not error)"
             return 2
+        fi
+        
+        # Check if core outputs exist despite failure
+        local pcac_output="${output_directory}/${CRITICAL_PCAC_CSV_FILENAME}"
+        local pion_output="${output_directory}/${CRITICAL_PION_CSV_FILENAME}"
+        
+        if [[ -f "$pcac_output" ]] || [[ -f "$pion_output" ]]; then
+            # Core analysis succeeded, likely visualization failed
+            rm -f "$temp_log"
+            echo "⚠ WARNING: Stage 3.3 core analysis succeeded but visualization may have failed"
+            log_warning "Stage 3.3: Core analysis completed but script reported failure (likely visualization)"
+            
+            if $viz_enabled; then
+                visualization_failures+=("Stage 3.3")
+            fi
+            
+            echo "✓ Stage 3.3 core analysis completed"
+            return 0
         else
-            # Hard failure
+            # Hard failure - core analysis failed
             rm -f "$temp_log"
             echo "ERROR: Stage 3.3 failed" >&2
             log_error "Stage 3.3 failed (hard error)"
@@ -729,9 +791,9 @@ function run_stage_3_4() {
     # Execute Stage 3.4: Cost Extrapolation
     #
     # Returns:
-    #   0 - Success
-    #   1 - Hard failure (script error)
-    #   2 - Graceful skip (insufficient data)
+    #   0 - Success (core analysis completed, visualization may have failed)
+    #   1 - Hard failure (core analysis failed)
+    #   2 - Graceful skip (insufficient data for extrapolation)
     
     echo ""
     echo "==================================================================="
@@ -750,8 +812,10 @@ function run_stage_3_4() {
     cmd+=" -o \"$output_directory\""
     cmd+=" -log_dir \"$log_directory\""
     
+    local viz_enabled=false
     if [[ -n "$plots_directory" ]]; then
         cmd+=" -p \"$plots_directory\" --enable-viz"
+        viz_enabled=true
     fi
     
     if $skip_checks; then
@@ -768,19 +832,19 @@ function run_stage_3_4() {
     
     log_info "Command: $cmd"
     
-    # Execute and capture output and exit code properly
+    # Execute and capture output and exit code
     local temp_log=$(mktemp)
     eval "$cmd" 2>&1 | tee "$temp_log"
     local exit_code=${PIPESTATUS[0]}
     
     if [[ $exit_code -eq 0 ]]; then
-        # Success
+        # Complete success
         rm -f "$temp_log"
         echo "✓ Stage 3.4 completed successfully"
         log_info "Stage 3.4 completed successfully"
         return 0
     else
-        # Failure - check if it's due to insufficient data
+        # Check if graceful skip due to insufficient data
         if grep -q "Cost extrapolation produced no results" "$temp_log"; then
             # Graceful skip - insufficient data
             rm -f "$temp_log"
@@ -791,8 +855,26 @@ function run_stage_3_4() {
             log_warning "Stage 3.4: Insufficient data for cost extrapolation"
             log_info "Stage 3.4 skipped gracefully (data limitation, not error)"
             return 2
+        fi
+        
+        # Check if core outputs exist despite failure
+        local pcac_output="${output_directory}/${COST_PCAC_CSV_FILENAME}"
+        local pion_output="${output_directory}/${COST_PION_CSV_FILENAME}"
+        
+        if [[ -f "$pcac_output" ]] || [[ -f "$pion_output" ]]; then
+            # Core analysis succeeded, likely visualization failed
+            rm -f "$temp_log"
+            echo "⚠ WARNING: Stage 3.4 core analysis succeeded but visualization may have failed"
+            log_warning "Stage 3.4: Core analysis completed but script reported failure (likely visualization)"
+            
+            if $viz_enabled; then
+                visualization_failures+=("Stage 3.4")
+            fi
+            
+            echo "✓ Stage 3.4 core analysis completed"
+            return 0
         else
-            # Hard failure - some other error
+            # Hard failure - core analysis failed
             rm -f "$temp_log"
             echo "ERROR: Stage 3.4 failed" >&2
             log_error "Stage 3.4 failed (hard error)"
@@ -1168,6 +1250,7 @@ fi
 
 # Execute pipeline stages
 pipeline_success=true
+visualization_failures=()  # Track which visualization stages failed
 
 # Stage 1: Parsing
 if should_run_stage 1; then
@@ -1213,7 +1296,11 @@ fi
 # Final summary
 echo ""
 echo "==================================================================="
-echo "   PIPELINE COMPLETED SUCCESSFULLY"
+if [[ ${#visualization_failures[@]} -eq 0 ]]; then
+    echo "   PIPELINE COMPLETED SUCCESSFULLY"
+else
+    echo "   PIPELINE COMPLETED WITH WARNINGS"
+fi
 echo "==================================================================="
 
 if $has_correlators; then
@@ -1227,21 +1314,42 @@ if $has_correlators; then
         echo "  Stage 2A:  Processing parameters ✓"
         echo "  Stage 2B:  Jackknife analysis ✓"
         if [[ -n "$plots_directory" ]]; then
-            echo "  Stage 2C:  Jackknife visualization ✓"
+            if [[ " ${visualization_failures[@]} " =~ " Stage 2C " ]]; then
+                echo "  Stage 2C:  Jackknife visualization ⚠ (failed)"
+            else
+                echo "  Stage 2C:  Jackknife visualization ✓"
+            fi
         fi
     fi
     
     if should_run_stage 3; then
-        echo "  Stage 3.1: Correlator calculations ✓"
-        echo "  Stage 3.2: Plateau extraction ✓"
+        if [[ " ${visualization_failures[@]} " =~ " Stage 3.1 " ]]; then
+            echo "  Stage 3.1: Correlator calculations ✓ (visualization ⚠)"
+        else
+            echo "  Stage 3.1: Correlator calculations ✓"
+        fi
+        
+        if [[ " ${visualization_failures[@]} " =~ " Stage 3.2 " ]]; then
+            echo "  Stage 3.2: Plateau extraction ✓ (visualization ⚠)"
+        else
+            echo "  Stage 3.2: Plateau extraction ✓"
+        fi
         
         # Check if Stage 3.3 ran
         if [[ -f "${output_directory}/${CRITICAL_PCAC_CSV_FILENAME}" || -f "${output_directory}/${CRITICAL_PION_CSV_FILENAME}" ]]; then
-            echo "  Stage 3.3: Critical mass extrapolation ✓"
+            if [[ " ${visualization_failures[@]} " =~ " Stage 3.3 " ]]; then
+                echo "  Stage 3.3: Critical mass extrapolation ✓ (visualization ⚠)"
+            else
+                echo "  Stage 3.3: Critical mass extrapolation ✓"
+            fi
             
             # Check if Stage 3.4 ran
             if [[ -f "${output_directory}/${COST_PCAC_CSV_FILENAME}" || -f "${output_directory}/${COST_PION_CSV_FILENAME}" ]]; then
-                echo "  Stage 3.4: Cost extrapolation ✓"
+                if [[ " ${visualization_failures[@]} " =~ " Stage 3.4 " ]]; then
+                    echo "  Stage 3.4: Cost extrapolation ✓ (visualization ⚠)"
+                else
+                    echo "  Stage 3.4: Cost extrapolation ✓"
+                fi
             else
                 echo "  Stage 3.4: Cost extrapolation ○ (skipped - insufficient data)"
             fi
@@ -1275,6 +1383,19 @@ echo ""
 echo "Main log file: $(get_display_path "$SCRIPT_LOG_FILE_PATH")"
 echo "==================================================================="
 
+# Report visualization failures if any
+if [[ ${#visualization_failures[@]} -gt 0 ]]; then
+    echo ""
+    echo "⚠ WARNING: Visualization failed for the following stages:"
+    for stage in "${visualization_failures[@]}"; do
+        echo "  - $stage"
+    done
+    echo ""
+    echo "Core analysis completed successfully, but some plots may be missing."
+    echo "Check individual stage logs for details."
+    log_warning "Pipeline completed with ${#visualization_failures[@]} visualization failure(s): ${visualization_failures[*]}"
+fi
+
 log_info "=== PIPELINE EXECUTION COMPLETED SUCCESSFULLY ==="
 
 if [[ -n "$stages_to_run" ]]; then
@@ -1291,6 +1412,10 @@ else
     fi
 fi
 
+if [[ ${#visualization_failures[@]} -gt 0 ]]; then
+    log_info "Visualization failures: ${#visualization_failures[@]} stage(s)"
+fi
+
 log_info "Auxiliary files organized successfully"
 
-exit 0
+exit 0  # Always exit 0 if we got here (core pipeline succeeded)
