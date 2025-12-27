@@ -1025,6 +1025,7 @@ skipped_filter_count=0
 skipped_stage_count=0
 success_count=0
 failure_count=0
+failed_sets=()  # Array to store relative paths of failed data sets
 
 # Process each data set
 set_index=0
@@ -1126,6 +1127,7 @@ for data_set_dir in "${data_sets[@]}"; do
     else
         # Failure - don't update timestamp
         ((failure_count++))
+        failed_sets+=("$rel_path")
         echo ""
         echo "✗ FAILED [$set_index/$total_sets]: $rel_path encountered errors"
         echo ""
@@ -1161,7 +1163,10 @@ if [[ $success_count -eq $processed_count && $processed_count -gt 0 ]]; then
     echo "INFO: All processed data file sets completed successfully"
     exit 0
 elif [[ $failure_count -gt 0 ]]; then
-    echo "WARNING: Some data file sets failed processing"
+    echo "WARNING - Some data file sets failed processing:"
+    for failed_set in "${failed_sets[@]}"; do
+        echo "  ✗ $failed_set"
+    done
     exit 1
 else
     echo "INFO: Batch processing complete"
