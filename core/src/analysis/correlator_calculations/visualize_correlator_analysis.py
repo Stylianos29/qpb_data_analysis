@@ -31,6 +31,7 @@ Usage:
 import os
 import sys
 from pathlib import Path
+import shutil
 from typing import Dict, List, Optional, Tuple
 
 import click
@@ -63,6 +64,7 @@ from src.analysis.correlator_calculations._correlator_visualization_core import 
 from src.analysis.correlator_calculations._correlator_visualization_config import (
     get_analysis_config,
     validate_visualization_config,
+    get_plot_subdirectory_name,
 )
 
 
@@ -113,7 +115,8 @@ def _load_configuration_labels(group: h5py.Group, n_samples: int) -> List[str]:
     # Extract just the configuration numbers from filenames
     clean_labels = []
     for label in labels:
-        # Look for pattern like "config0013800" and extract just the number
+        # Look for pattern like "config0013800" and extract just the
+        # number
         match = re.search(r"config(\d+)", label)
         if match:
             clean_labels.append(match.group(1))  # Just the number
@@ -397,19 +400,46 @@ def main(
         logger.info(f"Plots directory: {plots_directory}")
         logger.info(f"Samples per plot: {analysis_config.get('samples_per_plot', 8)}")
 
-        # Setup visualization managers (following exact pattern from
-        # visualize_PCAC_mass.py)
+        # Setup visualization managers
         file_manager = PlotFileManager(plots_directory)
         layout_manager = PlotLayoutManager(constants)
         style_manager = PlotStyleManager(constants)
         title_builder = PlotTitleBuilder(constants.TITLE_LABELS_BY_COLUMN_NAME)
 
-        # Prepare plots base subdirectory
-        base_plots_dir = file_manager.prepare_subdirectory(
-            analysis_config["plot_base_directory"],
-            clear_existing,
-            confirm_clear=False,
-        )
+        # Get hierarchical directory structure
+        parent_name, subdir_name = get_plot_subdirectory_name(analysis_type)
+
+        if parent_name:
+            # Hierarchical: parent/subdir/
+            logger.info(f"Using directory structure: {parent_name}/{subdir_name}/")
+
+            # Create parent directory
+            parent_path = file_manager.prepare_subdirectory(
+                parent_name, clear_existing=False, confirm_clear=False
+            )
+
+            # Create subdirectory within parent
+            plots_subdir_path = Path(parent_path) / subdir_name
+            plots_subdir_path.mkdir(parents=True, exist_ok=True)
+
+            # Clear only this subdirectory if requested
+            if clear_existing:
+                if plots_subdir_path.exists():
+                    shutil.rmtree(plots_subdir_path)
+                    plots_subdir_path.mkdir(parents=True, exist_ok=True)
+                logger.info(f"Cleared existing plots in {parent_name}/{subdir_name}/")
+
+            base_plots_dir = str(plots_subdir_path)
+        else:
+            # Flat structure (backward compatibility)
+            logger.info(f"Using directory structure: {subdir_name}/")
+            base_plots_dir = file_manager.prepare_subdirectory(
+                subdir_name, clear_existing=clear_existing, confirm_clear=False
+            )
+            if clear_existing:
+                logger.info(f"Cleared existing plots in {subdir_name}/")
+
+        logger.info(f"Plot output directory: {base_plots_dir}")
 
         # Process correlator data
         total_plots = _process_correlator_data(

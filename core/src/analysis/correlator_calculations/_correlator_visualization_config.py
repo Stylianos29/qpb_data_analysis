@@ -81,6 +81,17 @@ TITLE_EXCLUDED_PARAMETERS = [
     "Threads_per_process",
 ]
 
+# =============================================================================
+# PLOT DIRECTORY CONFIGURATION
+# =============================================================================
+
+PLOT_DIRECTORY_CONFIG = {
+    "parent_directory_name": "Correlator_analysis_visualization",
+    "use_parent_directory": True,  # Toggle between hierarchical/flat structure
+    "subdirectory_name_pcac_mass": "PCAC_mass",
+    "subdirectory_name_effective_mass": "Effective_mass",
+}
+
 # Analysis-specific configurations
 ANALYSIS_CONFIGS = {
     "pcac_mass": {
@@ -88,7 +99,7 @@ ANALYSIS_CONFIGS = {
         "samples_dataset": PCAC_OUTPUT_DATASETS["samples"],
         "mean_dataset": PCAC_OUTPUT_DATASETS["mean"],
         "error_dataset": PCAC_OUTPUT_DATASETS["error"],
-        "plot_base_directory": "PCAC_mass_visualization",
+        "plot_base_directory": "PCAC_mass_visualization",  # DEPRECATED - use get_plot_subdirectory_name()
         "time_offset": PCAC_TRUNCATE_START,  # PCAC starts at t=2 due to truncation
         "time_range": {
             "min": 5,  # Positive integer, or None
@@ -109,7 +120,7 @@ ANALYSIS_CONFIGS = {
         "samples_dataset": EFFECTIVE_OUTPUT_DATASETS["samples"],
         "mean_dataset": EFFECTIVE_OUTPUT_DATASETS["mean"],
         "error_dataset": EFFECTIVE_OUTPUT_DATASETS["error"],
-        "plot_base_directory": "Effective_mass_visualization",
+        "plot_base_directory": "Effective_mass_visualization",  # DEPRECATED - use get_plot_subdirectory_name()
         "time_offset": 1,  # Effective mass starts at t=1
         "time_range": {
             "min": 6,  # Positive integer, or None
@@ -137,6 +148,44 @@ def get_analysis_config(analysis_type):
     if analysis_type not in ANALYSIS_CONFIGS:
         raise ValueError(f"Unknown analysis type: {analysis_type}")
     return ANALYSIS_CONFIGS[analysis_type]
+
+
+def get_plot_subdirectory_name(analysis_type: str) -> tuple:
+    """
+    Get subdirectory name(s) for plots.
+
+    Args:
+        analysis_type: Type of analysis ("pcac_mass" or
+        "effective_mass")
+
+    Returns:
+        Tuple of (parent_name, subdir_name) If use_parent_directory is
+        False, parent_name will be None
+
+    Examples:
+        Hierarchical mode (use_parent_directory=True):
+            ("Correlator_analysis_visualization", "PCAC_mass")
+
+        Flat mode (use_parent_directory=False):
+            (None, "Correlator_analysis_visualization_pcac")
+    """
+    if analysis_type not in ANALYSIS_CONFIGS:
+        raise ValueError(f"Unknown analysis type: {analysis_type}")
+
+    config = PLOT_DIRECTORY_CONFIG
+
+    if config["use_parent_directory"]:
+        parent = config["parent_directory_name"]
+        subdir = config[f"subdirectory_name_{analysis_type}"]
+        return (parent, subdir)
+    else:
+        # Backward compatibility: flat structure
+        parent = None
+        # Convert pcac_mass -> pcac, effective_mass -> effective for
+        # backward compatibility
+        short_type = analysis_type.replace("_mass", "")
+        subdir = f"{config['parent_directory_name']}_{short_type}"
+        return (parent, subdir)
 
 
 # =============================================================================
