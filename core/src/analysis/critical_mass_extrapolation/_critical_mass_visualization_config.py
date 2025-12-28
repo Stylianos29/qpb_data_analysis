@@ -89,11 +89,11 @@ VISUALIZATION_CONFIG = {
 # UPDATE ANALYSIS CONFIGS TO REFLECT ACTUAL Y-AXIS LABELS
 ANALYSIS_CONFIGS = {
     "pcac": {
-        "plot_subdirectory": "critical_mass_extrapolation_pcac",
+        "plot_subdirectory": "Critical_bare_mass_extrapolation_pcac",
         "default_y_label": "a$m_{PCAC}$",
     },
     "pion": {
-        "plot_subdirectory": "critical_mass_extrapolation_pion",
+        "plot_subdirectory": "Critical_bare_mass_extrapolation_pion",
         "default_y_label": "$a^2 m^2_{\\pi}$",
     },
 }

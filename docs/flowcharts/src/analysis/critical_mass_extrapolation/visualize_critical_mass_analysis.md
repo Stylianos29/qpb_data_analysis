@@ -48,8 +48,8 @@ flowchart TD
     
     %% VISUALIZATION INFRASTRUCTURE SETUP
     LogDataCounts --> SetupInfrastructure[Setup Visualization Infrastructure:<br/>PlotTitleBuilder, PlotFileManager<br/>TITLE_LABELS_BY_COLUMN_NAME]
-    SetupInfrastructure --> CreatePlotsDirectory[Create Plots Directory:<br/>critical_mass_extrapolation_analysis_type<br/>Clear existing subdirectory]
-    CreatePlotsDirectory --> PrepareSubdirectory[Prepare Subdirectory:<br/>file_manager.prepare_subdirectory<br/>clear_existing = True]
+    SetupInfrastructure --> CreatePlotsDirectory[Create Plots Directory:<br/>Hierarchical or Flat structure<br/>Based on use_parent_directory config]
+    CreatePlotsDirectory --> PrepareSubdirectory[Prepare Subdirectory:<br/>file_manager.prepare_subdirectory<br/>clear_existing option available]
     
     %% DATA GROUPING PHASE
     PrepareSubdirectory --> GroupDataForViz[Group Data for Visualization:<br/>group_data_for_visualization<br/>Match results with plateau data]
@@ -66,26 +66,21 @@ flowchart TD
     CreateExtrapolationPlot --> SetupFigure[Setup Figure:<br/>matplotlib subplots<br/>Configure figure size]
     SetupFigure --> ExtractPlotData[Extract Plot Data:<br/>x_data = Bare_mass values<br/>y_data = plateau estimates]
     ExtractPlotData --> CheckAnalysisTypeForColumns{analysis_type<br/>for Columns?}
-    CheckAnalysisTypeForColumns -- pcac --> LoadPCACColumns[Load PCAC Columns:<br/>PCAC_plateau_mean/error<br/>y_label = PCAC Mass]
-    CheckAnalysisTypeForColumns -- pion --> LoadPionColumns[Load Pion Columns:<br/>pion_plateau_mean/error<br/>y_label = Pion Effective Mass]
-    LoadPCACColumns --> PlotDataPoints
-    LoadPionColumns --> PlotDataPoints[Plot Data Points:<br/>errorbar with plateau data<br/>Error bars and styling]
+    CheckAnalysisTypeForColumns -- PCAC --> LoadPCACColumns[Load PCAC Columns:<br/>PCAC_plateau_mean<br/>PCAC_plateau_error]
+    CheckAnalysisTypeForColumns -- Pion --> LoadPionColumns[Load Pion Columns:<br/>pion_plateau_mean<br/>pion_plateau_error<br/>Square values for pion]
     
-    %% PLOT ELEMENTS CREATION
-    PlotDataPoints --> CalcPlotRanges[Calculate Plot Ranges:<br/>calculate_plot_ranges function<br/>Extend for extrapolation view]
-    CalcPlotRanges --> CreateFitLine[Create Linear Fit Line:<br/>create_linear_fit_line<br/>Use slope/intercept from results]
-    CreateFitLine --> PlotFitLine[Plot Fit Line:<br/>Linear extrapolation line<br/>Include R² in label]
-    PlotFitLine --> AddZeroLine[Add Zero Line:<br/>Horizontal line at y=0<br/>Show chiral limit reference]
-    AddZeroLine --> AnnotateCriticalMass[Annotate Critical Mass:<br/>annotate_critical_mass function<br/>Vertical line and text box]
+    %% PLOT COMPONENTS
+    LoadPCACColumns --> PlotDataPoints[Plot Data Points:<br/>errorbar with color and markers<br/>Include error bars]
+    LoadPionColumns --> PlotDataPoints
+    PlotDataPoints --> CreateFitLine[Create Fit Line:<br/>y = slope * x + intercept<br/>Using results_data parameters]
+    CreateFitLine --> PlotFitLine[Plot Fit Line:<br/>Extend fit to show extrapolation<br/>Display R² in legend]
+    PlotFitLine --> AddZeroLine[Add Zero Reference Line:<br/>Horizontal line at y=0<br/>Represents chiral limit]
+    AddZeroLine --> AnnotateCriticalMass[Annotate Critical Mass:<br/>Vertical line at critical_mass_mean<br/>Text box with value ± error]
     
-    %% PLOT FINISHING
-    AnnotateCriticalMass --> ConfigureAxes[Configure Axes:<br/>Set labels, limits, grid<br/>Analysis-specific y-label]
-    ConfigureAxes --> AddLegend[Add Legend:<br/>Data points and fit line<br/>Include fit quality R²]
-    AddLegend --> ApplyStyling[Apply Plot Styling:<br/>get_plot_styling config<br/>Professional appearance]
-    ApplyStyling --> GenerateFilename[Generate Plot Filename:<br/>PlotFilenameBuilder<br/>Parameter-based naming]
-    GenerateFilename --> SavePlot[Save Plot:<br/>High-resolution PNG output<br/>file_manager.plot_path]
-    SavePlot --> CleanupMatplotlib[Cleanup Matplotlib:<br/>plt.close figure<br/>Free memory resources]
-    CleanupMatplotlib --> CheckPlotSuccess{Plot Created<br/>Successfully?}
+    %% FINALIZATION
+    AnnotateCriticalMass --> ConfigureAxes[Configure Axes:<br/>Set labels and limits<br/>Add grid and legend]
+    ConfigureAxes --> SavePlot[Save Plot:<br/>PNG format with high DPI<br/>Descriptive filename from parameters]
+    SavePlot --> CheckPlotSuccess{Plot Saved<br/>Successfully?}
     CheckPlotSuccess -- No --> LogPlotFailure[Log Plot Failure:<br/>Warning for failed group<br/>Continue with next group]
     CheckPlotSuccess -- Yes --> IncrementCounter[Increment Plot Counter:<br/>Track successful plots<br/>Continue processing]
     
@@ -178,10 +173,12 @@ flowchart TD
 ### Analysis-Specific Configuration
 | Element | PCAC Analysis | Pion Analysis |
 |---------|---------------|---------------|
-| Y-axis Label | "PCAC Mass" | "Pion Effective Mass" |
+| Y-axis Label | "a$m_{PCAC}$" | "$a^2 m^2_{\\pi}$" |
 | Data Columns | PCAC_plateau_mean/error | pion_plateau_mean/error |
-| Plot Subdirectory | critical_mass_extrapolation_pcac | critical_mass_extrapolation_pion |
+| Plot Subdirectory (Hierarchical) | Critical_bare_mass_extrapolation/from_PCAC_mass | Critical_bare_mass_extrapolation/from_Pion_mass |
+| Plot Subdirectory (Flat) | Critical_bare_mass_extrapolation_pcac | Critical_bare_mass_extrapolation_pion |
 | Physics Interpretation | PCAC mass → 0 | Pion effective mass → 0 |
+| Power Transformation | mass¹ | mass² |
 
 ## Data Flow Pipeline
 
@@ -207,24 +204,27 @@ Group Data → Plot Setup → Data Points → Fit Line → Annotations → Save
 ## CLI Usage
 
 ```bash
-# Basic usage with auto-detection
+# Basic usage with explicit analysis type
 python visualize_critical_mass_analysis.py \
     -r critical_bare_mass_from_pcac.csv \
     -p plateau_PCAC_mass_estimates.csv \
-    -o plots_dir
+    -o plots_dir \
+    -t pcac
 
-# Explicit analysis type specification
+# Pion analysis with plot clearing
 python visualize_critical_mass_analysis.py \
     -r critical_bare_mass_from_pion.csv \
     -p plateau_pion_mass_estimates.csv \
     -o plots_dir \
-    -t pion
+    -t pion \
+    --clear_existing
 
 # With logging
 python visualize_critical_mass_analysis.py \
     -r results.csv \
     -p plateau.csv \
     -o plots_dir \
+    -t pcac \
     -log_on \
     -log_dir logs
 ```
@@ -232,15 +232,58 @@ python visualize_critical_mass_analysis.py \
 ## Output Structure
 
 ### Directory Organization
+
+The script supports two directory organization modes controlled by the
+`use_parent_directory` configuration in `PLOT_DIRECTORY_CONFIG`:
+
+#### Hierarchical Structure (Default: `use_parent_directory: True`)
 ```
 plots_dir/
-├── critical_mass_extrapolation_pcac/    # PCAC analysis plots
+└── Critical_bare_mass_extrapolation/        # Parent directory
+    ├── from_PCAC_mass/                      # PCAC analysis plots
+    │   ├── group_param1_param2.png
+    │   ├── group_param3_param4.png
+    │   └── ...
+    └── from_Pion_mass/                      # Pion analysis plots
+        ├── group_param1_param2.png
+        ├── group_param3_param4.png
+        └── ...
+```
+
+**Benefits**:
+- Clean organization with both analysis types under one parent
+- Easy to locate all critical mass plots
+- `--clear_existing` flag only clears the specific analysis subdirectory
+
+#### Flat Structure (Backward Compatibility: `use_parent_directory: False`)
+```
+plots_dir/
+├── Critical_bare_mass_extrapolation_pcac/   # PCAC plots directly
 │   ├── group_param1_param2.png
 │   ├── group_param3_param4.png
 │   └── ...
-└── critical_mass_extrapolation_pion/    # Pion analysis plots
+└── Critical_bare_mass_extrapolation_pion/   # Pion plots directly
     ├── group_param1_param2.png
+    ├── group_param3_param4.png
     └── ...
+```
+
+**Use case**:
+- Backward compatibility with older workflows
+- Simpler flat directory structure
+
+### Configuration Details
+
+The directory structure is determined by `PLOT_DIRECTORY_CONFIG` in
+`_critical_mass_visualization_config.py`:
+
+```python
+PLOT_DIRECTORY_CONFIG = {
+    "parent_directory_name": "Critical_bare_mass_extrapolation",
+    "use_parent_directory": True,  # Toggle between hierarchical/flat
+    "subdirectory_name_pcac": "from_PCAC_mass",
+    "subdirectory_name_pion": "from_Pion_mass",
+}
 ```
 
 ### Plot Features
@@ -265,3 +308,5 @@ plots_dir/
   extrapolation methodology
 - **Integration Ready**: Fits seamlessly into critical mass analysis
   workflow as final visualization step
+- **Flexible Organization**: Supports both hierarchical and flat
+  directory structures

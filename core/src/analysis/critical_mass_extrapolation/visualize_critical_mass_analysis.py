@@ -107,15 +107,16 @@ def process_critical_mass_visualization(
         Number of plots successfully created
 
     Raises:
-        ValueError: If input files are empty, missing required columns,
-        or
-                   analysis_type is unsupported
-        FileNotFoundError: If input CSV files do not exist Exception:
-        For plot creation failures (logged as warnings, not fatal)
+        - ValueError: If input files are empty, missing required
+          columns, or analysis_type is unsupported
+        - FileNotFoundError: If input CSV files do not exist
+        - Exception: For plot creation failures (logged as warnings, not
+          fatal)
 
     Process Flow:
         1. Load and validate input CSV files with required columns
-        2. Validate parameter consistency between results and plateau data
+        2. Validate parameter consistency between results and plateau
+           data
         3. Group data by lattice parameters using intelligent analysis
         4. Set up visualization infrastructure (file managers, title
            builders)
