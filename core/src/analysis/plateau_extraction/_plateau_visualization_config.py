@@ -79,6 +79,17 @@ TITLE_EXCLUDED_PARAMETERS = [
 ]
 
 # =============================================================================
+# PLOT DIRECTORY CONFIGURATION
+# =============================================================================
+
+PLOT_DIRECTORY_CONFIG = {
+    "parent_directory_name": "Plateau_extraction",
+    "use_parent_directory": True,  # Toggle between hierarchical/flat structure
+    "subdirectory_name_pcac_mass": "PCAC_mass",
+    "subdirectory_name_pion_mass": "Pion_mass",
+}
+
+# =============================================================================
 # PLOT LAYOUT CONFIGURATION
 # =============================================================================
 
@@ -352,6 +363,40 @@ def get_data_config() -> Dict[str, Any]:
 def get_error_handling_config() -> Dict[str, Any]:
     """Get error handling configuration."""
     return ERROR_HANDLING_CONFIG.copy()
+
+
+def get_plot_subdirectory_name(analysis_type: str) -> tuple:
+    """
+    Get subdirectory name(s) for plots.
+
+    Args:
+        analysis_type: Type of analysis ("pcac_mass" or "pion_mass")
+
+    Returns:
+        Tuple of (parent_name, subdir_name). If use_parent_directory is
+        False, parent_name will be None
+
+    Examples:
+        Hierarchical mode (use_parent_directory=True):
+            ("Plateau_extraction", "from_PCAC_mass")
+
+        Flat mode (use_parent_directory=False):
+            (None, "Plateau_extraction_pcac")
+    """
+    validate_analysis_type(analysis_type)
+    config = PLOT_DIRECTORY_CONFIG
+
+    if config["use_parent_directory"]:
+        parent = config["parent_directory_name"]
+        subdir = config[f"subdirectory_name_{analysis_type}"]
+        return (parent, subdir)
+    else:
+        # Backward compatibility: flat structure
+        parent = None
+        # Convert pcac_mass -> pcac, pion_mass -> pion for backward compatibility
+        short_type = analysis_type.replace("_mass", "")
+        subdir = f"{config['parent_directory_name']}_{short_type}"
+        return (parent, subdir)
 
 
 # =============================================================================

@@ -25,6 +25,7 @@ Usage:
 import os
 import sys
 from pathlib import Path
+import shutil
 from typing import Dict, List, Optional
 
 import click
@@ -48,6 +49,7 @@ from src.analysis.plateau_extraction._plateau_visualization_config import (
     get_analysis_config,
     validate_analysis_type,
     validate_visualization_config,
+    get_plot_subdirectory_name,
 )
 from src.analysis.plateau_extraction._plateau_visualization_core import (
     process_group_visualization,
@@ -219,16 +221,55 @@ def _prepare_visualization_tools(
     # Create plot file manager
     file_manager = PlotFileManager(plots_directory)
 
-    # Prepare analysis-specific subdirectory
-    plot_subdir = analysis_config["plot_subdirectory"]
-    subdir_path = file_manager.prepare_subdirectory(
-        plot_subdir,
-        clear_existing=clear_existing,
-        confirm_clear=False,
-    )
+    # Get analysis type from config Extract it from description or
+    # column_prefix
+    if "pcac" in analysis_config["description"].lower():
+        analysis_type = "pcac_mass"
+    elif "pion" in analysis_config["description"].lower():
+        analysis_type = "pion_mass"
+    else:
+        raise ValueError(
+            f"Cannot determine analysis type from config: {analysis_config}"
+        )
 
-    if clear_existing:
-        logger.info(f"Cleared existing plots in {plot_subdir}")
+    # Get hierarchical directory structure
+    parent_name, subdir_name = get_plot_subdirectory_name(analysis_type)
+
+    if parent_name:
+        # Hierarchical: parent/subdir/
+        logger.info(f"Using directory structure: {parent_name}/{subdir_name}/")
+
+        # Create parent directory
+        parent_path = file_manager.prepare_subdirectory(
+            parent_name, clear_existing=False, confirm_clear=False
+        )
+
+        # Create subdirectory within parent
+        plots_subdir_path = Path(parent_path) / subdir_name
+        plots_subdir_path.mkdir(parents=True, exist_ok=True)
+
+        # Clear only this subdirectory if requested
+        if clear_existing:
+            if plots_subdir_path.exists():
+                shutil.rmtree(plots_subdir_path)
+                plots_subdir_path.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Cleared existing plots in {parent_name}/{subdir_name}/")
+
+        # Store the full path for use by the file manager We need to
+        # update the file manager's base directory
+        file_manager = PlotFileManager(str(plots_subdir_path))
+        subdir_path = str(plots_subdir_path)
+    else:
+        # Flat structure (backward compatibility)
+        logger.info(f"Using directory structure: {subdir_name}/")
+        subdir_path = file_manager.prepare_subdirectory(
+            subdir_name, clear_existing=clear_existing, confirm_clear=False
+        )
+        if clear_existing:
+            logger.info(f"Cleared existing plots in {subdir_name}/")
+
+        # Update file manager to point to the subdirectory
+        file_manager = PlotFileManager(subdir_path)
 
     logger.info(f"Plot output directory: {subdir_path}")
 
