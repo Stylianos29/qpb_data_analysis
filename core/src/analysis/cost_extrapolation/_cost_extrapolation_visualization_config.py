@@ -229,6 +229,31 @@ TITLE_EXCLUDED_PARAMETERS = [
 ]
 
 # =============================================================================
+# PLOT DIRECTORY CONFIGURATION
+# =============================================================================
+
+PLOT_DIRECTORY_CONFIG = {
+    "parent_directory_name": "Cost_extrapolation",
+    "use_parent_directory": True,  # Toggle between hierarchical/flat structure
+    "subdirectory_name_pcac": "from_PCAC_mass",
+    "subdirectory_name_pion": "from_Pion_mass",
+}
+
+# Plot subdirectories (DEPRECATED - kept for backward compatibility) Use
+# get_plot_subdirectory_name() instead
+PLOT_SUBDIRECTORIES = {
+    "pcac": "Cost_extrapolation_pcac",
+    "pion": "Cost_extrapolation_pion",
+}
+
+# Plot type sub-subdirectories (these remain within the analysis
+# subdirectory)
+PLOT_TYPE_SUBDIRECTORIES = {
+    "mass_fit": "Plateau_mass_vs_Bare_mass",
+    "cost_fit": "Computational_cost_vs_Bare_mass",
+}
+
+# =============================================================================
 # COLUMN MAPPINGS FOR RESULTS CSV
 # =============================================================================
 
@@ -351,10 +376,49 @@ def get_analysis_config(analysis_type: str) -> Dict[str, Any]:
 
 
 def get_plot_subdirectory(analysis_type: str) -> str:
-    """Get plot subdirectory name for analysis type."""
+    """
+    Get plot subdirectory name for analysis type.
+
+    DEPRECATED: Use get_plot_subdirectory_name() for hierarchical
+    support. Kept for backward compatibility.
+    """
     if analysis_type not in PLOT_SUBDIRECTORIES:
         raise ValueError(f"Unknown analysis type: {analysis_type}")
     return PLOT_SUBDIRECTORIES[analysis_type]
+
+
+def get_plot_subdirectory_name(analysis_type: str) -> tuple:
+    """
+    Get subdirectory name(s) for plots.
+
+    Args:
+        analysis_type: Type of analysis ("pcac" or "pion")
+
+    Returns:
+        Tuple of (parent_name, subdir_name) If use_parent_directory is
+        False, parent_name will be None
+
+    Examples:
+        Hierarchical mode (use_parent_directory=True):
+            ("Cost_extrapolation", "from_PCAC_mass")
+
+        Flat mode (use_parent_directory=False):
+            (None, "cost_extrapolation_pcac")
+    """
+    if analysis_type not in ["pcac", "pion"]:
+        raise ValueError(f"Unknown analysis type: {analysis_type}")
+
+    config = PLOT_DIRECTORY_CONFIG
+
+    if config["use_parent_directory"]:
+        parent = config["parent_directory_name"]
+        subdir = config[f"subdirectory_name_{analysis_type}"]
+        return (parent, subdir)
+    else:
+        # Backward compatibility: flat structure
+        parent = None
+        subdir = PLOT_SUBDIRECTORIES[analysis_type]
+        return (parent, subdir)
 
 
 def get_plot_type_subdirectories() -> Dict[str, str]:

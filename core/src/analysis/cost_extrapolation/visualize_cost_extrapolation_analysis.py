@@ -48,6 +48,7 @@ Input Requirements:
 """
 
 from pathlib import Path
+import shutil
 
 import click
 
@@ -64,6 +65,7 @@ from library.constants.labels import TITLE_LABELS_BY_COLUMN_NAME
 from src.analysis.cost_extrapolation._cost_extrapolation_visualization_config import (
     validate_visualization_config,
     get_plot_subdirectory,
+    get_plot_subdirectory_name,
 )
 from src.analysis.cost_extrapolation._cost_extrapolation_visualization_core import (
     load_and_validate_results_data,
@@ -93,11 +95,13 @@ def process_cost_extrapolation_visualization(
       2. Cost vs bare mass shifted power law fit with extrapolation
 
     Args:
-        results_csv_path: Path to cost extrapolation results CSV
-        mass_csv_path: Path to mass plateau estimates CSV cost_csv_path:
-        Path to cost data CSV plots_directory: Directory for saving
-        plots analysis_type: "pcac" or "pion" clear_existing_plots:
-        Whether to clear existing plots logger: Logger instance
+        - results_csv_path: Path to cost extrapolation results CSV
+        - mass_csv_path: Path to mass plateau estimates CSV
+        - cost_csv_path: Path to cost data CSV
+        - plots_directory: Directory for saving plots
+        - analysis_type: "pcac" or "pion"
+        - clear_existing_plots: Whether to clear existing plots
+        - logger: Logger instance
 
     Returns:
         Number of plot pairs successfully created
@@ -109,19 +113,44 @@ def process_cost_extrapolation_visualization(
 
     # Set up visualization infrastructure
     title_builder = PlotTitleBuilder(TITLE_LABELS_BY_COLUMN_NAME)
-
-    # Create plots directory structure
-    plot_base_name = get_plot_subdirectory(analysis_type)
-
     file_manager = PlotFileManager(base_directory=str(plots_directory))
-    plots_subdir_path = file_manager.prepare_subdirectory(
-        plot_base_name,
-        clear_existing=clear_existing_plots,
-        confirm_clear=False,
-    )
 
-    if clear_existing_plots:
-        logger.info(f"Cleared existing plots in {plot_base_name} subdirectory")
+    # Get hierarchical directory structure
+    parent_name, subdir_name = get_plot_subdirectory_name(analysis_type)
+
+    if parent_name:
+        # Hierarchical: parent/subdir/
+        logger.info(f"Using directory structure: {parent_name}/{subdir_name}/")
+
+        # Create parent directory
+        parent_path = file_manager.prepare_subdirectory(
+            parent_name, clear_existing=False, confirm_clear=False
+        )
+
+        # Create subdirectory within parent
+        plots_subdir_path = Path(parent_path) / subdir_name
+        plots_subdir_path.mkdir(parents=True, exist_ok=True)
+
+        # Clear only this subdirectory if requested
+        if clear_existing_plots:
+            if plots_subdir_path.exists():
+                shutil.rmtree(plots_subdir_path)
+                plots_subdir_path.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Cleared existing plots in {parent_name}/{subdir_name}/")
+
+        plots_subdir_path = Path(plots_subdir_path)
+    else:
+        # Flat structure (backward compatibility)
+        logger.info(f"Using directory structure: {subdir_name}/")
+        plots_subdir_path = Path(
+            file_manager.prepare_subdirectory(
+                subdir_name, clear_existing=clear_existing_plots, confirm_clear=False
+            )
+        )
+        if clear_existing_plots:
+            logger.info(f"Cleared existing plots in {subdir_name}/")
+
+    logger.info(f"Plot output directory: {plots_subdir_path}")
 
     # Group data for visualization
     grouped_data = group_data_for_visualization(
@@ -137,7 +166,7 @@ def process_cost_extrapolation_visualization(
         try:
             mass_plot_path, cost_plot_path = create_cost_extrapolation_plots(
                 group_info,
-                Path(plots_subdir_path),
+                plots_subdir_path,  # Pass Path object directly
                 file_manager,
                 title_builder,
                 logger,
