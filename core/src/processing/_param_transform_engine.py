@@ -23,6 +23,7 @@ from src.processing._param_transform_config import (
     HDF5_PROCESSING_RULES,
     ANALYSIS_CASES,
     TIME_COST_CALCULATIONS,
+    VALIDATION_RULES,
     FORMATTER_FUNCTIONS,
     PARSER_FUNCTIONS,
     CALCULATION_FUNCTIONS,
@@ -537,10 +538,7 @@ class HDF5ParameterProcessor:
 
     def _deduce_spinor_count_from_hdf5(self) -> Optional[int]:
         """Try to deduce spinor count from HDF5 dataset lengths."""
-        test_datasets = [
-            "CG_total_calculation_time_per_spinor",
-            "Total_number_of_CG_iterations_per_spinor",
-        ]
+        test_datasets = VALIDATION_RULES["spinor_deduction_datasets"]
 
         for dataset_name in test_datasets:
             if (
@@ -559,13 +557,12 @@ class HDF5ParameterProcessor:
 
     def _deduce_vector_count_from_hdf5(self) -> Optional[int]:
         """Try to deduce vector count from HDF5 dataset lengths."""
-        if (
-            "Calculation_result_per_vector"
-            in self.hdf5_analyzer.list_of_output_quantity_names_from_hdf5
-        ):
+        dataset_name = VALIDATION_RULES["vector_deduction_dataset"]
+
+        if dataset_name in self.hdf5_analyzer.list_of_output_quantity_names_from_hdf5:
             try:
                 data_values = self.hdf5_analyzer.dataset_values(
-                    "Calculation_result_per_vector", return_gvar=False
+                    dataset_name, return_gvar=False
                 )
                 if data_values and len(data_values) > 0:
                     return len(data_values[0])  # Length of first group's data

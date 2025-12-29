@@ -134,7 +134,6 @@ RAW_SOLVER_PARAMETER_NAMES = [
     "Generic_solver_max_iterations",
 ]
 
-
 # =============================================================================
 # STRING TRANSFORMATION CONFIGURATIONS
 # =============================================================================
@@ -146,7 +145,6 @@ STRING_TRANSFORMATIONS = {
     "Configuration_label": {"formatter": "zero_pad", "length": 7},
     "QCD_beta_value": {"formatter": "decimal_places", "places": 2},
 }
-
 
 # =============================================================================
 # MATHEMATICAL TRANSFORMATION CONFIGURATIONS
@@ -162,7 +160,6 @@ MATH_TRANSFORMATIONS = {
     # Type conversions
     "type_conversions": {"Clover_coefficient": int},
 }
-
 
 # =============================================================================
 # COMPOUND PARAMETER EXTRACTION CONFIGURATIONS
@@ -182,7 +179,6 @@ EXTRACTION_RULES = {
         "parser": "ast_literal_eval",
     },
 }
-
 
 # =============================================================================
 # COLUMN OPERATION CONFIGURATIONS
@@ -217,7 +213,6 @@ COLUMN_OPERATIONS = {
         }
     },
 }
-
 
 # =============================================================================
 # HDF5 PROCESSING CONFIGURATIONS
@@ -255,6 +250,17 @@ HDF5_PROCESSING_RULES = {
     },
 }
 
+# =============================================================================
+# VALIDATION CONFIGURATIONS
+# =============================================================================
+
+VALIDATION_RULES = {
+    "spinor_deduction_datasets": [
+        "CG_total_calculation_time_per_spinor",
+        "Total_number_of_CG_iterations_per_spinor",
+    ],
+    "vector_deduction_dataset": "Calculation_result_per_vector",
+}
 
 # =============================================================================
 # ANALYSIS CASE CONFIGURATIONS
@@ -270,7 +276,6 @@ ANALYSIS_CASES = {
         "time_cost_input": "Average_wall_clock_time_per_vector",
     },
 }
-
 
 # =============================================================================
 # TIME AND COST CALCULATION CONFIGURATIONS
@@ -294,7 +299,6 @@ TIME_COST_CALCULATIONS = {
         },
     },
 }
-
 
 # =============================================================================
 # HELPER FUNCTION REGISTRIES
