@@ -1055,6 +1055,7 @@ class HDF5ParameterProcessor:
         # Validate for each file/row
         validation_errors = []
         validated_count = 0  # Track successful validations
+        skipped_files = []  # Track files with zero-length datasets
 
         for idx, row in self.dataframe.iterrows():
             filename = row["Filename"]
@@ -1076,6 +1077,11 @@ class HDF5ParameterProcessor:
                     )
                     continue
 
+                # Skip validation for zero-length datasets
+                if actual_length == 0:
+                    skipped_files.append(filename)
+                    continue
+
                 # Validate
                 if actual_length != expected_total:
                     error_msg = (
@@ -1091,6 +1097,12 @@ class HDF5ParameterProcessor:
 
             except Exception as e:
                 self.logger.warning(f"Error validating {filename}: {e}")
+
+        # Report skipped files summary
+        if skipped_files:
+            self.logger.info(
+                f"Skipped validation for {len(skipped_files)}/{len(self.dataframe)} files with zero-length datasets"
+            )
 
         # Report validation results
         if validation_errors:
