@@ -387,8 +387,8 @@ FILE_CONTENTS_ARRAY_PATTERNS_DICTIONARY = {
         "type": float,
     },
     "Total_number_of_CG_iterations_per_spinor": {
-        "line_identifier": ", CG converged,",
-        "regex_pattern": r"After (\d+) iters,",
+        "line_identifier": "Done vector =",
+        "regex_pattern": r"Done vector = \d+ / \d+, iters = (\d+)",
         "type": int,
     },
     "Number_of_kernel_applications_per_MSCG": {
