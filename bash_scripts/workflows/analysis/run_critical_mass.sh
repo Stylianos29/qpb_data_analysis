@@ -688,14 +688,16 @@ function main() {
     # Provide a meaningful final status message based on what actually happened
     if [[ "$pcac_success" == "true" || "$pion_success" == "true" ]]; then
         echo "✓ Stage 3.3 (Critical Mass Extrapolation) completed successfully"
+        exit 0
     elif [[ "$pcac_data_insufficient" == "true" || "$pion_data_insufficient" == "true" ]]; then
         echo "⚠ Stage 3.3 (Critical Mass Extrapolation) completed with warnings"
         echo "  (Insufficient bare mass variation for extrapolation)"
+        exit 2  # <-- Signal graceful skip
     else
         echo "○ Stage 3.3 (Critical Mass Extrapolation) completed (all branches skipped)"
+        exit 2  # <-- Also a graceful skip
     fi
     
-    return 0
 }
 
 # Execute main function
