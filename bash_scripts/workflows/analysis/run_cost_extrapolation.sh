@@ -250,7 +250,9 @@ function main() {
     local output_directory=""
     local plots_directory=""
     local log_directory=""
-    
+    local pcac_data_insufficient="false"
+    local pion_data_insufficient="false"
+
     # Control flags
     local enable_viz="false"
     local skip_checks="false"
@@ -437,7 +439,10 @@ function main() {
             --enable_logging \
             --log_directory "$log_directory"
         
-        if [[ $? -eq 0 ]]; then
+        local script_exit_code=$?
+
+        if [[ $script_exit_code -eq 0 ]]; then
+            # Success
             pcac_success="true"
             echo "  ✓ PCAC cost extrapolation completed"
             log_info "PCAC cost extrapolation successful"
@@ -513,12 +518,22 @@ function main() {
                     fi
                 fi
             fi
+
+        elif [[ $script_exit_code -eq 2 ]]; then
+            # Graceful skip - insufficient data
+            pcac_data_insufficient="true"
+            echo "  ⚠ PCAC cost extrapolation skipped - insufficient data"
+            echo "  → Cost extrapolation requires sufficient bare mass variation"
+            log_warning "PCAC cost extrapolation skipped: insufficient data points"
+
         else
+            # Actual error (exit code 1 or other)
             echo "ERROR: PCAC cost extrapolation failed" >&2
-            log_error "PCAC cost extrapolation failed"
+            log_error "PCAC cost extrapolation failed with exit code $script_exit_code"
             close_logging
             exit 1
         fi
+
     else
         pcac_skipped="true"
         echo "○ PCAC branch skipped (no input file provided)"
@@ -555,8 +570,11 @@ function main() {
             --output_csv "$pion_output_csv" \
             --enable_logging \
             --log_directory "$log_directory"
-        
-        if [[ $? -eq 0 ]]; then
+
+        local script_exit_code=$?
+
+        if [[ $script_exit_code -eq 0 ]]; then
+            # Success
             pion_success="true"
             echo "  ✓ Pion cost extrapolation completed"
             log_info "Pion cost extrapolation successful"
@@ -632,12 +650,22 @@ function main() {
                     fi
                 fi
             fi
+
+        elif [[ $script_exit_code -eq 2 ]]; then
+            # Graceful skip - insufficient data
+            pion_data_insufficient="true"
+            echo "  ⚠ Pion cost extrapolation skipped - insufficient data"
+            echo "  → Cost extrapolation requires sufficient bare mass variation"
+            log_warning "Pion cost extrapolation skipped: insufficient data points"
+
         else
+            # Actual error (exit code 1 or other)
             echo "ERROR: Pion cost extrapolation failed" >&2
-            log_error "Pion cost extrapolation failed"
+            log_error "Pion cost extrapolation failed with exit code $script_exit_code"
             close_logging
             exit 1
         fi
+
     else
         pion_skipped="true"
         echo "○ Pion branch skipped (no input file provided)"
@@ -674,9 +702,19 @@ function main() {
     close_logging
     
     echo ""
-    echo "✓ Stage 3.4 (Cost Extrapolation) completed successfully"
-    
-    return 0
+    # Final exit code logic
+    if [[ "$pcac_success" == "true" || "$pion_success" == "true" ]]; then
+        echo "✓ Stage 3.4 (Cost Extrapolation) completed successfully"
+        exit 0
+    elif [[ "$pcac_data_insufficient" == "true" || "$pion_data_insufficient" == "true" ]]; then
+        echo "⚠ Stage 3.4 (Cost Extrapolation) completed with warnings"
+        echo "  (Insufficient data for cost extrapolation)"
+        exit 2  # Signal graceful skip
+    else
+        echo "○ Stage 3.4 (Cost Extrapolation) completed (all branches skipped)"
+        exit 2  # Also a graceful skip
+    fi
+
 }
 
 # Execute main function

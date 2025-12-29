@@ -16,8 +16,7 @@ Key capabilities:
   - Export comprehensive results to CSV
 """
 
-from typing import Dict, Any, Optional, List, Tuple
-from pathlib import Path
+from typing import Dict, Any, Optional, List, Tuple, Mapping
 
 import numpy as np
 import pandas as pd
@@ -32,18 +31,28 @@ from library.constants.data_types import (
 
 
 from src.analysis.cost_extrapolation._cost_extrapolation_shared_config import (
-    get_grouping_parameters,
     get_grouping_excluded_parameters,
-    get_filtering_config,
     get_validation_config,
-    get_fit_quality_config,
-    get_physical_validation_config,
     get_cost_data_columns,
-    get_cost_fit_config,
     get_csv_output_config,
-    get_output_column_mapping,
-    get_error_handling_config,
 )
+
+# =============================================================================
+# CUSTOM EXCEPTIONS
+# =============================================================================
+
+
+class InsufficientDataError(Exception):
+    """
+    Raised when there is insufficient data for cost extrapolation
+    analysis.
+
+    This is not a programming error but a data limitation - for example,
+    when all parameter groups have fewer than the minimum required data
+    points for fitting.
+    """
+
+    pass
 
 
 # =============================================================================
@@ -62,9 +71,10 @@ def filter_data_by_fit_range(
     used.
 
     Args:
-        df: Input dataframe bare_mass_col: Name of bare mass column
-        range_min: Minimum bound (None = use data minimum) range_max:
-        Maximum bound (None = use data maximum)
+        - df: Input dataframe
+        - bare_mass_col: Name of bare mass column
+        - range_min: Minimum bound (None = use data minimum)
+        - range_max: Maximum bound (None = use data maximum)
 
     Returns:
         Tuple of (filtered_df, (actual_min, actual_max)) where
@@ -101,7 +111,6 @@ def process_cost_extrapolation_analysis(
     output_csv_path: str,
     analysis_type: str,
     column_mapping: Dict[str, str],
-    required_columns: List[str],
     logger,
 ) -> str:
     """
@@ -118,12 +127,12 @@ def process_cost_extrapolation_analysis(
       8. Export results to CSV
 
     Args:
-        cost_csv_path: Path to computational cost CSV mass_csv_path:
-        Path to mass plateau estimates CSV output_csv_path: Path for
-        output results CSV analysis_type: "pcac" or "pion"
-        column_mapping: Column name mapping for mass data
-        required_columns: Required columns in mass data logger: Logger
-        instance
+        - cost_csv_path: Path to computational cost CSV
+        - mass_csv_path: Path to mass plateau estimates CSV
+        - output_csv_path: Path for output results CSV
+        - analysis_type: "pcac" or "pion"
+        - column_mapping: Column name mapping for mass data
+        - logger: Logger instance
 
     Returns:
         Path to output CSV file
@@ -164,7 +173,6 @@ def process_cost_extrapolation_analysis(
     cost_results_df = extrapolate_computational_costs(
         cost_csv_path,
         derived_bare_mass_df,
-        analysis_type,
         fit_range_config,  # Pass fit_range_config
         logger,
     )
@@ -190,7 +198,7 @@ def convert_mass_to_bare_mass(
     mass_csv_path: str,
     analysis_type: str,
     column_mapping: Dict[str, str],
-    fit_range_config: Dict[str, Dict[str, Optional[float]]],
+    fit_range_config: Mapping[str, Mapping[str, Optional[float]]],
     logger,
 ) -> pd.DataFrame:
     """
@@ -205,10 +213,11 @@ def convert_mass_to_bare_mass(
       6. Store results with fit range information
 
     Args:
-        mass_csv_path: Path to mass plateau estimates CSV analysis_type:
-        "pcac" or "pion" column_mapping: Column name mappings
-        fit_range_config: Fitting range configuration logger: Logger
-        instance
+        - mass_csv_path: Path to mass plateau estimates CSV
+        - analysis_type: "pcac" or "pion"
+        - column_mapping: Column name mappings
+        - fit_range_config: Fitting range configuration
+        - logger: Logger instance
 
     Returns:
         DataFrame with derived bare mass and fit info per group
@@ -372,8 +381,10 @@ def convert_mass_to_bare_mass(
     )
 
     if not results:
-        logger.error("No successful mass to bare mass conversions")
-        return pd.DataFrame()
+        raise InsufficientDataError(
+            "No successful mass to bare mass conversions. "
+            "All groups failed validation or fitting."
+        )
 
     return pd.DataFrame(results)
 
@@ -564,8 +575,7 @@ def _build_mass_conversion_result(
 def extrapolate_computational_costs(
     cost_csv_path: str,
     derived_bare_mass_df: pd.DataFrame,
-    analysis_type: str,
-    fit_range_config: Dict[str, Dict[str, Optional[float]]],
+    fit_range_config: Mapping[str, Mapping[str, Optional[float]]],
     logger,
 ) -> pd.DataFrame:
     """
@@ -585,7 +595,6 @@ def extrapolate_computational_costs(
         - cost_csv_path: Path to cost data CSV
         - derived_bare_mass_df: DataFrame with derived bare masses per
           group
-        - analysis_type: "pcac" or "pion"
         - logger: Logger instance
 
     Returns:
@@ -673,8 +682,10 @@ def extrapolate_computational_costs(
     logger.info(f"Cost extrapolation complete: {len(results)} successful groups")
 
     if not results:
-        logger.error("No successful cost extrapolations")
-        return pd.DataFrame()
+        raise InsufficientDataError(
+            "No successful cost extrapolations. "
+            "All groups failed validation or fitting."
+        )
 
     return pd.DataFrame(results)
 
@@ -744,7 +755,7 @@ def load_and_average_cost_data(cost_csv_path: str, logger) -> pd.DataFrame:
 def fit_and_extrapolate_cost(
     cost_group_df: pd.DataFrame,
     derived_bare_mass: gv.GVar,
-    fit_range_config: Dict[str, Optional[float]],
+    fit_range_config: Mapping[str, Optional[float]],
     logger,
 ) -> Optional[Dict[str, Any]]:
     """
@@ -935,12 +946,14 @@ def _build_group_key(
     Build group key tuple from mass results row.
 
     Args:
-        mass_row: Row from derived_bare_mass_df
-        grouping_param_names: List of grouping parameter names in correct order
-        logger: Logger instance
+        - mass_row: Row from derived_bare_mass_df
+        - grouping_param_names: List of grouping parameter names in
+          correct order
+        - logger: Logger instance
 
     Returns:
-        Tuple of parameter values in the same order as grouping_param_names
+        Tuple of parameter values in the same order as
+        grouping_param_names
     """
     key_values = []
 

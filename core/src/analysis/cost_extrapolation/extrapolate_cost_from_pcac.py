@@ -25,6 +25,7 @@ Usage:
 """
 
 from pathlib import Path
+import sys
 
 import click
 
@@ -39,10 +40,10 @@ from src.analysis.cost_extrapolation._pcac_cost_extrapolation_config import (
     COLUMN_MAPPING,
     DEFAULT_OUTPUT_FILENAME,
     validate_pcac_cost_config,
-    get_required_columns,
 )
 from src.analysis.cost_extrapolation._cost_extrapolation_core import (
     process_cost_extrapolation_analysis,
+    InsufficientDataError,
 )
 
 
@@ -144,17 +145,26 @@ def main(
             output_csv_path=output_csv,
             analysis_type="pcac",
             column_mapping=COLUMN_MAPPING,
-            required_columns=get_required_columns(),
             logger=logger,
         )
 
         click.echo(f"✓ PCAC cost extrapolation complete: {output_path}")
         logger.log_script_end("PCAC cost extrapolation completed successfully")
 
+    except InsufficientDataError as e:
+        # Graceful skip - not enough data for analysis (not an error)
+        logger.warning(f"Insufficient data: {e}")
+        logger.log_script_end("PCAC cost extrapolation skipped (insufficient data)")
+        click.echo("⚠ Insufficient data for PCAC cost extrapolation", err=True)
+        click.echo(f"  → {e}", err=True)
+        sys.exit(2)  # Exit code 2 = graceful skip
+
     except Exception as e:
+        # Actual error
         logger.error(f"Script failed: {e}")
         logger.log_script_end("PCAC cost extrapolation failed")
-        raise
+        click.echo(f"ERROR: {e}", err=True)
+        sys.exit(1)  # Exit code 1 = error
 
 
 if __name__ == "__main__":

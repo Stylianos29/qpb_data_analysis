@@ -765,7 +765,7 @@ function run_stage_3_4() {
     # Execute Stage 3.4: Cost Extrapolation
     #
     # Returns:
-    #   0 - Success (core analysis completed, visualization may have failed)
+    #   0 - Success (core analysis completed)
     #   1 - Hard failure (core analysis failed)
     #   2 - Graceful skip (insufficient data for extrapolation)
     
@@ -786,10 +786,8 @@ function run_stage_3_4() {
     cmd+=" -o \"$output_directory\""
     cmd+=" -log_dir \"$log_directory\""
     
-    local viz_enabled=false
     if [[ -n "$plots_directory" ]]; then
         cmd+=" -p \"$plots_directory\" --enable-viz"
-        viz_enabled=true
     fi
     
     if $skip_checks; then
@@ -806,54 +804,31 @@ function run_stage_3_4() {
     
     log_info "Command: $cmd"
     
-    # Execute and capture output and exit code
-    local temp_log=$(mktemp)
-    eval "$cmd" 2>&1 | tee "$temp_log"
-    local exit_code=${PIPESTATUS[0]}
+    # Execute and capture exit code
+    eval "$cmd"
+    local exit_code=$?
     
     if [[ $exit_code -eq 0 ]]; then
         # Complete success
-        rm -f "$temp_log"
         echo "✓ Stage 3.4 completed successfully"
         log_info "Stage 3.4 completed successfully"
         return 0
+        
+    elif [[ $exit_code -eq 2 ]]; then
+        # Graceful skip - insufficient data
+        echo ""
+        echo "⚠ WARNING: Insufficient data for cost extrapolation"
+        echo "  → Not enough data points for power law fit"
+        echo "  → Stage 3.4 skipped gracefully"
+        log_warning "Stage 3.4: Insufficient data for cost extrapolation"
+        log_info "Stage 3.4 skipped gracefully (data limitation, not error)"
+        return 2
+        
     else
-        # Check if graceful skip due to insufficient data
-        if grep -q "Cost extrapolation produced no results" "$temp_log"; then
-            # Graceful skip - insufficient data
-            rm -f "$temp_log"
-            echo ""
-            echo "⚠ WARNING: Insufficient data for cost extrapolation"
-            echo "  → Not enough bare mass variation for power law fit"
-            echo "  → Stage 3.4 skipped gracefully"
-            log_warning "Stage 3.4: Insufficient data for cost extrapolation"
-            log_info "Stage 3.4 skipped gracefully (data limitation, not error)"
-            return 2
-        fi
-        
-        # Check if core outputs exist despite failure
-        local pcac_output="${output_directory}/${COST_PCAC_CSV_FILENAME}"
-        local pion_output="${output_directory}/${COST_PION_CSV_FILENAME}"
-        
-        if [[ -f "$pcac_output" ]] || [[ -f "$pion_output" ]]; then
-            # Core analysis succeeded, likely visualization failed
-            rm -f "$temp_log"
-            echo "⚠ WARNING: Stage 3.4 core analysis succeeded but visualization may have failed"
-            log_warning "Stage 3.4: Core analysis completed but script reported failure (likely visualization)"
-            
-            if $viz_enabled; then
-                visualization_failures+=("Stage 3.4")
-            fi
-            
-            echo "✓ Stage 3.4 core analysis completed"
-            return 0
-        else
-            # Hard failure - core analysis failed
-            rm -f "$temp_log"
-            echo "ERROR: Stage 3.4 failed" >&2
-            log_error "Stage 3.4 failed (hard error)"
-            return 1
-        fi
+        # Hard failure
+        echo "ERROR: Stage 3.4 failed" >&2
+        log_error "Stage 3.4 failed (hard error)"
+        return 1
     fi
 }
 
