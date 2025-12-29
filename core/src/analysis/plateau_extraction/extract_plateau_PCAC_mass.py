@@ -38,7 +38,6 @@ from src.analysis.plateau_extraction._plateau_extraction_shared_config import (
 )
 from src.analysis.plateau_extraction._pcac_plateau_config import (
     INPUT_DATASETS,
-    TIME_OFFSET,
     APPLY_SYMMETRIZATION,
     SYMMETRIZATION_TRUNCATION,
     PLATEAU_SEARCH_RANGE,
@@ -53,6 +52,7 @@ from src.analysis.plateau_extraction._plateau_extraction_core import (
     process_all_groups,
     export_to_csv,
     export_to_hdf5,
+    NoSuccessfulExtractionsError,
 )
 
 
@@ -166,12 +166,31 @@ def main(
             verbose,
         )
 
+        # No groups found in input file (hard error)
         if not results:
-            logger.warning("No results obtained from processing")
-            click.echo("⚠️ No results to export", err=True)
+            logger.error("No groups found in input file")
+            logger.log_script_end("PCAC mass plateau extraction failed (no groups)")
+            click.echo("❌ ERROR: No groups found in input file", err=True)
             sys.exit(1)
 
-        # Export to CSV
+        # Check success rate
+        n_success = sum(1 for r in results if r["success"])
+        n_total = len(results)
+
+        # Groups processed but all failed (graceful skip)
+        if n_success == 0:
+            logger.warning(f"No successful plateau extractions: 0/{n_total} groups")
+            logger.log_script_end(
+                f"PCAC mass plateau extraction skipped (no plateaus found in {n_total} groups)"
+            )
+            click.echo(f"⚠ No plateaus found in any of the {n_total} groups", err=True)
+            click.echo(
+                "  → Plateau detection failed for all groups (data quality issue)",
+                err=True,
+            )
+            sys.exit(2)  # Exit code 2 = graceful skip
+
+        # Export to CSV. At least one successful extraction
         output_csv_path = os.path.join(output_directory, output_csv_filename)
         export_to_csv(
             results,
@@ -192,10 +211,7 @@ def main(
             logger,
         )
 
-        # Report summary
-        n_success = sum(1 for r in results if r["success"])
-        n_total = len(results)
-
+        # Report success
         logger.log_script_end(f"Extraction complete: {n_success}/{n_total} successful")
         click.echo(
             f"✅ Plateau extraction complete: {n_success}/{n_total} successful\n"

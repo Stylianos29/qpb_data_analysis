@@ -240,7 +240,9 @@ function main() {
     local output_directory=""
     local plots_directory=""
     local log_directory=""
-    
+    local pcac_data_insufficient="false"
+    local pion_data_insufficient="false"
+
     # Control flags
     local enable_viz="false"
     local skip_checks="false"
@@ -406,26 +408,20 @@ function main() {
             --output_csv_filename "$PCAC_OUTPUT_CSV" \
             --enable_logging \
             --log_directory "$log_directory"
-        
-        if [[ $? -eq 0 ]]; then
+
+        local script_exit_code=$?
+
+        if [[ $script_exit_code -eq 0 ]]; then
+            # Success
             pcac_success="true"
             echo "  ✓ PCAC plateau extraction completed"
             log_info "PCAC plateau extraction successful"
             
             # Validate output files
-            local pcac_csv_file="${output_directory}/${PCAC_OUTPUT_CSV}"
-            local pcac_hdf5_file="${output_directory}/${PCAC_OUTPUT_HDF5}"
-            
             if [[ "$skip_checks" != "true" ]]; then
-                if [[ ! -f "$pcac_csv_file" ]]; then
-                    echo "ERROR: PCAC CSV file not created: $pcac_csv_file" >&2
-                    log_error "PCAC CSV file missing: $pcac_csv_file"
-                    close_logging
-                    exit 1
-                fi
-                if [[ ! -f "$pcac_hdf5_file" ]]; then
-                    echo "ERROR: PCAC HDF5 file not created: $pcac_hdf5_file" >&2
-                    log_error "PCAC HDF5 file missing: $pcac_hdf5_file"
+                if [[ ! -f "${output_directory}/${PCAC_OUTPUT_CSV}" ]]; then
+                    echo "ERROR: PCAC CSV file not created: ${output_directory}/${PCAC_OUTPUT_CSV}" >&2
+                    log_error "PCAC CSV missing: ${output_directory}/${PCAC_OUTPUT_CSV}"
                     close_logging
                     exit 1
                 fi
@@ -515,12 +511,22 @@ function main() {
                     fi
                 fi
             fi
+
+        elif [[ $script_exit_code -eq 2 ]]; then
+            # Graceful skip - no successful plateau extractions
+            pcac_data_insufficient="true"
+            echo "  ⚠ PCAC plateau extraction skipped - no plateaus detected"
+            echo "  → Plateau detection failed for all groups (data quality issue)"
+            log_warning "PCAC plateau extraction skipped: no successful extractions"
+
         else
+            # Actual error (exit code 1 or other)
             echo "ERROR: PCAC plateau extraction failed" >&2
-            log_error "PCAC plateau extraction failed"
+            log_error "PCAC plateau extraction failed with exit code $script_exit_code"
             close_logging
             exit 1
         fi
+
     else
         pcac_skipped="true"
         echo "○ PCAC branch skipped (no input file provided)"
@@ -556,25 +562,19 @@ function main() {
             --enable_logging \
             --log_directory "$log_directory"
         
-        if [[ $? -eq 0 ]]; then
+        local script_exit_code=$?
+
+        if [[ $script_exit_code -eq 0 ]]; then
+            # Success
             pion_success="true"
             echo "  ✓ Pion plateau extraction completed"
             log_info "Pion plateau extraction successful"
             
             # Validate output files
-            local pion_csv_file="${output_directory}/${PION_OUTPUT_CSV}"
-            local pion_hdf5_file="${output_directory}/${PION_OUTPUT_HDF5}"
-            
             if [[ "$skip_checks" != "true" ]]; then
-                if [[ ! -f "$pion_csv_file" ]]; then
-                    echo "ERROR: Pion CSV file not created: $pion_csv_file" >&2
-                    log_error "Pion CSV file missing: $pion_csv_file"
-                    close_logging
-                    exit 1
-                fi
-                if [[ ! -f "$pion_hdf5_file" ]]; then
-                    echo "ERROR: Pion HDF5 file not created: $pion_hdf5_file" >&2
-                    log_error "Pion HDF5 file missing: $pion_hdf5_file"
+                if [[ ! -f "${output_directory}/${PION_OUTPUT_CSV}" ]]; then
+                    echo "ERROR: Pion CSV file not created: ${output_directory}/${PION_OUTPUT_CSV}" >&2
+                    log_error "Pion CSV missing: ${output_directory}/${PION_OUTPUT_CSV}"
                     close_logging
                     exit 1
                 fi
@@ -656,20 +656,30 @@ function main() {
                         "${viz_args[@]}"
                     
                     if [[ $? -eq 0 ]]; then
-                        echo "  ✓ PCAC visualizations generated"
-                        log_info "PCAC visualization completed"
+                        echo "  ✓ Pion visualizations generated"
+                        log_info "Pion visualization completed"
                     else
-                        echo "  ⚠ Warning: PCAC visualization failed" >&2
-                        log_warning "PCAC visualization failed"
+                        echo "  ⚠ Warning: Pion visualization failed" >&2
+                        log_warning "Pion visualization failed"
                     fi
                 fi
             fi
+
+        elif [[ $script_exit_code -eq 2 ]]; then
+            # Graceful skip - no successful plateau extractions
+            pion_data_insufficient="true"
+            echo "  ⚠ Pion plateau extraction skipped - no plateaus detected"
+            echo "  → Plateau detection failed for all groups (data quality issue)"
+            log_warning "Pion plateau extraction skipped: no successful extractions"
+
         else
+            # Actual error (exit code 1 or other)
             echo "ERROR: Pion plateau extraction failed" >&2
-            log_error "Pion plateau extraction failed"
+            log_error "Pion plateau extraction failed with exit code $script_exit_code"
             close_logging
             exit 1
         fi
+
     else
         pion_skipped="true"
         echo "○ Pion branch skipped (no input file provided)"
@@ -679,36 +689,49 @@ function main() {
     # =========================================================================
     # COMPLETION SUMMARY
     # =========================================================================
-    
+
     echo ""
     echo "=========================================="
     echo "Stage 3.2 Completion Summary"
     echo "=========================================="
-    
+
     if [[ "$pcac_success" == "true" ]]; then
         echo "✓ PCAC branch completed successfully"
+    elif [[ "$pcac_data_insufficient" == "true" ]]; then
+        echo "⚠ PCAC branch skipped (no plateaus detected)"
     elif [[ "$pcac_skipped" == "true" ]]; then
-        echo "○ PCAC branch skipped"
+        echo "○ PCAC branch skipped (no input file)"
     fi
-    
+
     if [[ "$pion_success" == "true" ]]; then
         echo "✓ Pion branch completed successfully"
+    elif [[ "$pion_data_insufficient" == "true" ]]; then
+        echo "⚠ Pion branch skipped (no plateaus detected)"
     elif [[ "$pion_skipped" == "true" ]]; then
-        echo "○ Pion branch skipped"
+        echo "○ Pion branch skipped (no input file)"
     fi
-    
+
     echo ""
     echo "Output files location: $output_directory"
     [[ -n "$plots_directory" ]] && echo "Plots location: $plots_directory"
     echo "Log file: $log_file"
-    
+
     log_info "=== Stage 3.2: Plateau Extraction Completed ==="
     close_logging
-    
+
     echo ""
-    echo "✓ Stage 3.2 (Plateau Extraction) completed successfully"
-    
-    return 0
+    # Provide a meaningful final status message based on what actually happened
+    if [[ "$pcac_success" == "true" || "$pion_success" == "true" ]]; then
+        echo "✓ Stage 3.2 (Plateau Extraction) completed successfully"
+        exit 0
+    elif [[ "$pcac_data_insufficient" == "true" || "$pion_data_insufficient" == "true" ]]; then
+        echo "⚠ Stage 3.2 (Plateau Extraction) completed with warnings"
+        echo "  (No plateaus detected in processed groups)"
+        exit 2  # Signal graceful skip
+    else
+        echo "○ Stage 3.2 (Plateau Extraction) completed (all branches skipped)"
+        exit 2  # Also a graceful skip
+    fi
 }
 
 # Execute main function

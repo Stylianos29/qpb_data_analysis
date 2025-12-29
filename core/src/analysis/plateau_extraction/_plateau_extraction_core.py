@@ -6,10 +6,10 @@ This module provides shared functions for detecting and extracting
 plateau values from time series data using jackknife analysis.
 
 The correct procedure:
-1. Calculate jackknife average (with uncertainties) from all samples
-2. Detect plateau region on the averaged time series  
-3. Apply the common bounds to extract individual plateau values
-4. Calculate jackknife statistics from individual plateau values
+    1. Calculate jackknife average (with uncertainties) from all samples
+    2. Detect plateau region on the averaged time series  
+    3. Apply the common bounds to extract individual plateau values
+    4. Calculate jackknife statistics from individual plateau values
 """
 
 import os
@@ -23,7 +23,6 @@ import click
 import gvar as gv
 
 from src.analysis.correlator_calculations._correlator_analysis_core import (
-    copy_parent_attributes,
     copy_metadata,
 )
 from library.data.hdf5_analyzer import HDF5Analyzer
@@ -31,6 +30,25 @@ from library.constants import (
     PARAMETERS_WITH_EXPONENTIAL_FORMAT,
     PARAMETERS_OF_INTEGER_VALUE,
 )
+
+
+# =============================================================================
+# CUSTOM EXCEPTIONS
+# =============================================================================
+
+
+class NoSuccessfulExtractionsError(Exception):
+    """
+    Raised when plateau extraction completes but no groups have
+    successful results.
+
+    This is not a programming error but a data quality limitation - for
+    example, when the signal-to-noise ratio is too low for reliable
+    plateau detection in all parameter groups.
+    """
+
+    pass
+
 
 # =============================================================================
 # LOW-LEVEL UTILITY FUNCTIONS
@@ -133,10 +151,11 @@ def detect_plateau_region_weighted_range(
     Detect plateau region using weighted range test on gvar time series.
 
     Args:
-        time_series_gvar: Array of gvar objects (from jackknife average)
-        sigma_threshold: Number of sigma for plateau criterion
-        min_plateau_size: Minimum number of points in plateau
-        search_range: Search range configuration
+        - time_series_gvar: Array of gvar objects (from jackknife
+          average)
+        - sigma_threshold: Number of sigma for plateau criterion
+        - min_plateau_size: Minimum number of points in plateau
+        - search_range: Search range configuration
 
     Returns:
         (start_index, end_index) of plateau region, or None if not found
@@ -163,7 +182,8 @@ def detect_plateau_region_weighted_range(
             weighted_mean = np.sum(weights * plateau_means) / np.sum(weights)
             weighted_error = 1.0 / np.sqrt(np.sum(weights))
 
-            # Check if all points are within sigma_threshold of weighted mean
+            # Check if all points are within sigma_threshold of weighted
+            # mean
             deviations = np.abs(plateau_means - weighted_mean) / plateau_stds
             if np.all(deviations <= sigma_threshold):
                 return (start, end)
@@ -187,19 +207,19 @@ def extract_plateau_from_jackknife_samples(
 ) -> Dict[str, Any]:
     """
     Extract plateau values using the CORRECT statistical procedure:
-    1. Calculate jackknife average with covariances
-    2. Detect plateau on averaged (less noisy) time series
-    3. Apply common bounds to extract individual plateau values
-    4. Calculate final jackknife statistics
+        1. Calculate jackknife average with covariances
+        2. Detect plateau on averaged (less noisy) time series
+        3. Apply common bounds to extract individual plateau values
+        4. Calculate final jackknife statistics
 
     Args:
-        jackknife_samples: Array of shape (N_samples, N_time)
-        config_labels: List of configuration labels
-        sigma_thresholds: List of sigma thresholds to try
-        min_plateau_size: Minimum plateau size
-        search_range: Search range configuration
-        group_name: Name for logging
-        logger: Logger instance
+        - jackknife_samples: Array of shape (N_samples, N_time)
+        - config_labels: List of configuration labels
+        - sigma_thresholds: List of sigma thresholds to try
+        - min_plateau_size: Minimum plateau size
+        - search_range: Search range configuration
+        - group_name: Name for logging
+        - logger: Logger instance
 
     Returns:
         Dictionary with extraction results
@@ -287,7 +307,8 @@ def extract_plateau_from_jackknife_samples(
             individual_plateau = np.mean(plateau_region)
             individual_plateau_values.append(individual_plateau)
 
-            # Store sigma threshold used (same for all successful samples)
+            # Store sigma threshold used (same for all successful
+            # samples)
             individual_sigma_thresholds.append(sigma_used)
 
             # Keep track of successful indices and config labels
@@ -324,7 +345,8 @@ def extract_plateau_from_jackknife_samples(
             "sigma_threshold": sigma_used,
         }
 
-    # Step 4: Calculate final jackknife statistics from individual plateau values
+    # Step 4: Calculate final jackknife statistics from individual
+    # plateau values
     plateau_values_array = np.array(individual_plateau_values)
     plateau_mean = np.mean(plateau_values_array)
 
@@ -339,7 +361,8 @@ def extract_plateau_from_jackknife_samples(
     # Create gvar result
     plateau_gvar = gv.gvar(plateau_mean, plateau_error)
 
-    # Extract successful time series for HDF5 export (processed data only)
+    # Extract successful time series for HDF5 export (processed data
+    # only)
     successful_time_series = jackknife_samples[successful_sample_indices, :]
 
     logger.info(
@@ -427,19 +450,22 @@ def apply_preprocessing(
     logger,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
-    Apply preprocessing steps (symmetrization, truncation) to time series data.
+    Apply preprocessing steps (symmetrization, truncation) to time
+    series data.
 
     Args:
-        jackknife_samples: Shape (N_samples, N_time)
-        mean_values: Shape (N_time,)
-        error_values: Shape (N_time,)
-        apply_symmetrization: Whether to symmetrize
-        symmetrization_truncation: Whether to truncate after symmetrization
-        data_type: "PCAC mass" or "pion effective mass" (for logging)
-        logger: Logger instance
+        - jackknife_samples: Shape (N_samples, N_time)
+        - mean_values: Shape (N_time,)
+        - error_values: Shape (N_time,)
+        - apply_symmetrization: Whether to symmetrize
+        - symmetrization_truncation: Whether to truncate after
+          symmetrization
+        - data_type: "PCAC mass" or "pion effective mass" (for logging)
+        - logger: Logger instance
 
     Returns:
-        Tuple of processed (jackknife_samples, mean_values, error_values)
+        Tuple of processed (jackknife_samples, mean_values,
+        error_values)
     """
     original_time_points = jackknife_samples.shape[1]
 
@@ -452,7 +478,8 @@ def apply_preprocessing(
         error_values = symmetrize_time_series(error_values)
 
         if symmetrization_truncation:
-            # CRITICAL: For PCAC mass, truncate to T/2 after symmetrization
+            # CRITICAL: For PCAC mass, truncate to T/2 after
+            # symmetrization
             truncate_length = original_time_points // 2
             logger.info(
                 f"Truncating {data_type} to T/2 = {truncate_length} points after symmetrization"
@@ -535,17 +562,18 @@ def process_analysis_group(
     Process a single analysis group to extract plateau values.
 
     Args:
-        group: HDF5 group containing the data
-        group_name: Name of the group for logging
-        input_datasets: Dataset name mapping
-        apply_symmetrization: Whether to apply symmetrization
-        symmetrization_truncation: Whether to truncate after symmetrization
-        sigma_thresholds: List of sigma thresholds to try
-        min_plateau_size: Minimum plateau size
-        search_range: Search range configuration
-        data_type: Type of data being processed (for logging)
-        parent_metadata: Metadata from parent group
-        logger: Logger instance
+        - group: HDF5 group containing the data
+        - group_name: Name of the group for logging
+        - input_datasets: Dataset name mapping
+        - apply_symmetrization: Whether to apply symmetrization
+        - symmetrization_truncation: Whether to truncate after
+          symmetrization
+        - sigma_thresholds: List of sigma thresholds to try
+        - min_plateau_size: Minimum plateau size
+        - search_range: Search range configuration
+        - data_type: Type of data being processed (for logging)
+        - parent_metadata: Metadata from parent group
+        - logger: Logger instance
 
     Returns:
         Dictionary with processing results
@@ -783,7 +811,8 @@ def _copy_parent_group_structure(
             # Create parent group in output file
             output_parent = output_file.require_group(parent_path)
 
-            # Copy all parent group attributes (the constant parameters!)
+            # Copy all parent group attributes (the constant
+            # parameters!)
             for attr_name, attr_value in input_parent.attrs.items():
                 try:
                     output_parent.attrs[attr_name] = attr_value
@@ -873,7 +902,8 @@ def export_to_hdf5(
             # Create corresponding output group structure
             output_group = output_file.require_group(group_path)
 
-            # Use processed time series data (already symmetrized/truncated)
+            # Use processed time series data (already
+            # symmetrized/truncated)
             processed_time_series = result["successful_time_series"]
 
             # Get individual plateau estimates and sigma thresholds

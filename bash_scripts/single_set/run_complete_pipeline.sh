@@ -622,8 +622,9 @@ function run_stage_3_2() {
     # Execute Stage 3.2: Plateau Extraction
     #
     # Returns:
-    #   0 - Success (core analysis completed, visualization may have failed)
-    #   1 - Failure (core analysis failed)
+    #   0 - Success (at least one branch extracted plateaus)
+    #   1 - Hard failure (error during processing)
+    #   2 - Graceful skip (no plateaus detected in any group)
     
     echo ""
     echo "==================================================================="
@@ -641,10 +642,8 @@ function run_stage_3_2() {
     cmd+=" -o \"$output_directory\""
     cmd+=" -log_dir \"$log_directory\""
     
-    local viz_enabled=false
     if [[ -n "$plots_directory" ]]; then
         cmd+=" -p \"$plots_directory\" --enable-viz"
-        viz_enabled=true
     fi
     
     if $skip_checks; then
@@ -661,33 +660,31 @@ function run_stage_3_2() {
     
     log_info "Command: $cmd"
     
-    # Execute and capture result
-    if eval "$cmd"; then
+    # Execute and capture exit code
+    eval "$cmd"
+    local exit_code=$?
+    
+    if [[ $exit_code -eq 0 ]]; then
+        # Complete success
         echo "✓ Stage 3.2 completed successfully"
         log_info "Stage 3.2 completed successfully"
         return 0
-    else
-        # Check if core outputs exist despite failure
-        local pcac_output="${output_directory}/${PCAC_PLATEAU_CSV_FILENAME}"
-        local pion_output="${output_directory}/${PION_PLATEAU_CSV_FILENAME}"
         
-        if [[ -f "$pcac_output" ]] || [[ -f "$pion_output" ]]; then
-            # Core analysis succeeded, likely visualization failed
-            echo "⚠ WARNING: Stage 3.2 core analysis succeeded but visualization may have failed"
-            log_warning "Stage 3.2: Core analysis completed but script reported failure (likely visualization)"
-            
-            if $viz_enabled; then
-                visualization_failures+=("Stage 3.2")
-            fi
-            
-            echo "✓ Stage 3.2 core analysis completed"
-            return 0
-        else
-            # Core analysis actually failed
-            echo "ERROR: Stage 3.2 failed" >&2
-            log_error "Stage 3.2 failed (core analysis)"
-            return 1
-        fi
+    elif [[ $exit_code -eq 2 ]]; then
+        # Graceful skip - no plateaus detected
+        echo ""
+        echo "⚠ WARNING: No plateaus detected in any group"
+        echo "  → Plateau detection failed for all parameter groups"
+        echo "  → Stage 3.2 skipped gracefully"
+        log_warning "Stage 3.2: No successful plateau extractions"
+        log_info "Stage 3.2 skipped gracefully (data quality limitation, not error)"
+        return 2
+        
+    else
+        # Hard failure
+        echo "ERROR: Stage 3.2 failed" >&2
+        log_error "Stage 3.2 failed (hard error)"
+        return 1
     fi
 }
 
@@ -854,11 +851,23 @@ function run_analysis_stage() {
     fi
     
     # Stage 3.2: Plateau Extraction
-    if ! run_stage_3_2; then
+    run_stage_3_2
+    local stage_3_2_result=$?
+    
+    if [[ $stage_3_2_result -eq 1 ]]; then
+        # Hard failure in Stage 3.2
         return 1
+    elif [[ $stage_3_2_result -eq 2 ]]; then
+        # Graceful skip in Stage 3.2 - don't run Stage 3.3 or 3.4
+        echo ""
+        echo "○ Stage 3.2 completed with graceful skip"
+        echo "○ Stage 3.3 skipped (requires Stage 3.2 results)"
+        echo "○ Stage 3.4 skipped (requires Stage 3.3 results)"
+        log_info "Stage 3 completed with Stage 3.1 successful, 3.2-3.4 skipped"
+        return 0
     fi
     
-    # Stage 3.3: Critical Mass Extrapolation
+    # Stage 3.2 succeeded, proceed to Stage 3.3
     run_stage_3_3
     local stage_3_3_result=$?
     
