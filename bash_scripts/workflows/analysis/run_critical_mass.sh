@@ -374,7 +374,20 @@ function main() {
     
     # Auxiliary directories
     local summary_dir="${output_directory}/${AUXILIARY_DIR_NAME}/${AUXILIARY_SUMMARIES_SUBDIR}"
-    
+        
+    # =============================================================================
+    # EXIT CODE CONVENTION
+    # =============================================================================
+    # The CLI scripts using this module follow these exit codes:
+    #   0 - Success: Analysis completed, results exported
+    #   1 - Error: Unexpected failure (file errors, malformed data, etc.)
+    #   2 - Graceful skip: Insufficient data for analysis (InsufficientDataError)
+    #
+    # Exit code 2 allows orchestrating scripts to distinguish between "cannot
+    # run due to data limitations" (not an error) and "failed unexpectedly"
+    # (an error that should be investigated).
+    # =============================================================================
+
     # =========================================================================
     # PCAC BRANCH
     # =========================================================================
@@ -397,21 +410,18 @@ function main() {
         # Construct full output path
         local pcac_output_csv="${output_directory}/${PCAC_OUTPUT_CSV}"
         
-        # Create temporary file to capture stderr
-        local stderr_capture=$(mktemp)
-        
-        # Execute PCAC critical mass calculation with stderr capture
+        # Execute PCAC critical mass calculation
         echo "  → Running calculate_critical_mass_from_pcac.py..."
         execute_python_script "$PCAC_CRITICAL_SCRIPT" "calculate_critical_mass_from_pcac" \
             --input_csv "$input_pcac_csv" \
             --output_csv "$pcac_output_csv" \
             --enable_logging \
-            --log_directory "$log_directory" \
-            2> >(tee -a "$stderr_capture" >&2)
+            --log_directory "$log_directory"
         
         local script_exit_code=$?
         
         if [[ $script_exit_code -eq 0 ]]; then
+            # Success
             pcac_success="true"
             echo "  ✓ PCAC critical mass calculation completed"
             log_info "PCAC critical mass calculation successful"
@@ -486,27 +496,21 @@ function main() {
                     fi
                 fi
             fi
+        elif [[ $script_exit_code -eq 2 ]]; then
+            # Graceful skip - insufficient data
+            pcac_data_insufficient="true"
+            echo "  ⚠ PCAC analysis skipped - insufficient bare mass variation"
+            echo "  → Critical mass extrapolation requires multiple bare mass values"
+            log_warning "PCAC critical mass skipped: insufficient data points for extrapolation"
+            
         else
-            # Check if it's a data insufficiency error vs a real failure
-            # Check the captured stderr for the specific error message
-            if grep -q "No groups have sufficient data points for analysis" "$stderr_capture" 2>/dev/null; then
-                # Graceful handling of insufficient data
-                pcac_data_insufficient="true"
-                echo "  ⚠ PCAC analysis skipped - insufficient bare mass variation" >&2
-                echo "  → Critical mass extrapolation requires multiple bare mass values" >&2
-                log_warning "PCAC critical mass skipped: insufficient data points for extrapolation (only one bare mass value)"
-            else
-                # Real error - should fail
-                echo "ERROR: PCAC critical mass calculation failed" >&2
-                log_error "PCAC critical mass calculation failed"
-                rm -f "$stderr_capture"
-                close_logging
-                exit 1
-            fi
+            # Actual error (exit code 1 or other)
+            echo "ERROR: PCAC critical mass calculation failed" >&2
+            log_error "PCAC critical mass calculation failed with exit code $script_exit_code"
+            close_logging
+            exit 1
         fi
-        
-        # Clean up temporary stderr capture file
-        rm -f "$stderr_capture"
+
     else
         pcac_skipped="true"
         echo "○ PCAC branch skipped (no input file provided)"
@@ -535,21 +539,18 @@ function main() {
         # Construct full output path
         local pion_output_csv="${output_directory}/${PION_OUTPUT_CSV}"
         
-        # Create temporary file to capture stderr
-        local stderr_capture=$(mktemp)
-        
         # Execute pion critical mass calculation with stderr capture
         echo "  → Running calculate_critical_mass_from_pion.py..."
         execute_python_script "$PION_CRITICAL_SCRIPT" "calculate_critical_mass_from_pion" \
             --input_csv "$input_pion_csv" \
             --output_csv "$pion_output_csv" \
             --enable_logging \
-            --log_directory "$log_directory" \
-            2> >(tee -a "$stderr_capture" >&2)
-        
+            --log_directory "$log_directory"
+
         local script_exit_code=$?
-        
+
         if [[ $script_exit_code -eq 0 ]]; then
+            # Success
             pion_success="true"
             echo "  ✓ Pion critical mass calculation completed"
             log_info "Pion critical mass calculation successful"
@@ -583,16 +584,16 @@ function main() {
             if [[ "$enable_viz" == "true" ]]; then
                 if [[ -z "$plots_directory" ]]; then
                     echo "  ⚠ Warning: Visualization requested but no plots directory specified" >&2
-                    log_warning "PCAC visualization skipped: no plots directory"
+                    log_warning "Pion visualization skipped: no plots directory"
                 elif [[ ! -f "$VIZ_SCRIPT" ]]; then
                     echo "  ⚠ Warning: Visualization script not found: $VIZ_SCRIPT" >&2
                     log_warning "Visualization script not found"
                 elif [[ ! -d "$plots_directory" ]]; then
                     echo "  ⚠ Warning: Plots directory does not exist: $plots_directory" >&2
                     echo "  → Please create it to enable visualization" >&2
-                    log_warning "PCAC visualization skipped: plots directory does not exist"
+                    log_warning "Pion visualization skipped: plots directory does not exist"
                 else
-                    echo "  → Generating PCAC visualizations..."
+                    echo "  → Generating Pion visualizations..."
                     
                     # Build visualization arguments
                     local viz_args=(
@@ -616,35 +617,29 @@ function main() {
                         "${viz_args[@]}"
                     
                     if [[ $? -eq 0 ]]; then
-                        echo "  ✓ PCAC visualizations generated"
-                        log_info "PCAC visualization completed"
+                        echo "  ✓ Pion visualizations generated"
+                        log_info "Pion visualization completed"
                     else
-                        echo "  ⚠ Warning: PCAC visualization failed" >&2
-                        log_warning "PCAC visualization failed"
+                        echo "  ⚠ Warning: Pion visualization failed" >&2
+                        log_warning "Pion visualization failed"
                     fi
                 fi
             fi
+        elif [[ $script_exit_code -eq 2 ]]; then
+            # Graceful skip - insufficient data
+            pion_data_insufficient="true"
+            echo "  ⚠ Pion analysis skipped - insufficient bare mass variation"
+            echo "  → Critical mass extrapolation requires multiple bare mass values"
+            log_warning "Pion critical mass skipped: insufficient data points for extrapolation"
+            
         else
-            # Check if it's a data insufficiency error vs a real failure
-            # Check the captured stderr for the specific error message
-            if grep -q "No groups have sufficient data points for analysis" "$stderr_capture" 2>/dev/null; then
-                # Graceful handling of insufficient data
-                pion_data_insufficient="true"
-                echo "  ⚠ Pion analysis skipped - insufficient bare mass variation" >&2
-                echo "  → Critical mass extrapolation requires multiple bare mass values" >&2
-                log_warning "Pion critical mass skipped: insufficient data points for extrapolation (only one bare mass value)"
-            else
-                # Real error - should fail
-                echo "ERROR: Pion critical mass calculation failed" >&2
-                log_error "Pion critical mass calculation failed"
-                rm -f "$stderr_capture"
-                close_logging
-                exit 1
-            fi
+            # Actual error (exit code 1 or other)
+            echo "ERROR: Pion critical mass calculation failed" >&2
+            log_error "Pion critical mass calculation failed with exit code $script_exit_code"
+            close_logging
+            exit 1
         fi
-        
-        # Clean up temporary stderr capture file
-        rm -f "$stderr_capture"
+
     else
         pion_skipped="true"
         echo "○ Pion branch skipped (no input file provided)"

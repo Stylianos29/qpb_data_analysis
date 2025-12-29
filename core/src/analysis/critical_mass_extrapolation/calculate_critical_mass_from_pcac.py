@@ -8,6 +8,7 @@ Usage: python calculate_critical_mass_from_pcac.py \
 """
 
 from pathlib import Path
+import sys
 
 import click
 
@@ -29,6 +30,7 @@ from src.analysis.critical_mass_extrapolation._pcac_critical_mass_config import 
 )
 from src.analysis.critical_mass_extrapolation._critical_mass_core import (
     process_critical_mass_analysis,
+    InsufficientDataError,
 )
 
 
@@ -112,10 +114,22 @@ def main(input_csv, output_csv, enable_logging, log_directory, log_filename):
         click.echo(f"✓ PCAC critical mass calculation complete: {output_path}")
         logger.log_script_end("PCAC critical mass calculation completed")
 
+    except InsufficientDataError as e:
+        # Graceful skip - not enough data for analysis (not an error)
+        logger.warning(f"Insufficient data: {e}")
+        logger.log_script_end(
+            "PCAC critical mass calculation skipped (insufficient data)"
+        )
+        click.echo(f"⚠ Insufficient data for PCAC critical mass calculation", err=True)
+        click.echo(f"  → {e}", err=True)
+        sys.exit(2)  # Exit code 2 = graceful skip
+
     except Exception as e:
+        # Actual error
         logger.error(f"Script failed: {e}")
         logger.log_script_end("PCAC critical mass calculation failed")
-        raise
+        click.echo(f"ERROR: {e}", err=True)
+        sys.exit(1)  # Exit code 1 = error
 
 
 if __name__ == "__main__":

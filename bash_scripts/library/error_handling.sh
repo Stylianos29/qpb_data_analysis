@@ -393,7 +393,15 @@ function execute_python_script() {
     #
     # Returns:
     #   0 - Script executed successfully
-    #   1 - Script execution failed
+    #   1 - Script execution failed (hard error)
+    #   2 - Script completed with graceful skip (insufficient data)
+    #   N - Other exit codes are passed through as-is
+    #
+    # Exit Code Convention:
+    #   Scripts using this function should follow this convention:
+    #     0 - Success: Analysis completed, results exported
+    #     1 - Error: Unexpected failure (file errors, malformed data, etc.)
+    #     2 - Graceful skip: Insufficient data for analysis (not an error)
     #
     # Examples:
     #   # Simple execution
@@ -409,6 +417,20 @@ function execute_python_script() {
     #       --enable_logging \
     #       --log_directory "$log_dir" \
     #       || exit 1
+    #
+    #   # Handling graceful skip (exit code 2)
+    #   execute_python_script "$CRITICAL_MASS_SCRIPT" "calculate_critical_mass" \
+    #       --input_csv "$csv_file" \
+    #       --output_directory "$output_dir"
+    #   local exit_code=$?
+    #   if [[ $exit_code -eq 0 ]]; then
+    #       echo "Success"
+    #   elif [[ $exit_code -eq 2 ]]; then
+    #       echo "Graceful skip - insufficient data"
+    #   else
+    #       echo "Error"
+    #       return 1
+    #   fi
     #
     # Usage Pattern:
     #   local script_path="$1"
@@ -443,13 +465,20 @@ function execute_python_script() {
     
     # Check execution result
     if [[ $exit_code -eq 0 ]]; then
+        # Success
         echo "  ✓ $script_name completed successfully"
         [[ -n "$SCRIPT_LOG_FILE_PATH" ]] && log_info "$script_name execution successful"
         return 0
+    elif [[ $exit_code -eq 2 ]]; then
+        # Graceful skip - insufficient data (not an error)
+        # Don't print ERROR - let the calling script handle the messaging
+        [[ -n "$SCRIPT_LOG_FILE_PATH" ]] && log_warning "$script_name completed with graceful skip (exit code 2)"
+        return 2
     else
+        # Hard error
         echo "ERROR: $script_name failed with exit code $exit_code" >&2
         [[ -n "$SCRIPT_LOG_FILE_PATH" ]] && log_error "$script_name failed with exit code $exit_code"
-        return 1
+        return $exit_code
     fi
 }
 

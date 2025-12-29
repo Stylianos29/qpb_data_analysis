@@ -715,10 +715,8 @@ function run_stage_3_3() {
     cmd+=" -o \"$output_directory\""
     cmd+=" -log_dir \"$log_directory\""
     
-    local viz_enabled=false
     if [[ -n "$plots_directory" ]]; then
         cmd+=" -p \"$plots_directory\" --enable-viz"
-        viz_enabled=true
     fi
     
     if $skip_checks; then
@@ -735,55 +733,31 @@ function run_stage_3_3() {
     
     log_info "Command: $cmd"
     
-    # Execute and capture output and exit code
-    local temp_log=$(mktemp)
-    eval "$cmd" 2>&1 | tee "$temp_log"
-    local exit_code=${PIPESTATUS[0]}
+    # Execute and capture exit code
+    eval "$cmd"
+    local exit_code=$?
     
     if [[ $exit_code -eq 0 ]]; then
         # Complete success
-        rm -f "$temp_log"
         echo "✓ Stage 3.3 completed successfully"
         log_info "Stage 3.3 completed successfully"
         return 0
+        
+    elif [[ $exit_code -eq 2 ]]; then
+        # Graceful skip - insufficient data (from run_critical_mass.sh)
+        echo ""
+        echo "⚠ WARNING: Insufficient data for critical mass extrapolation"
+        echo "  → Not enough bare mass variation across parameter groups"
+        echo "  → Stage 3.3 skipped gracefully"
+        log_warning "Stage 3.3: Insufficient data for critical mass extrapolation"
+        log_info "Stage 3.3 skipped gracefully (data limitation, not error)"
+        return 2
+        
     else
-        # Check if graceful skip due to insufficient data
-        if grep -q "Insufficient bare mass variation for extrapolation" "$temp_log" || \
-           grep -q "No valid groups with sufficient bare mass variation" "$temp_log"; then
-            # Graceful skip - insufficient data
-            rm -f "$temp_log"
-            echo ""
-            echo "⚠ WARNING: Insufficient data for critical mass extrapolation"
-            echo "  → Not enough bare mass variation across parameter groups"
-            echo "  → Stage 3.3 skipped gracefully"
-            log_warning "Stage 3.3: Insufficient data for critical mass extrapolation"
-            log_info "Stage 3.3 skipped gracefully (data limitation, not error)"
-            return 2
-        fi
-        
-        # Check if core outputs exist despite failure
-        local pcac_output="${output_directory}/${CRITICAL_PCAC_CSV_FILENAME}"
-        local pion_output="${output_directory}/${CRITICAL_PION_CSV_FILENAME}"
-        
-        if [[ -f "$pcac_output" ]] || [[ -f "$pion_output" ]]; then
-            # Core analysis succeeded, likely visualization failed
-            rm -f "$temp_log"
-            echo "⚠ WARNING: Stage 3.3 core analysis succeeded but visualization may have failed"
-            log_warning "Stage 3.3: Core analysis completed but script reported failure (likely visualization)"
-            
-            if $viz_enabled; then
-                visualization_failures+=("Stage 3.3")
-            fi
-            
-            echo "✓ Stage 3.3 core analysis completed"
-            return 0
-        else
-            # Hard failure - core analysis failed
-            rm -f "$temp_log"
-            echo "ERROR: Stage 3.3 failed" >&2
-            log_error "Stage 3.3 failed (hard error)"
-            return 1
-        fi
+        # Hard failure
+        echo "ERROR: Stage 3.3 failed" >&2
+        log_error "Stage 3.3 failed (hard error)"
+        return 1
     fi
 }
 

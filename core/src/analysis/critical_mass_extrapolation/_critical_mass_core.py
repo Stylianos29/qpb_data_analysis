@@ -19,7 +19,27 @@ from library.data import load_csv
 from src.analysis.critical_mass_extrapolation._critical_mass_shared_config import (
     GROUPING_EXCLUDED_PARAMETERS,
     OUTPUT_COLUMN_NAMES,
+    FILTERING_PARAMETERS,
 )
+
+# Get the minimum data points from config
+MIN_DATA_POINTS = FILTERING_PARAMETERS["min_data_points_per_group"]
+
+# =============================================================================
+# CUSTOM EXCEPTIONS
+# =============================================================================
+
+
+class InsufficientDataError(Exception):
+    """
+    Raised when there is insufficient data for critical mass analysis.
+
+    This is not a programming error but a data limitation - for example,
+    when all parameter groups have fewer than the minimum required bare
+    mass values for linear extrapolation.
+    """
+
+    pass
 
 
 # =============================================================================
@@ -499,13 +519,15 @@ def validate_critical_mass_input_data(
     Validate plateau data for critical mass calculation.
 
     Args:
-        df: Input dataframe analysis_type: Type of analysis ("pcac" or
-        "pion") column_mapping: Mapping of standard names to CSV columns
-        logger: Logger instance
+        - df: Input dataframe
+        - analysis_type: Type of analysis ("pcac" or "pion")
+        - column_mapping: Mapping of standard names to CSV columns
+        - logger: Logger instance
     """
     # Check sufficient data points
-    if len(df) < 3:
-        raise ValueError("Need at least 3 data points for extrapolation")
+    min_points = FILTERING_PARAMETERS["min_data_points_per_group"]
+    if len(df) < min_points:
+        raise ValueError(f"Need at least {min_points} data points for extrapolation")
 
     # Check required columns exist
     y_mean_col = column_mapping["plateau_mean"]
@@ -604,7 +626,12 @@ def process_critical_mass_analysis(
             logger.warning(f"Skipping group {group_id}: {e}")
 
     if not valid_groups:
-        raise ValueError("No groups have sufficient data points for analysis")
+        min_points = FILTERING_PARAMETERS["min_data_points_per_group"]
+        raise InsufficientDataError(
+            "No groups have sufficient data points for analysis. "
+            f"Critical mass extrapolation requires at least {min_points} "
+            "bare mass values per group."
+        )
 
     logger.info(f"Processing {len(valid_groups)} valid parameter groups")
 
@@ -642,7 +669,10 @@ def process_critical_mass_analysis(
             continue
 
     if not results:
-        raise ValueError("No valid critical mass calculations completed")
+        raise InsufficientDataError(
+            "No valid critical mass calculations completed. "
+            "All groups failed validation or fitting."
+        )
 
     # Export results
     logger.info(f"Exporting {len(results)} results to {output_csv_path}")
