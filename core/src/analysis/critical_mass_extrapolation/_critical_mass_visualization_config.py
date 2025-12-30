@@ -8,9 +8,12 @@ creating critical mass extrapolation plots.
 
 from typing import Dict
 
+from library.constants.labels import AXES_LABELS_BY_COLUMN_NAME
+
 from src.analysis.critical_mass_extrapolation._critical_mass_shared_config import (
     OUTPUT_COLUMN_NAMES,
 )
+
 
 # =============================================================================
 # CONSTANTS
@@ -86,15 +89,26 @@ VISUALIZATION_CONFIG = {
     "enable_plot_validation": True,
 }
 
-# UPDATE ANALYSIS CONFIGS TO REFLECT ACTUAL Y-AXIS LABELS
+# =============================================================================
+# Y-AXIS LABEL MAPPING
+# =============================================================================
+# Maps analysis types to canonical column names in the centralized
+# AXES_LABELS_BY_COLUMN_NAME dictionary from library.constants.labels
+#
+# This approach maintains a single source of truth for all axis labels while
+# allowing this module to specify which label to use for each analysis type.
+
+Y_AXIS_LABEL_COLUMN_MAPPING = {
+    "pcac": "PCAC_plateau_mean",
+    "pion": "pion_mass_squared",
+}
+
 ANALYSIS_CONFIGS = {
     "pcac": {
         "plot_subdirectory": "Critical_bare_mass_extrapolation_pcac",
-        "default_y_label": "a$m_{PCAC}$",
     },
     "pion": {
         "plot_subdirectory": "Critical_bare_mass_extrapolation_pion",
-        "default_y_label": "$a^2 m^2_{\\pi}$",
     },
 }
 
@@ -160,10 +174,29 @@ def get_visualization_config():
 
 
 def get_analysis_config(analysis_type):
-    """Get analysis-specific configuration."""
+    """
+    Get analysis-specific configuration. Dynamically adds y-axis label
+    from centralized dictionary.
+
+    Args:
+        analysis_type: "pcac" or "pion"
+
+    Returns:
+        Dictionary with analysis-specific settings including dynamically
+        retrieved y-axis label from centralized
+        AXES_LABELS_BY_COLUMN_NAME
+    """
     if analysis_type not in ANALYSIS_CONFIGS:
         raise ValueError(f"Unknown analysis type: {analysis_type}")
-    return ANALYSIS_CONFIGS[analysis_type].copy()
+
+    # Get base config
+    config = ANALYSIS_CONFIGS[analysis_type].copy()
+
+    # Add y-axis label dynamically from centralized dictionary
+    column_name = Y_AXIS_LABEL_COLUMN_MAPPING[analysis_type]
+    config["default_y_label"] = AXES_LABELS_BY_COLUMN_NAME.get(column_name, column_name)
+
+    return config
 
 
 def get_results_column_mapping() -> Dict[str, str]:
@@ -350,7 +383,9 @@ def validate_layout_config():
 
 
 def validate_visualization_config():
-    """Validate all visualization configuration."""
+    """
+    Validate all visualization configuration.
+    """
     validate_plot_styling()
     validate_layout_config()
 
@@ -366,5 +401,12 @@ def validate_visualization_config():
         if not config["plot_subdirectory"]:
             raise ValueError(f"plot_subdirectory for {analysis_type} cannot be empty")
 
-        if not config["default_y_label"]:
-            raise ValueError(f"default_y_label for {analysis_type} cannot be empty")
+    # NEW: Validate that all mapped column names exist in centralized dictionary
+    for analysis_type, column_name in Y_AXIS_LABEL_COLUMN_MAPPING.items():
+        if column_name not in AXES_LABELS_BY_COLUMN_NAME:
+            raise ValueError(
+                f"Y-axis label mapping error: Column name '{column_name}' "
+                f"(for analysis type '{analysis_type}') not found in "
+                f"AXES_LABELS_BY_COLUMN_NAME. Please add it to "
+                f"library/constants/labels.py"
+            )
