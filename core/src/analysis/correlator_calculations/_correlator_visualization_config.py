@@ -9,6 +9,8 @@ dataset specifications, and analysis-specific parameters.
 
 from typing import Dict
 
+from library.constants.labels import AXES_LABELS_BY_COLUMN_NAME
+
 # Import analysis-specific configurations
 from src.analysis.correlator_calculations._pcac_mass_config import (
     TRUNCATE_START as PCAC_TRUNCATE_START,
@@ -17,6 +19,7 @@ from src.analysis.correlator_calculations._pcac_mass_config import (
 from src.analysis.correlator_calculations._effective_mass_config import (
     OUTPUT_DATASETS as EFFECTIVE_OUTPUT_DATASETS,
 )
+
 
 # =============================================================================
 # CONSTANTS
@@ -186,6 +189,30 @@ def get_plot_subdirectory_name(analysis_type: str) -> tuple:
         short_type = analysis_type.replace("_mass", "")
         subdir = f"{config['parent_directory_name']}_{short_type}"
         return (parent, subdir)
+
+
+def get_axis_labels(analysis_type: str) -> Dict[str, str]:
+    """
+    Get axis labels for correlator visualization.
+
+    Args:
+        analysis_type: "pcac_mass" or "effective_mass"
+
+    Returns:
+        Dictionary with x_label and y_label
+    """
+    config = get_analysis_config(analysis_type)
+
+    # Get labels from centralized dictionary
+    x_label = AXES_LABELS_BY_COLUMN_NAME.get("time_index", "$t/a$")
+    y_label = AXES_LABELS_BY_COLUMN_NAME.get(
+        config["samples_dataset"], "Correlator Value"
+    )
+
+    return {
+        "x_label": x_label,
+        "y_label": y_label,
+    }
 
 
 # =============================================================================

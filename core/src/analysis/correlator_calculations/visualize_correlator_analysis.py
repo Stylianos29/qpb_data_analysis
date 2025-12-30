@@ -165,6 +165,7 @@ def _process_single_correlator_group(
     layout_manager: PlotLayoutManager,
     style_manager: PlotStyleManager,
     title_builder: PlotTitleBuilder,
+    analysis_type: str,
     logger,
     verbose: bool,
 ) -> int:
@@ -211,6 +212,7 @@ def _process_single_correlator_group(
             layout_manager,
             style_manager,
             title_builder,
+            analysis_type,
             verbose,
         )
 
@@ -229,6 +231,7 @@ def _process_correlator_data(
     layout_manager: PlotLayoutManager,
     style_manager: PlotStyleManager,
     title_builder: PlotTitleBuilder,
+    analysis_type: str,
     logger,
     verbose: bool,
 ) -> int:
@@ -281,6 +284,7 @@ def _process_correlator_data(
                         layout_manager,
                         style_manager,
                         title_builder,
+                        analysis_type,
                         logger,
                         verbose,
                     )
@@ -450,6 +454,7 @@ def main(
             layout_manager,
             style_manager,
             title_builder,
+            analysis_type,
             logger,
             verbose,
         )

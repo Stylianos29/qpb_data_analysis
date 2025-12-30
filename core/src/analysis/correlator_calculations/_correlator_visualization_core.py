@@ -63,6 +63,7 @@ from src.analysis.correlator_calculations._correlator_visualization_config impor
     DEFAULT_FONT_SIZE,
     PLOT_STYLING,
     TITLE_EXCLUDED_PARAMETERS,
+    get_axis_labels,
 )
 
 
@@ -101,6 +102,7 @@ def _create_multi_sample_plots(
     layout_manager: PlotLayoutManager,
     style_manager: PlotStyleManager,
     title_builder: PlotTitleBuilder,
+    analysis_type: str,
     verbose: bool,
 ) -> int:
     """Create multi-sample plots for correlator data."""
@@ -151,6 +153,7 @@ def _create_multi_sample_plots(
             layout_manager,
             style_manager,
             title_builder,
+            analysis_type,
         )
 
         # Generate filename and save using file manager
@@ -182,6 +185,7 @@ def _create_single_correlator_plot(
     layout_manager: PlotLayoutManager,
     style_manager: PlotStyleManager,
     title_builder: PlotTitleBuilder,
+    analysis_type: str,
 ) -> Figure:
     """Create a single correlator plot with samples and average."""
 
@@ -227,16 +231,11 @@ def _create_single_correlator_plot(
     # Configure axes using constants and analysis config
     plot_config = analysis_config["plot_config"]
 
-    # Use AXES_LABELS_BY_COLUMN_NAME for proper labels
-    x_label = constants.AXES_LABELS_BY_COLUMN_NAME.get("time_index") or plot_config.get(
-        "x_label"
-    )
-    y_label = constants.AXES_LABELS_BY_COLUMN_NAME.get(
-        analysis_config["samples_dataset"]
-    ) or plot_config.get("y_label")
+    axis_labels = get_axis_labels(analysis_type)
 
-    ax.set_xlabel(x_label, fontsize=DEFAULT_FONT_SIZE)
-    ax.set_ylabel(y_label, fontsize=DEFAULT_FONT_SIZE)
+    ax.set_xlabel(axis_labels["x_label"], fontsize=DEFAULT_FONT_SIZE)
+    ax.set_ylabel(axis_labels["y_label"], fontsize=DEFAULT_FONT_SIZE)
+
     ax.set_yscale(plot_config["y_scale"])
 
     # Set x-axis limits to start from zero
