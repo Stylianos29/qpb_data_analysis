@@ -318,7 +318,7 @@ def validate_visualization_config() -> None:
 
     # Check analysis configs
     for analysis_type, config in ANALYSIS_CONFIGS.items():
-        required_keys = ["input_datasets", "time_offset", "y_label", "title_prefix"]
+        required_keys = ["input_datasets", "time_offset", "title_prefix"]
         for key in required_keys:
             if key not in config:
                 raise ValueError(
