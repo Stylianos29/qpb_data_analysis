@@ -416,12 +416,22 @@ function main() {
             pcac_success="true"
             echo "  ✓ PCAC plateau extraction completed"
             log_info "PCAC plateau extraction successful"
-            
+                    
+            # Define output file paths
+            local pcac_csv_file="${output_directory}/${PCAC_OUTPUT_CSV}"
+            local pcac_hdf5_file="${output_directory}/${PCAC_OUTPUT_HDF5}"
+
             # Validate output files
             if [[ "$skip_checks" != "true" ]]; then
-                if [[ ! -f "${output_directory}/${PCAC_OUTPUT_CSV}" ]]; then
-                    echo "ERROR: PCAC CSV file not created: ${output_directory}/${PCAC_OUTPUT_CSV}" >&2
-                    log_error "PCAC CSV missing: ${output_directory}/${PCAC_OUTPUT_CSV}"
+                if [[ ! -f "$pcac_csv_file" ]]; then
+                    echo "ERROR: PCAC CSV file not created: $pcac_csv_file" >&2
+                    log_error "PCAC CSV missing: $pcac_csv_file"
+                    close_logging
+                    exit 1
+                fi
+                if [[ ! -f "$pcac_hdf5_file" ]]; then
+                    echo "ERROR: PCAC HDF5 file not created: $pcac_hdf5_file" >&2
+                    log_error "PCAC HDF5 missing: $pcac_hdf5_file"
                     close_logging
                     exit 1
                 fi
@@ -569,18 +579,28 @@ function main() {
             pion_success="true"
             echo "  ✓ Pion plateau extraction completed"
             log_info "Pion plateau extraction successful"
-            
+                    
+            # Define output file paths
+            local pion_csv_file="${output_directory}/${PION_OUTPUT_CSV}"
+            local pion_hdf5_file="${output_directory}/${PION_OUTPUT_HDF5}"
+
             # Validate output files
             if [[ "$skip_checks" != "true" ]]; then
-                if [[ ! -f "${output_directory}/${PION_OUTPUT_CSV}" ]]; then
-                    echo "ERROR: Pion CSV file not created: ${output_directory}/${PION_OUTPUT_CSV}" >&2
-                    log_error "Pion CSV missing: ${output_directory}/${PION_OUTPUT_CSV}"
+                if [[ ! -f "$pion_csv_file" ]]; then
+                    echo "ERROR: Pion CSV file not created: $pion_csv_file" >&2
+                    log_error "Pion CSV missing: $pion_csv_file"
+                    close_logging
+                    exit 1
+                fi
+                if [[ ! -f "$pion_hdf5_file" ]]; then
+                    echo "ERROR: Pion HDF5 file not created: $pion_hdf5_file" >&2
+                    log_error "Pion HDF5 missing: $pion_hdf5_file"
                     close_logging
                     exit 1
                 fi
                 echo "  ✓ Output files validated"
             fi
-            
+
             # Move HDF5 file to visualization directory
             echo "  → Moving HDF5 to visualization directory..."
             mv "$pion_hdf5_file" "$viz_dir/" || {
