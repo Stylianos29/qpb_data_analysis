@@ -9,7 +9,10 @@ extract_plateau_PCAC_mass.py visualization.
 """
 
 from typing import Dict, Any, List
+
 import numpy as np
+
+from library.constants.labels import AXES_LABELS_BY_COLUMN_NAME
 
 # =============================================================================
 # CONSTANTS
@@ -17,6 +20,20 @@ import numpy as np
 
 DEFAULT_FONT_SIZE = 14
 DEFAULT_DPI = 300
+
+# =============================================================================
+# Y-AXIS LABEL MAPPING
+# =============================================================================
+# Maps analysis types to canonical column names in the centralized
+# AXES_LABELS_BY_COLUMN_NAME dictionary from library.constants.labels
+#
+# This approach maintains a single source of truth for all axis labels while
+# allowing this module to specify which label to use for each analysis type.
+
+Y_AXIS_LABEL_COLUMN_MAPPING = {
+    "pcac_mass": "PCAC_plateau_mean",
+    "pion_mass": "pion_effective_mass",
+}
 
 # =============================================================================
 # ANALYSIS-SPECIFIC CONFIGURATIONS
@@ -31,7 +48,6 @@ ANALYSIS_CONFIGS = {
             "config_labels": "gauge_configuration_labels",
         },
         "time_offset": 2,  # PCAC mass starts at t=2
-        "y_label": r"$am_{\mathrm{PCAC}}$",
         "title_prefix": "PCAC Mass Plateau Extraction",
         "plot_subdirectory": "Plateau_extraction_pcac",
         "column_prefix": "PCAC",
@@ -51,7 +67,6 @@ ANALYSIS_CONFIGS = {
             "config_labels": "gauge_configuration_labels",
         },
         "time_offset": 1,  # Effective mass starts at t=1
-        "y_label": r"$am_{\pi}^{\mathrm{eff}}$",
         "title_prefix": "Pion Effective Mass Plateau Extraction",
         "plot_subdirectory": "Plateau_extraction_pion",
         "column_prefix": "pion",
@@ -318,6 +333,17 @@ def validate_visualization_config() -> None:
     if OUTPUT_CONFIG["dpi"] < 50:
         raise ValueError("dpi must be at least 50")
 
+    # Validate that all mapped column names exist in centralized
+    # dictionary
+    for analysis_type, column_name in Y_AXIS_LABEL_COLUMN_MAPPING.items():
+        if column_name not in AXES_LABELS_BY_COLUMN_NAME:
+            raise ValueError(
+                f"Y-axis label mapping error: Column name '{column_name}' "
+                f"(for analysis type '{analysis_type}') not found in "
+                f"AXES_LABELS_BY_COLUMN_NAME. Please add it to "
+                f"library/constants/labels.py"
+            )
+
 
 # =============================================================================
 # ACCESSOR FUNCTIONS
@@ -325,9 +351,26 @@ def validate_visualization_config() -> None:
 
 
 def get_analysis_config(analysis_type: str) -> Dict[str, Any]:
-    """Get configuration for specific analysis type."""
+    """
+    Get configuration for specific analysis type. Dynamically adds
+    y-axis label from centralized dictionary.
+
+    Args:
+        analysis_type: "pcac_mass" or "pion_mass"
+
+    Returns:
+        Dictionary with analysis-specific settings including dynamically
+        retrieved y-axis label from centralized
+        AXES_LABELS_BY_COLUMN_NAME
+    """
     validate_analysis_type(analysis_type)
-    return ANALYSIS_CONFIGS[analysis_type].copy()
+    config = ANALYSIS_CONFIGS[analysis_type].copy()
+
+    # Add y-axis label dynamically from centralized dictionary
+    column_name = Y_AXIS_LABEL_COLUMN_MAPPING[analysis_type]
+    config["y_label"] = AXES_LABELS_BY_COLUMN_NAME.get(column_name, column_name)
+
+    return config
 
 
 def get_layout_config() -> Dict[str, Any]:
