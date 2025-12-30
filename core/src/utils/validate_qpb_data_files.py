@@ -4,7 +4,7 @@ validate_qpb_data_files.py
 Summary:
     A validation script for qpb data files that checks file integrity,
     ensures consistency between file types, and maintains program type
-    compatibility (invert vs non-invert) within a data files set
+    compatibility (invert vs non-invert) within a data file set
     directory.
 
 Input:
@@ -20,7 +20,7 @@ Input:
         - log_filename: Custom name for the log file
 
 Output:
-    1. Validated and cleaned data files set directory
+    1. Validated and cleaned data file set directory
     2. metadata.md file containing:
         - Main program type (invert/non-invert)
         - File counts by type
@@ -85,7 +85,7 @@ def get_yes_or_no_user_response(prompt_text, logger=None):
     "raw_data_files_set_directory_path",
     required=True,
     callback=directory.must_exist,
-    help="Path to the raw data files set directory",
+    help="Path to the raw data file set directory",
 )
 @click.option(
     "-ax_files_dir",
@@ -162,7 +162,7 @@ def main(
 
     # INITIATE SCRIPT AND LOGGING
 
-    click.echo("   -- Validating raw qpb data files set initiated.")
+    click.echo("   -- Validating raw qpb data file set initiated.")
 
     # Setup logging
     logger = LoggingWrapper(logs_directory, log_filename, enable_logging)
@@ -170,11 +170,11 @@ def main(
     # Log script start
     logger.initiate_script_logging()
 
-    # CHECK IF DATA FILES SET DIRECTORY IS EMPTY
+    # CHECK IF DATA FILE SET DIRECTORY IS EMPTY
 
     if not os.listdir(raw_data_files_set_directory_path):
         logger.error(
-            f"Data files set directory '{raw_data_files_set_directory_path}' "
+            f"Data file set directory '{raw_data_files_set_directory_path}' "
             "is empty. Validation cannot proceed without any files to validate.",
             to_console=True,
         )
@@ -197,7 +197,7 @@ def main(
     # (unsupported)
     all_files = glob.glob(os.path.join(raw_data_files_set_directory_path, "*"))
     logger.info(
-        f"Total number of files in raw data files set directory: {len(all_files)}"
+        f"Total number of files in raw data file set directory: {len(all_files)}"
     )
 
     invalid_extension_files = [
@@ -233,15 +233,15 @@ def main(
         else:
             logger.error(
                 "Validation cannot proceed with unsupported file types "
-                "present inside the qpb data files set directory. "
+                "present inside the qpb data file set directory. "
                 "Exiting the program.",
                 to_console=True,
             )
             sys.exit(1)
     else:
-        logger.info("No unsupported file types found in raw data files set directory.")
+        logger.info("No unsupported file types found in raw DATA FILE SET directory.")
 
-    # REMOVE ANY NULL CORRELATORS FILES
+    # REMOVE ANY NULL CORRELATOR FILES
 
     # Find correlator files (.dat) with null values in the 5th column
     null_correlator_files = []
@@ -309,8 +309,8 @@ def main(
                     )
         else:
             logger.error(
-                "Validation cannot proceed with null correlators files "
-                "present inside the qpb data files set directory. "
+                "Validation cannot proceed with null correlator files "
+                "present inside the qpb data file set directory. "
                 "Exiting the program.",
                 to_console=True,
             )
@@ -358,7 +358,7 @@ def main(
             # Check if directory is empty after deleting files
             if not os.listdir(raw_data_files_set_directory_path):
                 logger.error(
-                    f"Data files set directory '{raw_data_files_set_directory_path}' "
+                    f"Data file set directory '{raw_data_files_set_directory_path}' "
                     "is now empty after deleting empty files. Validation cannot proceed.",
                     to_console=True,
                 )
@@ -366,13 +366,13 @@ def main(
         else:
             logger.error(
                 "Validation cannot proceed with empty qpb log or correlations "
-                "files present inside the qpb data files set directory. "
+                "files present inside the qpb data file set directory. "
                 "Exiting the program.",
                 to_console=True,
             )
             sys.exit(1)
     else:
-        logger.info("No empty files found in raw data files set directory.")
+        logger.info("No empty files found in raw data file set directory.")
 
     # RETRIEVE STORED FILE PATHS
 
@@ -455,7 +455,7 @@ def main(
     if list_of_qpb_correlators_files_to_validate:
         logger.info(
             f"Found {len(list_of_qpb_correlators_files_to_validate)} "
-            "correlators files not listed.",
+            "correlator files not listed.",
             to_console=True,
         )
 
@@ -621,7 +621,7 @@ def main(
             # empty
             if not os.listdir(raw_data_files_set_directory_path):
                 logger.error(
-                    f"Data files set directory '{raw_data_files_set_directory_path}' "
+                    f"Data file set directory '{raw_data_files_set_directory_path}' "
                     "is now empty after deleting corrupted files. Validation cannot "
                     "proceed.",
                     to_console=True,
@@ -631,7 +631,7 @@ def main(
         else:
             logger.error(
                 "Validation cannot proceed with corrupted files present "
-                "inside the qpb data files set directory. "
+                "inside the qpb data file set directory. "
                 "Exiting the program.",
                 to_console=True,
             )
@@ -673,7 +673,7 @@ def main(
             logger.error(
                 f"Found {len(incompatible_files)} '{incompatible_main_program_type}' "
                 "incompatible file(s). This conflicts with the established main "
-                "program type of the data files set.",
+                "program type of the data file set.",
                 to_console=True,
             )
             response = get_yes_or_no_user_response(
@@ -717,7 +717,7 @@ def main(
                 logger.error(
                     "Validation cannot proceed with incompatible "
                     f"{incompatible_main_program_type} file types present inside the "
-                    "qpb data files set directory. Exiting the program.",
+                    "qpb data file set directory. Exiting the program.",
                     to_console=True,
                 )
                 sys.exit(1)
@@ -756,7 +756,7 @@ def main(
             )
             sys.exit(1)
 
-    # CHECK IF CORRELATORS FILES CONTAIN ONLY ZERO VALUES
+    # CHECK IF CORRELATOR FILES CONTAIN ONLY ZERO VALUES
 
     if main_program_type == "invert":
         # Initialize list to store files with all zero values in columns
@@ -794,7 +794,7 @@ def main(
                 to_console=True,
             )
             response = get_yes_or_no_user_response(
-                "Delete correlators files containing only zero correlator values?\n"
+                "Delete correlator files containing only zero correlator values?\n"
                 "This will also remove their associated .txt files. (y[Y]/n[N])"
             )
             if response:
@@ -823,7 +823,7 @@ def main(
                         )
             else:
                 logger.info(
-                    "No correlators files with all zero values were deleted.",
+                    "No correlator files with all zero values were deleted.",
                     to_console=True,
                 )
 
@@ -859,7 +859,7 @@ def main(
 
             response = get_yes_or_no_user_response(
                 "Do you want to delete qpb log files without matching "
-                "correlators files? (y[Y]/n[N])"
+                "correlator files? (y[Y]/n[N])"
             )
             if response:
                 for file_path in unmatched_txt_files:
@@ -886,7 +886,7 @@ def main(
             ]
 
             response = get_yes_or_no_user_response(
-                "Do you want to delete qpb correlators files without matching "
+                "Do you want to delete qpb correlator files without matching "
                 "log files? (y[Y]/n[N])"
             )
             if response:
@@ -900,7 +900,7 @@ def main(
                     except Exception as e:
                         logger.error(f"Error deleting file {file_path}: {str(e)}")
         else:
-            logger.info("No unmatched qpb correlators files found.")
+            logger.info("No unmatched qpb correlator files found.")
 
     # STORE REMAINING FILE PATHS IN SEPARATE TEXT FILES
 
@@ -957,7 +957,7 @@ def main(
         file.write(f"\nNumber of qpb error files: {len(list_of_qpb_error_file_paths)}")
         if main_program_type == "invert":
             file.write(
-                "\nNumber of qpb correlators files: "
+                "\nNumber of qpb correlator files: "
                 f"{len(list_of_qpb_correlators_file_paths)}"
             )
         file.write("\n")
@@ -971,7 +971,7 @@ def main(
     # Terminate logging
     logger.terminate_script_logging()
 
-    click.echo("   -- Validating raw qpb data files set completed.")
+    click.echo("   -- Validating raw qpb data file set completed.")
 
 
 if __name__ == "__main__":
