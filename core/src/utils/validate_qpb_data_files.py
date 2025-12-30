@@ -847,29 +847,49 @@ def main(
 
         # Handle unmatched .txt files
         if unmatched_log_files_only:
-            logger.warning(
-                f"Found {len(unmatched_log_files_only)} qpb log files without "
-                "matching correlator files."
-            )
-            unmatched_txt_files = [
-                path
-                for path in list_of_qpb_log_file_paths
-                if os.path.splitext(path)[0] in unmatched_log_files_only
-            ]
+            # Check if this is an intentional no-correlators data file set
+            total_log_files = len(list_of_qpb_log_files_to_validate)
+            total_dat_files = len(list_of_qpb_correlators_files_to_validate)
 
-            response = get_yes_or_no_user_response(
-                "Do you want to delete qpb log files without matching "
-                "correlator files? (y[Y]/n[N])"
-            )
-            if response:
-                for file_path in unmatched_txt_files:
-                    try:
-                        os.remove(file_path)
-                        logger.info(
-                            f"Deleted unmatched log file: {os.path.basename(file_path)}"
-                        )
-                    except Exception as e:
-                        logger.error(f"Error deleting file {file_path}: {str(e)}")
+            # If ALL logs are unmatched AND there are ZERO .dat files
+            # then assume this is an intentional no-correlators invert
+            # data file set
+            if (
+                total_dat_files == 0
+                and len(unmatched_log_files_only) == total_log_files
+            ):
+                logger.info(
+                    f"Detected intentional invert no-correlators data file set "
+                    f"({total_log_files} log files, 0 correlator files). "
+                    "Skipping correlator matching validation.",
+                    to_console=True,
+                )
+                # Don't prompt - this is clearly by design
+            else:
+                # Partial mismatch - user attention needed
+                logger.warning(
+                    f"Found {len(unmatched_log_files_only)} qpb log files without "
+                    "matching correlator files."
+                )
+                unmatched_txt_files = [
+                    path
+                    for path in list_of_qpb_log_file_paths
+                    if os.path.splitext(path)[0] in unmatched_log_files_only
+                ]
+
+                response = get_yes_or_no_user_response(
+                    "Do you want to delete qpb log files without matching "
+                    "correlators files? (y[Y]/n[N])"
+                )
+                if response:
+                    for file_path in unmatched_txt_files:
+                        try:
+                            os.remove(file_path)
+                            logger.info(
+                                f"Deleted unmatched log file: {os.path.basename(file_path)}"
+                            )
+                        except Exception as e:
+                            logger.error(f"Error deleting file {file_path}: {str(e)}")
         else:
             logger.info("No unmatched qpb log files found.")
 
@@ -918,13 +938,17 @@ def main(
 
         # Precautionary check if lengths match for invert program type
         if main_program_type == "invert":
-            if len(list_of_qpb_log_file_paths) != len(
-                list_of_qpb_correlators_file_paths
-            ):
+            total_log_files = len(list_of_qpb_log_file_paths)
+            total_dat_files = len(list_of_qpb_correlators_file_paths)
+
+            # Only warn about mismatches if correlator files are present
+            # (total_dat_files == 0 indicates intentional no-correlators
+            # invert data file set
+            if total_log_files != total_dat_files and total_dat_files != 0:
                 logger.warning(
-                    f"Number of log files ({len(list_of_qpb_log_file_paths)}) "
+                    f"Number of log files ({total_log_files}) "
                     "does not match number of correlator files "
-                    f"({len(list_of_qpb_correlators_file_paths)}). "
+                    f"({total_dat_files}). "
                     "This may indicate missing or extra files.",
                     to_console=True,
                 )
