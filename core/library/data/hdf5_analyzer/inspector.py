@@ -14,16 +14,45 @@ import h5py
 import numpy as np
 
 
+def _convert_hdf5_attr_to_python(value):
+    """
+    Convert an HDF5 attribute value to a hashable Python type.
+
+    This helper function ensures all values stored from HDF5 attributes
+    are native Python types that can be used in pandas DataFrames and
+    support hashing for uniqueness calculations.
+
+    Args:
+        value: The HDF5 attribute value (could be numpy array, numpy
+        scalar, bytes, or native Python type)
+
+    Returns:
+        A hashable Python type (tuple, int, float, str, etc.)
+    """
+    if isinstance(value, np.ndarray):
+        # Convert numpy arrays to tuples (hashable)
+        return tuple(value.flatten().tolist())
+    elif isinstance(value, (np.integer, np.floating)):
+        # Convert numpy scalars to native Python types
+        return value.item()
+    elif isinstance(value, bytes):
+        # Decode bytes to string
+        return value.decode("utf-8")
+    else:
+        # Already a native Python type
+        return value
+
+
 class _HDF5Inspector:
     """
     Private base class for read-only inspection of HDF5 files.
 
     This class analyzes HDF5 file structure and categorizes parameters
     and datasets according to the project's conventions:
-    - Directory hierarchy mirroring in top-level groups
-    - Single-valued parameters as attributes at second-to-last level
-    - Multi-valued parameters as attributes at deepest level
-    - Datasets stored in deepest level groups
+        - Directory hierarchy mirroring in top-level groups
+        - Single-valued parameters as attributes at second-to-last level
+        - Multi-valued parameters as attributes at deepest level
+        - Datasets stored in deepest level groups
 
     Attributes follow the same naming convention as DataFrameAnalyzer
     for consistency.
@@ -91,11 +120,11 @@ class _HDF5Inspector:
         datasets.
 
         This method identifies:
-        - Group hierarchy levels
-        - Single-valued parameters (second-to-last level attributes)
-        - Multi-valued parameters (deepest level attributes)
-        - Output datasets and their locations
-        - Gvar dataset pairs (mean/error)
+            - Group hierarchy levels
+            - Single-valued parameters (second-to-last level attributes)
+            - Multi-valued parameters (deepest level attributes)
+            - Output datasets and their locations
+            - Gvar dataset pairs (mean/error)
         """
         # First pass: collect all groups and their levels
         self._collect_groups()
@@ -120,11 +149,26 @@ class _HDF5Inspector:
         self._file.visititems(visit_group)
 
     def _extract_parameters(self):
-        """Extract and categorize parameters from group attributes."""
+        """
+        Extract and categorize parameters from group attributes.
+
+        This method extracts parameters from HDF5 group attributes at
+        two levels:
+            - Second-to-deepest level: Single-valued parameters
+              (constant across groups)
+            - Deepest level: Multi-valued parameters (vary between
+              groups)
+
+        All values are converted to hashable Python types to ensure
+        compatibility with pandas DataFrame operations and uniqueness
+        calculations.
+        """
         all_param_values = defaultdict(set)
         max_level = max(self._groups_by_level.keys()) if self._groups_by_level else -1
 
+        # =========================================================================
         # Extract single-valued parameters from second-to-deepest level
+        # =========================================================================
         self._single_valued_parameters_from_parent = {}
         if max_level > 0:  # Ensure there's a second-to-deepest level
             second_deepest_level = max_level - 1
@@ -133,39 +177,46 @@ class _HDF5Inspector:
             for group_path in second_deepest_groups:
                 if group_path in self._file:
                     group = self._file[group_path]
-                    attrs = dict(group.attrs)
-                    if attrs:
-                        # Store parameters from second-to-deepest level
-                        self._parameters_by_group[group_path] = attrs
-                        # These are single-valued by definition
-                        # (constant across all deepest groups)
-                        for param_name, value in attrs.items():
-                            # Convert numpy types to native Python types
-                            if isinstance(value, (np.integer, np.floating)):
-                                value = value.item()
+                    raw_attrs = dict(group.attrs)
+                    if raw_attrs:
+                        # Convert all attribute values to hashable Python types
+                        converted_attrs = {}
+                        for param_name, value in raw_attrs.items():
+                            converted_value = _convert_hdf5_attr_to_python(value)
+                            converted_attrs[param_name] = converted_value
+                            # These are single-valued by definition
                             self._single_valued_parameters_from_parent[param_name] = (
-                                value
+                                converted_value
                             )
 
+                        # Store converted attributes (not raw)
+                        self._parameters_by_group[group_path] = converted_attrs
+
+        # =========================================================================
         # Extract multi-valued parameters from deepest level
+        # =========================================================================
         deepest_groups = self._groups_by_level.get(max_level, [])
 
         for group_path in deepest_groups:
             if group_path in self._file:
                 group = self._file[group_path]
-                attrs = dict(group.attrs)
-                if attrs:
-                    self._parameters_by_group[group_path] = attrs
-                    # Track all values for each parameter
-                    for param_name, value in attrs.items():
-                        # Convert numpy arrays to tuples for hashability
-                        if isinstance(value, np.ndarray):
-                            value = tuple(value.flatten())
-                        elif isinstance(value, (np.integer, np.floating)):
-                            value = value.item()  # Convert to native Python type
-                        all_param_values[param_name].add(value)
+                raw_attrs = dict(group.attrs)
+                if raw_attrs:
+                    # Convert all attribute values to hashable Python types
+                    converted_attrs = {}
+                    for param_name, value in raw_attrs.items():
+                        converted_value = _convert_hdf5_attr_to_python(value)
+                        converted_attrs[param_name] = converted_value
+                        # Track for uniqueness analysis
+                        all_param_values[param_name].add(converted_value)
 
-        # Now categorize ALL parameters based on their value counts
+                    # Store converted attributes (not raw)
+                    self._parameters_by_group[group_path] = converted_attrs
+
+        # =========================================================================
+        # Categorize ALL parameters based on their value counts
+        # =========================================================================
+
         # First add the single-valued parameters from parent groups
         for param_name, value in self._single_valued_parameters_from_parent.items():
             self.unique_value_columns_dictionary[param_name] = value
@@ -173,14 +224,13 @@ class _HDF5Inspector:
         # Then categorize parameters from deepest level groups
         for param_name, values in all_param_values.items():
             if len(values) == 1:
-                # Single-valued parameter
+                # Single-valued parameter - store the single value
                 value = next(iter(values))
-                # Convert back from tuple if it was an array
-                if isinstance(value, tuple):
-                    value = np.array(value)
+                # NOTE: We keep tuples as tuples (don't convert back to arrays)
+                # This ensures hashability throughout the codebase
                 self.unique_value_columns_dictionary[param_name] = value
             else:
-                # Multi-valued parameter
+                # Multi-valued parameter - store count of unique values
                 self.multivalued_columns_count_dictionary[param_name] = len(values)
 
     def _collect_datasets(self):
@@ -276,7 +326,8 @@ class _HDF5Inspector:
         return True
 
     def _categorize_columns(self):
-        """Categorize all parameters and datasets into appropriate lists."""
+        """Categorize all parameters and datasets into appropriate
+        lists."""
         from ...constants import TUNABLE_PARAMETER_NAMES_LIST
 
         # Get all parameter names from HDF5 attributes
@@ -289,13 +340,14 @@ class _HDF5Inspector:
         # Get all dataset names
         dataset_names = set(self._dataset_paths.keys())
 
-        # FIXED: Proper categorization logic
-        # Tunable parameters = attributes that ARE in TUNABLE_PARAMETER_NAMES_LIST
+        # FIXED: Proper categorization logic Tunable parameters =
+        # attributes that ARE in TUNABLE_PARAMETER_NAMES_LIST
         self.list_of_tunable_parameter_names_from_hdf5 = sorted(
             [name for name in all_param_names if name in TUNABLE_PARAMETER_NAMES_LIST]
         )
 
-        # Output quantities = ALL datasets + attributes that are NOT tunable parameters
+        # Output quantities = ALL datasets + attributes that are NOT
+        # tunable parameters
         tunable_param_names = set(self.list_of_tunable_parameter_names_from_hdf5)
         non_tunable_param_names = all_param_names - tunable_param_names
         self.list_of_output_quantity_names_from_hdf5 = sorted(
@@ -314,7 +366,8 @@ class _HDF5Inspector:
             list(self.multivalued_columns_count_dictionary.keys())
         )
 
-        # Categorized parameter lists (using the filtered tunable parameters)
+        # Categorized parameter lists (using the filtered tunable
+        # parameters)
         param_set = set(self.list_of_tunable_parameter_names_from_hdf5)
         self.list_of_single_valued_tunable_parameter_names = [
             name
