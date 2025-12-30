@@ -146,6 +146,8 @@ AXES_LABELS_BY_COLUMN_NAME = {
     "Jackknife_average_of_PCAC_mass_correlator": "$a m_{\\text{PCAC}}$(t)",
     "Jackknife_average_of_PCAC_mass_correlator_mean_values": "$a m_{\\text{PCAC}}$(t)",
     "PCAC_mass_jackknife_samples": "$a m_{\\text{PCAC}}$(t)",
+    "PCAC_plateau_mean": r"$am_{\mathrm{PCAC}}$",
+    "PCAC_plateau_error": r"$\sigma(am_{\mathrm{PCAC}})$",
     # ---------------------------------------------------------------------------
     # Pion effective mass observables
     # ---------------------------------------------------------------------------
@@ -154,6 +156,9 @@ AXES_LABELS_BY_COLUMN_NAME = {
     "Jackknife_average_of_pion_effective_mass_correlator": "$a M_{\\pi}^{\\mathrm{eff}}(t)$",
     "pion_effective_mass_jackknife_samples": "$a M_{\\pi}^{\\mathrm{eff}}(t)$",
     "pion_effective_mass": "$a M_{\\pi}^{\\mathrm{eff}}(t)$",
+    "pion_plateau_mean": r"$aM_{\pi}$",
+    "pion_plateau_error": r"$\sigma(aM_{\pi})$",
+    "pion_mass_squared": r"$a^2M^2_{\pi}$",
     # ---------------------------------------------------------------------------
     # Correlator observables
     # ---------------------------------------------------------------------------

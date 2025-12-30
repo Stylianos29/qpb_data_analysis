@@ -5,7 +5,9 @@ Defines plotting parameters, styling, and column mappings for creating
 high-quality visualizations of cost extrapolation results.
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any
+
+from library.constants.labels import AXES_LABELS_BY_COLUMN_NAME
 
 
 # =============================================================================
@@ -116,26 +118,21 @@ LEGEND_CONFIG = {
 }
 
 # =============================================================================
-# AXIS LABELS
+# AXIS LABEL MAPPING AND STYLING
 # =============================================================================
+# Maps local analysis-specific keys to canonical column names in the
+# centralized AXES_LABELS_BY_COLUMN_NAME dictionary from library.constants.labels
 
-AXIS_LABELS = {
-    "bare_mass": {
-        "label": r"$am$",
-        "fontsize": 12,
-    },
-    "pcac_mass": {
-        "label": r"$am_{\mathrm{PCAC}}$",
-        "fontsize": 12,
-    },
-    "pion_mass_squared": {
-        "label": r"$a^2m^2_{\pi}$",
-        "fontsize": 12,
-    },
-    "cost": {
-        "label": "Computational cost (core-hours/spinor/config)",
-        "fontsize": 12,
-    },
+AXIS_LABEL_COLUMN_MAPPING = {
+    "bare_mass": "Bare_mass",
+    "pcac_mass": "PCAC_plateau_mean",
+    "pion_mass_squared": "pion_mass_squared",
+    "cost": "Average_core_hours_per_spinor_per_configuration",
+}
+
+# Axis styling configuration (separate from label content)
+AXIS_STYLING = {
+    "fontsize": 12,  # Default fontsize for all axis labels
 }
 
 # =============================================================================
@@ -351,8 +348,32 @@ def get_legend_config(plot_type: str = "mass_fit") -> Dict[str, Any]:
 
 
 def get_axis_labels() -> Dict[str, Dict[str, Any]]:
-    """Get axis labels."""
-    return AXIS_LABELS.copy()
+    """
+    Get axis labels with styling information.
+
+    Pulls label text from the centralized AXES_LABELS_BY_COLUMN_NAME and
+    combines it with local styling configuration.
+
+    Returns:
+        Dictionary with structure: {
+            "bare_mass": {"label": "$a m$", "fontsize": 12},
+            "pcac_mass": {"label": "$am_{\\mathrm{PCAC}}$", "fontsize":
+            12}, ...
+        }
+    """
+    result = {}
+
+    for local_key, column_name in AXIS_LABEL_COLUMN_MAPPING.items():
+        # Get label from centralized dictionary
+        label_text = AXES_LABELS_BY_COLUMN_NAME.get(column_name, column_name)
+
+        # Combine with styling
+        result[local_key] = {
+            "label": label_text,
+            "fontsize": AXIS_STYLING["fontsize"],
+        }
+
+    return result
 
 
 def get_title_styling() -> Dict[str, Any]:
