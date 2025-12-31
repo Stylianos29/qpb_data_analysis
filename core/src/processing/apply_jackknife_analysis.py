@@ -33,6 +33,7 @@ from typing import Optional
 
 import click
 import numpy as np
+import pandas as pd
 
 # Import library components
 from library.data.hdf5_analyzer import HDF5Analyzer
@@ -478,11 +479,55 @@ def main(
                 f"g4g5g5={g4g5g5_array.shape}"
             )
 
-            # === BUILD METADATA BEFORE PROCESSING === This is needed by
-            # the processor
+            # === BUILD METADATA BEFORE PROCESSING === This metadata is
+            # needed by the processor and will be stored in HDF5
+
+            # Extract computational cost for each configuration in this
+            # group
+            core_hours_values = []
+
+            # Determine the correct column name based on analysis type
+            # (invert uses per_spinor, forward uses per_vector)
+            core_hours_column = None
+            if "Average_core_hours_per_spinor" in group_df.columns:
+                core_hours_column = "Average_core_hours_per_spinor"
+            elif "Average_core_hours_per_vector" in group_df.columns:
+                core_hours_column = "Average_core_hours_per_vector"
+
+            if core_hours_column:
+                for qpb_filename in qpb_filenames:
+                    # Convert HDF5 filename (.dat) to CSV filename
+                    # (.txt) if needed
+                    csv_filename = qpb_filename
+                    if qpb_filename.endswith(".dat"):
+                        csv_filename = qpb_filename.replace(".dat", ".txt")
+
+                    matching_row = group_df[group_df["Filename"] == csv_filename]
+
+                    if not matching_row.empty:
+                        core_hours = matching_row[core_hours_column].iloc[0]
+                        # Handle potential NaN or missing values
+                        if pd.notna(core_hours):
+                            core_hours_values.append(float(core_hours))
+                        else:
+                            core_hours_values.append(np.nan)
+                    else:
+                        # Filename not found in group - use NaN as
+                        # placeholder
+                        logger.debug(
+                            f"Could not find {csv_filename} in group_df for core hours extraction"
+                        )
+                        core_hours_values.append(np.nan)
+            else:
+                logger.debug(
+                    "No core hours column found in CSV - skipping core hours extraction"
+                )
+                core_hours_values = None
+
             group_metadata = {
                 "configuration_labels": config_labels,
                 "qpb_filenames": qpb_filenames,
+                "core_hours_per_spinor": core_hours_values,  # May be None if not available
             }
 
             # === APPLY JACKKNIFE PROCESSING ===

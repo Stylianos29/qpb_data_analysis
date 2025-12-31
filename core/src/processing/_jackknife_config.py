@@ -75,6 +75,7 @@ OUTPUT_DATASET_PATTERNS = {
 METADATA_DATASETS = {
     "gauge_configs": "gauge_configuration_labels",
     "qpb_filenames": "qpb_log_filenames",
+    "core_hours": "average_core_hours_per_spinor",
 }
 
 
@@ -155,6 +156,11 @@ DATASET_DESCRIPTIONS = {
     "qpb_log_filenames": (
         "Array of QPB log filenames corresponding to each gauge configuration. "
         "These trace back to the original simulation log files."
+    ),
+    "average_core_hours_per_spinor": (
+        "Array of computational cost values (core-hours per spinor) for each "
+        "gauge configuration in the jackknife group. Values are extracted from "
+        "processed_parameter_values.csv (Stage 2A output)."
     ),
 }
 

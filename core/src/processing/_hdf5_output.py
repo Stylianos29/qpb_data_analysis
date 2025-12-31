@@ -600,7 +600,7 @@ def _store_jackknife_datasets(
 def _store_metadata_arrays(
     group: h5py.Group,
     config_metadata: Dict,
-    mpi_geometry_storage: str,  # Keep parameter but ignore it
+    mpi_geometry_storage: str,  # Keep parameter for API compatibility
     compression: Optional[str],
     compression_opts: Optional[int],
     logger,
@@ -608,20 +608,44 @@ def _store_metadata_arrays(
     """
     Store configuration metadata as HDF5 datasets.
 
-    Always stores: - gauge_configuration_labels: List of configuration
-    labels - qpb_log_filenames: List of log filenames
+    Always stores (when available):
+        - gauge_configuration_labels: List of configuration labels
+          (strings)
+        - qpb_log_filenames: List of log filenames (strings)
+        - average_core_hours_per_spinor: Array of computational costs
+          (floats)
 
     Note: MPI_geometry is stored as an attribute (never as dataset)
     based on whether it's single-valued or multivalued in the CSV.
+
+    Args:
+        - group: HDF5 group to store datasets in
+        - config_metadata: Dictionary containing metadata arrays
+        - mpi_geometry_storage: Storage strategy for MPI_geometry
+          (unused here)
+        - compression: HDF5 compression method
+        - compression_opts: Compression level
+        - logger: Logger instance
     """
-    # Always store these metadata arrays
-    required_metadata = {
+    from src.processing._jackknife_config import get_dataset_description
+
+    # String metadata arrays (required)
+    string_metadata = {
         "gauge_configuration_labels": "configuration_labels",
         "qpb_log_filenames": "qpb_filenames",
     }
 
+    # Numeric metadata arrays (optional but recommended)
+    numeric_metadata = {
+        "average_core_hours_per_spinor": "core_hours_per_spinor",
+    }
+
     stored_count = 0
-    for dataset_name, metadata_key in required_metadata.items():
+
+    # -------------------------------------------------------------------------
+    # Store string arrays
+    # -------------------------------------------------------------------------
+    for dataset_name, metadata_key in string_metadata.items():
         if metadata_key in config_metadata:
             data = config_metadata[metadata_key]
 
@@ -636,10 +660,66 @@ def _store_metadata_arrays(
                 compression_opts=compression_opts,
             )
 
+            # Add description as attribute
+            description = get_dataset_description(dataset_name)
+            if description:
+                group[dataset_name].attrs["description"] = description
+
             logger.debug(f"  Created metadata dataset: {dataset_name}")
             stored_count += 1
         else:
             logger.warning(f"Expected metadata key '{metadata_key}' not found")
+
+    # -------------------------------------------------------------------------
+    # Store numeric arrays
+    # -------------------------------------------------------------------------
+    for dataset_name, metadata_key in numeric_metadata.items():
+        if metadata_key in config_metadata:
+            data = config_metadata[metadata_key]
+
+            # Skip if data is None or empty
+            if data is None:
+                logger.debug(f"  Metadata key '{metadata_key}' is None - skipping")
+                continue
+
+            if isinstance(data, list) and len(data) == 0:
+                logger.debug(
+                    f"  Metadata key '{metadata_key}' is empty list - skipping"
+                )
+                continue
+
+            # Convert to numpy array of floats
+            if isinstance(data, list):
+                data = np.array(data, dtype=np.float64)
+            elif not isinstance(data, np.ndarray):
+                data = np.array([data], dtype=np.float64)
+
+            # Only store if we have valid (non-all-NaN) data
+            if np.all(np.isnan(data)):
+                logger.debug(
+                    f"  Metadata '{metadata_key}' contains only NaN values - skipping"
+                )
+                continue
+
+            group.create_dataset(
+                dataset_name,
+                data=data,
+                compression=compression,
+                compression_opts=compression_opts,
+            )
+
+            # Add description as attribute
+            description = get_dataset_description(dataset_name)
+            if description:
+                group[dataset_name].attrs["description"] = description
+
+            logger.debug(
+                f"  Created metadata dataset: {dataset_name} (numeric, shape={data.shape})"
+            )
+            stored_count += 1
+        else:
+            # Numeric metadata is optional, so just debug-level log
+            logger.debug(f"  Optional metadata key '{metadata_key}' not found")
 
     logger.info(f"Stored {stored_count} metadata arrays")
 
