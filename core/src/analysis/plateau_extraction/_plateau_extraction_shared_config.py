@@ -30,6 +30,7 @@ METADATA_DATASETS = [
     "mpi_geometry_values",
     "qpb_log_filenames",
     "Number_of_gauge_configurations",
+    "average_core_hours_per_spinor",
 ]
 
 # CSV output configuration

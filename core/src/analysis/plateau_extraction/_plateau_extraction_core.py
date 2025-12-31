@@ -955,7 +955,12 @@ def export_to_hdf5(
             )
 
             # Copy essential metadata
-            metadata_datasets = ["mpi_geometry_values", "qpb_log_filenames"]
+            # TODO: This list should be configurable
+            metadata_datasets = [
+                "mpi_geometry_values",
+                "qpb_log_filenames",
+                "average_core_hours_per_spinor",
+            ]
             copy_metadata(input_group, output_group, metadata_datasets)
 
             # Add plateau extraction attributes
