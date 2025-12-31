@@ -336,9 +336,17 @@ def main(
 
             if hdf5_paths:
                 grouped_data[group_key] = {"paths": hdf5_paths, "dataframe": group_df}
+                # Format group_key for display
+                if len(grouping_params) == 1:
+                    # Single parameter: group_key = ('param_name', value)
+                    group_key_display = {group_key[0]: group_key[1]}
+                else:
+                    # Multiple parameters: group_key = (('p1', v1), ('p2', v2), ...)
+                    group_key_display = dict(group_key)
+
                 logger.info(
                     f"Group {group_index}/{len(csv_grouped)}: "
-                    f"{dict(group_key) if isinstance(group_key, tuple) else group_key} → "
+                    f"{group_key_display} → "
                     f"{len(hdf5_paths)} files matched"
                 )
             else:

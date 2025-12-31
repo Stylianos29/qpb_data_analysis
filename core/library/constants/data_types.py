@@ -37,6 +37,8 @@ CONVERTERS_MAPPING = {
         if x.strip()
         else x
     ),
+    # Additional_text (stores unmatched filename segments as tuples)
+    "Additional_text": lambda x: safe_literal_eval(x) if x.strip() else x,
     # OUTPUT QUANTITIES
     # TODO: Add the rest of the 'Average_calculation_result' variations
     "PCAC_mass_estimate": lambda x: safe_literal_eval(x) if x.strip() else x,
