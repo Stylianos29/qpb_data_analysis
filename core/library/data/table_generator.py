@@ -31,8 +31,8 @@ class TableGenerator(DataFrameAnalyzer):
             - output_directory (str, optional): Default directory to
               save generated table files. If None, you must provide an
               output_directory when calling export methods, otherwise a
-              ValueError will be raised. Defaults to None. 
-        
+              ValueError will be raised. Defaults to None.
+
         Raises:
             TypeError: If the input is not a Pandas DataFrame.
         """
@@ -358,6 +358,7 @@ class TableGenerator(DataFrameAnalyzer):
         row_variable: Optional[str] = None,
         column_variable: Optional[str] = None,
         aggregation: Union[str, Callable] = "count",
+        format_value: Optional[Callable] = None,
         exclude_from_grouping: Optional[list] = None,
         export_to_file: bool = False,
         output_directory: Optional[str] = None,
@@ -378,6 +379,9 @@ class TableGenerator(DataFrameAnalyzer):
               'len', 'min', 'max', 'mean'), or a custom callable
               function that takes a pandas Series as input and returns a
               value.
+            - format_value (Callable, optional): A function to format
+              aggregated values for display. Takes a value and returns a
+              string. If None, str() is used. Default is None.
             - exclude_from_grouping (list, optional): Additional tunable
               parameters to exclude from grouping.
             - export_to_file (bool, optional): Whether to export the
@@ -456,6 +460,11 @@ class TableGenerator(DataFrameAnalyzer):
             elif agg == "std":
                 return series.std() / np.sqrt(series.nunique())
 
+        # Define formatter wrapper
+        def format_result(value):
+            """Apply formatting function if provided, otherwise use str()."""
+            return format_value(value) if format_value is not None else str(value)
+
         for idx, (group_keys, group_df) in enumerate(groupby_obj):
             if not isinstance(group_keys, tuple):
                 group_keys = (group_keys,)
@@ -478,7 +487,9 @@ class TableGenerator(DataFrameAnalyzer):
             if row_variable is None and column_variable is None:
                 values = group_df[value_variable]
                 result = apply_aggregation(values, aggregation)
-                table_lines.append(f"{value_variable} ({agg_label}): {result}")
+                table_lines.append(
+                    f"{value_variable} ({agg_label}): {format_result(result)}"
+                )
 
             # 1D case (only row or column variable)
             elif (row_variable is not None) ^ (column_variable is not None):
@@ -495,7 +506,7 @@ class TableGenerator(DataFrameAnalyzer):
                 table_lines.append(f"{grouping_var} | {agg_label} of {value_variable}")
                 table_lines.append("-- | --")
                 for k in sorted(result_dict):
-                    table_lines.append(f"{k} | {result_dict[k]}")
+                    table_lines.append(f"{k} | {format_result(result_dict[k])}")
 
             # 2D case (both row and column variables)
             elif row_variable is not None and column_variable is not None:
@@ -517,7 +528,7 @@ class TableGenerator(DataFrameAnalyzer):
 
                 for row_index, row in table_df.iterrows():
                     row_str = f"{row_index} | " + " | ".join(
-                        str(row[col]) if pd.notnull(row[col]) else ""
+                        format_result(row[col]) if pd.notnull(row[col]) else ""
                         for col in table_df.columns
                     )
                     table_lines.append(row_str)
