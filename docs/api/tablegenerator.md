@@ -13,7 +13,7 @@ vary across different parameter combinations.
 
 ```python
 class TableGenerator(DataFrameAnalyzer):
-    def __init__(dataframe: pd.DataFrame, output_directory: str = ".")
+    def __init__(dataframe: pd.DataFrame, output_directory: Optional[str] = None)
 ```
 
 ## Constructor
@@ -26,8 +26,9 @@ directory.
 **Parameters:**
 - `dataframe` (pd.DataFrame): The input DataFrame to analyze and generate tables
   from.
-- `output_directory` (str, optional): Default directory to save generated table
-  files. Defaults to current directory (".").
+- `output_directory` (str, optional): Default directory to save
+  generated table files. If not provided during initialization, you must
+  specify it when calling export methods. Defaults to None.
 
 **Raises:**
 - `TypeError`: If the input is not a Pandas DataFrame.

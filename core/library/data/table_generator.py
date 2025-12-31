@@ -29,9 +29,10 @@ class TableGenerator(DataFrameAnalyzer):
             - dataframe (pd.DataFrame): The input DataFrame to analyze
               and generate tables from.
             - output_directory (str, optional): Default directory to
-              save generated table files. Defaults to current directory
-              (".").
-
+              save generated table files. If None, you must provide an
+              output_directory when calling export methods, otherwise a
+              ValueError will be raised. Defaults to None. 
+        
         Raises:
             TypeError: If the input is not a Pandas DataFrame.
         """
