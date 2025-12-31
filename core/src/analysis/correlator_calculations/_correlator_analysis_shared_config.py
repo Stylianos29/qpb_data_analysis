@@ -14,6 +14,7 @@ METADATA_DATASETS = [
     "mpi_geometry_values",
     "qpb_log_filenames",
     "Number_of_gauge_configurations",
+    "average_core_hours_per_spinor",
 ]
 
 
@@ -35,9 +36,9 @@ def validate_shared_config():
         raise ValueError(
             f"METADATA_DATASETS must be list, got {type(METADATA_DATASETS)}"
         )
-    if len(METADATA_DATASETS) != 4:
+    if len(METADATA_DATASETS) != 5:
         raise ValueError(
-            "METADATA_DATASETS must have exactly 4 elements, "
+            "METADATA_DATASETS must have exactly 5 elements, "
             f"got {len(METADATA_DATASETS)}"
         )
 
