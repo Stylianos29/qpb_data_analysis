@@ -751,8 +751,12 @@ def export_to_csv(
         # Add metadata
         metadata = result.get("metadata", {})
         for key, value in metadata.items():
+            # Convert list/array values to tuples for CSV storage
+            # This ensures load_csv() with safe_literal_eval() returns hashable tuples
+            if isinstance(value, (list, np.ndarray)):
+                row_data[key] = tuple(value)
             # Format special parameters
-            if key in PARAMETERS_WITH_EXPONENTIAL_FORMAT:
+            elif key in PARAMETERS_WITH_EXPONENTIAL_FORMAT:
                 row_data[key] = f"{value:.2e}"
             elif key in PARAMETERS_OF_INTEGER_VALUE:
                 row_data[key] = int(value) if not np.isnan(float(value)) else value
