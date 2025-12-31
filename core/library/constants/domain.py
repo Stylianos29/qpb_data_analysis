@@ -30,6 +30,7 @@ TUNABLE_PARAMETER_NAMES_LIST = [
     "Rho_value",
     "Solver_epsilon",
     "Threads_per_process",
+    "Additional_text",
 ]
 
 

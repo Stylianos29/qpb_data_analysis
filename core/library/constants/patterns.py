@@ -371,10 +371,58 @@ FILE_CONTENTS_ARRAY_PATTERNS_DICTIONARY = {
         "regex_pattern": r"= (\d+(?:\.\d+)?e[+-]\d+)",
         "type": float,
     },
-    "MSCG_iterations_running_count": {
-        "line_identifier": "iters = ",
-        "regex_pattern": r"(\d+) , res = ",
+    # Lanczos Solver
+    "Lanczos_iterations_running_count": {
+        "line_identifier": " (change = ",
+        "regex_pattern": r"(\d+), CN",
         "type": int,
+    },
+    # CG Solver
+    "CG_iterations_running_count": {
+        "line_identifier": " 	 iters =",
+        "regex_pattern": r"(\d+)\s*, res",
+        "type": int,
+    },
+    "CG_running_relative_residual_squared": {
+        "line_identifier": " 	 iters =",
+        "regex_pattern": r", res = (\d+(?:\.\d+)?e[+-]\d+)",
+        "type": float,
+    },
+    "Final_CG_relative_residual_squared": {
+        "line_identifier": ", CG converged,",
+        "regex_pattern": r", relative = (\d+(?:\.\d+)?e[+-]\d+)",
+        "type": float,
+    },
+    "CG_total_calculation_time_per_spinor": {
+        "line_identifier": ", CG converged,",
+        "regex_pattern": r", t = (\d+(?:\.\d+)?) sec",
+        "type": float,
+    },
+    "Total_number_of_CG_iterations_per_spinor": {
+        "line_identifier": "Done vector =",
+        "regex_pattern": r"Done vector = \d+ / \d+, iters = (\d+)",
+        "type": int,
+    },
+    # MSCG Soler
+    "MSCG_iterations_running_count": {
+        "line_identifier": " 	iters =",
+        "regex_pattern": r"(\d+)\s*, res =",
+        "type": int,
+    },
+    "MSCG_running_relative_residual_squared": {
+        "line_identifier": " 	iters =",
+        "regex_pattern": r", res = (\d+(?:\.\d+)?e[+-]\d+)",
+        "type": float,
+    },
+    "Final_MSCG_relative_residual_squared": {
+        "line_identifier": "Shift = ",
+        "regex_pattern": r", relative = (\d+(?:\.\d+)?e[+-]\d+)",
+        "type": float,
+    },
+    "MS_expansion_shifts": {
+        "line_identifier": "Shift = ",
+        "regex_pattern": r"(\d+(?:\.\d+)?),",
+        "type": float,
     },
     "Total_number_of_MSCG_iterations": {
         "line_identifier": "msCG converged, t",
@@ -386,50 +434,10 @@ FILE_CONTENTS_ARRAY_PATTERNS_DICTIONARY = {
         "regex_pattern": r", t = (\d+(?:\.\d+)?)",
         "type": float,
     },
-    "Total_number_of_CG_iterations_per_spinor": {
-        "line_identifier": "Done vector =",
-        "regex_pattern": r"Done vector = \d+ / \d+, iters = (\d+)",
-        "type": int,
-    },
     "Number_of_kernel_applications_per_MSCG": {
-        "line_identifier": " Total number of dslash applications",
+        "line_identifier": "Total number of dslash applications",
         "regex_pattern": r"dslash applications (\d+)",
         "type": int,
-    },
-    "CG_total_calculation_time_per_spinor": {
-        "line_identifier": ", CG converged,",
-        "regex_pattern": r", t = (\d+(?:\.\d+)?) sec",
-        "type": float,
-    },
-    "Lanczos_iterations_running_count": {
-        "line_identifier": "iter =",
-        "regex_pattern": r"(\d+), CN",
-        "type": int,
-    },
-    "Solver_iterations_running_count": {
-        "line_identifier": " iters =",
-        "regex_pattern": r"(\d+), res",
-        "type": int,
-    },
-    "Running_squared_relative_residual": {
-        "line_identifier": " iters =",
-        "regex_pattern": r", res = (\d+(?:\.\d+)?e[+-]\d+)",
-        "type": float,
-    },
-    "MS_expansion_shifts": {
-        "line_identifier": "Shift = ",
-        "regex_pattern": r"(\d+(?:\.\d+)?),",
-        "type": float,
-    },
-    "Final_squared_residual": {
-        "line_identifier": "Shift = ",
-        "regex_pattern": r", residual = (\d+(?:\.\d+)?e[+-]\d+)",
-        "type": float,
-    },
-    "Final_squared_relative_residual": {
-        "line_identifier": "Shift = ",
-        "regex_pattern": r", relative = (\d+(?:\.\d+)?e[+-]\d+)",
-        "type": float,
     },
 }
 
