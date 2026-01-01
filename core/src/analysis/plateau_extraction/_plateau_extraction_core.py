@@ -25,12 +25,15 @@ import gvar as gv
 from src.analysis.correlator_calculations._correlator_analysis_core import (
     copy_metadata,
 )
+from src.analysis.plateau_extraction._plateau_extraction_shared_config import (
+    HDF5_EXPORT_METADATA_DATASETS,
+)
+
 from library.data.hdf5_analyzer import HDF5Analyzer
 from library.constants import (
     PARAMETERS_WITH_EXPONENTIAL_FORMAT,
     PARAMETERS_OF_INTEGER_VALUE,
 )
-
 
 # =============================================================================
 # CUSTOM EXCEPTIONS
@@ -998,14 +1001,8 @@ def export_to_hdf5(
                 dtype=dt,
             )
 
-            # Copy essential metadata TODO: This list should be
-            # configurable
-            metadata_datasets = [
-                "mpi_geometry_values",
-                "qpb_log_filenames",
-                "average_core_hours_per_spinor",
-            ]
-            copy_metadata(input_group, output_group, metadata_datasets)
+            # Copy essential metadata
+            copy_metadata(input_group, output_group, HDF5_EXPORT_METADATA_DATASETS)
 
             # Add plateau extraction attributes
             output_group.attrs["plateau_extraction_success"] = True

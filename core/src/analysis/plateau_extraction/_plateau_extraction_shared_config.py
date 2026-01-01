@@ -68,6 +68,14 @@ ERROR_HANDLING = {
     "log_failures": True,
 }
 
+# Metadata datasets to copy during HDF5 export Note:
+# gauge_configuration_labels is handled separately in export_to_hdf5()
+# Note: Number_of_gauge_configurations is stored as a group attribute
+HDF5_EXPORT_METADATA_DATASETS = [
+    "mpi_geometry_values",
+    "qpb_log_filenames",
+    "average_core_hours_per_spinor",
+]
 
 # =============================================================================
 # VALIDATION FUNCTIONS
