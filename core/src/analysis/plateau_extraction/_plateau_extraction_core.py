@@ -55,6 +55,34 @@ class NoSuccessfulExtractionsError(Exception):
 # =============================================================================
 
 
+def calculate_core_hours_statistics(group: h5py.Group) -> Optional[Tuple[float, float]]:
+    """Calculate mean and SEM of average_core_hours_per_spinor for a
+    group."""
+    dataset_name = "average_core_hours_per_spinor"
+
+    if dataset_name not in group:
+        return None
+
+    dataset = group[dataset_name]
+    if not isinstance(dataset, h5py.Dataset):
+        return None
+
+    core_hours_array = dataset[:]
+    valid_values = core_hours_array[~np.isnan(core_hours_array)]
+
+    if len(valid_values) == 0:
+        return None
+
+    mean_value = float(np.mean(valid_values))
+
+    if len(valid_values) > 1:
+        sem_value = float(np.std(valid_values, ddof=1) / np.sqrt(len(valid_values)))
+    else:
+        sem_value = 0.0
+
+    return (mean_value, sem_value)
+
+
 def symmetrize_time_series(data: np.ndarray) -> np.ndarray:
     """
     Symmetrize time series data: C_sym(t) = 0.5 * (C(t) + C(T-t)).
@@ -624,6 +652,15 @@ def process_analysis_group(
         logger,
     )
 
+    # Calculate core hours statistics if available
+    core_hours_stats = calculate_core_hours_statistics(group)
+    if core_hours_stats is not None:
+        result["average_core_hours_per_spinor_per_config"] = core_hours_stats
+        logger.debug(
+            f"Group {group_name}: Core hours per config = "
+            f"{core_hours_stats[0]:.4f} ± {core_hours_stats[1]:.4f}"
+        )
+
     # Add metadata
     group_metadata = extract_group_metadata(group)
     combined_metadata = {**parent_metadata, **group_metadata}
@@ -751,8 +788,9 @@ def export_to_csv(
         # Add metadata
         metadata = result.get("metadata", {})
         for key, value in metadata.items():
-            # Convert list/array values to tuples for CSV storage
-            # This ensures load_csv() with safe_literal_eval() returns hashable tuples
+            # Convert list/array values to tuples for CSV storage. This
+            # ensures load_csv() with safe_literal_eval() returns
+            # hashable tuples
             if isinstance(value, (list, np.ndarray)):
                 row_data[key] = tuple(value)
             # Format special parameters
@@ -786,6 +824,12 @@ def export_to_csv(
         row_data[f"{output_column_prefix}_estimation_method"] = result[
             "estimation_method"
         ]
+
+        # Add core hours statistics if available
+        if "average_core_hours_per_spinor_per_config" in result:
+            row_data["Average_core_hours_per_spinor_per_config"] = result[
+                "average_core_hours_per_spinor_per_config"
+            ]
 
         csv_data.append(row_data)
 
@@ -954,8 +998,8 @@ def export_to_hdf5(
                 dtype=dt,
             )
 
-            # Copy essential metadata
-            # TODO: This list should be configurable
+            # Copy essential metadata TODO: This list should be
+            # configurable
             metadata_datasets = [
                 "mpi_geometry_values",
                 "qpb_log_filenames",
