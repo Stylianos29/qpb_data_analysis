@@ -72,6 +72,7 @@ PARAMETERS_WITH_EXPONENTIAL_FORMAT = [
     "Lanczos_epsilon",
     "MSCG_epsilon",
     "Solver_epsilon",
+    "Inner_solver_epsilon",
 ]
 
 PARAMETERS_OF_INTEGER_VALUE = [

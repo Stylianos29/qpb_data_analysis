@@ -16,8 +16,8 @@ Dictionaries:
 # =============================================================================
 # TITLE LABELS
 # =============================================================================
-# Short, human-readable labels for plot titles.
-# Used by PlotTitleBuilder for constructing informative plot titles.
+# Short, human-readable labels for plot titles. Used by PlotTitleBuilder
+# for constructing informative plot titles.
 
 TITLE_LABELS_BY_COLUMN_NAME = {
     # Tunable parameters
@@ -35,6 +35,7 @@ TITLE_LABELS_BY_COLUMN_NAME = {
     "Solver_epsilon": "$\\epsilon_{CG}$",
     "CG_epsilon": "$\\epsilon_{CG}$",
     "MSCG_epsilon": "$\\epsilon_{MSCG}$",
+    "Inner_solver_epsilon": "$\\epsilon_{MSCG}$",
     "KL_diagonal_order": "n",
     "Zolotarev_order": "n",
     "Neuberger_order": "n",
@@ -54,8 +55,8 @@ TITLE_LABELS_BY_COLUMN_NAME = {
 # =============================================================================
 # FILENAME LABELS
 # =============================================================================
-# Short abbreviations for constructing filenames.
-# Used by PlotFilenameBuilder for generating plot file names.
+# Short abbreviations for constructing filenames. Used by
+# PlotFilenameBuilder for generating plot file names.
 
 FILENAME_LABELS_BY_COLUMN_NAME = {
     "QCD_beta_value": "beta",
@@ -84,8 +85,8 @@ FILENAME_LABELS_BY_COLUMN_NAME = {
 # =============================================================================
 # AXES LABELS
 # =============================================================================
-# LaTeX-formatted labels for plot axes.
-# Used by PlotLayoutManager and PlotStyleManager for axis labeling.
+# LaTeX-formatted labels for plot axes. Used by PlotLayoutManager and
+# PlotStyleManager for axis labeling.
 
 AXES_LABELS_BY_COLUMN_NAME = {
     # ---------------------------------------------------------------------------
@@ -223,8 +224,8 @@ AXES_LABELS_BY_COLUMN_NAME = {
 # =============================================================================
 # LEGEND LABELS
 # =============================================================================
-# Labels for legend entries and titles.
-# Used by PlotStyleManager for legend configuration.
+# Labels for legend entries and titles. Used by PlotStyleManager for
+# legend configuration.
 
 LEGEND_LABELS_BY_COLUMN_NAME = {
     "Condition_number": "$\\kappa_{\\mathbb{X}^2}=$",
@@ -235,4 +236,6 @@ LEGEND_LABELS_BY_COLUMN_NAME = {
     "Kernel_operator_type": "Kernel:",
     "Bare_mass": "a$m_{\\text{bare}}=$",
     "Threads_per_process": "$n_{\\text{OMP}}=$",
+    "Outer_solver_epsilon": "$\\epsilon_{CG}$:",
+    "Inner_solver_epsilon": "$\\epsilon_{MSCG}$:",
 }
