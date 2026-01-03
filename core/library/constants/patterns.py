@@ -403,6 +403,11 @@ FILE_CONTENTS_ARRAY_PATTERNS_DICTIONARY = {
         "regex_pattern": r"Done vector = \d+ / \d+, iters = (\d+)",
         "type": int,
     },
+    "CG_final_relative_residual_squared": {
+        "line_identifier": "Final relative residual =",
+        "regex_pattern": r"Final relative residual = (\d+(?:\.\d+)?e[+-]\d+)",
+        "type": float,
+    },
     # MSCG Soler
     "MSCG_iterations_running_count": {
         "line_identifier": " 	iters =",
