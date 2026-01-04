@@ -248,6 +248,11 @@ HDF5_PROCESSING_RULES = {
         "aggregation_method": "mean_with_error",
         "condition": "all_lengths_greater_than_one",
     },
+    "True_final_relative_residual_squared": {
+        "output_pattern": "True_final_relative_residual_squared_per_spinor",
+        "aggregation_method": "mean_with_error",
+        "condition": "all_lengths_greater_than_one",
+    },
 }
 
 # =============================================================================
