@@ -184,6 +184,14 @@ AXES_LABELS_BY_COLUMN_NAME = {
     "g5g5_jackknife_samples": r"$C_{\gamma_5\text{-}\gamma_5}(t)$",
     "g4g5g5_jackknife_samples": r"$C_{\gamma_4\gamma_5\text{-}\gamma_5}(t)$",
     "g4g5g5_derivative_jackknife_samples": r"$\partial_t C_{\gamma_4\gamma_5\text{-}\gamma_5}(t)$",
+    "1-1": r"$C_{\gamma_1\text{-}\gamma_1}(t)$",
+    "g5-g5": r"$C_{\gamma_5\text{-}\gamma_5}(t)$",
+    "g5-g4g5": r"$C_{\gamma_5\text{-}\gamma_4\gamma_5}(t)$",
+    "g4g5-g5": r"$C_{\gamma_4\gamma_5\text{-}\gamma_5}(t)$",
+    "g4g5-g4g5": r"$C_{\gamma_4\gamma_5\text{-}\gamma_4\gamma_5}(t)$",
+    "g1-g1": r"$C_{\gamma_1\text{-}\gamma_1}(t)$",
+    "g2-g2": r"$C_{\gamma_2\text{-}\gamma_2}(t)$",
+    "g3-g3": r"$C_{\gamma_3\text{-}\gamma_3}(t)$",
     # ---------------------------------------------------------------------------
     # Overlap operator quality metrics
     # ---------------------------------------------------------------------------
