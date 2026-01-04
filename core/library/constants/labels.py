@@ -33,6 +33,7 @@ TITLE_LABELS_BY_COLUMN_NAME = {
     "Number_of_Chebyshev_terms": "N",
     "Lanczos_epsilon": "$\\epsilon_{Lanczos}$",
     "Solver_epsilon": "$\\epsilon_{CG}$",
+    "Outer_solver_epsilon": "$\\epsilon_{CG}$",
     "CG_epsilon": "$\\epsilon_{CG}$",
     "MSCG_epsilon": "$\\epsilon_{MSCG}$",
     "Inner_solver_epsilon": "$\\epsilon_{MSCG}$",
