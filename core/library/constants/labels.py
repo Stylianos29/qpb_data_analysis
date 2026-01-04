@@ -181,6 +181,9 @@ AXES_LABELS_BY_COLUMN_NAME = {
     "Jackknife_average_of_g4g5_g5_derivative_correlator_mean_values": (
         "$\\partial_t C_{\\gamma_4\\gamma_5\\text{-}\\gamma_5}'(t)$"
     ),
+    "g5g5_jackknife_samples": r"$C_{\gamma_5\text{-}\gamma_5}(t)$",
+    "g4g5g5_jackknife_samples": r"$C_{\gamma_4\gamma_5\text{-}\gamma_5}(t)$",
+    "g4g5g5_derivative_jackknife_samples": r"$\partial_t C_{\gamma_4\gamma_5\text{-}\gamma_5}(t)$",
     # ---------------------------------------------------------------------------
     # Overlap operator quality metrics
     # ---------------------------------------------------------------------------

@@ -5,6 +5,11 @@ This module contains the list of 2D jackknife datasets that should be
 visualized by the jackknife visualization script.
 """
 
+from typing import Dict
+
+from library.constants import AXES_LABELS_BY_COLUMN_NAME
+
+
 # List of 2D jackknife datasets to visualize These correspond to the exact
 # dataset names in the HDF5 file
 JACKKNIFE_DATASETS_TO_PLOT = [
@@ -62,24 +67,18 @@ DATASET_PLOT_CONFIGS = {
         "y_scale": "log",  # Use logarithmic y-axis
         "x_start_index": 1,  # Start from time index 1 (skip t=0)
         "x_end_offset": 0,  # Include all points up to the end
-        "x_label": r"$t/a$",  # LaTeX x-axis label
-        "y_label": r"$C_{\gamma_5\text{-}\gamma_5}(t)$",  # LaTeX y-axis label
         "description": "g5-g5 correlator with log scale starting from t=1",
     },
     "g4g5g5_jackknife_samples": {
         "y_scale": "linear",  # Use linear y-axis
         "x_start_index": 2,  # Start from time index 2
         "x_end_offset": 2,  # Exclude last 2 time points
-        "x_label": r"$t/a$",  # LaTeX x-axis label
-        "y_label": r"$C_{\gamma_4\gamma_5\text{-}\gamma_5}(t)$",  # LaTeX y-axis label
         "description": "g4g5-g5 correlator with reduced time range",
     },
     "g4g5g5_derivative_jackknife_samples": {
         "y_scale": "linear",  # Use linear y-axis
         "x_start_index": 2,  # Start from time index 2
         "x_end_offset": 2,  # Exclude last 2 time points
-        "x_label": r"$t/a$",  # LaTeX x-axis label
-        "y_label": r"$\partial_t C_{\gamma_4\gamma_5\text{-}\gamma_5}(t)$",  # LaTeX y-axis label
         "description": "g4g5-g5 derivative correlator with reduced time range",
     },
 }
@@ -89,10 +88,14 @@ DEFAULT_DATASET_PLOT_CONFIG = {
     "y_scale": "linear",
     "x_start_index": 0,
     "x_end_offset": 0,
-    "x_label": r"$t/a$",  # Default LaTeX x-axis label
-    "y_label": "Correlator Value",  # Default y-axis label
     "description": "Default linear scale with full time range",
 }
+
+
+def get_dataset_labels(dataset_name: str) -> Dict[str, str]:
+    x_label = AXES_LABELS_BY_COLUMN_NAME.get("time_index", r"$t/a$")
+    y_label = AXES_LABELS_BY_COLUMN_NAME.get(dataset_name, "Correlator Value")
+    return {"x_label": x_label, "y_label": y_label}
 
 
 def get_dataset_plot_config(dataset_name: str) -> dict:

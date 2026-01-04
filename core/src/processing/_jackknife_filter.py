@@ -8,8 +8,7 @@ files from processing.
 
 import json
 from pathlib import Path
-from typing import Dict, List, Set, Optional
-import logging
+from typing import Dict, List
 
 
 def load_filter_config(filter_config_path: str, logger) -> Dict:

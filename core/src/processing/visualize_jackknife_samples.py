@@ -57,6 +57,7 @@ from src.processing._jackknife_visualization_config import (
     SAMPLES_PER_PLOT,
     TITLE_EXCLUDED_PARAMETERS,
     get_dataset_plot_config,
+    get_dataset_labels,
 )
 
 
@@ -687,10 +688,9 @@ def create_multi_sample_plot(
     ax.set_yscale(y_scale)
 
     # Set axis labels using dataset-specific LaTeX notation
-    x_label = dataset_config.get("x_label", r"$t/a$")
-    y_label = dataset_config.get("y_label", "Correlator Value")
-    ax.set_xlabel(x_label, fontsize=DEFAULT_FONT_SIZE)
-    ax.set_ylabel(y_label, fontsize=DEFAULT_FONT_SIZE)
+    labels = get_dataset_labels(dataset_name)
+    ax.set_xlabel(labels["x_label"], fontsize=DEFAULT_FONT_SIZE)
+    ax.set_ylabel(labels["y_label"], fontsize=DEFAULT_FONT_SIZE)
 
     # Use the proper title builder system with the existing
     # generate_sample_plot_title function
