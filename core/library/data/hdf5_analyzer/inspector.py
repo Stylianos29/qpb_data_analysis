@@ -8,7 +8,7 @@ discovery. It serves as the foundation for the HDF5Analyzer public API.
 
 import os
 from collections import defaultdict
-from typing import List, Set, Any
+from typing import List, Set, Any, Dict
 
 import h5py
 import numpy as np
@@ -114,6 +114,9 @@ class _HDF5Inspector:
         self._single_valued_parameters_from_parent = {}
         self._gvar_dataset_pairs = {}
 
+        # Attribute value mappings for display purposes
+        self._attribute_mappings = {}
+
     def _analyze_structure(self):
         """
         Analyze the HDF5 file structure and categorize parameters and
@@ -207,8 +210,16 @@ class _HDF5Inspector:
                     for param_name, value in raw_attrs.items():
                         converted_value = _convert_hdf5_attr_to_python(value)
                         converted_attrs[param_name] = converted_value
+
+                        # Apply mapping if exists before tracking (NEW)
+                        value_for_tracking = converted_value
+                        if param_name in self._attribute_mappings:
+                            value_for_tracking = self._attribute_mappings[
+                                param_name
+                            ].get(converted_value, converted_value)
+
                         # Track for uniqueness analysis
-                        all_param_values[param_name].add(converted_value)
+                        all_param_values[param_name].add(value_for_tracking)
 
                     # Store converted attributes (not raw)
                     self._parameters_by_group[group_path] = converted_attrs
@@ -219,6 +230,9 @@ class _HDF5Inspector:
 
         # First add the single-valued parameters from parent groups
         for param_name, value in self._single_valued_parameters_from_parent.items():
+            # Apply mapping if exists (NEW)
+            if param_name in self._attribute_mappings:
+                value = self._attribute_mappings[param_name].get(value, value)
             self.unique_value_columns_dictionary[param_name] = value
 
         # Then categorize parameters from deepest level groups
@@ -406,7 +420,11 @@ class _HDF5Inspector:
         """
         # Check single-valued columns first
         if column_name in self.unique_value_columns_dictionary:
-            return [self.unique_value_columns_dictionary[column_name]]
+            value = self.unique_value_columns_dictionary[column_name]
+            # Apply mapping if exists (NEW)
+            if column_name in self._attribute_mappings:
+                value = self._attribute_mappings[column_name].get(value, value)
+            return [value]
 
         # Check multi-valued parameters
         if column_name in self.list_of_multivalued_tunable_parameter_names:
@@ -419,6 +437,11 @@ class _HDF5Inspector:
                         value = tuple(value.flatten())
                     elif isinstance(value, (np.integer, np.floating)):
                         value = value.item()  # Convert to native Python type
+
+                    # Apply mapping if exists (NEW)
+                    if column_name in self._attribute_mappings:
+                        value = self._attribute_mappings[column_name].get(value, value)
+
                     values.add(value)
 
             # Convert back to numpy arrays if needed
@@ -430,6 +453,57 @@ class _HDF5Inspector:
             return sorted(result)
 
         raise ValueError(f"Column '{column_name}' not found in HDF5 file")
+
+    def set_attribute_mapping(
+        self, parameter_name: str, mapping: Dict[Any, Any]
+    ) -> None:
+        """
+        Map attribute values for display/analysis purposes (in-memory
+        only).
+
+        This affects all methods that return attribute values,
+        including:
+            - parameters_for_group()
+            - column_unique_values()
+            - to_dataframe()
+            - And consequently all HDF5Plotter operations
+
+        Args:
+            parameter_name: Name of the parameter/attribute to map
+            mapping: Dictionary mapping old values to new values
+
+        Example:
+            >>> analyzer.set_attribute_mapping('Additional_text', {
+            ...     ('multiply_down_equal_degree_1243',): 'MD 1243',
+            ...     ('multiply_down_equal_degree_1423',): 'MD 1423',
+            ... })
+        """
+        self._attribute_mappings[parameter_name] = mapping
+
+        # Re-analyze structure to update categorization with new mappings
+        self._extract_parameters()
+        self._categorize_columns()
+
+    def _apply_attribute_mappings(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Apply stored attribute mappings to a parameter dictionary.
+
+        Args:
+            params: Dictionary of parameters to transform
+
+        Returns:
+            New dictionary with mappings applied
+        """
+        if not self._attribute_mappings:
+            return params
+
+        mapped_params = params.copy()
+        for param_name, mapping in self._attribute_mappings.items():
+            if param_name in mapped_params:
+                old_value = mapped_params[param_name]
+                mapped_params[param_name] = mapping.get(old_value, old_value)
+
+        return mapped_params
 
     def __del__(self):
         """Ensure HDF5 file is properly closed."""

@@ -155,7 +155,8 @@ class _HDF5DataManager(_HDF5Inspector):
                 if param not in all_params:
                     all_params[param] = value
 
-        return all_params
+        # Apply attribute mappings (NEW)
+        return self._apply_attribute_mappings(all_params)
 
     def restrict_data(
         self, condition: Optional[str] = None, filter_func: Optional[Callable] = None
