@@ -68,11 +68,12 @@ CONVERTERS_MAPPING = {
 }
 
 PARAMETERS_WITH_EXPONENTIAL_FORMAT = [
-    "CG_epsilon",
     "Lanczos_epsilon",
-    "MSCG_epsilon",
+    "Outer_solver_epsilon",
+    "CG_epsilon",
     "Solver_epsilon",
     "Inner_solver_epsilon",
+    "MSCG_epsilon",
 ]
 
 PARAMETERS_OF_INTEGER_VALUE = [

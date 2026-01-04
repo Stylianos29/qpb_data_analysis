@@ -1049,7 +1049,6 @@ class DataPlotter(DataFrameAnalyzer):
                 "MPI_geometry",
                 "Number_of_spinors",
                 "Number_of_vectors",
-                "Outer_solver_epsilon",
                 "Threads_per_process",
             ]
         )

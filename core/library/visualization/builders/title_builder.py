@@ -167,12 +167,12 @@ class PlotTitleBuilder:
 
     def _overlap_kernel_parts(self, metadata: dict, excluded: set) -> list:
         """
-        Extract overlap/kernel related title parts with special formatting.
+        Get title parts for overlap operator and kernel parameters.
 
         Handles the hierarchical structure:
-        - Overlap method (Chebyshev/KL/Bare)
-        - Kernel type (Wilson/Brillouin)
-        - Method-specific parameters (Chebyshev terms, KL order)
+            - Overlap method (Chebyshev/KL/Bare)
+            - Kernel type (Wilson/Brillouin)
+            - Method-specific parameters (Chebyshev terms, KL order)
 
         Parameters:
         -----------
@@ -208,16 +208,40 @@ class PlotTitleBuilder:
                 if terms is not None and "Number_of_Chebyshev_terms" not in excluded:
                     components.append("N=" + str(terms))
             elif overlap_method == "KL":
+                # Try method-specific parameter first
                 order = metadata.get("KL_diagonal_order")
-                if order is not None and "KL_diagonal_order" not in excluded:
+                param_excluded = "KL_diagonal_order" in excluded
+
+                # Fall back to generic Rational_order if method-specific not available
+                if order is None:
+                    order = metadata.get("Rational_order")
+                    param_excluded = "Rational_order" in excluded
+
+                if order is not None and not param_excluded:
                     components.append("n=" + str(order))
             elif overlap_method == "Neuberger":
+                # Try method-specific parameter first
                 order = metadata.get("Neuberger_order")
-                if order is not None and "Neuberger_order" not in excluded:
+                param_excluded = "Neuberger_order" in excluded
+
+                # Fall back to generic Rational_order if method-specific not available
+                if order is None:
+                    order = metadata.get("Rational_order")
+                    param_excluded = "Rational_order" in excluded
+
+                if order is not None and not param_excluded:
                     components.append("n=" + str(order))
             elif overlap_method == "Zolotarev":
+                # Try method-specific parameter first
                 order = metadata.get("Zolotarev_order")
-                if order is not None and "Zolotarev_order" not in excluded:
+                param_excluded = "Zolotarev_order" in excluded
+
+                # Fall back to generic Rational_order if method-specific not available
+                if order is None:
+                    order = metadata.get("Rational_order")
+                    param_excluded = "Rational_order" in excluded
+
+                if order is not None and not param_excluded:
                     components.append("n=" + str(order))
 
         # Only add to parts if we have something to show
