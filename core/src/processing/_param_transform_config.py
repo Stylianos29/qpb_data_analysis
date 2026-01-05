@@ -262,12 +262,9 @@ HDF5_PROCESSING_RULES = {
                 "unit": "spinor",
                 # TODO: The divisor must be actually the product of
                 # number of spinors times the number of vectors
-                "divisor": "Number_of_spinors"
+                "divisor": "Number_of_spinors",
             },
-            "default": {
-                "unit": "vector",
-                "divisor": "Number_of_vectors"
-            },
+            "default": {"unit": "vector", "divisor": "Number_of_vectors"},
         },
     },
 }
