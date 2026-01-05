@@ -253,6 +253,23 @@ HDF5_PROCESSING_RULES = {
         "aggregation_method": "mean_with_error",
         "condition": "all_lengths_greater_than_one",
     },
+    "Number_of_kernel_applications_per_MSCG": {
+        "output_pattern": "Average_number_of_kernel_applications_per_{unit}",
+        "aggregation_method": "sum_then_divide",
+        "condition": "all_lengths_greater_than_one",
+        "unit_mapping": {
+            "has_Number_of_spinors": {
+                "unit": "spinor",
+                # TODO: The divisor must be actually the product of
+                # number of spinors times the number of vectors
+                "divisor": "Number_of_spinors"
+            },
+            "default": {
+                "unit": "vector",
+                "divisor": "Number_of_vectors"
+            },
+        },
+    },
 }
 
 # =============================================================================
