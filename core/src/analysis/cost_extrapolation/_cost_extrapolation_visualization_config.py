@@ -127,7 +127,7 @@ AXIS_LABEL_COLUMN_MAPPING = {
     "bare_mass": "Bare_mass",
     "pcac_mass": "PCAC_plateau_mean",
     "pion_mass_squared": "pion_mass_squared",
-    "cost": "Average_core_hours_per_spinor_per_configuration",
+    "cost": "Average_core_hours_per_spinor_per_config",
 }
 
 # Axis styling configuration (separate from label content)

@@ -99,11 +99,11 @@ AXES_LABELS_BY_COLUMN_NAME = {
     # ---------------------------------------------------------------------------
     # Computational cost metrics
     # ---------------------------------------------------------------------------
-    "Average_calculation_time_per_spinor_per_configuration": (
+    "Average_calculation_time_per_spinor_per_config": (
         "Average wall-clock time (per spinor per config) (s)"
     ),
     "Average_core_hours_per_spinor": "Computational cost (core-hours/spinor)",
-    "Average_core_hours_per_spinor_per_configuration": (
+    "Average_core_hours_per_spinor_per_config": (
         "Computational cost (core-hours/spinor/config)"
     ),
     "Average_core_hours_per_vector": "Computational cost (core-hours/vector)",

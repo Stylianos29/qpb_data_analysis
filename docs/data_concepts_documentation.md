@@ -107,9 +107,9 @@ These represent the physical or computational quantities of interest.
 ### Computational Output Quantities
 
 #### Performance Metrics
-- `Average_calculation_time_per_spinor_per_configuration`: Wall-clock
+- `Average_calculation_time_per_spinor_per_config`: Wall-clock
   time
-- `Average_core_hours_per_spinor_per_configuration`: Computational cost
+- `Average_core_hours_per_spinor_per_config`: Computational cost
 - `Average_number_of_MV_multiplications_per_spinor`: Matrix-vector
   operations
 - `Total_number_of_Lanczos_iterations`: Algorithm iterations

@@ -65,6 +65,9 @@ CONVERTERS_MAPPING = {
     # TODO: Revisit whether Kernel_operator_type needs a converter
     # "Kernel_operator_type": lambda x: pd.Categorical( x,
     #         categories=["Wilson", "Brillouin"], ordered=True )
+    "Average_core_hours_per_spinor_per_config": lambda x: (
+        ast.literal_eval(x) if x.strip() else x
+    ),
 }
 
 PARAMETERS_WITH_EXPONENTIAL_FORMAT = [
