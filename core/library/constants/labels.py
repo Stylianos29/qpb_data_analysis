@@ -230,6 +230,7 @@ AXES_LABELS_BY_COLUMN_NAME = {
     "Minimum_eigenvalue_squared": "$\\lambda_{min}^2$",
     "Maximum_eigenvalue_squared": "$\\lambda_{max}^2$",
     "Condition_number": "$\\kappa_{\\mathbb{X}^2}$",
+    "KL_scaling_factor": "$\\mu$",
 }
 
 
@@ -250,4 +251,5 @@ LEGEND_LABELS_BY_COLUMN_NAME = {
     "Threads_per_process": "$n_{\\text{OMP}}=$",
     "Outer_solver_epsilon": "$\\epsilon_{CG}$:",
     "Inner_solver_epsilon": "$\\epsilon_{MSCG}$:",
+    "KL_scaling_factor": "$\\mu$",
 }
