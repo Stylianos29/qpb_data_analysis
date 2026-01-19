@@ -263,7 +263,7 @@ def load_and_validate_results_data(
     Returns:
         DataFrame containing validated results data
     """
-    df = pd.read_csv(csv_path)
+    df = load_csv(csv_path)
 
     if len(df) == 0:
         raise ValueError("Results CSV contains no data rows")
