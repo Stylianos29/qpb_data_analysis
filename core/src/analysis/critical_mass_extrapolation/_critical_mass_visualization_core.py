@@ -36,7 +36,7 @@ from src.analysis.critical_mass_extrapolation._critical_mass_visualization_confi
     get_title_excluded_parameters,
     get_filename_base_name,
     get_filename_custom_prefix,
-    ANALYSIS_CONFIGS,
+    get_analysis_config,
 )
 
 
@@ -567,7 +567,7 @@ def create_critical_mass_plot(
         )
 
     # Get y-axis label from config
-    y_label = ANALYSIS_CONFIGS[analysis_type]["default_y_label"]
+    y_label = get_analysis_config(analysis_type)["default_y_label"]
 
     # DATA POINTS
     #############
