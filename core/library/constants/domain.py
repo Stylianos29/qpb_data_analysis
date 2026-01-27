@@ -34,7 +34,6 @@ TUNABLE_PARAMETER_NAMES_LIST = [
     # Parameters specific to Chebyshev polynomial approximation
     "Number_of_Chebyshev_terms",  # Number of terms in Chebyshev expansion
     "Lanczos_epsilon",  # Lanczos convergence tolerance
-    "Maximum_Lanczos_iterations",  # Maximum Lanczos iterations
     "Delta_Max",  # Maximum eigenvalue modification delta
     "Delta_Min",  # Minimum eigenvalue modification delta
     # =========================================================================
