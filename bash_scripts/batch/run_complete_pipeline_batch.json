@@ -1,8 +1,9 @@
 {
     "filter_type": "data-file-set",
+    "description": "",
+    "usage_notes": "",
     "include": [
     ],
     "exclude": [
-                "invert/KL_several_n_sfrac_CGNR_Vs_CGNE"
     ]
 }

@@ -9,6 +9,8 @@
         "If both empty: No filtering occurs (all data file sets are validated).",
         "If both non-empty: 'include' takes precedence (allowlist mode)."
     ],
-    "include": [],
-    "exclude": []
+    "include": [
+    ],
+    "exclude": [
+    ]
 }
