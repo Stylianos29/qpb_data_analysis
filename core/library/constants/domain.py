@@ -45,8 +45,9 @@ TUNABLE_PARAMETER_NAMES_LIST = [
     "Solver_epsilon",  # Generic/outer solver tolerance
     "MSCG_epsilon",  # Multi-shift CG solver tolerance (inner)
     "Outer_solver_epsilon",  # Outer solver tolerance (for nested solvers)
-    "Maximum_solver_iterations",  # Maximum solver iterations
     "Inner_solver_epsilon",  # Inner solver tolerance (for nested solvers)
+    # NOTE: Maximum iterations for solvers are absent due to variability
+    # that does not affect results
     # =========================================================================
     # Stochastic Estimation Parameters
     # =========================================================================
