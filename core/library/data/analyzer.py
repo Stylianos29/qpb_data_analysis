@@ -140,24 +140,32 @@ class _DataFrameInspector:
         )
 
         # Create intersection lists
-        self.list_of_single_valued_tunable_parameter_names = list(
-            set(self.list_of_tunable_parameter_names_from_dataframe)
-            & set(self.list_of_single_valued_column_names)
+        self.list_of_single_valued_tunable_parameter_names = sorted(
+            list(
+                set(self.list_of_tunable_parameter_names_from_dataframe)
+                & set(self.list_of_single_valued_column_names)
+            )
         )
 
-        self.list_of_multivalued_tunable_parameter_names = list(
-            set(self.list_of_tunable_parameter_names_from_dataframe)
-            & set(self.list_of_multivalued_column_names)
+        self.list_of_multivalued_tunable_parameter_names = sorted(
+            list(
+                set(self.list_of_tunable_parameter_names_from_dataframe)
+                & set(self.list_of_multivalued_column_names)
+            )
         )
 
-        self.list_of_single_valued_output_quantity_names = list(
-            set(self.list_of_output_quantity_names_from_dataframe)
-            & set(self.list_of_single_valued_column_names)
+        self.list_of_single_valued_output_quantity_names = sorted(
+            list(
+                set(self.list_of_output_quantity_names_from_dataframe)
+                & set(self.list_of_single_valued_column_names)
+            )
         )
 
-        self.list_of_multivalued_output_quantity_names = list(
-            set(self.list_of_output_quantity_names_from_dataframe)
-            & set(self.list_of_multivalued_column_names)
+        self.list_of_multivalued_output_quantity_names = sorted(
+            list(
+                set(self.list_of_output_quantity_names_from_dataframe)
+                & set(self.list_of_multivalued_column_names)
+            )
         )
 
     def _unique_value_columns(self) -> dict:
