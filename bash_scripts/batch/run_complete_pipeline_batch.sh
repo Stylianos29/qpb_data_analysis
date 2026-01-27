@@ -791,7 +791,7 @@ force_all=false
 skip_checks=false
 skip_summaries=false
 disable_plots=false
-clean_plots=false
+clean_plots=true
 use_filter=false
 filter_file=""
 
@@ -845,8 +845,8 @@ while [[ $# -gt 0 ]]; do
             disable_plots=true
             shift
             ;;
-        --clean-plots)
-            clean_plots=true
+        --preserve-plots)
+            clean_plots=false
             shift
             ;;
         -h|--help)
