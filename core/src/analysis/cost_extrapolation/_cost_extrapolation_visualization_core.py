@@ -11,13 +11,14 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import gvar as gv
 import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from library import load_csv
+from library.visualization.builders.filename_builder import PlotFilenameBuilder
+from library.constants.labels import FILENAME_LABELS_BY_COLUMN_NAME
 
 from src.analysis.cost_extrapolation._cost_extrapolation_visualization_config import (
     get_figure_config,
@@ -623,7 +624,13 @@ def create_mass_fit_plot(
     mass_subdir = plots_directory / plot_subdirs["mass_fit"]
     mass_subdir.mkdir(parents=True, exist_ok=True)
 
-    filename = f"mass_fit_{group_info['group_id']}.png"
+    # Generate filename using PlotFilenameBuilder for consistent naming
+    filename_builder = PlotFilenameBuilder(FILENAME_LABELS_BY_COLUMN_NAME)
+    filename = filename_builder.build(
+        metadata_dict=group_info["group_metadata"],
+        base_name="mass_fit",
+        multivalued_params=group_info["grouping_params"],
+    )
     plot_path = mass_subdir / filename
     fig.savefig(plot_path, dpi=fig_cfg["dpi"], bbox_inches="tight")
     plt.close(fig)
@@ -835,7 +842,13 @@ def create_cost_fit_plot(
     cost_subdir = plots_directory / plot_subdirs["cost_fit"]
     cost_subdir.mkdir(parents=True, exist_ok=True)
 
-    filename = f"cost_fit_{group_info['group_id']}.png"
+    # Generate filename using PlotFilenameBuilder for consistent naming
+    filename_builder = PlotFilenameBuilder(FILENAME_LABELS_BY_COLUMN_NAME)
+    filename = filename_builder.build(
+        metadata_dict=group_info["group_metadata"],
+        base_name="cost_fit",
+        multivalued_params=group_info["grouping_params"],
+    )
     plot_path = cost_subdir / filename
     fig.savefig(plot_path, dpi=fig_cfg["dpi"], bbox_inches="tight")
     plt.close(fig)
