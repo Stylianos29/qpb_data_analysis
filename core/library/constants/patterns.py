@@ -398,6 +398,16 @@ FILE_CONTENTS_ARRAY_PATTERNS_DICTIONARY = {
         "regex_pattern": r", t = (\d+(?:\.\d+)?) sec",
         "type": float,
     },
+    "Final_BiCGStab_relative_residual_squared": {
+        "line_identifier": ", BiCGStab converged,",
+        "regex_pattern": r", relative = (\d+(?:\.\d+)?e[+-]\d+)",
+        "type": float,
+    },
+    "BiCGStab_total_calculation_time_per_spinor": {
+        "line_identifier": ", BiCGStab converged,",
+        "regex_pattern": r", t = (\d+(?:\.\d+)?) sec",
+        "type": float,
+    },
     "Total_number_of_CG_iterations_per_spinor": {
         "line_identifier": "Done vector =",
         "regex_pattern": r"Done vector = \d+ / \d+, iters = (\d+)",
