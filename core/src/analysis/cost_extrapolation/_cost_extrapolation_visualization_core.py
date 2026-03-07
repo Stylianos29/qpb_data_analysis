@@ -127,8 +127,7 @@ def load_and_validate_results_data(
     required_cols = [
         col_mapping["derived_bare_mass_mean"],
         col_mapping["derived_bare_mass_error"],
-        col_mapping["extrapolated_cost_mean"],
-        col_mapping["extrapolated_cost_error"],
+        col_mapping["extrapolated_cost"],
     ]
 
     missing = [col for col in required_cols if col not in df.columns]
@@ -751,8 +750,9 @@ def create_cost_fit_plot(
 
     # Mark extrapolation point
     derived_bare_mass = results_row[col_mapping["derived_bare_mass_mean"]]
-    extrapolated_cost = results_row[col_mapping["extrapolated_cost_mean"]]
-    extrapolated_cost_error = results_row[col_mapping["extrapolated_cost_error"]]
+    extrapolated_cost_tuple = results_row[col_mapping["extrapolated_cost"]]
+    extrapolated_cost = extrapolated_cost_tuple[0]
+    extrapolated_cost_error = extrapolated_cost_tuple[1]
 
     extrap_marker = get_extrapolation_marker_style()
 

@@ -38,8 +38,7 @@ PHYSICAL_VALIDATION = {
 # Output CSV column names
 OUTPUT_COLUMN_NAMES = {
     # Linear fit results
-    "critical_mass_mean": "critical_mass_mean",
-    "critical_mass_error": "critical_mass_error",
+    "critical_mass": "Critical_bare_mass",
     "slope_mean": "slope_mean",
     "slope_error": "slope_error",
     "intercept_mean": "intercept_mean",
@@ -55,8 +54,7 @@ OUTPUT_COLUMN_NAMES = {
     "quadratic_b_error": "quadratic_b_error",
     "quadratic_c_mean": "quadratic_c_mean",
     "quadratic_c_error": "quadratic_c_error",
-    "quadratic_critical_mass_mean": "quadratic_critical_mass_mean",
-    "quadratic_critical_mass_error": "quadratic_critical_mass_error",
+    "quadratic_critical_mass": "quadratic_critical_mass",
     "quadratic_r_squared": "quadratic_r_squared",
     "quadratic_chi2_reduced": "quadratic_chi2_reduced",
     "quadratic_fit_quality": "quadratic_fit_quality",

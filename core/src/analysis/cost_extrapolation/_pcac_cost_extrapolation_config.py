@@ -42,8 +42,7 @@ PCAC_FIT_CONFIG = {
 # listed here are considered required
 COLUMN_MAPPING = {
     "bare_mass": "Bare_mass",
-    "mass_mean": "PCAC_plateau_mean",
-    "mass_error": "PCAC_plateau_error",
+    "mass": "Plateau_PCAC_mass",
 }
 
 # Columns required in cost data CSV
@@ -157,7 +156,7 @@ def validate_pcac_cost_config():
         raise ValueError("REFERENCE_PCAC_MASS must be positive")
 
     # Validate column mapping
-    required_mappings = ["bare_mass", "mass_mean", "mass_error"]
+    required_mappings = ["bare_mass", "mass"]
     for key in required_mappings:
         if key not in COLUMN_MAPPING:
             raise ValueError(f"Missing required column mapping: {key}")

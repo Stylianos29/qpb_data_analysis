@@ -27,6 +27,7 @@ from library.constants.labels import FILENAME_LABELS_BY_COLUMN_NAME
 from library.data import load_csv
 
 from src.analysis.critical_mass_extrapolation._critical_mass_shared_config import (
+    OUTPUT_COLUMN_NAMES,
     get_grouping_parameters,
 )
 from src.analysis.critical_mass_extrapolation._critical_mass_visualization_config import (
@@ -320,10 +321,9 @@ def load_and_validate_plateau_data(
 
     # Get column names from mapping
     bare_mass_col = plateau_column_mapping["bare_mass"]
-    plateau_mean_col = plateau_column_mapping["plateau_mean"]
-    plateau_error_col = plateau_column_mapping["plateau_error"]
+    plateau_col = plateau_column_mapping["plateau"]
 
-    required_cols = [bare_mass_col, plateau_mean_col, plateau_error_col]
+    required_cols = [bare_mass_col, plateau_col]
     missing_cols = [col for col in required_cols if col not in df.columns]
 
     if missing_cols:
@@ -546,12 +546,12 @@ def create_critical_mass_plot(
 
     # Get data using column mapping
     bare_mass_col = plateau_column_mapping["bare_mass"]
-    plateau_mean_col = plateau_column_mapping["plateau_mean"]
-    plateau_error_col = plateau_column_mapping["plateau_error"]
+    plateau_col = plateau_column_mapping["plateau"]
 
     x_data = plateau_data[bare_mass_col].values
-    y_data_raw = plateau_data[plateau_mean_col].values
-    y_errors_raw = plateau_data[plateau_error_col].values
+    plateau_tuples = plateau_data[plateau_col].tolist()
+    y_data_raw = np.array([v[0] for v in plateau_tuples])
+    y_errors_raw = np.array([v[1] for v in plateau_tuples])
 
     # Apply power transformation to match calculation
     plateau_mass_power = get_plateau_mass_power(analysis_type)
@@ -747,8 +747,9 @@ def create_critical_mass_plot(
     #############
 
     # Add critical mass vertical line with error band
-    critical_mass_mean = results_data["critical_mass_mean"]
-    critical_mass_error = results_data["critical_mass_error"]
+    critical_mass_tuple = results_data[OUTPUT_COLUMN_NAMES["critical_mass"]]
+    critical_mass_mean = critical_mass_tuple[0]
+    critical_mass_error = critical_mass_tuple[1]
     critical_mass_label = (
         f"a$m^{{\\mathrm{{critical}}}}_{{\\mathrm{{bare}}}} = "
         f"{critical_mass_mean:.6f} "

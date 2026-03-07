@@ -45,8 +45,7 @@ PION_FIT_CONFIG = {
 # listed here are considered required
 COLUMN_MAPPING = {
     "bare_mass": "Bare_mass",
-    "mass_mean": "pion_plateau_mean",
-    "mass_error": "pion_plateau_error",
+    "mass": "Plateau_pion_mass",
 }
 
 # Columns required in cost data CSV
@@ -169,7 +168,7 @@ def validate_pion_cost_config():
         raise ValueError("PION_MASS_POWER must be 1 (m_π) or 2 (m_π²)")
 
     # Validate column mapping
-    required_mappings = ["bare_mass", "mass_mean", "mass_error"]
+    required_mappings = ["bare_mass", "mass"]
     for key in required_mappings:
         if key not in COLUMN_MAPPING:
             raise ValueError(f"Missing required column mapping: {key}")

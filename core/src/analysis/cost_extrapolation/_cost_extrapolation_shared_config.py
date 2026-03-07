@@ -144,8 +144,7 @@ OUTPUT_COLUMN_MAPPING = {
     "cost_fit_chi2_reduced": "cost_fit_chi2_reduced",
     "cost_fit_quality": "cost_fit_q_value",
     # Extrapolated cost at reference bare mass
-    "extrapolated_cost_mean": "extrapolated_cost_value",
-    "extrapolated_cost_error": "extrapolated_cost_error",
+    "extrapolated_cost": "extrapolated_cost",
     # Data counts
     "n_bare_mass_points": "number_of_bare_mass_points",
     "n_configurations": "number_of_configurations_averaged",

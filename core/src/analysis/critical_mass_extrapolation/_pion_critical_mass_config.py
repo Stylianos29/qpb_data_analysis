@@ -18,15 +18,13 @@ from src.analysis.critical_mass_extrapolation._critical_mass_shared_config impor
 # Required input CSV columns
 REQUIRED_COLUMNS = [
     "Bare_mass",
-    "pion_plateau_mean",
-    "pion_plateau_error",
+    "Plateau_pion_mass",
 ]
 
 # Column mapping for flexibility
 COLUMN_MAPPING = {
     "bare_mass": "Bare_mass",
-    "plateau_mean": "pion_plateau_mean",
-    "plateau_error": "pion_plateau_error",
+    "plateau": "Plateau_pion_mass",
 }
 
 PLATEAU_MASS_POWER = 2  # Fit pion_mass^2 vs bare_mass
@@ -100,16 +98,15 @@ def validate_pion_critical_config():
     if not isinstance(REQUIRED_COLUMNS, list):
         raise ValueError("REQUIRED_COLUMNS must be a list")
 
-    if len(REQUIRED_COLUMNS) < 3:
-        raise ValueError("REQUIRED_COLUMNS must contain at least 3 columns")
+    if len(REQUIRED_COLUMNS) < 2:
+        raise ValueError("REQUIRED_COLUMNS must contain at least 2 columns")
 
     # Check for essential columns
-    has_mass_col = any("mass" in col.lower() for col in REQUIRED_COLUMNS)
-    has_mean_col = any("mean" in col.lower() for col in REQUIRED_COLUMNS)
-    has_error_col = any("error" in col.lower() for col in REQUIRED_COLUMNS)
+    has_bare_col = any("bare" in col.lower() for col in REQUIRED_COLUMNS)
+    has_plateau_col = any("plateau" in col.lower() for col in REQUIRED_COLUMNS)
 
-    if not (has_mass_col and has_mean_col and has_error_col):
-        raise ValueError("REQUIRED_COLUMNS must include mass, mean, and error columns")
+    if not (has_bare_col and has_plateau_col):
+        raise ValueError("REQUIRED_COLUMNS must include bare and plateau mass columns")
 
     # Validate quadratic fit config
     if not (0 < QUADRATIC_FIT_CONFIG["quadratic_coefficient_scale"] <= 1.0):

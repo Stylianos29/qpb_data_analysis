@@ -43,7 +43,11 @@ CONVERTERS_MAPPING = {
     # TODO: Add the rest of the 'Average_calculation_result' variations
     "PCAC_mass_estimate": lambda x: safe_literal_eval(x) if x.strip() else x,
     "Pion_effective_mass_estimate": lambda x: ast.literal_eval(x) if x.strip() else x,
+    "Plateau_PCAC_mass": lambda x: ast.literal_eval(x) if x.strip() else x,
+    "Plateau_pion_mass": lambda x: ast.literal_eval(x) if x.strip() else x,
     "Critical_bare_mass": lambda x: ast.literal_eval(x) if x.strip() else x,
+    "quadratic_critical_mass": lambda x: ast.literal_eval(x) if x.strip() else x,
+    "extrapolated_cost": lambda x: ast.literal_eval(x) if x.strip() else x,
     "Average_calculation_result": lambda x: safe_literal_eval(x) if x.strip() else x,
     "Average_sign_squared_values": lambda x: ast.literal_eval(x) if x.strip() else x,
     "Average_sign_squared_violation_values": lambda x: (

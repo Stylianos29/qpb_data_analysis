@@ -353,8 +353,7 @@ def calculate_critical_mass_for_group(
     """
     # Get column names from config
     mass_col = column_mapping["bare_mass"]
-    y_mean_col = column_mapping["plateau_mean"]
-    y_error_col = column_mapping["plateau_error"]
+    plateau_col = column_mapping["plateau"]
 
     # === LINEAR FIT === Apply linear fit range filter
     if fit_range_config is not None:
@@ -373,9 +372,11 @@ def calculate_critical_mass_for_group(
 
     # Extract data for linear fitting
     x_data_linear = linear_df[mass_col].to_numpy()
-    y_mean_linear = linear_df[y_mean_col].to_numpy()
-    y_error_linear = linear_df[y_error_col].to_numpy()
-    y_data_linear = gv.gvar(y_mean_linear, y_error_linear)
+    plateau_vals_linear = linear_df[plateau_col].tolist()
+    y_data_linear = gv.gvar(
+        [v[0] for v in plateau_vals_linear],
+        [v[1] for v in plateau_vals_linear],
+    )
     y_means_transformed_linear = y_data_linear**plateau_mass_power
 
     # Perform linear fit
@@ -390,8 +391,10 @@ def calculate_critical_mass_for_group(
 
     # Build core results dictionary
     result = {
-        OUTPUT_COLUMN_NAMES["critical_mass_mean"]: gv.mean(critical_mass),
-        OUTPUT_COLUMN_NAMES["critical_mass_error"]: gv.sdev(critical_mass),
+        OUTPUT_COLUMN_NAMES["critical_mass"]: (
+            float(gv.mean(critical_mass)),
+            float(gv.sdev(critical_mass)),
+        ),
         OUTPUT_COLUMN_NAMES["slope_mean"]: gv.mean(fit_result.p[0]),
         OUTPUT_COLUMN_NAMES["slope_error"]: gv.sdev(fit_result.p[0]),
         OUTPUT_COLUMN_NAMES["intercept_mean"]: gv.mean(fit_result.p[1]),
@@ -424,9 +427,11 @@ def calculate_critical_mass_for_group(
 
             # Extract data for quadratic fitting
             x_data_quad = quadratic_df[mass_col].to_numpy()
-            y_mean_quad = quadratic_df[y_mean_col].to_numpy()
-            y_error_quad = quadratic_df[y_error_col].to_numpy()
-            y_data_quad = gv.gvar(y_mean_quad, y_error_quad)
+            plateau_vals_quad = quadratic_df[plateau_col].tolist()
+            y_data_quad = gv.gvar(
+                [v[0] for v in plateau_vals_quad],
+                [v[1] for v in plateau_vals_quad],
+            )
             y_means_transformed_quad = y_data_quad**plateau_mass_power
 
             # Perform quadratic fit
@@ -461,11 +466,13 @@ def calculate_critical_mass_for_group(
                     OUTPUT_COLUMN_NAMES["quadratic_c_error"]: gv.sdev(
                         quad_fit_result.p[2]
                     ),
-                    OUTPUT_COLUMN_NAMES["quadratic_critical_mass_mean"]: (
-                        gv.mean(quad_critical_mass) if quad_critical_mass else np.nan
-                    ),
-                    OUTPUT_COLUMN_NAMES["quadratic_critical_mass_error"]: (
-                        gv.sdev(quad_critical_mass) if quad_critical_mass else np.nan
+                    OUTPUT_COLUMN_NAMES["quadratic_critical_mass"]: (
+                        (
+                            float(gv.mean(quad_critical_mass)),
+                            float(gv.sdev(quad_critical_mass)),
+                        )
+                        if quad_critical_mass
+                        else np.nan
                     ),
                     OUTPUT_COLUMN_NAMES["quadratic_r_squared"]: quad_quality_metrics[
                         "r_squared"
@@ -502,7 +509,7 @@ def calculate_critical_mass_for_group(
             )
 
     # Add all single-valued columns automatically
-    excluded_cols = {mass_col, y_mean_col, y_error_col}
+    excluded_cols = {mass_col, plateau_col}
     for col in group_df.columns:
         if col not in excluded_cols:
             values = group_df[col].unique()
@@ -529,15 +536,12 @@ def validate_critical_mass_input_data(
     if len(df) < min_points:
         raise ValueError(f"Need at least {min_points} data points for extrapolation")
 
-    # Check required columns exist
-    y_mean_col = column_mapping["plateau_mean"]
-    y_error_col = column_mapping["plateau_error"]
+    # Check required column exist
+    plateau_col = column_mapping["plateau"]
 
     missing_cols = []
-    if y_mean_col not in df.columns:
-        missing_cols.append(y_mean_col)
-    if y_error_col not in df.columns:
-        missing_cols.append(y_error_col)
+    if plateau_col not in df.columns:
+        missing_cols.append(plateau_col)
 
     if missing_cols:
         raise ValueError(f"Missing required columns: {missing_cols}")

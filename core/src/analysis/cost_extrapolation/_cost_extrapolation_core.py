@@ -412,21 +412,16 @@ def fit_mass_vs_bare_mass(
     try:
         # Extract data
         bare_mass_col = column_mapping["bare_mass"]
-        mass_mean_col = column_mapping["mass_mean"]
-        mass_error_col = column_mapping["mass_error"]
+        mass_col = column_mapping["mass"]
 
-        logger.info(
-            f"    Looking for columns: {bare_mass_col}, {mass_mean_col}, {mass_error_col}"
-        )
+        logger.info(f"    Looking for columns: {bare_mass_col} and {mass_col}")
 
         # Check columns exist
         missing = []
         if bare_mass_col not in group_df.columns:
             missing.append(bare_mass_col)
-        if mass_mean_col not in group_df.columns:
-            missing.append(mass_mean_col)
-        if mass_error_col not in group_df.columns:
-            missing.append(mass_error_col)
+        if mass_col not in group_df.columns:
+            missing.append(mass_col)
 
         if missing:
             logger.error(f"    Missing columns in data: {missing}")
@@ -434,15 +429,18 @@ def fit_mass_vs_bare_mass(
             return None
 
         x_data = group_df[bare_mass_col].to_numpy()
-        y_mean = group_df[mass_mean_col].to_numpy()
-        y_error = group_df[mass_error_col].to_numpy()
+        mass_tuples = group_df[mass_col].tolist()
+        y_data = gv.gvar(
+            [v[0] for v in mass_tuples],
+            [v[1] for v in mass_tuples],
+        )
+        y_mean = gv.mean(y_data)
 
         logger.info(f"    Extracted {len(x_data)} data points")
         logger.info(f"    Bare mass range: [{x_data.min():.6f}, {x_data.max():.6f}]")
         logger.info(f"    Mass range: [{y_mean.min():.6f}, {y_mean.max():.6f}]")
 
         # Apply mass power transformation
-        y_data = gv.gvar(y_mean, y_error)
         y_transformed = y_data**mass_power
 
         logger.info(f"    Applied mass power {mass_power}")
@@ -862,8 +860,10 @@ def fit_and_extrapolate_cost(
 
         # Build result dictionary
         result = {
-            "extrapolated_cost_mean": float(gv.mean(extrapolated_cost)),
-            "extrapolated_cost_error": float(gv.sdev(extrapolated_cost)),
+            "extrapolated_cost": (
+                float(gv.mean(extrapolated_cost)),
+                float(gv.sdev(extrapolated_cost)),
+            ),
             "cost_fit_param_a_mean": float(gv.mean(fit.p["a"])),
             "cost_fit_param_a_error": float(gv.sdev(fit.p["a"])),
             "cost_fit_param_b_mean": float(gv.mean(fit.p["b"])),

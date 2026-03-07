@@ -389,12 +389,12 @@ def extract_plateau_from_jackknife_samples(
     )
     plateau_error = np.sqrt(plateau_variance)
 
-    # Create gvar result
-    plateau_gvar = gv.gvar(plateau_mean, plateau_error)
-
     # Extract successful time series for HDF5 export (processed data
     # only)
     successful_time_series = jackknife_samples[successful_sample_indices, :]
+
+    # Create gvar result
+    plateau_gvar = gv.gvar(plateau_mean, plateau_error)
 
     logger.info(
         f"Group {group_name}: Success! Plateau = {plateau_gvar}, "
@@ -404,10 +404,8 @@ def extract_plateau_from_jackknife_samples(
     return {
         "success": True,
         "group_name": group_name,
-        "plateau_value": plateau_gvar,
+        "plateau_value": (float(plateau_mean), float(plateau_error)),
         "plateau_bounds": plateau_bounds,
-        "plateau_mean": plateau_mean,
-        "plateau_error": plateau_error,
         "sigma_threshold": sigma_used,
         "n_total_samples": n_samples,
         "n_successful": n_successful,
@@ -742,7 +740,7 @@ def process_all_groups(
                 if result["success"]:
                     logger.info(
                         f"Successfully extracted plateau for {group_name}: "
-                        f"{result['plateau_value']}"
+                        f"{gv.gvar(result['plateau_value'])}"
                     )
                 else:
                     logger.warning(
@@ -805,8 +803,7 @@ def export_to_csv(
                 row_data[key] = value
 
         # Add extraction results
-        row_data[f"{output_column_prefix}_plateau_mean"] = result["plateau_mean"]
-        row_data[f"{output_column_prefix}_plateau_error"] = result["plateau_error"]
+        row_data[f"Plateau_{output_column_prefix}_mass"] = result["plateau_value"]
         row_data[f"{output_column_prefix}_plateau_start_time"] = result[
             "plateau_bounds"
         ][0]
@@ -1008,8 +1005,8 @@ def export_to_hdf5(
             output_group.attrs["plateau_extraction_success"] = True
             output_group.attrs["n_samples"] = len(individual_estimates)
             output_group.attrs["n_time_points"] = processed_time_series.shape[1]
-            output_group.attrs["plateau_mean"] = result["plateau_mean"]
-            output_group.attrs["plateau_error"] = result["plateau_error"]
+            output_group.attrs["plateau_mean"] = result["plateau_value"][0]
+            output_group.attrs["plateau_error"] = result["plateau_value"][1]
             output_group.attrs["plateau_start"] = result["plateau_bounds"][0]
             output_group.attrs["plateau_end"] = result["plateau_bounds"][1]
             output_group.attrs["sigma_threshold_used"] = result["sigma_threshold"]
