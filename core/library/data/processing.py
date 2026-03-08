@@ -195,7 +195,7 @@ def apply_categorical_dtypes(
             try:
                 dataframe[column_name] = pd.Categorical(
                     dataframe[column_name],
-                    categories=config["categories"],
+                    categories=cast(list, config["categories"]),
                     ordered=cast(bool, config.get("ordered", False)),
                 )
                 logging.info(f"Applied categorical type to column '{column_name}'")
@@ -227,7 +227,7 @@ def _check_missing_values(
     total_missing = missing_mask.sum().sum()
 
     # Check for empty strings (often considered missing in CSV context)
-    empty_string_mask = dataframe.astype(str).eq("")
+    empty_string_mask = dataframe.astype(str) == ""
     total_empty_strings = empty_string_mask.sum().sum()
 
     # Check for common missing value placeholders
