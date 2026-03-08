@@ -14,6 +14,7 @@ def load_csv(
     converters_mapping: Optional[Dict[str, Callable]] = None,
     validate_required_columns: Optional[Set[str]] = None,
     encoding: str = "utf-8",
+    suppress_warnings: bool = False,
 ) -> pd.DataFrame:
     """
     Loads a CSV file into a Pandas DataFrame with robust error handling
@@ -72,9 +73,10 @@ def load_csv(
         raise ValueError(f"Path is not a file: {file_path}")
 
     if file_path.suffix.lower() not in [".csv", ".txt"]:
-        logging.warning(
-            f"File extension '{file_path.suffix}' is not typical for CSV files"
-        )
+        if not suppress_warnings:
+            logging.warning(
+                f"File extension '{file_path.suffix}' is not typical for CSV files"
+            )
 
     # Set default mappings if not provided
     if dtype_mapping is None:
@@ -136,11 +138,12 @@ def load_csv(
 
         # Validate that dataframe is not empty
         if dataframe.empty:
-            logging.warning(f"Loaded DataFrame is empty: {file_path}")
+            if not suppress_warnings:
+                logging.warning(f"Loaded DataFrame is empty: {file_path}")
             return dataframe
 
         # Check for missing values
-        _check_missing_values(dataframe, file_path)
+        _check_missing_values(dataframe, file_path, suppress_warnings)
 
         logging.info(
             f"Successfully loaded CSV with shape {dataframe.shape}: {file_path}"
@@ -204,7 +207,9 @@ def apply_categorical_dtypes(
     return dataframe
 
 
-def _check_missing_values(dataframe: pd.DataFrame, file_path: Path) -> None:
+def _check_missing_values(
+    dataframe: pd.DataFrame, file_path: Path, suppress_warnings: bool = False
+) -> None:
     """
     Check for and report missing values in the DataFrame.
 
@@ -233,10 +238,11 @@ def _check_missing_values(dataframe: pd.DataFrame, file_path: Path) -> None:
     # Report findings
     if total_missing > 0:
         missing_percentage = (total_missing / total_cells) * 100
-        logging.warning(
-            f"Missing values detected in {file_path}: {total_missing} cells "
-            f"({missing_percentage:.2f}% of total data)"
-        )
+        if not suppress_warnings:
+            logging.warning(
+                f"Missing values detected in {file_path}: {total_missing} cells "
+                f"({missing_percentage:.2f}% of total data)"
+            )
 
         # Report per-column missing values
         columns_with_missing = missing_mask.sum()
@@ -244,30 +250,34 @@ def _check_missing_values(dataframe: pd.DataFrame, file_path: Path) -> None:
         if not columns_with_missing.empty:
             for col, count in columns_with_missing.items():
                 col_percentage = (count / len(dataframe)) * 100
-                logging.warning(
-                    f"  Column '{col}': {count} missing values "
-                    f"({col_percentage:.1f}% of column)"
-                )
+                if not suppress_warnings:
+                    logging.warning(
+                        f"  Column '{col}': {count} missing values "
+                        f"({col_percentage:.1f}% of column)"
+                    )
 
     if total_empty_strings > 0:
         empty_percentage = (total_empty_strings / total_cells) * 100
-        logging.warning(
-            f"Empty string values detected in {file_path}: {total_empty_strings} "
-            f"cells ({empty_percentage:.2f}% of total data)"
-        )
+        if not suppress_warnings:
+            logging.warning(
+                f"Empty string values detected in {file_path}: {total_empty_strings} "
+                f"cells ({empty_percentage:.2f}% of total data)"
+            )
 
     if total_placeholders > 0:
         placeholder_percentage = (total_placeholders / total_cells) * 100
-        logging.warning(
-            f"Missing value placeholders detected in {file_path}: "
-            f"{total_placeholders} cells ({placeholder_percentage:.2f}% of total data) "
-            f"containing: {common_na_values}"
-        )
+        if not suppress_warnings:
+            logging.warning(
+                f"Missing value placeholders detected in {file_path}: "
+                f"{total_placeholders} cells ({placeholder_percentage:.2f}% of total data) "
+                f"containing: {common_na_values}"
+            )
 
     # Summary message if any missing data found
     total_problematic = total_missing + total_empty_strings + total_placeholders
     if total_problematic > 0:
-        logging.warning(
-            f"Total potentially missing/problematic values: {total_problematic} "
-            f"({(total_problematic / total_cells) * 100:.2f}% of all data)"
-        )
+        if not suppress_warnings:
+            logging.warning(
+                f"Total potentially missing/problematic values: {total_problematic} "
+                f"({(total_problematic / total_cells) * 100:.2f}% of all data)"
+            )
