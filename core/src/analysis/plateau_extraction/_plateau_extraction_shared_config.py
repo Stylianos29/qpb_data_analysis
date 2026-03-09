@@ -31,6 +31,7 @@ METADATA_DATASETS = [
     "qpb_log_filenames",
     "Number_of_gauge_configurations",
     "average_core_hours_per_spinor",
+    "overhead_core_hours",
 ]
 
 # CSV output configuration
@@ -75,6 +76,7 @@ HDF5_EXPORT_METADATA_DATASETS = [
     "mpi_geometry_values",
     "qpb_log_filenames",
     "average_core_hours_per_spinor",
+    "overhead_core_hours",
 ]
 
 # =============================================================================

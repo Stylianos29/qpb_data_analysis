@@ -115,6 +115,7 @@ AXES_LABELS_BY_COLUMN_NAME = {
     "Total_calculation_time": "Total wall-clock time (s)",
     "Total_overhead_time": "Overhead time (s)",
     "Overhead_core_hours": "Overhead cost (core-hours)",
+    "Average_overhead_core_hours_per_config": "Average overhead cost (core-hours/config)",
     # ---------------------------------------------------------------------------
     # Matrix-vector multiplication counts
     # ---------------------------------------------------------------------------

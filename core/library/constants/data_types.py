@@ -73,6 +73,9 @@ CONVERTERS_MAPPING = {
     "Average_core_hours_per_spinor_per_config": lambda x: (
         ast.literal_eval(x) if x.strip() else x
     ),
+    "Average_overhead_core_hours_per_config": lambda x: (
+        ast.literal_eval(x) if x.strip() else x
+    ),
 }
 
 PARAMETERS_WITH_EXPONENTIAL_FORMAT = [

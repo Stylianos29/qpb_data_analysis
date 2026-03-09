@@ -86,6 +86,35 @@ def calculate_core_hours_statistics(group: h5py.Group) -> Optional[Tuple[float, 
     return (mean_value, sem_value)
 
 
+def calculate_overhead_core_hours_statistics(
+    group: h5py.Group,
+) -> Optional[Tuple[float, float]]:
+    """Calculate mean and SEM of overhead_core_hours for a group."""
+    dataset_name = "overhead_core_hours"
+
+    if dataset_name not in group:
+        return None
+
+    dataset = group[dataset_name]
+    if not isinstance(dataset, h5py.Dataset):
+        return None
+
+    overhead_array = dataset[:]
+    valid_values = overhead_array[~np.isnan(overhead_array)]
+
+    if len(valid_values) == 0:
+        return None
+
+    mean_value = float(np.mean(valid_values))
+    sem_value = (
+        float(np.std(valid_values, ddof=1) / np.sqrt(len(valid_values)))
+        if len(valid_values) > 1
+        else 0.0
+    )
+
+    return (mean_value, sem_value)
+
+
 def symmetrize_time_series(data: np.ndarray) -> np.ndarray:
     """
     Symmetrize time series data: C_sym(t) = 0.5 * (C(t) + C(T-t)).
@@ -662,6 +691,15 @@ def process_analysis_group(
             f"{core_hours_stats[0]:.4f} ± {core_hours_stats[1]:.4f}"
         )
 
+    # Calculate overhead core hours statistics if available
+    overhead_stats = calculate_overhead_core_hours_statistics(group)
+    if overhead_stats is not None:
+        result["average_overhead_core_hours_per_config"] = overhead_stats
+        logger.debug(
+            f"Group {group_name}: Overhead core hours per config = "
+            f"{overhead_stats[0]:.4f} ± {overhead_stats[1]:.4f}"
+        )
+
     # Add metadata
     group_metadata = extract_group_metadata(group)
     combined_metadata = {**parent_metadata, **group_metadata}
@@ -829,6 +867,12 @@ def export_to_csv(
         if "average_core_hours_per_spinor_per_config" in result:
             row_data["Average_core_hours_per_spinor_per_config"] = result[
                 "average_core_hours_per_spinor_per_config"
+            ]
+
+        # Add overhead core hours statistics if available
+        if "average_overhead_core_hours_per_config" in result:
+            row_data["Average_overhead_core_hours_per_config"] = result[
+                "average_overhead_core_hours_per_config"
             ]
 
         csv_data.append(row_data)
