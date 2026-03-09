@@ -1247,6 +1247,7 @@ class AnalysisCaseProcessor:
         # Apply case-specific calculations
         self._apply_mv_multiplication_calculations(analysis_case)
         self._apply_time_cost_calculations(analysis_case)
+        self._calculate_overhead_core_hours()
 
         return self.dataframe
 
@@ -1405,3 +1406,26 @@ class AnalysisCaseProcessor:
             self.logger.warning(
                 f"Cannot calculate {output_column}: {input_column} not found"
             )
+
+    def _calculate_overhead_core_hours(self) -> None:
+        """Calculate overhead cost in core-hours (no spinor division)."""
+        if "overhead_core_hours" not in TIME_COST_CALCULATIONS:
+            return
+
+        config = TIME_COST_CALCULATIONS["overhead_core_hours"]
+        required = config.get("required_columns", [])
+
+        for col in required:
+            if col not in self.dataframe.columns:
+                self.logger.debug(
+                    f"Skipping Overhead_core_hours: required column '{col}' not found"
+                )
+                return
+
+        output_column = config["output_column"]
+        self.dataframe[output_column] = (
+            self.dataframe["Total_overhead_time"]
+            * self.dataframe["Number_of_cores"]
+            / 3600
+        )
+        self.logger.info(f"Calculated {output_column}")

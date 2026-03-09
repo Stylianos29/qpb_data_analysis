@@ -322,6 +322,10 @@ TIME_COST_CALCULATIONS = {
             "output_column": "Average_core_hours_per_vector",
         },
     },
+    "overhead_core_hours": {
+        "output_column": "Overhead_core_hours",
+        "required_columns": ["Total_overhead_time", "Number_of_cores"],
+    },
 }
 
 # =============================================================================
