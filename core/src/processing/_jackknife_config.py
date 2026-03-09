@@ -162,6 +162,13 @@ DATASET_DESCRIPTIONS = {
         "gauge configuration in the jackknife group. Values are extracted from "
         "processed_parameter_values.csv (Stage 2A output)."
     ),
+    "overhead_core_hours": (
+        "Array of overhead cost values (core-hours) for each gauge "
+        "configuration in the jackknife group. Computed as "
+        "Total_overhead_time * Number_of_cores / 3600 per configuration. "
+        "Values are extracted from processed_parameter_values.csv "
+        "(Stage 2A output)."
+    ),
 }
 
 

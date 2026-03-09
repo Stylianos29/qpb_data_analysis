@@ -524,10 +524,40 @@ def main(
                 )
                 core_hours_values = None
 
+            # Extract overhead cost for each configuration in this group
+            overhead_core_hours_values = []
+
+            if "Overhead_core_hours" in group_df.columns:
+                for qpb_filename in qpb_filenames:
+                    csv_filename = qpb_filename
+                    if qpb_filename.endswith(".dat"):
+                        csv_filename = qpb_filename.replace(".dat", ".txt")
+
+                    matching_row = group_df[group_df["Filename"] == csv_filename]
+
+                    if not matching_row.empty:
+                        overhead = matching_row["Overhead_core_hours"].iloc[0]
+                        overhead_core_hours_values.append(
+                            float(overhead) if pd.notna(overhead) else np.nan
+                        )
+                    else:
+                        logger.debug(
+                            f"Could not find {csv_filename} in group_df "
+                            f"for overhead core hours extraction"
+                        )
+                        overhead_core_hours_values.append(np.nan)
+            else:
+                logger.debug(
+                    "No Overhead_core_hours column found in CSV - "
+                    "skipping overhead core hours extraction"
+                )
+                overhead_core_hours_values = None
+
             group_metadata = {
                 "configuration_labels": config_labels,
                 "qpb_filenames": qpb_filenames,
                 "core_hours_per_spinor": core_hours_values,  # May be None if not available
+                "overhead_core_hours": overhead_core_hours_values,  # May be None if not available
             }
 
             # === APPLY JACKKNIFE PROCESSING ===

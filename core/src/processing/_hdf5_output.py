@@ -638,6 +638,7 @@ def _store_metadata_arrays(
     # Numeric metadata arrays (optional but recommended)
     numeric_metadata = {
         "average_core_hours_per_spinor": "core_hours_per_spinor",
+        "overhead_core_hours": "overhead_core_hours",
     }
 
     stored_count = 0
