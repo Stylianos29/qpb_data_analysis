@@ -161,6 +161,8 @@ class PlotTitleBuilder:
 
             if "Kernel_operator_type" in col:
                 parts.append(f"{formatted_value} Kernel")
+            elif "Overlap_operator_method" in col:
+                parts.append(f"{formatted_value}")
             else:
                 parts.append(f"{label}={formatted_value}")
         return ", ".join(parts)
