@@ -218,6 +218,7 @@ class DataPlotter(DataFrameAnalyzer):
         is_inset: bool = False,
         save_figure: bool = True,
         file_format: Optional[str] = None,
+        include_combined_prefix: bool = False,
         verbose: bool = True,
     ) -> "DataPlotter":
         """
@@ -473,6 +474,7 @@ class DataPlotter(DataFrameAnalyzer):
                     group_keys=group_keys,
                     grouping_variable=grouping_variable,
                     file_format=file_format,
+                    include_combined_prefix=include_combined_prefix,
                 )
 
         return self
@@ -1096,6 +1098,7 @@ class DataPlotter(DataFrameAnalyzer):
         group_keys: Tuple[Any, ...],
         grouping_variable: Optional[Union[str, List[str]]],
         file_format: Optional[str] = None,
+        include_combined_prefix: bool = False,
     ) -> None:
         """Save the plot using file manager and filename builder."""
 
@@ -1111,7 +1114,9 @@ class DataPlotter(DataFrameAnalyzer):
             base_name=self.plots_base_name,
             multivalued_params=self.reduced_multivalued_tunable_parameter_names_list,
             grouping_variable=grouping_variable,
-            include_combined_prefix=(grouping_variable is not None),
+            include_combined_prefix=(
+                include_combined_prefix and grouping_variable is not None
+            ),
         )
 
         # Determine save directory
