@@ -26,4 +26,6 @@ output/*
 !output/plots/README.md
 !output/tables/README.md
 
+published_results/*/*
+
 notebooks/*

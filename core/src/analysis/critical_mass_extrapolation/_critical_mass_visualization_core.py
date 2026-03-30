@@ -88,7 +88,10 @@ def create_quadratic_fit_line(
 
 
 def calculate_plot_ranges(
-    plateau_data: pd.DataFrame, results_data: pd.Series, analysis_type: str
+    plateau_data: pd.DataFrame,
+    results_data: pd.Series,
+    analysis_type: str,
+    plateau_column_mapping: Dict[str, str],
 ) -> Tuple[Tuple[float, float], Tuple[float, float]]:
     """
     Calculate appropriate plot ranges including extrapolation.
@@ -98,30 +101,31 @@ def calculate_plot_ranges(
           values
         - results_data: Series containing critical mass results
         - analysis_type: Type of analysis ("pcac" or "pion")
+        - plateau_column_mapping: Dictionary mapping standard names to
+          CSV columns
 
     Returns:
         Tuple of (x_range, y_range) where each range is (min, max)
     """
-    bare_mass = plateau_data["Bare_mass"].to_numpy(dtype=float)
 
+    bare_mass = plateau_data["Bare_mass"].to_numpy(dtype=float)
     plateau_mass_power = get_plateau_mass_power(analysis_type)
 
-    # Get plateau mass column (still hard-coded for functions using
-    # analysis_type)
-    if analysis_type == "pcac":
-        plateau_mass = plateau_data["PCAC_plateau_mean"].to_numpy(dtype=float)
-    else:
-        plateau_mass = plateau_data["pion_plateau_mean"].to_numpy(dtype=float)
+    # Read the tuple column instead of the old separate mean column
+    plateau_col = plateau_column_mapping["plateau"]
+    plateau_tuples = plateau_data[plateau_col].tolist()
+    plateau_mass = np.array([v[0] for v in plateau_tuples], dtype=float)
 
-    # Apply power transformation to match calculation
     plateau_mass_transformed = plateau_mass**plateau_mass_power
 
-    # X-range: extend beyond data to show extrapolation
-    x_min = min(bare_mass.min(), results_data["critical_mass_mean"] * 1.2)
+    # Read critical_mass from tuple instead of old "critical_mass_mean" column
+    critical_mass_tuple = results_data[OUTPUT_COLUMN_NAMES["critical_mass"]]
+    critical_mass_mean = critical_mass_tuple[0]
+
+    x_min = min(bare_mass.min(), critical_mass_mean * 1.2)
     x_max = max(bare_mass.max(), 0.0) * 1.1
     x_range = (x_min, x_max)
 
-    # Y-range: include zero and some margin
     y_min = min(plateau_mass_transformed.min() * 1.1, -0.01)
     y_max = plateau_mass_transformed.max() * 1.1
     y_range = (y_min, y_max)
@@ -584,7 +588,9 @@ def create_critical_mass_plot(
     )
 
     # Calculate plot ranges
-    x_range, _ = calculate_plot_ranges(plateau_data, results_data, analysis_type)
+    x_range, _ = calculate_plot_ranges(
+        plateau_data, results_data, analysis_type, plateau_column_mapping
+    )
 
     # LINEAR FIT
     #############
