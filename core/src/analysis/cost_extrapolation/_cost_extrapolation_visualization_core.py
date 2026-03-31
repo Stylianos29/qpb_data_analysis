@@ -165,8 +165,7 @@ def load_and_validate_mass_data(
     col_mapping = get_mass_data_column_mapping(analysis_type)
     required_cols = [
         col_mapping["bare_mass"],
-        col_mapping["mass_mean"],
-        col_mapping["mass_error"],
+        col_mapping["mass"],
     ]
 
     missing = [col for col in required_cols if col not in df.columns]
@@ -454,14 +453,14 @@ def create_mass_fit_plot(
     mass_col_mapping = get_mass_data_column_mapping(analysis_type=analysis_type)
 
     # Determine mass columns and power based on analysis type
-    mass_mean_col = analysis_cfg["mass_column_mean"]
-    mass_error_col = analysis_cfg["mass_column_error"]
+    mass_col = analysis_cfg["mass_column"]
+    mass_tuples = mass_df[mass_col].tolist()
     mass_power = analysis_cfg["mass_power"]
 
     # Extract data
     x_data = mass_df[mass_col_mapping["bare_mass"]].values
-    y_mean = mass_df[mass_mean_col].values
-    y_error = mass_df[mass_error_col].values
+    y_mean = np.array([v[0] for v in mass_tuples])
+    y_error = np.array([v[1] for v in mass_tuples])
 
     # Apply power transformation
     y_data = y_mean**mass_power

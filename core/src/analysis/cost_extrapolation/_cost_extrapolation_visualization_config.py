@@ -191,8 +191,7 @@ FIT_LINE_EXTENSION = {
 
 ANALYSIS_CONFIG = {
     "pcac": {
-        "mass_column_mean": "PCAC_plateau_mean",
-        "mass_column_error": "PCAC_plateau_error",
+        "mass_column": "Plateau_PCAC_mass",
         "mass_power": 1,  # PCAC mass to power 1
         "mass_label": "PCAC Mass",
         "plot_title_prefix": "PCAC Cost Extrapolation",
@@ -200,8 +199,7 @@ ANALYSIS_CONFIG = {
         "fit_color": "red",
     },
     "pion": {
-        "mass_column_mean": "pion_plateau_mean",
-        "mass_column_error": "pion_plateau_error",
+        "mass_column": "Plateau_pion_mass",
         "mass_power": 2,  # Pion mass squared
         "mass_label": r"$m_\pi^2$",
         "plot_title_prefix": "Pion Cost Extrapolation",
@@ -286,8 +284,7 @@ RESULTS_COLUMN_MAPPING = {
     # Derived quantities
     "derived_bare_mass_mean": "derived_bare_mass_mean",
     "derived_bare_mass_error": "derived_bare_mass_error",
-    "extrapolated_cost_mean": "extrapolated_cost_mean",
-    "extrapolated_cost_error": "extrapolated_cost_error",
+    "extrapolated_cost": "extrapolated_cost",
 }
 
 # Column mappings for mass data CSV (plateau estimates)
@@ -465,8 +462,7 @@ def get_mass_data_column_mapping(analysis_type: str) -> Dict[str, str]:
     analysis_cfg = get_analysis_config(analysis_type)
 
     mapping = MASS_DATA_COLUMN_MAPPING.copy()
-    mapping["mass_mean"] = analysis_cfg["mass_column_mean"]
-    mapping["mass_error"] = analysis_cfg["mass_column_error"]
+    mapping["mass"] = analysis_cfg["mass_column"]
 
     return mapping
 
@@ -522,8 +518,7 @@ def validate_visualization_config():
 
         cfg = ANALYSIS_CONFIG[analysis_type]
         required_keys = [
-            "mass_column_mean",
-            "mass_column_error",
+            "mass_column",
             "mass_power",
             "mass_label",
         ]
