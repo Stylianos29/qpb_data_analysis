@@ -743,7 +743,7 @@ def load_and_average_cost_data(cost_csv_path: str, logger) -> pd.DataFrame:
             result.update(analyzer.unique_value_columns_dictionary)
             result["Bare_mass"] = bare_mass
             result["cost_mean"] = mean_cost
-            result["cost_error"] = error_cost if not pd.isna(error_cost) else 0.0
+            result["cost_error"] = error_cost
             result["n_configurations"] = n_configs
 
             results.append(result)
