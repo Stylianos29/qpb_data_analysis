@@ -471,12 +471,19 @@ def fit_mass_vs_bare_mass(
         quality = _calculate_fit_quality(fit, x_data, y_transformed)
 
         logger.info(
-            f"    Fit quality: R²={quality['r_squared']:.3f}, χ²/dof={quality['chi2_reduced']:.3f}, Q={quality['q_value']:.3f}"
+            f"    Fit quality: R²={quality['r_squared']:.3f}, "
+            f"χ²/dof={quality['chi2_reduced']:.3f}, Q={quality['q_value']:.3f}"
         )
+
+        # Calculate critical bare mass (x-intercept)
+        critical_bare_mass = -fit.p["intercept"] / fit.p["slope"]
+
+        logger.info(f"    Critical bare mass (x-intercept): {critical_bare_mass}")
 
         return {
             "slope": fit.p["slope"],
             "intercept": fit.p["intercept"],
+            "critical_bare_mass": critical_bare_mass,
             "r_squared": quality["r_squared"],
             "chi2_reduced": quality["chi2_reduced"],
             "q_value": quality["q_value"],
@@ -562,6 +569,12 @@ def _build_mass_conversion_result(
     result["mass_fit_chi2_reduced"] = fit_result["chi2_reduced"]
     result["mass_fit_q_value"] = fit_result["q_value"]
     result["n_bare_mass_points"] = fit_result["n_points"]
+
+    # Add critical bare mass as tuple
+    result["Critical_bare_mass"] = (
+        float(gv.mean(fit_result["critical_bare_mass"])),
+        float(gv.sdev(fit_result["critical_bare_mass"])),
+    )
 
     return result
 

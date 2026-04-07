@@ -268,6 +268,7 @@ RESULTS_COLUMN_MAPPING = {
         "r_squared": "mass_fit_r_squared",
         "chi2_reduced": "mass_fit_chi2_reduced",
         "q_value": "mass_fit_q_value",
+        "critical_bare_mass": "Critical_bare_mass",
     },
     # Cost fit results
     "cost_fit": {
