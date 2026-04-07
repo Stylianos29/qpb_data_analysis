@@ -35,6 +35,7 @@ from src.analysis.cost_extrapolation._cost_extrapolation_shared_config import (
     get_validation_config,
     get_cost_data_columns,
     get_csv_output_config,
+    get_output_excluded_columns,
 )
 
 # =============================================================================
@@ -860,7 +861,7 @@ def fit_and_extrapolate_cost(
 
         # Build result dictionary
         result = {
-            "extrapolated_cost": (
+            "Extrapolated_cost": (
                 float(gv.mean(extrapolated_cost)),
                 float(gv.sdev(extrapolated_cost)),
             ),
@@ -990,6 +991,11 @@ def export_cost_extrapolation_results(
 
     # Create a copy to avoid modifying original
     export_df = results_df.copy()
+
+    excluded_cols = get_output_excluded_columns()
+    export_df = export_df.drop(
+        columns=[c for c in excluded_cols if c in export_df.columns]
+    )
 
     # Format columns based on their type
     for col in export_df.columns:

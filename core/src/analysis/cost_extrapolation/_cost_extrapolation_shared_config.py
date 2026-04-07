@@ -144,12 +144,17 @@ OUTPUT_COLUMN_MAPPING = {
     "cost_fit_chi2_reduced": "cost_fit_chi2_reduced",
     "cost_fit_quality": "cost_fit_q_value",
     # Extrapolated cost at reference bare mass
-    "extrapolated_cost": "extrapolated_cost",
+    "extrapolated_cost": "Extrapolated_cost",
     # Data counts
     "n_bare_mass_points": "number_of_bare_mass_points",
     "n_configurations": "number_of_configurations_averaged",
 }
 
+# Columns to exclude from the output CSV (present in input data but
+# irrelevant at the cost extrapolation stage)
+OUTPUT_EXCLUDED_COLUMNS = [
+    "PCAC_estimation_method",
+]
 
 # =============================================================================
 # ERROR HANDLING CONFIGURATION
@@ -216,6 +221,11 @@ def get_csv_output_config() -> Dict[str, Any]:
 def get_output_column_mapping() -> Dict[str, str]:
     """Get output column name mapping."""
     return OUTPUT_COLUMN_MAPPING.copy()
+
+
+def get_output_excluded_columns() -> List[str]:
+    """Get list of columns to drop from the output CSV."""
+    return OUTPUT_EXCLUDED_COLUMNS.copy()
 
 
 def get_error_handling_config() -> Dict[str, Any]:

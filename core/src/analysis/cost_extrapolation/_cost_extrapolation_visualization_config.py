@@ -284,7 +284,7 @@ RESULTS_COLUMN_MAPPING = {
     # Derived quantities
     "derived_bare_mass_mean": "derived_bare_mass_mean",
     "derived_bare_mass_error": "derived_bare_mass_error",
-    "extrapolated_cost": "extrapolated_cost",
+    "extrapolated_cost": "Extrapolated_cost",
 }
 
 # Column mappings for mass data CSV (plateau estimates)
