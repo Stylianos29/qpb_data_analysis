@@ -48,7 +48,7 @@ CONVERTERS_MAPPING = {
     "Critical_bare_mass": lambda x: ast.literal_eval(x) if x.strip() else x,
     "quadratic_critical_mass": lambda x: ast.literal_eval(x) if x.strip() else x,
     "Absolute_critical_bare_mass": lambda x: ast.literal_eval(x) if x.strip() else x,
-    "extrapolated_cost": lambda x: ast.literal_eval(x) if x.strip() else x,
+    "Extrapolated_cost": lambda x: ast.literal_eval(x) if x.strip() else x,
     "Average_calculation_result": lambda x: safe_literal_eval(x) if x.strip() else x,
     "Average_sign_squared_values": lambda x: ast.literal_eval(x) if x.strip() else x,
     "Average_sign_squared_violation_values": lambda x: (

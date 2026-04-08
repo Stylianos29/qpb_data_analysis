@@ -106,6 +106,7 @@ AXES_LABELS_BY_COLUMN_NAME = {
     "Average_core_hours_per_spinor_per_config": (
         "Computational cost (core-hours/spinor/config)"
     ),
+    "Extrapolated_cost": ("Computational cost (core-hours/spinor/config)"),
     "Average_core_hours_per_vector": "Computational cost (core-hours/vector)",
     "Core_hours_for_constant_PCAC_mass": (
         "Computational cost (core-hours/spinor/config)"
