@@ -423,6 +423,7 @@ class PlotLayoutManager:
         yaxis_start_at_zero: bool = False,
         invert_xaxis: bool = False,
         invert_yaxis: bool = False,
+        apply_custom_function: Optional[Callable] = None,
     ) -> None:
         """
         Configure axes specifically for insets with simplified styling.
@@ -459,6 +460,10 @@ class PlotLayoutManager:
 
         # Configure font sizes for inset
         ax.tick_params(labelsize=font_size)
+
+        # Apply custom modifications if provided
+        if apply_custom_function is not None:
+            apply_custom_function(ax)
 
     def _setup_inset_labels(
         self,

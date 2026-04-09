@@ -337,6 +337,7 @@ class DataPlotter(DataFrameAnalyzer):
                     yaxis_start_at_zero=yaxis_start_at_zero,
                     invert_xaxis=invert_xaxis,
                     invert_yaxis=invert_yaxis,
+                    apply_custom_function=customization_function,
                 )
 
             # Prepare metadata for this group
