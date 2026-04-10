@@ -163,8 +163,10 @@ AXES_LABELS_BY_COLUMN_NAME = {
     "pion_effective_mass_jackknife_samples": "$a M_{\\pi}^{\\mathrm{eff}}(t)$",
     "pion_effective_mass": "$a M_{\\pi}^{\\mathrm{eff}}(t)$",
     "pion_plateau_mean": r"$a M_{\pi}$",
+    "Plateau_pion_mass": r"$a M_{\pi}$",
     "pion_plateau_error": r"$\sigma(a M_{\pi})$",
     "pion_mass_squared": r"$a^2 M^2_{\pi}$",
+    "Plateau_pion_mass_squared": r"$a^2 M^2_{\pi}$",
     # ---------------------------------------------------------------------------
     # Correlator observables
     # ---------------------------------------------------------------------------
