@@ -148,10 +148,11 @@ class PlotInsetManager:
                 # Try to infer from main axes or use same as main plot
                 yaxis_variable = self._infer_yaxis_variable(main_axes, temp_plotter)
 
-            # Set plot variables
-            temp_plotter.set_plot_variables(
-                xaxis_variable, yaxis_variable, clear_existing=False
-            )
+            # Set plot variables directly without creating subdirectory
+            # (insets don't save files, so no directory is needed)
+            temp_plotter.xaxis_variable_name = xaxis_variable
+            temp_plotter.yaxis_variable_name = yaxis_variable
+            temp_plotter.plots_base_name = f"{yaxis_variable}_Vs_{xaxis_variable}"
 
             # Check if we have multivalued parameters for grouping
             if not temp_plotter.list_of_multivalued_tunable_parameter_names:
