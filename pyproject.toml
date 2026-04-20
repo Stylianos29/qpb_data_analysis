@@ -3,7 +3,7 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "qpb_data_analysis"
+name = "qpb-data-tools"
 version = "0.1"
 description = "A Python project for data analysis and processing of qpb data."
 authors = [
@@ -41,8 +41,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Stylianos29/qpb_data_analysis"
-Repository = "https://github.com/Stylianos29/qpb_data_analysis"
+Homepage = "https://github.com/Stylianos29/qpb-data-tools"
+Repository = "https://github.com/Stylianos29/qpb-data-tools"
 
 [tool.setuptools.packages.find]
 where = ["core"]
