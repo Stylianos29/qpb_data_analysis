@@ -3,8 +3,7 @@
 bash_scripts/unit_tests/mock_data/*
 
 core/**/__pycache__/*
-core/qpb_data_analysis.egg-info/*
-core/qpb_data_tools.egg-info/*
+*.egg-info/
 core/tests/integration_tests/*/*
 core/tests/mock_data/golden_masters/*
 core/tests/mock_data/valid/*
