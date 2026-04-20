@@ -1,4 +1,4 @@
-# qpb_data_analysis
+# QPB-data-tools
 
 A Python-based toolkit for analyzing log files and data files generated
 by the 'qpb' project. This repository provides scripts for processing
@@ -21,8 +21,8 @@ This project requires the following system tools to be installed:
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/Stylianos29/qpb_data_analysis.git
-cd qpb_data_analysis
+git clone https://github.com/Stylianos29/qpb-data-tools.git
+cd qpb-data-tools
 ```
 
 ### 2. Set up your Python environment
@@ -68,7 +68,7 @@ pip install -e ".[dev]"
 ## Project Structure
 
 ```
-qpb_data_analysis/
+qpb-data-tools/
 ├── core/                   # Main Python package
 │   ├── library/           # Generic functions and classes (reusable utilities)
 │   ├── src/               # Analysis scripts and domain-specific modules
