@@ -208,6 +208,7 @@ AXES_LABELS_BY_COLUMN_NAME = {
     ),
     "Average_sign_squared_values": "||sgn$^2$(X)||$^2$",
     "Sign_squared_value_with_no_error": "||sgn$^2$(X)||$^2$",
+    # TODO: Subsbsript "ov." must become "ov." upperscript
     "Average_normality_values": (
         "||$aD_{ov.}^{\\dagger} aD_{ov.} - aD_{ov.} aD_{ov.}^{\\dagger}$||$^2$"
     ),
@@ -215,12 +216,12 @@ AXES_LABELS_BY_COLUMN_NAME = {
         "||$aD_{ov.}^{\\dagger} aD_{ov.} - aD_{ov.} aD_{ov.}^{\\dagger}$||$^2$"
     ),
     "Average_ginsparg_wilson_relation_values": (
-        "||$\\gamma_5 aD_{ov.} + aD_{ov.} \\gamma_5 "
-        "- aD_{ov.} \\gamma_5 aD_{ov.}$||$^2$"
+        "||$\\gamma_5 aD^{\\mathrm{ov}} + aD^{\\mathrm{ov}} \\gamma_5 "
+        "- aD^{\\mathrm{ov}} \\gamma_5 aD^{\\mathrm{ov}}$||$^2$"
     ),
     "Ginsparg_wilson_relation_with_no_error": (
-        "||$\\gamma_5 aD_{ov.} + aD_{ov.} \\gamma_5 "
-        "- aD_{ov.} \\gamma_5 aD_{ov.}$||$^2$"
+        "||$\\gamma_5 aD^{\\mathrm{ov}} + aD^{\\mathrm{ov}} \\gamma_5 "
+        "- aD^{\\mathrm{ov}} \\gamma_5 aD^{\\mathrm{ov}}$||$^2$"
     ),
     # ---------------------------------------------------------------------------
     # Time and order parameters
