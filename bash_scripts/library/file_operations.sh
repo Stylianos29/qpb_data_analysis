@@ -316,7 +316,7 @@ function get_display_path() {
     # the project base directory parent. This makes console output cleaner
     # and more readable.
     #
-    # The function searches for "qpb_data_analysis" in the path and returns
+    # The function searches for "qpb-data-tools" in the path and returns
     # everything from that point onwards. If the project directory is not
     # found in the path, returns the original path unchanged.
     #
@@ -329,10 +329,10 @@ function get_display_path() {
     #
     # Examples:
     #   # Long absolute path
-    #   long_path="/home/user/projects/qpb_data_analysis/data_files/raw/experiment1"
+    #   long_path="/home/user/projects/qpb-data-tools/data_files/raw/experiment1"
     #   short_path=$(get_display_path "$long_path")
     #   echo "$short_path"  
-    #   # Output: qpb_data_analysis/data_files/raw/experiment1
+    #   # Output: qpb-data-tools/data_files/raw/experiment1
     #
     #   # Path without project directory (returns unchanged)
     #   other_path="/tmp/some/other/path"
@@ -345,7 +345,7 @@ function get_display_path() {
     #   echo "Output: $(get_display_path "$output_directory")"
     
     local path="$1"
-    local project_dir="qpb_data_analysis"
+    local project_dir="qpb-data-tools"
     
     # Check if path contains the project directory
     if [[ "$path" == *"$project_dir"* ]]; then

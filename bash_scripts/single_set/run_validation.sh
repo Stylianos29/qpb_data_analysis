@@ -149,7 +149,7 @@ EXAMPLES:
   $SCRIPT_NAME -i ../raw/experiment1/ --disable-cache
 
 NOTES:
-  - Requires Python environment with qpb_data_analysis package
+  - Requires Python environment with qpb-data-tools package
   - Validation script path: ${VALIDATION_SCRIPT}
   - Uses library functions from: ${LIBRARY_SCRIPTS_DIRECTORY_PATH}
 

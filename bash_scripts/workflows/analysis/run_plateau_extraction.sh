@@ -64,7 +64,7 @@
 # - Python scripts: extract_plateau_PCAC_mass.py, extract_plateau_pion_mass.py,
 #                   visualize_plateau_extraction.py
 # - Library scripts in bash_scripts/library/
-# - Python environment with qpb_data_analysis package
+# - Python environment with qpb-data-tools package
 #
 # INPUT FILES:
 # - PCAC_mass_analysis.h5 (optional, from Stage 3.1)

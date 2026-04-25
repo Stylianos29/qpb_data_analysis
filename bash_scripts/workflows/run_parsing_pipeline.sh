@@ -57,7 +57,7 @@
 # DEPENDENCIES:
 # - Python scripts: parse_log_files.py, parse_correlator_files.py
 # - Library scripts in bash_scripts/library/
-# - Python environment with qpb_data_analysis package
+# - Python environment with qpb-data-tools package
 #
 # OUTPUT FILES:
 # - single_valued_parameters.csv     : Scalar parameters from log files

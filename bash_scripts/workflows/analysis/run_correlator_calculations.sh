@@ -61,7 +61,7 @@
 # - Python scripts: calculate_PCAC_mass.py, calculate_effective_mass.py,
 #                   visualize_correlator_analysis.py
 # - Library scripts in bash_scripts/library/
-# - Python environment with qpb_data_analysis package
+# - Python environment with qpb-data-tools package
 #
 # INPUT FILES:
 # - correlators_jackknife_analysis.h5 (REQUIRED)

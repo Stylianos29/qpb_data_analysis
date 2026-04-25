@@ -72,7 +72,7 @@
 #                   extrapolate_cost_from_pion.py,
 #                   visualize_cost_extrapolation_analysis.py
 # - Library scripts in bash_scripts/library/
-# - Python environment with qpb_data_analysis package
+# - Python environment with qpb-data-tools package
 #
 # INPUT FILES:
 # - plateau_PCAC_mass_estimates.csv (optional, from Stage 3.2)
