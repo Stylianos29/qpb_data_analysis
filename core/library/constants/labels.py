@@ -216,12 +216,14 @@ AXES_LABELS_BY_COLUMN_NAME = {
         "||$aD_{ov.}^{\\dagger} aD_{ov.} - aD_{ov.} aD_{ov.}^{\\dagger}$||$^2$"
     ),
     "Average_ginsparg_wilson_relation_values": (
-        "||$aD^{\\mathrm{ov}} \\gamma_5 + \\gamma_5 aD^{\\mathrm{ov}} "
-        "- aD^{\\mathrm{ov}} \\gamma_5 aD^{\\mathrm{ov}}$||$^2$"
+        "||($aD^{\\mathrm{ov}} \\gamma_5 + \\gamma_5 aD^{\\mathrm{ov}} "
+        "- aD^{\\mathrm{ov}} \\gamma_5 aD^{\\mathrm{ov}})\\eta$||$^2$"
+        "/||$\\eta$||$^2$"
     ),
     "Ginsparg_wilson_relation_with_no_error": (
-        "||$aD^{\\mathrm{ov}} \\gamma_5 + \\gamma_5 aD^{\\mathrm{ov}} "
-        "- aD^{\\mathrm{ov}} \\gamma_5 aD^{\\mathrm{ov}}$||$^2$"
+        "||($aD^{\\mathrm{ov}} \\gamma_5 + \\gamma_5 aD^{\\mathrm{ov}} "
+        "- aD^{\\mathrm{ov}} \\gamma_5 aD^{\\mathrm{ov}})\\eta$||$^2$"
+        "/||$\\eta$||$^2$"
     ),
     # ---------------------------------------------------------------------------
     # Time and order parameters
