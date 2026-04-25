@@ -1,7 +1,7 @@
 # Data Concepts and HDF5 Structure
 
 This document explains the fundamental concepts used throughout the
-`qpb_data_analysis` library: tunable parameters, output quantities, and
+`qpb-data-tools` library: tunable parameters, output quantities, and
 how they relate to the HDF5 file hierarchy.
 
 ## Table of Contents
@@ -15,7 +15,7 @@ how they relate to the HDF5 file hierarchy.
 
 ## Overview
 
-The `qpb_data_analysis` library is designed to analyze data from Lattice
+The `qpb-data-tools` library is designed to analyze data from Lattice
 QCD simulations, particularly lattice QCD calculations using overlap
 fermions. The data analysis revolves around three key concepts:
 
@@ -316,7 +316,7 @@ plotter.plot(grouping_variable='Configuration_label')
 
 Understanding the relationship between tunable parameters, output
 quantities, and the HDF5 hierarchy is crucial for effective use of the
-`qpb_data_analysis` library. This organization enables:
+`qpb-data-tools` library. This organization enables:
 
 - **Scalable analysis** of large parameter spaces
 - **Efficient data access** through hierarchical organization

@@ -1,5 +1,5 @@
 """
-Flexible Click validation callbacks for qpb_data_analysis
+Flexible Click validation callbacks for qpb-data-tools
 
 This module provides a clean, minimal API for Click option validation
 with both convenience functions and configurable validators.

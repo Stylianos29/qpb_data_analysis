@@ -1,4 +1,4 @@
-# Organizing Data Files for `qpb_data_analysis`
+# Organizing Data Files for `qpb-data-tools`
 
 This guide provides detailed suggestions for organizing the `data_files/raw` and
 `data_files/processed` directories to ensure consistency, ease of access, and
@@ -68,7 +68,7 @@ data_files/raw/sign_squared_violation/KL_several_vectors_varying_configs_and_n/
 ## Guidelines for `data_files/processed`
 
 1. **Purpose**: Store files generated after processing raw data using the
-`qpb_data_analysis` scripts.
+`qpb-data-tools` scripts.
 
 2. **Recommended File Types**:
 - `.csv`: Data tables suitable for analysis in spreadsheet software or further

@@ -1,7 +1,7 @@
 # Project Structure Documentation
 
 This document provides a comprehensive overview of the
-`qpb_data_analysis` project structure, explaining the purpose and
+`qpb-data-tools` project structure, explaining the purpose and
 organization of each directory.
 
 ## Overview
@@ -10,7 +10,7 @@ The project follows a modular architecture that separates data
 processing, analysis, and presentation into distinct components:
 
 ```
-qpb_data_analysis/
+qpb-data-tools/
 ├── core/                   # Main Python package
 ├── bash_scripts/          # Processing pipeline automation
 ├── data_files/            # Data storage (raw and processed)
