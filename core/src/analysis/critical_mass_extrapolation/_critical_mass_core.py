@@ -98,6 +98,22 @@ def calculate_total_core_hours(df: pd.DataFrame) -> Optional[float]:
     return float((avg_means * n_spinors * n_configs).sum())
 
 
+def calculate_total_n_configs(df: pd.DataFrame) -> Optional[int]:
+    """
+    Compute the total number of gauge field configurations across the
+    rows of `df`:
+
+        total = Σ_i  Number_of_gauge_configurations_i
+
+    The input column name comes from COST_COMPUTATION_COLUMNS in the
+    shared config. Returns None if the column is absent.
+    """
+    col = COST_COMPUTATION_COLUMNS["n_configs"]
+    if col not in df.columns:
+        return None
+    return int(df[col].astype(int).sum())
+
+
 # =============================================================================
 # FITTING RANGE FUNCTIONS
 # =============================================================================
@@ -421,6 +437,7 @@ def calculate_critical_mass_for_group(
         return None
 
     _total_core_hours = calculate_total_core_hours(linear_df)
+    _total_n_configs = calculate_total_n_configs(linear_df)
 
     # Build core results dictionary
     result = {
@@ -440,6 +457,9 @@ def calculate_critical_mass_for_group(
         "fit_range_max": linear_max,
         OUTPUT_COLUMN_NAMES["total_core_hours"]: (
             np.nan if _total_core_hours is None else _total_core_hours
+        ),
+        OUTPUT_COLUMN_NAMES["total_n_configs"]: (
+            np.nan if _total_n_configs is None else _total_n_configs
         ),
     }
 

@@ -59,6 +59,7 @@ OUTPUT_COLUMN_NAMES = {
     "chi2_reduced": "chi2_reduced",
     "fit_quality": "fit_quality",
     "total_core_hours": "Total_core_hours",
+    "total_n_configs": "Total_number_of_configs",
     # Quadratic fit results (when enabled)
     "quadratic_a_mean": "quadratic_a_mean",
     "quadratic_a_error": "quadratic_a_error",
