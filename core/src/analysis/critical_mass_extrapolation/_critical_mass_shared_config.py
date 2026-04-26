@@ -35,6 +35,17 @@ PHYSICAL_VALIDATION = {
     "require_negative_slope": False,  # Whether slope must be negative
 }
 
+# Input columns required to compute the total computational cost
+# (Total_core_hours) for a parameter group. These are inherited by the
+# plateau CSV from the Stage 2A processed parameters CSV. If any of
+# these columns is missing in the input, the total cost is recorded
+# as NaN rather than failing the analysis.
+COST_COMPUTATION_COLUMNS = {
+    "avg_core_hours": "Average_core_hours_per_spinor_per_config",
+    "n_spinors": "Number_of_spinors",
+    "n_configs": "Number_of_gauge_configurations",
+}
+
 # Output CSV column names
 OUTPUT_COLUMN_NAMES = {
     # Linear fit results
@@ -47,6 +58,7 @@ OUTPUT_COLUMN_NAMES = {
     "r_squared": "r_squared",
     "chi2_reduced": "chi2_reduced",
     "fit_quality": "fit_quality",
+    "total_core_hours": "Total_core_hours",
     # Quadratic fit results (when enabled)
     "quadratic_a_mean": "quadratic_a_mean",
     "quadratic_a_error": "quadratic_a_error",

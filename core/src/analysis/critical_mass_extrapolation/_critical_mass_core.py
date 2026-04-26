@@ -20,6 +20,7 @@ from src.analysis.critical_mass_extrapolation._critical_mass_shared_config impor
     GROUPING_EXCLUDED_PARAMETERS,
     OUTPUT_COLUMN_NAMES,
     FILTERING_PARAMETERS,
+    COST_COMPUTATION_COLUMNS,
 )
 
 # Get the minimum data points from config
@@ -65,6 +66,36 @@ def safe_divide(
     with np.errstate(divide="ignore", invalid="ignore"):
         result = np.where(denominator != 0, numerator / denominator, default)
     return result
+
+
+def calculate_total_core_hours(df: pd.DataFrame) -> Optional[float]:
+    """
+    Compute total computational cost (core-hours) over the rows of `df`.
+
+    Formula:
+        total = Σ_i  avg_core_hours_per_spinor_per_config_i
+                     × Number_of_spinors_i ×
+                     Number_of_gauge_configurations_i
+
+    Input column names come from COST_COMPUTATION_COLUMNS in the shared
+    config. `Average_core_hours_per_spinor_per_config` may be stored
+    either as a plain float or as a (mean, error) tuple (it goes through
+    `ast.literal_eval` on load); only the mean is used here. Returns
+    None if any required column is absent — the caller decides whether
+    that's a hard error or just a NaN in the output.
+    """
+    cols = COST_COMPUTATION_COLUMNS
+    if any(c not in df.columns for c in cols.values()):
+        return None
+
+    def _mean_value(v):
+        return v[0] if isinstance(v, (tuple, list)) else v
+
+    avg_means = df[cols["avg_core_hours"]].apply(_mean_value).astype(float)
+    n_spinors = df[cols["n_spinors"]].astype(float)
+    n_configs = df[cols["n_configs"]].astype(float)
+
+    return float((avg_means * n_spinors * n_configs).sum())
 
 
 # =============================================================================
@@ -389,6 +420,8 @@ def calculate_critical_mass_for_group(
     if critical_mass is None:
         return None
 
+    _total_core_hours = calculate_total_core_hours(linear_df)
+
     # Build core results dictionary
     result = {
         OUTPUT_COLUMN_NAMES["critical_mass"]: (
@@ -405,6 +438,9 @@ def calculate_critical_mass_for_group(
         OUTPUT_COLUMN_NAMES["fit_quality"]: quality_metrics["Q"],
         "fit_range_min": linear_min,
         "fit_range_max": linear_max,
+        OUTPUT_COLUMN_NAMES["total_core_hours"]: (
+            np.nan if _total_core_hours is None else _total_core_hours
+        ),
     }
 
     # === QUADRATIC FIT ===
