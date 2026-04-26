@@ -22,6 +22,11 @@ from ..managers.annotation_manager import PlotAnnotationManager
 from ..specialized.curve_fitter import CurveFitter
 from ..specialized.inset_manager import PlotInsetManager
 
+# Convenience alias so users can write either {SKIP_FIGURE: True} or
+# {"skip_figure": True} in per_figure_overrides return values to skip a
+# figure entirely.
+SKIP_FIGURE = "skip_figure"
+
 
 class DataPlotter(DataFrameAnalyzer):
     """
@@ -45,6 +50,27 @@ class DataPlotter(DataFrameAnalyzer):
     This design provides better separation of concerns, easier testing,
     and improved maintainability compared to the monolithic original.
     """
+
+    # Keys that may NOT appear in a per_figure_overrides() return value.
+    # Two reasons a key lives here:
+    # - it governs the outer-grouping iteration, which is already fixed
+    #   by the time per-figure overrides are evaluated;
+    # - it's a per-call rendering-context flag that would be incoherent
+    #  to vary across figures from the same plot() call.
+    _STRUCTURAL_OVERRIDE_KEYS = frozenset(
+        {
+            # (a) Govern outer iteration / data subsetting:
+            "grouping_variable",
+            "excluded_from_grouping_list",
+            "styling_variable",
+            # (b) Per-call rendering context, not per-figure:
+            "target_ax",
+            "is_inset",
+            "verbose",
+            # The override callback itself, to prevent recursion:
+            "per_figure_overrides",
+        }
+    )
 
     def __init__(self, dataframe: pd.DataFrame, plots_directory: str):
         """
@@ -194,6 +220,9 @@ class DataPlotter(DataFrameAnalyzer):
         customization_function: Optional[Callable[[Axes], None]] = None,
         post_plot_customization_function: Optional[Callable[..., None]] = None,
         include_interpolation: bool = False,
+        per_figure_overrides: Optional[
+            Callable[[Dict[str, Any]], Optional[Dict[str, Any]]]
+        ] = None,
         # Curve fitting
         fit_function: Optional[str] = None,
         fit_label_format: str = ".2f",
@@ -232,26 +261,54 @@ class DataPlotter(DataFrameAnalyzer):
         Key Parameters:
         ---------------
         file_format : str, optional
-            Output file format for saved plots. If None, uses the default format
-            set in the file manager (default: "png"). Supported formats include:
-            "png", "pdf", "svg", "eps", "jpg", "tiff", "ps".
+            Output file format for saved plots. If None, uses the
+            default format set in the file manager (default: "png").
+            Supported formats include: "png", "pdf", "svg", "eps",
+            "jpg", "tiff", "ps".
+
             Examples: "pdf", "svg", "png"
 
         target_ax : matplotlib.axes.Axes, optional
-            If provided, plot on this existing axes instead of creating new figure.
+            If provided, plot on this existing axes instead of creating
+            new figure.
 
         save_figure : bool, optional
             Whether to save the figure to disk. Default is True.
 
         show_xaxis_label : bool, optional
-            Whether to display the x-axis label. Default is True.
-            Useful for insets where axis labels might be redundant.
+            Whether to display the x-axis label. Default is True. Useful
+            for insets where axis labels might be redundant.
         show_yaxis_label : bool, optional
-            Whether to display the y-axis label. Default is True.
-            Useful for insets where axis labels might be redundant.
+            Whether to display the y-axis label. Default is True. Useful
+            for insets where axis labels might be redundant.
         fit_min_data_points : int, optional
-            Minimum number of data points required for curve fitting.
-            If None, uses function-specific defaults from CurveFitter.
+            Minimum number of data points required for curve fitting. If
+            None, uses function-specific defaults from CurveFitter.
+        per_figure_overrides : Callable[[dict], dict | None], optional
+            Function that customizes plot kwargs per figure. Called once
+            per outer-grouping figure, receives that figure's metadata
+            dict (the same one used for titles and post-plot
+            customization), and returns a dict of kwarg overrides
+            layered on top of the values passed to plot(). Returning an
+            empty dict (or None) means "no overrides for this figure".
+            Returning a dict containing {"skip_figure": True} (or
+            {SKIP_FIGURE: True}) skips that figure entirely without
+            saving it.
+
+            Cannot override structural keys (see
+            _STRUCTURAL_OVERRIDE_KEYS) — those govern outer iteration or
+            per-call rendering context and must be set at the plot()
+            call site.
+
+            Example:
+                def styles(meta):
+                    if meta.get("Kernel_operator_type") == "Brillouin":
+                        return {"color_index_shift": 6, "empty_markers":
+                        True}
+                    return {"color_index_shift": -1}
+
+                plotter.plot(grouping_variable="...",
+                             per_figure_overrides=styles)
 
         Returns:
         --------
@@ -260,18 +317,6 @@ class DataPlotter(DataFrameAnalyzer):
         """
         if self.xaxis_variable_name is None or self.yaxis_variable_name is None:
             raise ValueError("Call 'set_plot_variables()' before plotting.")
-
-        # Handle alternate filled markers
-        if alternate_filled_markers:
-            empty_markers = False  # Override user setting
-
-        # Convert fit_index_range to slice for internal use
-        fit_slice: Optional[slice] = None
-        if fit_index_range:
-            if not isinstance(fit_index_range, tuple) or len(fit_index_range) != 2:
-                raise ValueError("fit_index_range must be a tuple like (start, stop)")
-            # fit_index_range = slice(*fit_index_range)
-            fit_slice = slice(*fit_index_range)
 
         # Prepare grouping configuration
         grouping_config = self._prepare_grouping_configuration(
@@ -288,8 +333,202 @@ class DataPlotter(DataFrameAnalyzer):
         self._last_plot_figures = {}
         self._last_plot_paths = {}
 
+        # Snapshot of every plot-time kwarg that may be overridden
+        # per-figure. Structural and per-call keys (target_ax, is_inset,
+        # verbose, grouping_variable, excluded_from_grouping_list,
+        # styling_variable, per_figure_overrides) are intentionally
+        # excluded — see _STRUCTURAL_OVERRIDE_KEYS.
+        base_plot_kwargs: Dict[str, Any] = {
+            # Grouping / data (overrideable subset only)
+            "labeling_variable": labeling_variable,
+            "sorting_variable": sorting_variable,
+            "sort_ascending": sort_ascending,
+            # Figure / layout
+            "figure_size": figure_size,
+            "font_size": font_size,
+            "left_margin_adjustment": left_margin_adjustment,
+            "right_margin_adjustment": right_margin_adjustment,
+            "bottom_margin_adjustment": bottom_margin_adjustment,
+            "top_margin_adjustment": top_margin_adjustment,
+            # Axes
+            "xaxis_label": xaxis_label,
+            "yaxis_label": yaxis_label,
+            "show_xaxis_label": show_xaxis_label,
+            "show_yaxis_label": show_yaxis_label,
+            "xaxis_log_scale": xaxis_log_scale,
+            "yaxis_log_scale": yaxis_log_scale,
+            "invert_xaxis": invert_xaxis,
+            "invert_yaxis": invert_yaxis,
+            "xlim": xlim,
+            "ylim": ylim,
+            "xaxis_start_at_zero": xaxis_start_at_zero,
+            "yaxis_start_at_zero": yaxis_start_at_zero,
+            # Styling
+            "marker_color_map": marker_color_map,
+            "color_index_shift": color_index_shift,
+            "marker_size": marker_size,
+            "empty_markers": empty_markers,
+            "alternate_filled_markers": alternate_filled_markers,
+            "alternate_filled_markers_reversed": alternate_filled_markers_reversed,
+            "capsize": capsize,
+            # Legend
+            "include_legend": include_legend,
+            "legend_location": legend_location,
+            "legend_columns": legend_columns,
+            "include_legend_title": include_legend_title,
+            "legend_number_format": legend_number_format,
+            # Titles
+            "include_plot_title": include_plot_title,
+            "custom_plot_title": custom_plot_title,
+            "title_from_columns": title_from_columns,
+            "custom_plot_titles_dict": custom_plot_titles_dict,
+            "title_size": title_size,
+            "bold_title": bold_title,
+            "leading_plot_substring": leading_plot_substring,
+            "excluded_from_title_list": excluded_from_title_list,
+            "title_number_format": title_number_format,
+            "title_exponential_format": title_exponential_format,
+            "title_wrapping_length": title_wrapping_length,
+            # Advanced
+            "customization_function": customization_function,
+            "post_plot_customization_function": post_plot_customization_function,
+            "include_interpolation": include_interpolation,
+            # Curve fitting
+            "fit_function": fit_function,
+            "fit_label_format": fit_label_format,
+            "show_fit_parameters_on_plot": show_fit_parameters_on_plot,
+            "fit_curve_style": fit_curve_style,
+            "fit_label_location": fit_label_location,
+            "fit_index_range": fit_index_range,
+            "fit_on_values": fit_on_values,
+            "fit_label_in_legend": fit_label_in_legend,
+            "fit_curve_range": fit_curve_range,
+            "fit_min_data_points": fit_min_data_points,
+            # Annotations
+            "annotation_variable": annotation_variable,
+            "annotation_label": annotation_label,
+            "annotation_range": annotation_range,
+            "annotation_fontsize": annotation_fontsize,
+            "annotation_boxstyle": annotation_boxstyle,
+            "annotation_alpha": annotation_alpha,
+            "annotation_offset": annotation_offset,
+            # Output (overrideable subset)
+            "save_figure": save_figure,
+            "file_format": file_format,
+            "include_combined_prefix": include_combined_prefix,
+        }
+
         # Process each group
         for group_keys, group_df in grouped:
+
+            # Extract metadata first — moved up from after the axes
+            # configuration so that per-figure overrides can see it.
+            metadata = self._extract_group_metadata(group_keys, group_df)
+
+            # Resolve per-figure overrides into the effective kwargs
+            # for this iteration. None means "skip this figure".
+            eff = self._resolve_per_figure_overrides(
+                per_figure_overrides, metadata, base_plot_kwargs
+            )
+            if eff is None:
+                continue
+
+            # Rebind every overrideable plot-time kwarg from `eff`,
+            # so the unchanged loop body below sees the per-figure
+            # values. Structural / per-call kwargs are NOT rebound
+            # and retain their function-arg values throughout.
+            #
+            # Grouping / data
+            labeling_variable = eff["labeling_variable"]
+            sorting_variable = eff["sorting_variable"]
+            sort_ascending = eff["sort_ascending"]
+            # Figure / layout
+            figure_size = eff["figure_size"]
+            font_size = eff["font_size"]
+            left_margin_adjustment = eff["left_margin_adjustment"]
+            right_margin_adjustment = eff["right_margin_adjustment"]
+            bottom_margin_adjustment = eff["bottom_margin_adjustment"]
+            top_margin_adjustment = eff["top_margin_adjustment"]
+            # Axes
+            xaxis_label = eff["xaxis_label"]
+            yaxis_label = eff["yaxis_label"]
+            show_xaxis_label = eff["show_xaxis_label"]
+            show_yaxis_label = eff["show_yaxis_label"]
+            xaxis_log_scale = eff["xaxis_log_scale"]
+            yaxis_log_scale = eff["yaxis_log_scale"]
+            invert_xaxis = eff["invert_xaxis"]
+            invert_yaxis = eff["invert_yaxis"]
+            xlim = eff["xlim"]
+            ylim = eff["ylim"]
+            xaxis_start_at_zero = eff["xaxis_start_at_zero"]
+            yaxis_start_at_zero = eff["yaxis_start_at_zero"]
+            # Styling
+            marker_color_map = eff["marker_color_map"]
+            color_index_shift = eff["color_index_shift"]
+            marker_size = eff["marker_size"]
+            empty_markers = eff["empty_markers"]
+            alternate_filled_markers = eff["alternate_filled_markers"]
+            alternate_filled_markers_reversed = eff["alternate_filled_markers_reversed"]
+            capsize = eff["capsize"]
+            # Legend
+            include_legend = eff["include_legend"]
+            legend_location = eff["legend_location"]
+            legend_columns = eff["legend_columns"]
+            include_legend_title = eff["include_legend_title"]
+            legend_number_format = eff["legend_number_format"]
+            # Titles
+            include_plot_title = eff["include_plot_title"]
+            custom_plot_title = eff["custom_plot_title"]
+            title_from_columns = eff["title_from_columns"]
+            custom_plot_titles_dict = eff["custom_plot_titles_dict"]
+            title_size = eff["title_size"]
+            bold_title = eff["bold_title"]
+            leading_plot_substring = eff["leading_plot_substring"]
+            excluded_from_title_list = eff["excluded_from_title_list"]
+            title_number_format = eff["title_number_format"]
+            title_exponential_format = eff["title_exponential_format"]
+            title_wrapping_length = eff["title_wrapping_length"]
+            # Advanced
+            customization_function = eff["customization_function"]
+            post_plot_customization_function = eff["post_plot_customization_function"]
+            include_interpolation = eff["include_interpolation"]
+            # Curve fitting
+            fit_function = eff["fit_function"]
+            fit_label_format = eff["fit_label_format"]
+            show_fit_parameters_on_plot = eff["show_fit_parameters_on_plot"]
+            fit_curve_style = eff["fit_curve_style"]
+            fit_label_location = eff["fit_label_location"]
+            fit_index_range = eff["fit_index_range"]
+            fit_on_values = eff["fit_on_values"]
+            fit_label_in_legend = eff["fit_label_in_legend"]
+            fit_curve_range = eff["fit_curve_range"]
+            fit_min_data_points = eff["fit_min_data_points"]
+            # Annotations
+            annotation_variable = eff["annotation_variable"]
+            annotation_label = eff["annotation_label"]
+            annotation_range = eff["annotation_range"]
+            annotation_fontsize = eff["annotation_fontsize"]
+            annotation_boxstyle = eff["annotation_boxstyle"]
+            annotation_alpha = eff["annotation_alpha"]
+            annotation_offset = eff["annotation_offset"]
+            # Output
+            save_figure = eff["save_figure"]
+            file_format = eff["file_format"]
+            include_combined_prefix = eff["include_combined_prefix"]
+
+            # Re-apply the two pre-loop transformations now that the
+            # underlying values may have changed for this figure.
+            if alternate_filled_markers:
+                empty_markers = False  # alternate flag wins
+
+            fit_slice: Optional[slice] = None
+            if fit_index_range is not None:
+                if not isinstance(fit_index_range, tuple) or len(fit_index_range) != 2:
+                    raise ValueError(
+                        "fit_index_range must be a tuple like (start, stop)"
+                    )
+                fit_slice = slice(*fit_index_range)
+
             # Create or use provided figure/axes
             if target_ax is None:
                 fig, ax = self.layout_manager.create_figure(figure_size)
@@ -340,8 +579,8 @@ class DataPlotter(DataFrameAnalyzer):
                     apply_custom_function=customization_function,
                 )
 
-            # Prepare metadata for this group
-            metadata = self._extract_group_metadata(group_keys, group_df)
+            # # Prepare metadata for this group
+            # metadata = self._extract_group_metadata(group_keys, group_df)
 
             if grouping_variable:
                 # Handle grouped plotting
@@ -740,6 +979,79 @@ class DataPlotter(DataFrameAnalyzer):
                     metadata[special] = unique_vals[0]
 
         return metadata
+
+    def _resolve_per_figure_overrides(
+        self,
+        callback: Optional[Callable[[Dict[str, Any]], Optional[Dict[str, Any]]]],
+        metadata: Dict[str, Any],
+        base_kwargs: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Evaluate the per_figure_overrides callable for one figure and
+        return the effective kwargs dict for that figure, or None to
+        signal that the figure should be skipped.
+
+        Args:
+            - callback: User-supplied function (metadata) -> dict|None,
+              or None if no callback was given.
+            - metadata: Metadata dict for the current figure, as built
+              by _extract_group_metadata.
+            - base_kwargs: The plot()-level kwargs that act as the
+              defaults to layer overrides on top of.
+
+        Returns:
+            - dict: The effective kwargs to use for this figure.
+            - None: The user signaled skip via {"skip_figure": True}.
+
+        Raises:
+            - TypeError: callback returned a non-dict, non-None value.
+            - ValueError: callback returned a dict containing a
+              structurally-forbidden key.
+            - RuntimeError: callback itself raised an exception
+              (re-raised with figure context for easier debugging).
+        """
+        if callback is None:
+            return base_kwargs
+
+        try:
+            overrides = callback(metadata)
+        except Exception as exc:
+            raise RuntimeError(
+                f"per_figure_overrides callable raised "
+                f"{type(exc).__name__} for figure with metadata "
+                f"{metadata}: {exc}"
+            ) from exc
+
+        # Forgiving: None means "no overrides for this figure".
+        # The skip signal is the explicit {"skip_figure": True} key.
+        if overrides is None:
+            return base_kwargs
+
+        if not isinstance(overrides, dict):
+            raise TypeError(
+                f"per_figure_overrides must return a dict or None, "
+                f"got {type(overrides).__name__} for figure with "
+                f"metadata {metadata}."
+            )
+
+        # Skip signal takes precedence over everything else.
+        if overrides.get(SKIP_FIGURE, False):
+            return None
+
+        # Reject structural keys with a clear, actionable error.
+        forbidden = set(overrides) & self._STRUCTURAL_OVERRIDE_KEYS
+        if forbidden:
+            raise ValueError(
+                f"per_figure_overrides cannot override structural "
+                f"keys {sorted(forbidden)} (figure metadata: "
+                f"{metadata}). These govern outer-grouping iteration "
+                f"and must be set at the plot() call site."
+            )
+
+        # Drop the skip flag (it might be present and False) before
+        # layering, then merge: overrides win over base.
+        clean = {k: v for k, v in overrides.items() if k != SKIP_FIGURE}
+        return {**base_kwargs, **clean}
 
     def _create_grouped_plot(self, ax: Axes, group_df: pd.DataFrame, **kwargs) -> None:
         """Create a plot with grouped data series."""
