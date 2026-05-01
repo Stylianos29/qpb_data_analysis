@@ -1039,12 +1039,10 @@ input_dir_name="$(basename "$input_directory")"
 if [[ -n "$filter_config" ]]; then
     if [[ ! -f "$filter_config" ]]; then
         echo "ERROR: Filter config file not found: $filter_config" >&2
-        log_error "Filter config file not found: $filter_config"
         exit 1
     fi
     filter_config="$(realpath "$filter_config")"
     echo "INFO: Filter configuration will be applied: $(get_display_path "$filter_config")"
-    log_info "Filter configuration: $filter_config"
 fi
 
 # Set default output directory if not specified
@@ -1122,6 +1120,9 @@ fi
 
 log_info "Input directory: $input_directory"
 log_info "Output directory: $output_directory"
+if [[ -n "$filter_config" ]]; then
+    log_info "Filter configuration: $filter_config"
+fi
 if [[ -n "$plots_directory" ]]; then
     log_info "Plots directory: $plots_directory (visualization enabled)"
 else
